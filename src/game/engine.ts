@@ -12,6 +12,7 @@ import {
   RECIPE_CATALOG,
   TASK_CATALOG,
 } from './catalog';
+import { getMarketQuote } from './market';
 
 export type GameErrorCode =
   | 'invalid-input'
@@ -26,6 +27,7 @@ export type GameErrorCode =
   | 'already-owned'
   | 'auction-lost'
   | 'storage-limit'
+  | 'market-limit'
   | 'already-claimed'
   | 'condition-not-met';
 
@@ -376,12 +378,15 @@ export function sellProduct(profile: PlayerProfile, productId: string, quantity:
   if (!isPositiveInteger(quantity)) return failure(profile, 'invalid-input', 'الكمية يجب أن تكون عددًا صحيحًا موجبًا.');
   const lot = profile.inventory.find((item) => item.materialOrProductId === productId);
   if (!lot || lot.quantity < quantity) return failure(profile, 'insufficient-materials', 'لا تملك هذه الكمية من المنتج.');
-  const grossRevenue = quantity * product.baseSellPrice;
+  const marketQuote = getMarketQuote(profile, productId);
+  if (!marketQuote) return failure(profile, 'not-found', 'لا يوجد عرض سوق لهذا المنتج اليوم.');
+  if (quantity > marketQuote.demandUnits) return failure(profile, 'market-limit', `الطلب المتاح اليوم ${marketQuote.demandUnits} وحدة فقط؛ خفّض الكمية أو انتظر يومًا آخر.`);
+  const grossRevenue = quantity * marketQuote.currentPrice;
   const taxRate = findCountry(profile.countryId)?.economy.taxRate ?? 0;
   const tax = Math.round(grossRevenue * taxRate);
   const costOfGoods = Math.round(lot.unitCost * quantity);
   const nextInventory = profile.inventory.map((item) => item.materialOrProductId === productId ? { ...item, quantity: item.quantity - quantity } : item).filter((item) => item.quantity > 0);
-  const sale = { id: nextId(profile, 'sale', profile.sales.length), productId, quantity, unitPrice: product.baseSellPrice, grossRevenue, tax, soldAt: timestampFor(profile) };
+  const sale = { id: nextId(profile, 'sale', profile.sales.length), productId, quantity, unitPrice: marketQuote.currentPrice, grossRevenue, tax, soldAt: timestampFor(profile) };
   const nextProfile = addLedger(
     { ...profile, inventory: nextInventory, sales: [...profile.sales, sale] },
     [
@@ -391,7 +396,7 @@ export function sellProduct(profile: PlayerProfile, productId: string, quantity:
     ],
     profile.bankBalance + grossRevenue - tax,
   );
-  return success(syncTasks(nextProfile), `تم بيع ${quantity} من ${product.name} بعد احتساب الضريبة وتكلفة المخزون.`, { productId, quantity, grossRevenue, tax, costOfGoods, netRevenue: grossRevenue - tax - costOfGoods });
+  return success(syncTasks(nextProfile), `تم بيع ${quantity} من ${product.name} بسعر سوق ${marketQuote.currentPrice.toLocaleString('ar-EG')} ج.م للوحدة بعد احتساب الضريبة والتكلفة.`, { productId, quantity, grossRevenue, tax, costOfGoods, netRevenue: grossRevenue - tax - costOfGoods });
 }
 
 const GOLD_SELL_SPREAD_RATE = 0.03;
