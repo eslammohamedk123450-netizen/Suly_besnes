@@ -61,12 +61,14 @@ function isCompany(value: unknown): value is PlayerCompany {
     && (value.licenseIds === undefined || (Array.isArray(value.licenseIds) && value.licenseIds.every(isNonEmptyString)))
     && (value.energyUnits === undefined || isFiniteNonNegative(value.energyUnits))
     && (value.energyCapacity === undefined || isFiniteNonNegative(value.energyCapacity))
-    && (value.operatingCostPerDay === undefined || isFiniteNonNegative(value.operatingCostPerDay));
+    && (value.operatingCostPerDay === undefined || isFiniteNonNegative(value.operatingCostPerDay))
+    && (value.maintenanceCondition === undefined || (isFiniteNonNegative(value.maintenanceCondition) && value.maintenanceCondition <= 100));
 }
 
 function isInventoryLot(value: unknown): value is InventoryLot {
   return isRecord(value) && isNonEmptyString(value.id) && isNonEmptyString(value.materialOrProductId)
-    && isFiniteNonNegative(value.quantity) && isNonEmptyString(value.unit) && isFiniteNonNegative(value.unitCost);
+    && isFiniteNonNegative(value.quantity) && isNonEmptyString(value.unit) && isFiniteNonNegative(value.unitCost)
+    && (value.qualityScore === undefined || (isFiniteNonNegative(value.qualityScore) && value.qualityScore <= 100));
 }
 
 function isLicense(value: unknown): value is LicenseRecord {
@@ -113,7 +115,9 @@ function isProductionOrder(value: unknown): value is ProductionOrder {
   return isRecord(value) && isNonEmptyString(value.id) && isNonEmptyString(value.companyId) && isNonEmptyString(value.productId)
     && isNonEmptyString(value.productName) && Number.isInteger(value.batches) && (value.batches as number) > 0
     && Number.isInteger(value.outputQuantity) && (value.outputQuantity as number) > 0 && isNonEmptyString(value.outputUnit)
-    && isFiniteNonNegative(value.materialCost) && isFiniteNonNegative(value.energyCost)
+    && isFiniteNonNegative(value.materialCost) && isFiniteNonNegative(value.energyCost) && isFiniteNonNegative(value.expectedUnitCost)
+    && isFiniteNonNegative(value.demandForecast) && value.demandForecast <= 1_000_000 && isFiniteNonNegative(value.qualityScore) && value.qualityScore <= 100
+    && isFiniteNonNegative(value.maintenanceCost)
     && Number.isInteger(value.startedOnDay) && (value.startedOnDay as number) >= 1
     && Number.isInteger(value.completesOnDay) && (value.completesOnDay as number) >= (value.startedOnDay as number)
     && (value.status === 'active' || value.status === 'completed' || value.status === 'cancelled');
@@ -195,6 +199,7 @@ function migrateProfile(value: unknown): PlayerProfile | null {
       operatingCostPerDay: isFiniteNonNegative(company.operatingCostPerDay) && company.operatingCostPerDay > 0
         ? company.operatingCostPerDay
         : industry?.dailyOperatingCost ?? 0,
+      maintenanceCondition: isFiniteNonNegative(company.maintenanceCondition) ? Math.min(100, company.maintenanceCondition) : 100,
     };
     const explicitLand = normalizedCompany.landId ? lands.find((land) => land.id === normalizedCompany.landId && !assignedLandIds.has(land.id)) : undefined;
     const linkedLand = explicitLand ?? (!normalizedCompany.landId ? lands.find((land) => !assignedLandIds.has(land.id)) : undefined);

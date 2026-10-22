@@ -30,6 +30,8 @@ export type GameErrorCode =
   | 'market-limit'
   | 'collateral-in-use'
   | 'deposit-not-mature'
+  | 'factory-maintenance'
+  | 'production-not-cancellable'
   | 'already-claimed'
   | 'condition-not-met';
 
@@ -340,6 +342,8 @@ export function runProduction(profile: PlayerProfile, companyId: string, batches
   if (!company) return failure(profile, 'not-found', 'الشركة غير موجودة.');
   const recipe = findRecipeForIndustry(company.industryId);
   if (!recipe) return failure(profile, 'not-found', 'لا توجد وصفة لهذا القطاع.');
+  const maintenanceCondition = company.maintenanceCondition ?? 100;
+  if (maintenanceCondition < 25) return failure(profile, 'factory-maintenance', 'المصنع متعطل ويحتاج إلى صيانة قبل بدء أمر جديد.');
   const energyAvailable = company.energyUnits ?? 0;
   if (energyAvailable < batches * recipe.energyUnits) return failure(profile, 'insufficient-energy', 'الطاقة المتاحة لا تكفي لهذه الدفعات.');
   for (const input of recipe.inputs) {
@@ -347,7 +351,8 @@ export function runProduction(profile: PlayerProfile, companyId: string, batches
     if (!lot || lot.quantity < input.quantity * batches) return failure(profile, 'insufficient-materials', 'المواد الخام لا تكفي لهذه الدفعات.');
   }
   const energyCost = batches * recipe.energyCost;
-  if (profile.bankBalance < energyCost) return failure(profile, 'insufficient-funds', 'لا يكفي الرصيد لتكلفة تشغيل الطاقة.');
+  const maintenanceCost = Math.round((company.operatingCostPerDay ?? 0) * 0.15);
+  if (profile.bankBalance < energyCost + maintenanceCost) return failure(profile, 'insufficient-funds', 'لا يكفي الرصيد لتكلفة الطاقة والصيانة لهذا الأمر.');
   const materialCost = recipe.inputs.reduce((sum, input) => {
     const lot = profile.inventory.find((item) => item.materialOrProductId === input.materialId);
     return sum + input.quantity * batches * (lot?.unitCost ?? 0);
@@ -359,14 +364,46 @@ export function runProduction(profile: PlayerProfile, companyId: string, batches
   }).filter((lot) => lot.quantity > 0);
   const outputQuantity = batches * recipe.outputQuantity;
   const companies = profile.companies.map((item) => item.id === companyId ? { ...item, energyUnits: energyAvailable - batches * recipe.energyUnits } : item);
-  const durationDays = Math.min(3, Math.max(1, Math.ceil(batches / 3)));
-  const order: ProductionOrder = { id: nextId(profile, 'production', profile.productionOrders.length), companyId, productId: recipe.productId, productName: recipe.productName, batches, outputQuantity, outputUnit: recipe.outputUnit, materialCost, energyCost, startedOnDay: profile.day, completesOnDay: profile.day + durationDays, status: 'active' };
+  const hasManager = profile.staff.some((member) => member.status === 'active' && member.role === 'manager' && member.companyId === companyId);
+  const durationDays = Math.min(3, Math.max(1, Math.ceil(batches / 3) - (hasManager ? 1 : 0)));
+  const marketForecast = getMarketQuote(profile, recipe.productId, profile.day + durationDays);
+  const qualityScore = Math.max(70, Math.min(100, 86 + (hasManager ? 10 : 0) - (maintenanceCondition < 60 ? 10 : 0)));
+  const expectedUnitCost = (materialCost + energyCost + maintenanceCost) / outputQuantity;
+  const nextMaintenanceCondition = Math.max(0, maintenanceCondition - Math.max(8, Math.ceil(batches / 2)));
+  const order: ProductionOrder = { id: nextId(profile, 'production', profile.productionOrders.length), companyId, productId: recipe.productId, productName: recipe.productName, batches, outputQuantity, outputUnit: recipe.outputUnit, materialCost, energyCost, expectedUnitCost, demandForecast: marketForecast?.demandUnits ?? 0, qualityScore, maintenanceCost, startedOnDay: profile.day, completesOnDay: profile.day + durationDays, status: 'active' };
+  const companiesWithMaintenance = companies.map((item) => item.id === companyId ? { ...item, maintenanceCondition: nextMaintenanceCondition } : item);
   const nextProfile = addLedger(
-    { ...profile, inventory, companies, productionOrders: [...profile.productionOrders, order] },
-    [ledgerEntry(profile, 'expense', energyCost, `حجز طاقة لأمر إنتاج ${recipe.productName}`, 0), ledgerEntry(profile, 'asset', materialCost, `حجز مواد لأمر إنتاج ${recipe.productName}`, 1)],
-    profile.bankBalance - energyCost,
+    { ...profile, inventory, companies: companiesWithMaintenance, productionOrders: [...profile.productionOrders, order] },
+    [ledgerEntry(profile, 'expense', energyCost, `حجز طاقة لأمر إنتاج ${recipe.productName}`, 0), ledgerEntry(profile, 'expense', maintenanceCost, `صيانة وقائية لأمر إنتاج ${recipe.productName}`, 1), ledgerEntry(profile, 'asset', materialCost, `حجز مواد لأمر إنتاج ${recipe.productName}`, 2)],
+    profile.bankBalance - energyCost - maintenanceCost,
   );
   return success(syncTasks(nextProfile), `بدأ أمر إنتاج ${recipe.productName} ويكتمل في اليوم ${order.completesOnDay}.`, { orderId: order.id, companyId, productId: recipe.productId, batches, outputQuantity, completesOnDay: order.completesOnDay });
+}
+
+export function serviceCompany(profile: PlayerProfile, companyId: string): GameResult<{ companyId: string; cost: number }> {
+  const company = profile.companies.find((item) => item.id === companyId);
+  if (!company) return failure(profile, 'not-found', 'الشركة غير موجودة.');
+  const cost = Math.max(5_000, Math.round((company.operatingCostPerDay ?? 0) * 0.4));
+  if (profile.bankBalance < cost) return failure(profile, 'insufficient-funds', 'لا يكفي الرصيد لإجراء صيانة المصنع.');
+  const nextProfile = addLedger(
+    { ...profile, companies: profile.companies.map((item) => item.id === companyId ? { ...item, maintenanceCondition: 100 } : item) },
+    [ledgerEntry(profile, 'expense', cost, `صيانة كاملة للمصنع: ${company.name}`, 0)],
+    profile.bankBalance - cost,
+  );
+  return success(nextProfile, `تمت صيانة ${company.name} وعادت كفاءة المصنع إلى 100%.`, { companyId, cost });
+}
+
+export function cancelProductionOrder(profile: PlayerProfile, orderId: string): GameResult<{ orderId: string; refund: number }> {
+  const order = profile.productionOrders.find((item) => item.id === orderId);
+  if (!order) return failure(profile, 'not-found', 'أمر الإنتاج غير موجود.');
+  if (order.status !== 'active') return failure(profile, 'production-not-cancellable', 'لا يمكن إلغاء أمر مكتمل أو ملغى.');
+  const refund = Math.round(order.materialCost * 0.7);
+  const nextProfile = addLedger(
+    { ...profile, productionOrders: profile.productionOrders.map((item) => item.id === orderId ? { ...item, status: 'cancelled' as const } : item) },
+    [ledgerEntry(profile, 'settlement', refund, `استرداد 70% من حجز أمر الإنتاج ${order.productName}`, 0)],
+    profile.bankBalance + refund,
+  );
+  return success(nextProfile, `تم إلغاء الأمر واسترداد ${refund.toLocaleString('ar-EG')} ج.م من الحجز.`, { orderId, refund });
 }
 
 export function sellProduct(profile: PlayerProfile, productId: string, quantity: number): GameResult<SaleOutcome> {
@@ -380,7 +417,8 @@ export function sellProduct(profile: PlayerProfile, productId: string, quantity:
   const marketQuote = getMarketQuote(profile, productId);
   if (!marketQuote) return failure(profile, 'not-found', 'لا يوجد عرض سوق لهذا المنتج اليوم.');
   if (quantity > marketQuote.demandUnits) return failure(profile, 'market-limit', `الطلب المتاح اليوم ${marketQuote.demandUnits} وحدة فقط؛ خفّض الكمية أو انتظر يومًا آخر.`);
-  const grossRevenue = quantity * marketQuote.currentPrice;
+  const qualityMultiplier = lot.qualityScore === undefined ? 1 : 0.85 + lot.qualityScore / 100 * 0.15;
+  const grossRevenue = Math.round(quantity * marketQuote.currentPrice * qualityMultiplier);
   const hasAccountant = profile.staff.some((member) => member.status === 'active' && member.role === 'accountant');
   const taxRate = (findCountry(profile.countryId)?.economy.taxRate ?? 0) * (hasAccountant ? 0.9 : 1);
   const tax = Math.round(grossRevenue * taxRate);
@@ -632,9 +670,9 @@ export function advanceDay(profile: PlayerProfile): GameResult<DayOutcome> {
     const existingLot = inventory.find((lot) => lot.materialOrProductId === order.productId);
     inventory = existingLot
       ? inventory.map((lot) => lot.materialOrProductId === order.productId
-        ? { ...lot, quantity: lot.quantity + order.outputQuantity, unitCost: (lot.quantity * lot.unitCost + order.outputQuantity * unitCost) / (lot.quantity + order.outputQuantity) }
+        ? { ...lot, quantity: lot.quantity + order.outputQuantity, unitCost: (lot.quantity * lot.unitCost + order.outputQuantity * unitCost) / (lot.quantity + order.outputQuantity), qualityScore: ((lot.qualityScore ?? 90) * lot.quantity + order.qualityScore * order.outputQuantity) / (lot.quantity + order.outputQuantity) }
         : lot)
-      : [...inventory, { id: nextId(profile, 'inventory', inventory.length), materialOrProductId: order.productId, quantity: order.outputQuantity, unit: order.outputUnit, unitCost }];
+      : [...inventory, { id: nextId(profile, 'inventory', inventory.length), materialOrProductId: order.productId, quantity: order.outputQuantity, unit: order.outputUnit, unitCost, qualityScore: order.qualityScore }];
     entries.push(ledgerEntry(profile, 'asset', order.materialCost, `اكتمل أمر إنتاج ${order.productName}`, entries.length));
     return { ...order, status: 'completed' as const };
   });

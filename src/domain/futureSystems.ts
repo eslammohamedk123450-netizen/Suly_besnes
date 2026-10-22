@@ -48,6 +48,7 @@ export interface InventoryLot {
   quantity: number;
   unit: string;
   unitCost: number;
+  qualityScore?: number;
 }
 
 export interface ProductSale {
@@ -128,6 +129,10 @@ export interface ProductionOrder {
   outputUnit: string;
   materialCost: number;
   energyCost: number;
+  expectedUnitCost: number;
+  demandForecast: number;
+  qualityScore: number;
+  maintenanceCost: number;
   startedOnDay: number;
   completesOnDay: number;
   status: 'active' | 'completed' | 'cancelled';

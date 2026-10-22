@@ -40,6 +40,7 @@ export interface PlayerCompany {
   energyUnits?: number;
   energyCapacity?: number;
   operatingCostPerDay?: number;
+  maintenanceCondition?: number;
 }
 
 export interface PlayerProfile {
