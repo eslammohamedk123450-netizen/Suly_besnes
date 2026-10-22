@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Brand } from './components/Brand';
 import { CountrySelection } from './components/CountrySelection';
+import { DailyBriefing } from './components/DailyBriefing';
 import { Dashboard } from './components/Dashboard';
 import { Icon } from './components/Icon';
 import { NoticeToast } from './components/NoticeToast';
@@ -11,7 +12,7 @@ import { GAME_SECTIONS, getSection, type SectionId } from './domain/navigation';
 import { createNewPlayer } from './domain/player';
 import type { PlayerProfile } from './domain/player';
 import { formatMoney } from './domain/formatters';
-import { advanceDay, type GameResult } from './game/engine';
+import { advanceDay, getDayBriefing, type DayBriefing, type DayOutcome, type GameResult } from './game/engine';
 import { loadSavedGame, saveGame } from './storage/saveRepository';
 import { loadNotificationTheme, saveNotificationTheme } from './storage/userPreferences';
 
@@ -24,6 +25,8 @@ export default function App() {
   const [notificationTheme, setNotificationTheme] = useState(loadNotificationTheme);
   const [notice, setNotice] = useState('');
   const [noticeTone, setNoticeTone] = useState<'success' | 'error'>('success');
+  const [dayBriefing, setDayBriefing] = useState<DayBriefing | null>(null);
+  const [dayOutcome, setDayOutcome] = useState<DayOutcome | null>(null);
 
   const country = findCountry(profile?.countryId ?? selectedCountryId) ?? COUNTRIES[0];
   const active = getSection(activeSection);
@@ -67,6 +70,34 @@ export default function App() {
   function runGameAction(action: (current: PlayerProfile) => GameResult<unknown>) {
     if (!profile) return;
     handleGameResult(action(profile));
+  }
+
+  function openDayBriefing() {
+    if (!profile) return;
+    setDayOutcome(null);
+    setDayBriefing(getDayBriefing(profile));
+  }
+
+  function closeDayBriefing() {
+    setDayBriefing(null);
+    setDayOutcome(null);
+  }
+
+  function confirmDay() {
+    if (!profile) return;
+    const result = advanceDay(profile);
+    if (!result.ok) {
+      handleGameResult(result);
+      closeDayBriefing();
+      return;
+    }
+    const saved = saveGame(result.profile);
+    const settledAmount = Math.max(0, profile.payables - result.profile.payables);
+    const settlementNote = settledAmount > 0 ? ` وُجّه ${formatMoney(settledAmount, country)} لسداد التزامات سابقة.` : '';
+    setProfile(result.profile);
+    setDayOutcome(result.data);
+    setNotice(saved.ok ? `${result.message}${settlementNote}` : `${result.message}${settlementNote} تعذر تثبيت الحفظ على هذا الجهاز.`);
+    setNoticeTone(saved.ok ? 'success' : 'error');
   }
 
   function navigate(section: SectionId) {
@@ -118,9 +149,9 @@ export default function App() {
 
         <main className="main-content">
           {activeSection === 'home' ? (
-            <Dashboard profile={profile} country={country} onNavigate={navigate} onAdvanceDay={() => runGameAction(advanceDay)} />
+            <Dashboard profile={profile} country={country} onNavigate={navigate} onAdvanceDay={openDayBriefing} />
           ) : (
-            <SectionPage section={active} profile={profile} country={country} notificationTheme={notificationTheme} onNotificationThemeChange={setNotificationTheme} onHome={() => navigate('home')} onAction={handleGameResult} />
+            <SectionPage section={active} profile={profile} country={country} notificationTheme={notificationTheme} onNotificationThemeChange={setNotificationTheme} onHome={() => navigate('home')} onAdvanceDay={openDayBriefing} onAction={handleGameResult} />
           )}
         </main>
       </div>
@@ -141,6 +172,7 @@ export default function App() {
       </div>}
 
       {notice && <NoticeToast message={notice} tone={noticeTone} theme={notificationTheme} onDismiss={() => setNotice('')} />}
+      {dayBriefing && <DailyBriefing profile={profile} country={country} briefing={dayBriefing} outcome={dayOutcome} onConfirm={confirmDay} onClose={closeDayBriefing} />}
       <footer className="app-footer"><span>إمبراطورية الأعمال</span><span>محاكاة محلية · الأسعار والأحداث لأغراض اللعبة</span></footer>
     </div>
   );

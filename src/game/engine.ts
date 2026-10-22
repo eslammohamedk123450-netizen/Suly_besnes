@@ -64,6 +64,15 @@ export interface DayOutcome {
   investmentPayout: number;
   event: GameEventRecord;
 }
+export interface DayBriefing {
+  day: number;
+  operatingCost: number;
+  existingPayables: number;
+  maturingInvestments: readonly { id: string; name: string }[];
+  event: { title: string; cashImpact: number };
+  availableEnergy: number;
+  energyPaused: boolean;
+}
 
 export interface InvestmentOutcome {
   investmentId: string;
@@ -431,6 +440,23 @@ export function sellGold(profile: PlayerProfile, grams: number): GameResult<Gold
   return success(nextProfile, `بعت ${grams.toFixed(1)} غرام ذهب بسعر محاكاة بعد فارق تداول 3%.`, { grams, cashAmount: proceeds, pricePerGram: GOLD_PRICE_PER_GRAM });
 }
 
+export function getDayBriefing(profile: PlayerProfile): DayBriefing {
+  const day = profile.day + 1;
+  const multiplier = findCountry(profile.countryId)?.economy.operatingCostMultiplier ?? 1;
+  const operatingCost = profile.companies.reduce((sum, company) => sum + (company.operatingCostPerDay ?? 0), 0) * multiplier;
+  const maturingInvestments = profile.investments
+    .filter((investment) => investment.status === 'active' && investment.maturityDay <= day)
+    .map((investment) => ({ id: investment.id, name: findInvestment(investment.investmentTypeId)?.name ?? investment.investmentTypeId }));
+  const eventTemplates = [
+    { title: 'طلب محلي مرتفع', cashImpact: 18_000 },
+    { title: 'ارتفاع لوجستي مؤقت', cashImpact: -14_000 },
+    { title: 'يوم استقرار اقتصادي', cashImpact: 0 },
+  ];
+  const event = eventTemplates[(day - 1) % eventTemplates.length];
+  const availableEnergy = profile.companies.reduce((sum, company) => sum + (company.energyUnits ?? 0), 0);
+  return { day, operatingCost, existingPayables: profile.payables, maturingInvestments, event, availableEnergy, energyPaused: profile.payables > 0 };
+}
+
 export function createInvestment(profile: PlayerProfile, investmentId: string, amount: number): GameResult<InvestmentOutcome> {
   const countryError = ensureEgypt(profile);
   if (countryError) return countryError;
@@ -458,10 +484,10 @@ export function createInvestment(profile: PlayerProfile, investmentId: string, a
 export function advanceDay(profile: PlayerProfile): GameResult<DayOutcome> {
   const countryError = ensureEgypt(profile);
   if (countryError) return countryError;
-  const nextDay = profile.day + 1;
+  const briefing = getDayBriefing(profile);
+  const nextDay = briefing.day;
   const now = timestampFor({ ...profile, day: nextDay });
-  const multiplier = findCountry(profile.countryId)?.economy.operatingCostMultiplier ?? 1;
-  const operatingCost = profile.companies.reduce((sum, company) => sum + (company.operatingCostPerDay ?? 0) * multiplier, 0);
+  const operatingCost = briefing.operatingCost;
   const entries: FinanceLedgerEntry[] = [];
   let balance = profile.bankBalance;
   let payables = profile.payables;
@@ -496,23 +522,16 @@ export function advanceDay(profile: PlayerProfile): GameResult<DayOutcome> {
     return { ...investment, status: hadLoss ? 'loss' as const : 'paid' as const, settledAmount: payout };
   });
 
-  const eventIndex = (nextDay - 1) % 3;
-  const eventTemplates = [
-    { id: 'event-demand', title: 'طلب محلي مرتفع', cashImpact: 18_000 },
-    { id: 'event-logistics', title: 'ارتفاع لوجستي مؤقت', cashImpact: -14_000 },
-    { id: 'event-steady', title: 'يوم استقرار اقتصادي', cashImpact: 0 },
-  ];
-  const template = eventTemplates[eventIndex];
-  let eventImpact = template.cashImpact;
-  if (template.cashImpact > 0) {
-    balance += template.cashImpact;
-    entries.push(ledgerEntry(profile, 'revenue', template.cashImpact, template.title, entries.length));
-  } else if (template.cashImpact < 0) {
-    const eventCost = Math.abs(template.cashImpact);
+  let eventImpact = briefing.event.cashImpact;
+  if (briefing.event.cashImpact > 0) {
+    balance += briefing.event.cashImpact;
+    entries.push(ledgerEntry(profile, 'revenue', briefing.event.cashImpact, briefing.event.title, entries.length));
+  } else if (briefing.event.cashImpact < 0) {
+    const eventCost = Math.abs(briefing.event.cashImpact);
     const paidEventCost = Math.min(balance, eventCost);
     balance -= paidEventCost;
     eventImpact = -paidEventCost;
-    entries.push(ledgerEntry(profile, 'expense', eventCost, template.title, entries.length));
+    entries.push(ledgerEntry(profile, 'expense', eventCost, briefing.event.title, entries.length));
     if (paidEventCost < eventCost) {
       const unpaidEventCost = eventCost - paidEventCost;
       payables += unpaidEventCost;
@@ -532,7 +551,7 @@ export function advanceDay(profile: PlayerProfile): GameResult<DayOutcome> {
     const supply = industry?.dailyEnergySupply ?? capacity;
     return { ...company, energyUnits: energyPaused ? 0 : Math.min(capacity, (company.energyUnits ?? 0) + supply) };
   });
-  const event: GameEventRecord = { id: `event-${nextDay}`, day: nextDay, title: template.title, cashImpact: eventImpact, occurredAt: now };
+  const event: GameEventRecord = { id: `event-${nextDay}`, day: nextDay, title: briefing.event.title, cashImpact: eventImpact, occurredAt: now };
   const nextProfile = addLedger(
     { ...profile, day: nextDay, companies, investments, events: [...profile.events, event], payables },
     entries,

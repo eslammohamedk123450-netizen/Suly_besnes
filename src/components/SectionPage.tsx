@@ -17,13 +17,14 @@ interface SectionPageProps {
   notificationTheme: NotificationTheme;
   onNotificationThemeChange: (theme: NotificationTheme) => void;
   onHome: () => void;
+  onAdvanceDay: () => void;
   onAction: (result: GameResult<unknown>) => void;
 }
 
 const landTypeNames = { industrial: 'صناعية', agricultural: 'زراعية', commercial: 'تجارية' } as const;
 const ledgerLabels = { revenue: 'إيراد', expense: 'مصروف', asset: 'أصل', liability: 'التزام', settlement: 'سداد التزام' } as const;
 
-export function SectionPage({ section, profile, country, notificationTheme, onNotificationThemeChange, onHome, onAction }: SectionPageProps) {
+export function SectionPage({ section, profile, country, notificationTheme, onNotificationThemeChange, onHome, onAdvanceDay, onAction }: SectionPageProps) {
   const [bidAmounts, setBidAmounts] = useState<Record<string, string>>({});
   const [companyName, setCompanyName] = useState('شركة جديدة');
   const [industryId, setIndustryId] = useState<IndustryId>('food');
@@ -39,7 +40,7 @@ export function SectionPage({ section, profile, country, notificationTheme, onNo
   const balanceLabel = `الرصيد ${formatMoney(profile.bankBalance, country)}`;
   const run = (action: (current: PlayerProfile) => GameResult<unknown>) => onAction(action(profile));
   const pageShell = (children: ReactNode) => (
-    <EconomyPageShell dayLabel={dayLabel} balanceLabel={balanceLabel} onAdvanceDay={() => run(advanceDay)}>
+    <EconomyPageShell dayLabel={dayLabel} balanceLabel={balanceLabel} onAdvanceDay={onAdvanceDay}>
       {children}
     </EconomyPageShell>
   );
@@ -127,7 +128,7 @@ export function SectionPage({ section, profile, country, notificationTheme, onNo
       <>
         <div className="economy-grid economy-grid--three-mobile"><EconomyStat label="قطع الأراضي" value={formatNumber(profile.lands.length)} /><EconomyStat label="أراضٍ مرتبطة بشركات" value={formatNumber(usedLandIds.size)} /><EconomyStat label="القيمة الدفترية" value={formatMoney(totalLandValue, country)} /></div>
         <EconomyPanel title="أراضي الإمبراطورية" description="تُسجل قيمة الشراء ضمن أصولك، ويمكن تخصيص كل أرض لشركة واحدة.">
-          {profile.lands.length === 0 ? <div className="economy-list"><EconomyEmpty title="ابدأ بشراء أول أرض" message="الأرض شرط لتأسيس شركة. انتقل إلى المزادات واختر موقعًا صناعيًا أو زراعيًا أو تجاريًا." /><button className="button button-primary" type="button" onClick={() => run(advanceDay)}>مرور يوم لمتابعة السوق</button></div> : <div className="economy-list">{profile.lands.map((land) => {
+          {profile.lands.length === 0 ? <div className="economy-list"><EconomyEmpty title="ابدأ بشراء أول أرض" message="الأرض شرط لتأسيس شركة. انتقل إلى المزادات واختر موقعًا صناعيًا أو زراعيًا أو تجاريًا." /><button className="button button-primary" type="button" onClick={onAdvanceDay}>معاينة مرور اليوم</button></div> : <div className="economy-list">{profile.lands.map((land) => {
             const owner = profile.companies.find((company) => company.landId === land.id);
             return <article className="economy-card" key={land.id}><div className="economy-card-head"><div className="economy-card-title"><span className="economy-card-icon"><Icon name={owner ? 'factory' : 'land'} size={19} /></span><span><strong>{land.label}</strong><small>{formatNumber(land.areaSquareMeters)} م² · {land.landType ? landTypeNames[land.landType] : 'نوع عام'}</small></span></div><span className={`economy-pill ${owner ? 'economy-pill--green' : 'economy-pill--gold'}`}>{owner ? `تشغلها ${owner.name}` : 'متاحة للتأسيس'}</span></div><div className="economy-card-body"><div className="economy-meta"><span>سعر الشراء {formatMoney(land.purchasePrice, country)}</span><span>تاريخ التسجيل {new Date(land.acquiredAt).toLocaleDateString('ar-EG')}</span></div></div></article>;
           })}</div>}
