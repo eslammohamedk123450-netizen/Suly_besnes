@@ -14,6 +14,7 @@ import { selectActiveInvestments, selectAvailableAuctions, selectFinancialReport
 import { Icon } from './Icon';
 import { EconomyEmpty, EconomyPageShell, EconomyPanel, EconomyStat } from './EconomyUI';
 import { CodeRedemption } from './CodeRedemption';
+import { PurchaseSupport } from './PurchaseSupport';
 
 interface SectionPageProps {
   section: SectionItem;
@@ -89,6 +90,7 @@ export function SectionPage({ section, profile, country, notificationTheme, onNo
           <div className="settings-row"><span>طريقة الحفظ</span><strong className="saved-status"><span /> على هذا الجهاز</strong></div>
           <div className="settings-note"><Icon name="shield" size={17} /><p>الحساب وتقدمك محفوظان محليًا على هذا الجهاز. لا توجد أكواد تحقق لتسجيل الدخول.</p></div>
           <CodeRedemption profile={profile} onRedeemed={onRedeemed} />
+          <PurchaseSupport />
           <div className="settings-notice-theme">
             <span>مظهر الإشعارات</span>
             <div className="settings-theme-switch" role="group" aria-label="اختيار مظهر الإشعارات">

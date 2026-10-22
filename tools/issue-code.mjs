@@ -1,13 +1,14 @@
 #!/usr/bin/env node
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
-import { generateKeyPairSync, randomUUID, sign } from 'node:crypto';
+import { randomUUID, sign } from 'node:crypto';
+import { createInterface } from 'node:readline/promises';
+import { stdin as input, stdout as output } from 'node:process';
 import { join } from 'node:path';
 
 const root = new URL('..', import.meta.url).pathname;
 const keyDir = join(root, '.local');
 const privateKeyPath = join(keyDir, 'reward-private.pem');
-const publicKeyPath = join(keyDir, 'reward-public.pem');
 
 function args() {
   const values = {};
@@ -20,27 +21,41 @@ function args() {
   return values;
 }
 
-async function ensureKeys() {
-  await mkdir(keyDir, { recursive: true });
-  if (existsSync(privateKeyPath) && existsSync(publicKeyPath)) return;
-  const pair = generateKeyPairSync('ed25519', { privateKeyEncoding: { type: 'pkcs8', format: 'pem' }, publicKeyEncoding: { type: 'spki', format: 'pem' } });
-  await writeFile(privateKeyPath, pair.privateKey, { mode: 0o600 });
-  await writeFile(publicKeyPath, pair.publicKey, { mode: 0o644 });
-  console.log(`تم إنشاء مفاتيح الإصدار محليًا داخل ${keyDir}؛ لا ترفعها إلى GitHub.`);
+async function askForValues() {
+  const reader = createInterface({ input, output });
+  const cash = await reader.question('المبلغ داخل اللعبة بالجنيه (0 إذا لا يوجد): ');
+  const gold = await reader.question('الذهب بالجرام (0 إذا لا يوجد): ');
+  const expires = await reader.question('تاريخ الانتهاء ISO (اتركه فارغًا لمدة 90 يومًا): ');
+  reader.close();
+  return { cash, gold, expires };
 }
 
-const input = args();
-const cash = input.cash ? Number(input.cash) : 0;
-const gold = input.gold ? Number(input.gold) : 0;
-const expiresAt = input.expires ?? new Date(Date.now() + 90 * 86_400_000).toISOString();
+async function loadPrivateKey() {
+  if (!existsSync(privateKeyPath)) {
+    throw new Error(`مفتاح الإصدار غير موجود: ${privateKeyPath}. لا تنشئ مفتاحًا جديدًا، واستعد نسخة المفتاح الإنتاجي أولًا.`);
+  }
+  return readFile(privateKeyPath, 'utf8');
+}
+
+const supplied = args();
+const inputValues = Object.keys(supplied).length ? supplied : await askForValues();
+const cash = inputValues.cash ? Number(inputValues.cash) : 0;
+const gold = inputValues.gold ? Number(inputValues.gold) : 0;
+const expiresAt = inputValues.expires || new Date(Date.now() + 90 * 86_400_000).toISOString();
+
 if (!Number.isInteger(cash) || cash < 0 || cash > 1_000_000) throw new Error('قيمة cash يجب أن تكون رقمًا صحيحًا بين 0 و1,000,000.');
 if (!Number.isFinite(gold) || gold < 0 || gold > 100) throw new Error('قيمة gold يجب أن تكون بين 0 و100 غرام.');
-if (!cash && !gold) throw new Error('أدخل --cash أو --gold على الأقل.');
+if (!cash && !gold) throw new Error('أدخل مبلغًا أو ذهبًا على الأقل.');
 if (!Number.isFinite(Date.parse(expiresAt)) || Date.parse(expiresAt) <= Date.now()) throw new Error('تاريخ الانتهاء يجب أن يكون مستقبليًا بصيغة ISO.');
 
-await ensureKeys();
-const privateKey = await readFile(privateKeyPath, 'utf8');
-const payload = { version: 1, codeId: randomUUID(), issuedAt: new Date().toISOString(), expiresAt, rewards: [...(cash ? [{ type: 'cash', amount: cash }] : []), ...(gold ? [{ type: 'gold', grams: gold }] : [])] };
+const privateKey = await loadPrivateKey();
+const payload = {
+  version: 1,
+  codeId: randomUUID(),
+  issuedAt: new Date().toISOString(),
+  expiresAt,
+  rewards: [...(cash ? [{ type: 'cash', amount: cash }] : []), ...(gold ? [{ type: 'gold', grams: gold }] : [])],
+};
 const encodedPayload = Buffer.from(JSON.stringify(payload)).toString('base64url');
 const signature = sign(null, Buffer.from(encodedPayload), privateKey).toString('base64url');
 console.log(`SULY1.${encodedPayload}.${signature}`);

@@ -1,7 +1,7 @@
 import type { FinanceLedgerEntry } from '../domain/futureSystems';
 import type { PlayerProfile } from '../domain/player';
 
-const PUBLIC_KEY_DER_BASE64 = 'MCowBQYDK2VwAyEADW7/ZO5mExMoo7h/flxBzeRPyEQmIYWerRnjukoDbiM=';
+const PUBLIC_KEY_DER_BASE64 = 'MCowBQYDK2VwAyEA84UjrthL2DPvb0nU4FJv519tEWgUpuHEBhP4gdmrAiY=';
 
 type Reward = { type: 'cash'; amount: number } | { type: 'gold'; grams: number };
 interface RewardPayload { version: 1; codeId: string; issuedAt: string; expiresAt: string; rewards: Reward[] }
