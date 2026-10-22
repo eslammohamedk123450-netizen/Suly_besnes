@@ -8,7 +8,7 @@ import { NoticeToast } from './components/NoticeToast';
 import { SectionPage } from './components/SectionPage';
 import { COUNTRIES, findCountry } from './domain/countries';
 import type { CountryId } from './domain/countries';
-import { GAME_SECTIONS, getSection, type SectionId } from './domain/navigation';
+import { GAME_SECTIONS, getSection, SECTION_GROUPS, type SectionId } from './domain/navigation';
 import { createNewPlayer } from './domain/player';
 import type { PlayerProfile } from './domain/player';
 import { formatMoney } from './domain/formatters';
@@ -139,10 +139,16 @@ export default function App() {
       <div className="app-layout">
         <aside className="side-nav" aria-label="أقسام اللعبة">
           <div className="side-nav-caption">إدارة الإمبراطورية</div>
-          {GAME_SECTIONS.map((section) => (
-            <button className={`nav-item${activeSection === section.id ? ' is-active' : ''}`} type="button" key={section.id} onClick={() => navigate(section.id)}>
-              <Icon name={section.icon} size={19} /><span>{section.label}</span>
-            </button>
+          {SECTION_GROUPS.map((group) => (
+            <div className="nav-group" key={group.id}>
+              <div className="nav-group-label">{group.label}</div>
+              {group.sections.map((sectionId) => {
+                const section = getSection(sectionId);
+                return <button className={`nav-item${activeSection === section.id ? ' is-active' : ''}`} type="button" key={section.id} onClick={() => navigate(section.id)} aria-current={activeSection === section.id ? 'page' : undefined}>
+                  <Icon name={section.icon} size={19} /><span>{section.label}</span>
+                </button>;
+              })}
+            </div>
           ))}
           <div className="side-nav-note"><Icon name="shield" size={16} /><span>حفظ محلي<br />بدون إنترنت</span></div>
         </aside>

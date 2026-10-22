@@ -117,6 +117,9 @@ button:disabled { cursor: not-allowed; opacity: .55; }
 .app-layout { display: grid; grid-template-columns: 232px minmax(0, 1fr); gap: 25px; max-width: 1440px; margin: 0 auto; padding: 25px 28px 0; }
 .side-nav { position: sticky; top: 99px; align-self: start; display: flex; flex-direction: column; gap: 4px; min-height: 530px; padding: 17px 12px; background: #fff; border: 1px solid #e5ebf0; border-radius: 17px; box-shadow: 0 8px 26px rgba(9,27,45,.035); }
 .side-nav-caption { margin: 0 9px 10px; color: #9a7b2c; font-size: 10px; font-weight: 900; }
+.nav-group { display: grid; gap: 3px; }
+.nav-group + .nav-group { margin-top: 7px; padding-top: 7px; border-top: 1px solid #eef1f3; }
+.nav-group-label { margin: 0 9px 2px; color: #9aa6b0; font-size: 8px; font-weight: 900; letter-spacing: .3px; }
 .nav-item { display: flex; align-items: center; gap: 11px; width: 100%; min-height: 41px; padding: 0 10px; color: #58697a; text-align: right; background: transparent; border: 1px solid transparent; border-radius: 10px; cursor: pointer; transition: color .15s, background .15s; }
 .nav-item > span { flex: 1; font-size: 11px; font-weight: 700; }
 .nav-item > svg:first-child { color: #8492a0; }
