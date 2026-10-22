@@ -41,6 +41,7 @@ export default defineConfig({
     host: '0.0.0.0',
     port: 3000,
     strictPort: true,
+    allowedHosts: ['3000-iketdicg64pocr7bvbsfa-c733e53e.sg2.manus.computer'],
   },
   build: {
     target: 'es2022',
