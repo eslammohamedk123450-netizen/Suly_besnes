@@ -1,6 +1,7 @@
 import type { CountryDefinition, CountryId, IndustryId } from './countries';
 import type {
   FinanceLedgerEntry,
+  AuctionBidRecord,
   GameEventRecord,
   InventoryLot,
   InvestmentRecord,
@@ -72,6 +73,7 @@ export interface PlayerProfile {
   };
   staff: StaffContract[];
   productionOrders: ProductionOrder[];
+  auctionHistory: AuctionBidRecord[];
   sales: ProductSale[];
   ledger: FinanceLedgerEntry[];
   events: GameEventRecord[];
@@ -110,6 +112,7 @@ export function createNewPlayer(
     banking: { deposits: [], loans: [] },
     staff: [],
     productionOrders: [],
+    auctionHistory: [],
     sales: [],
     ledger: [],
     events: [],

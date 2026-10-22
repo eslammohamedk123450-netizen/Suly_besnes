@@ -1,6 +1,7 @@
 import type { SectionId } from '../domain/navigation';
 import type { PlayerProfile } from '../domain/player';
 import { AUCTION_CATALOG, findIndustry, findMaterial, findInvestment, PRODUCT_CATALOG, RECIPE_CATALOG, TASK_CATALOG } from './catalog';
+import { isAuctionOpen } from './auctions';
 
 export interface InventorySummaryRow {
   id: string;
@@ -56,8 +57,8 @@ export interface ObligationsSummary {
   dailyOperatingCost: number;
 }
 
-export function selectAvailableAuctions(): typeof AUCTION_CATALOG {
-  return AUCTION_CATALOG.filter((listing) => listing.status === 'open');
+export function selectAvailableAuctions(profile: PlayerProfile): typeof AUCTION_CATALOG {
+  return AUCTION_CATALOG.filter((listing) => isAuctionOpen(profile, listing));
 }
 
 export function selectOperationsSnapshot(profile: PlayerProfile, operatingCostMultiplier = 1): OperationsSnapshot {

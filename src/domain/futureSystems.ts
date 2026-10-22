@@ -18,6 +18,16 @@ export interface AuctionListing {
   quantity?: number;
 }
 
+export interface AuctionBidRecord {
+  id: string;
+  listingId: string;
+  bidder: 'player' | 'bot';
+  bidderId: string;
+  amount: number;
+  day: number;
+  occurredAt: string;
+}
+
 export interface BotBid {
   bidderId: string;
   amount: number;

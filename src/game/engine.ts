@@ -1,6 +1,6 @@
 import { findCountry, type IndustryId } from '../domain/countries';
 import type { PlayerAsset, PlayerCompany, PlayerLand, PlayerProfile } from '../domain/player';
-import type { DepositRecord, FinanceLedgerEntry, GameEventRecord, InventoryLot, InvestmentRecord, LoanRecord, ProductionOrder, StaffContract, StaffRole } from '../domain/futureSystems';
+import type { AuctionBidRecord, DepositRecord, FinanceLedgerEntry, GameEventRecord, InventoryLot, InvestmentRecord, LoanRecord, ProductionOrder, StaffContract, StaffRole } from '../domain/futureSystems';
 import {
   AUCTION_CATALOG,
   GOLD_PRICE_PER_GRAM,
@@ -13,6 +13,7 @@ import {
   TASK_CATALOG,
 } from './catalog';
 import { getMarketQuote } from './market';
+import { isAuctionOpen } from './auctions';
 
 export type GameErrorCode =
   | 'invalid-input'
@@ -187,11 +188,11 @@ function ensureEgypt(profile: PlayerProfile): GameResult<never> | null {
     : failure(profile, 'wrong-country', 'هذه الجولة متاحة لمصر فقط.');
 }
 
-export function placeBid(profile: PlayerProfile, listingId: string, amount: number): GameResult<AuctionOutcome> {
+export function placeBid(profile: PlayerProfile, listingId: string, amount: number, targetCompanyId?: string): GameResult<AuctionOutcome> {
   const countryError = ensureEgypt(profile);
   if (countryError) return countryError;
   if (!Number.isFinite(amount) || !Number.isInteger(amount) || amount <= 0) return failure(profile, 'invalid-input', 'قيمة العرض يجب أن تكون مبلغًا صحيحًا موجبًا.');
-  const listing = AUCTION_CATALOG.find((entry) => entry.id === listingId && entry.status === 'open');
+  const listing = AUCTION_CATALOG.find((entry) => entry.id === listingId && isAuctionOpen(profile, entry));
   if (!listing) return failure(profile, 'not-found', 'المزاد غير موجود أو مغلق.');
   if (profile.lands.some((land) => land.id === listing.id) || profile.assets.some((asset) => asset.id === listing.id)
     || profile.ledger.some((entry) => entry.note.includes(listing.label))) return failure(profile, 'already-owned', 'لقد فزت بهذا المزاد بالفعل.');
@@ -207,10 +208,15 @@ export function placeBid(profile: PlayerProfile, listingId: string, amount: numb
     return failure(profile, 'auction-lost', `خسر عرضك المزاد؛ أعلى عرض آلي كان ${highestBotBid.toLocaleString('ar-EG')} ج.م.`);
   }
   if (profile.bankBalance < amount) return failure(profile, 'insufficient-funds', 'لا يكفي رصيدك لتسديد العرض الفائز.');
+  const auctionHistory: AuctionBidRecord[] = [
+    ...profile.auctionHistory,
+    ...botBids.map((bid, index) => ({ id: `${listing.id}-bot-${profile.auctionHistory.length + index}`, listingId, bidder: 'bot' as const, bidderId: bid.bidderId, amount: bid.amount, day: profile.day, occurredAt: timestampFor(profile) })),
+    { id: `${listing.id}-player-${profile.auctionHistory.length}`, listingId, bidder: 'player' as const, bidderId: profile.id, amount, day: profile.day, occurredAt: timestampFor(profile) },
+  ];
 
   const acquiredAt = timestampFor(profile);
   if (listing.lotType === 'factory') {
-    const company = profile.companies[0];
+    const company = profile.companies.find((item) => item.id === targetCompanyId) ?? profile.companies[0];
     if (!company) return failure(profile, 'condition-not-met', 'أسس شركة أولًا حتى تربط بها خط الإنتاج الفائز بالمزاد.');
     const bonus = listing.energyCapacityBonus ?? 40;
     const companyId = company.id;
@@ -220,7 +226,7 @@ export function placeBid(profile: PlayerProfile, listingId: string, amount: numb
       ? { ...item, energyCapacity: (item.energyCapacity ?? 0) + bonus, energyUnits: (item.energyUnits ?? 0) + bonus }
       : item);
     const nextProfile = addLedger(
-      { ...profile, assets: [...profile.assets, asset], companies },
+      { ...profile, assets: [...profile.assets, asset], companies, auctionHistory },
       [ledgerEntry(profile, 'asset', amount, `شراء مصنع بالمزاد: ${listing.label}`, 0)],
       profile.bankBalance - amount,
     );
@@ -238,7 +244,7 @@ export function placeBid(profile: PlayerProfile, listingId: string, amount: numb
       ? profile.inventory.map((lot) => lot.id === existing.id ? { ...lot, quantity: lot.quantity + quantity, unitCost: (lot.quantity * lot.unitCost + amount) / (lot.quantity + quantity) } : lot)
       : [...profile.inventory, { id: inventoryLotId, materialOrProductId: material.id, quantity, unit: material.unit, unitCost }];
     const nextProfile = addLedger(
-      { ...profile, inventory },
+      { ...profile, inventory, auctionHistory },
       [ledgerEntry(profile, 'asset', amount, `شراء ${quantity} ${material.unit} من ${material.name} بالمزاد: ${listing.label}`, 0)],
       profile.bankBalance - amount,
     );
@@ -253,7 +259,7 @@ export function placeBid(profile: PlayerProfile, listingId: string, amount: numb
     landType: listing.landType,
   };
   const nextProfile = addLedger(
-    { ...profile, lands: [...profile.lands, land] },
+    { ...profile, lands: [...profile.lands, land], auctionHistory },
     [ledgerEntry(profile, 'asset', amount, `شراء أرض بالمزاد: ${listing.label}`, 0)],
     profile.bankBalance - amount,
   );

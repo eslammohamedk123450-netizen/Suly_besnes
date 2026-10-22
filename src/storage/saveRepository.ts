@@ -1,6 +1,6 @@
 import { findCountry, type CountryId, type IndustryId } from '../domain/countries';
 import type { PlayerAsset, PlayerCompany, PlayerLand, PlayerProfile } from '../domain/player';
-import type { DepositRecord, FinanceLedgerEntry, InventoryLot, InvestmentRecord, LicenseRecord, LoanRecord, ProductSale, ProductionOrder, StaffContract, TaskProgress } from '../domain/futureSystems';
+import type { AuctionBidRecord, DepositRecord, FinanceLedgerEntry, InventoryLot, InvestmentRecord, LicenseRecord, LoanRecord, ProductSale, ProductionOrder, StaffContract, TaskProgress } from '../domain/futureSystems';
 import { findIndustry, GOLD_PRICE_PER_GRAM } from '../game/catalog';
 
 const SAVE_KEY = 'business-empire.save.v1';
@@ -123,6 +123,12 @@ function isProductionOrder(value: unknown): value is ProductionOrder {
     && (value.status === 'active' || value.status === 'completed' || value.status === 'cancelled');
 }
 
+function isAuctionBidRecord(value: unknown): value is AuctionBidRecord {
+  return isRecord(value) && isNonEmptyString(value.id) && isNonEmptyString(value.listingId)
+    && (value.bidder === 'player' || value.bidder === 'bot') && isNonEmptyString(value.bidderId)
+    && isFiniteNonNegative(value.amount) && Number.isInteger(value.day) && (value.day as number) >= 1 && isDateString(value.occurredAt);
+}
+
 function isSale(value: unknown): value is ProductSale {
   return isRecord(value) && isNonEmptyString(value.id) && isNonEmptyString(value.productId)
     && isFiniteNonNegative(value.quantity) && isFiniteNonNegative(value.unitPrice)
@@ -232,6 +238,7 @@ function migrateProfile(value: unknown): PlayerProfile | null {
   };
   const staff = Array.isArray(value.staff) && value.staff.every(isStaffContract) ? value.staff : [];
   const productionOrders = Array.isArray(value.productionOrders) && value.productionOrders.every(isProductionOrder) ? value.productionOrders : [];
+  const auctionHistory = Array.isArray(value.auctionHistory) && value.auctionHistory.every(isAuctionBidRecord) ? value.auctionHistory : [];
 
   return {
     id: value.id as string,
@@ -254,6 +261,7 @@ function migrateProfile(value: unknown): PlayerProfile | null {
     banking,
     staff,
     productionOrders,
+    auctionHistory,
     sales: Array.isArray(value.sales) && value.sales.every(isSale) ? value.sales : [],
     ledger,
     events: Array.isArray(value.events) ? value.events as PlayerProfile['events'] : [],
