@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Brand } from './components/Brand';
 import { CountrySelection } from './components/CountrySelection';
-import { DailyBriefing } from './components/DailyBriefing';
 import { Dashboard } from './components/Dashboard';
+import { GameDayTimer } from './components/GameDayTimer';
 import { Icon } from './components/Icon';
 import { NoticeToast } from './components/NoticeToast';
 import { SectionPage } from './components/SectionPage';
@@ -12,7 +12,7 @@ import { GAME_SECTIONS, getSection, SECTION_GROUPS, type SectionId } from './dom
 import { createNewPlayer } from './domain/player';
 import type { PlayerProfile } from './domain/player';
 import { formatMoney } from './domain/formatters';
-import { advanceDay, getDayBriefing, type DayBriefing, type DayOutcome, type GameResult } from './game/engine';
+import { advanceDay, type GameResult } from './game/engine';
 import { loadSavedGame, saveGame } from './storage/saveRepository';
 import { loadNotificationTheme, saveNotificationTheme } from './storage/userPreferences';
 
@@ -25,8 +25,6 @@ export default function App() {
   const [notificationTheme, setNotificationTheme] = useState(loadNotificationTheme);
   const [notice, setNotice] = useState('');
   const [noticeTone, setNoticeTone] = useState<'success' | 'error'>('success');
-  const [dayBriefing, setDayBriefing] = useState<DayBriefing | null>(null);
-  const [dayOutcome, setDayOutcome] = useState<DayOutcome | null>(null);
 
   const country = findCountry(profile?.countryId ?? selectedCountryId) ?? COUNTRIES[0];
   const active = getSection(activeSection);
@@ -72,31 +70,24 @@ export default function App() {
     handleGameResult(action(profile));
   }
 
-  function openDayBriefing() {
+  function handleDaysElapsed(days: number) {
     if (!profile) return;
-    setDayOutcome(null);
-    setDayBriefing(getDayBriefing(profile));
-  }
-
-  function closeDayBriefing() {
-    setDayBriefing(null);
-    setDayOutcome(null);
-  }
-
-  function confirmDay() {
-    if (!profile) return;
-    const result = advanceDay(profile);
-    if (!result.ok) {
-      handleGameResult(result);
-      closeDayBriefing();
-      return;
+    let current = profile;
+    let completedDays = 0;
+    for (let index = 0; index < days; index += 1) {
+      const result = advanceDay(current);
+      if (!result.ok) {
+        setNotice(result.message);
+        setNoticeTone('error');
+        break;
+      }
+      current = result.profile;
+      completedDays += 1;
     }
-    const saved = saveGame(result.profile);
-    const settledAmount = Math.max(0, profile.payables - result.profile.payables);
-    const settlementNote = settledAmount > 0 ? ` وُجّه ${formatMoney(settledAmount, country)} لسداد التزامات سابقة.` : '';
-    setProfile(result.profile);
-    setDayOutcome(result.data);
-    setNotice(saved.ok ? `${result.message}${settlementNote}` : `${result.message}${settlementNote} تعذر تثبيت الحفظ على هذا الجهاز.`);
+    if (completedDays === 0) return;
+    const saved = saveGame(current);
+    setProfile(current);
+    setNotice(saved.ok ? `تم ترحيل ${completedDays} ${completedDays === 1 ? 'يوم تلقائيًا' : 'أيام تلقائيًا'} بعد مرور 24 ساعة حقيقية.` : 'تم ترحيل الأيام، لكن تعذر تثبيت الحفظ على هذا الجهاز.');
     setNoticeTone(saved.ok ? 'success' : 'error');
   }
 
@@ -128,7 +119,8 @@ export default function App() {
     <div className="app-frame">
       <header className="app-header">
         <button className="header-brand-button" type="button" onClick={() => navigate('home')} aria-label="العودة إلى الرئيسية"><Brand compact /></button>
-        <div className="header-actions">
+          <div className="header-actions">
+          <GameDayTimer profile={profile} onDaysElapsed={handleDaysElapsed} />
           <div className="header-location"><span>{country.flag}</span><span>{country.name}</span><small>{country.currency.code}</small></div>
           <span className="header-divider" />
           <span className="player-level"><span className="avatar-initial">{profile.name.trim().charAt(0) || 'م'}</span><span><strong>{profile.name}</strong><small>المستوى {profile.level}</small></span></span>
@@ -155,9 +147,9 @@ export default function App() {
 
         <main className="main-content">
           {activeSection === 'home' ? (
-            <Dashboard profile={profile} country={country} onNavigate={navigate} onAdvanceDay={openDayBriefing} />
+            <Dashboard profile={profile} country={country} onNavigate={navigate} />
           ) : (
-            <SectionPage section={active} profile={profile} country={country} notificationTheme={notificationTheme} onNotificationThemeChange={setNotificationTheme} onHome={() => navigate('home')} onAdvanceDay={openDayBriefing} onAction={handleGameResult} />
+            <SectionPage section={active} profile={profile} country={country} notificationTheme={notificationTheme} onNotificationThemeChange={setNotificationTheme} onHome={() => navigate('home')} onAction={handleGameResult} />
           )}
         </main>
       </div>
@@ -178,7 +170,6 @@ export default function App() {
       </div>}
 
       {notice && <NoticeToast message={notice} tone={noticeTone} theme={notificationTheme} onDismiss={() => setNotice('')} />}
-      {dayBriefing && <DailyBriefing profile={profile} country={country} briefing={dayBriefing} outcome={dayOutcome} onConfirm={confirmDay} onClose={closeDayBriefing} />}
       <footer className="app-footer"><span>إمبراطورية الأعمال</span><span>محاكاة محلية · الأسعار والأحداث لأغراض اللعبة</span></footer>
     </div>
   );

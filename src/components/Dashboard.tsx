@@ -11,10 +11,9 @@ interface DashboardProps {
   profile: PlayerProfile;
   country: CountryDefinition;
   onNavigate: (section: SectionId) => void;
-  onAdvanceDay: () => void;
 }
 
-export function Dashboard({ profile, country, onNavigate, onAdvanceDay }: DashboardProps) {
+export function Dashboard({ profile, country, onNavigate }: DashboardProps) {
   const totalAssets = calculateTotalAssets(profile);
   const goldMarketValue = Math.round(profile.goldGrams * GOLD_PRICE_PER_GRAM);
   const quickSections = GAME_SECTIONS.filter((section) => section.id !== 'home');
@@ -37,7 +36,7 @@ export function Dashboard({ profile, country, onNavigate, onAdvanceDay }: Dashbo
           <h1>مرحبًا، {profile.name}</h1>
           <p>الثروة بداية الحكاية؛ قراراتك هي ما يبني الإمبراطورية.</p>
           <div className="hero-meta"><span className="country-chip">{country.flag} {country.name}</span><span className="hero-divider" /><span>المستوى {profile.level}</span><span className="hero-divider" /><span>{profile.companies.length} شركات</span></div>
-          <button className="button button-primary dashboard-turn-button" type="button" onClick={onAdvanceDay}><Icon name="clock" size={16} /> مرّر يومًا اقتصاديًا</button>
+          <span className="dashboard-auto-note"><Icon name="clock" size={15} /> اليوم يتقدم تلقائيًا كل 24 ساعة حقيقية</span>
         </div>
         <div className="hero-emblem"><Icon name="crown" size={25} /><span>BE</span></div>
       </section>

@@ -4,12 +4,10 @@ import { Icon } from './Icon';
 interface EconomyPageShellProps {
   dayLabel: string;
   balanceLabel: string;
-  onAdvanceDay: () => void;
-  busy?: boolean;
   children: ReactNode;
 }
 
-export function EconomyPageShell({ dayLabel, balanceLabel, onAdvanceDay, busy = false, children }: EconomyPageShellProps) {
+export function EconomyPageShell({ dayLabel, balanceLabel, children }: EconomyPageShellProps) {
   return (
     <div className="economy-page">
       <div className="economy-toolbar">
@@ -18,9 +16,7 @@ export function EconomyPageShell({ dayLabel, balanceLabel, onAdvanceDay, busy = 
           <small>{balanceLabel} · تقدمك محفوظ محليًا</small>
         </div>
         <span className="economy-day"><Icon name="clock" size={15} />{dayLabel}</span>
-        <button className="button button-primary" type="button" onClick={onAdvanceDay} disabled={busy}>
-          {busy ? 'جارٍ الحساب…' : 'مرور يوم'}
-        </button>
+        <span className="economy-auto-note"><Icon name="clock" size={14} /> اليوم يتقدم تلقائيًا كل 24 ساعة</span>
       </div>
       {children}
     </div>
