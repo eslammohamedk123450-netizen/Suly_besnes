@@ -4,7 +4,7 @@ export type IconName =
   | 'home' | 'gavel' | 'company' | 'investment' | 'land' | 'factory'
   | 'warehouse' | 'report' | 'tasks' | 'settings' | 'gold' | 'bank'
   | 'crown' | 'arrow' | 'chevron' | 'close' | 'play' | 'shield'
-  | 'briefcase' | 'menu' | 'clock' | 'lock' | 'plus' | 'globe';
+  | 'briefcase' | 'menu' | 'clock' | 'lock' | 'plus' | 'globe' | 'target';
 
 const drawings: Record<IconName, ReactNode> = {
   home: <><path d="m3 10 9-7 9 7"/><path d="M5 9v11h14V9M9 20v-6h6v6"/></>,
@@ -31,6 +31,7 @@ const drawings: Record<IconName, ReactNode> = {
   lock: <><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 1 1 8 0v3"/></>,
   plus: <><path d="M12 5v14M5 12h14"/></>,
   globe: <><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a15 15 0 0 1 0 18m0-18a15 15 0 0 0 0 18"/></>,
+  target: <><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2"/></>,
 };
 
 interface IconProps {

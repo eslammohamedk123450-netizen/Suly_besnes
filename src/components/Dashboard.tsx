@@ -5,6 +5,7 @@ import { formatGold, formatMoney, formatNumber } from '../domain/formatters';
 import { GOLD_PRICE_PER_GRAM } from '../game/catalog';
 import { GAME_SECTIONS, type SectionId } from '../domain/navigation';
 import { Icon } from './Icon';
+import { selectOperationsSnapshot } from '../game/selectors';
 
 interface DashboardProps {
   profile: PlayerProfile;
@@ -18,6 +19,13 @@ export function Dashboard({ profile, country, onNavigate, onAdvanceDay }: Dashbo
   const goldMarketValue = Math.round(profile.goldGrams * GOLD_PRICE_PER_GRAM);
   const quickSections = GAME_SECTIONS.filter((section) => section.id !== 'home');
   const latestEntries = profile.ledger.slice(-5).reverse();
+  const operations = selectOperationsSnapshot(profile, country.economy.operatingCostMultiplier ?? 1);
+  const ledgerDay = (occurredAt: string) => {
+    const createdAt = Date.parse(profile.createdAt);
+    const entryAt = Date.parse(occurredAt);
+    if (!Number.isFinite(createdAt) || !Number.isFinite(entryAt)) return profile.day;
+    return Math.max(1, Math.floor((entryAt - createdAt) / 86_400_000) + 1);
+  };
 
   return (
     <div className="dashboard-page">
@@ -35,6 +43,23 @@ export function Dashboard({ profile, country, onNavigate, onAdvanceDay }: Dashbo
       </section>
 
       {profile.payables > 0 && <div className="operating-warning" role="status">لديك التزامات غير مسددة بقيمة {formatMoney(profile.payables, country)}؛ أُوقفت الطاقة مؤقتًا، وتُخصم الالتزامات من السيولة الجديدة.</div>}
+
+      <section className={`operations-next operations-next--${operations.nextStep.tone}`}>
+        <div className="operations-next-mark"><Icon name="target" size={21} /></div>
+        <div className="operations-next-copy">
+          <span className="section-kicker">قرارك التشغيلي التالي</span>
+          <h2>{operations.nextStep.title}</h2>
+          <p>{operations.nextStep.description}</p>
+        </div>
+        <button className="button button-primary operations-next-action" type="button" onClick={() => onNavigate(operations.nextStep.section)}>{operations.nextStep.actionLabel}<Icon name="chevron" size={15} /></button>
+      </section>
+
+      <section className="operations-metrics" aria-label="مؤشرات التشغيل">
+        <div className="operations-metric"><span><Icon name="clock" size={15} /> تكلفة التشغيل اليومية</span><strong>{operations.dailyOperatingCost > 0 ? formatMoney(operations.dailyOperatingCost, country) : 'لا توجد شركات'}</strong></div>
+        <div className={`operations-metric${operations.runwayDays !== null && operations.runwayDays < 5 ? ' operations-metric--warning' : ''}`}><span><Icon name="bank" size={15} /> مدة الصمود بالنقد</span><strong>{operations.runwayDays === null ? '—' : `${formatNumber(operations.runwayDays)} يوم`}</strong></div>
+        <div className="operations-metric"><span><Icon name="factory" size={15} /> خطوط جاهزة للتشغيل</span><strong>{formatNumber(operations.readyProductionCompanies)}</strong></div>
+        <div className="operations-metric"><span><Icon name="briefcase" size={15} /> منتجات قابلة للبيع</span><strong>{formatNumber(operations.productUnits)}</strong></div>
+      </section>
 
       <section className="stats-grid" aria-label="المؤشرات المالية">
         <article className="stat-card stat-card--balance">
@@ -72,7 +97,7 @@ export function Dashboard({ profile, country, onNavigate, onAdvanceDay }: Dashbo
 
         <section className="surface activity-panel">
           <div className="panel-heading"><div><span className="section-kicker">سجل الحساب</span><h2>آخر العمليات</h2></div><button className="text-link" type="button" onClick={() => onNavigate('reports')}>التقارير <Icon name="chevron" size={14} /></button></div>
-          {latestEntries.length === 0 ? <div className="empty-activity"><span className="empty-ring"><Icon name="report" size={21} /></span><div><strong>لا توجد عمليات بعد</strong><p>ابدأ بمزاد أو شركة لتظهر حركة الحساب.</p></div></div> : <div className="dashboard-ledger">{latestEntries.map((entry) => <div className="dashboard-ledger-row" key={entry.id}><span className={`ledger-dot ledger-dot--${entry.category}`} /><span className="dashboard-ledger-copy"><strong>{entry.note}</strong><small>اليوم {formatNumber(profile.day)}</small></span><b className={entry.category === 'revenue' ? 'money-positive' : entry.category === 'expense' ? 'money-negative' : ''}>{entry.category === 'revenue' ? '+' : entry.category === 'expense' ? '−' : ''}{formatMoney(entry.amount, country)}</b></div>)}</div>}
+          {latestEntries.length === 0 ? <div className="empty-activity"><span className="empty-ring"><Icon name="report" size={21} /></span><div><strong>لا توجد عمليات بعد</strong><p>ابدأ بمزاد أو شركة لتظهر حركة الحساب.</p></div></div> : <div className="dashboard-ledger">{latestEntries.map((entry) => <div className="dashboard-ledger-row" key={entry.id}><span className={`ledger-dot ledger-dot--${entry.category}`} /><span className="dashboard-ledger-copy"><strong>{entry.note}</strong><small>اليوم {formatNumber(ledgerDay(entry.occurredAt))}</small></span><b className={entry.category === 'revenue' ? 'money-positive' : entry.category === 'expense' ? 'money-negative' : ''}>{entry.category === 'revenue' ? '+' : entry.category === 'expense' ? '−' : ''}{formatMoney(entry.amount, country)}</b></div>)}</div>}
         </section>
       </div>
 
