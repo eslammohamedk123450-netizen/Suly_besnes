@@ -4,6 +4,8 @@ import type {
   GameEventRecord,
   InventoryLot,
   InvestmentRecord,
+  DepositRecord,
+  LoanRecord,
   LicenseRecord,
   ProductSale,
   TaskProgress,
@@ -61,6 +63,10 @@ export interface PlayerProfile {
   inventory: InventoryLot[];
   licenses: LicenseRecord[];
   investments: InvestmentRecord[];
+  banking: {
+    deposits: DepositRecord[];
+    loans: LoanRecord[];
+  };
   sales: ProductSale[];
   ledger: FinanceLedgerEntry[];
   events: GameEventRecord[];
@@ -96,6 +102,7 @@ export function createNewPlayer(
     inventory: [],
     licenses: [],
     investments: [],
+    banking: { deposits: [], loans: [] },
     sales: [],
     ledger: [],
     events: [],

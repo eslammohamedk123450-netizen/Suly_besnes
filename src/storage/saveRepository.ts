@@ -1,6 +1,6 @@
 import { findCountry, type CountryId, type IndustryId } from '../domain/countries';
 import type { PlayerAsset, PlayerCompany, PlayerLand, PlayerProfile } from '../domain/player';
-import type { FinanceLedgerEntry, InventoryLot, InvestmentRecord, LicenseRecord, ProductSale, TaskProgress } from '../domain/futureSystems';
+import type { DepositRecord, FinanceLedgerEntry, InventoryLot, InvestmentRecord, LicenseRecord, LoanRecord, ProductSale, TaskProgress } from '../domain/futureSystems';
 import { findIndustry, GOLD_PRICE_PER_GRAM } from '../game/catalog';
 
 const SAVE_KEY = 'business-empire.save.v1';
@@ -81,6 +81,23 @@ function isInvestment(value: unknown): value is InvestmentRecord {
     && typeof value.startedOnDay === 'number' && Number.isInteger(value.startedOnDay) && value.startedOnDay >= 1
     && typeof value.maturityDay === 'number' && Number.isInteger(value.maturityDay) && value.maturityDay >= value.startedOnDay
     && (value.status === 'active' || value.status === 'paid' || value.status === 'loss');
+}
+
+function isDeposit(value: unknown): value is DepositRecord {
+  return isRecord(value) && isNonEmptyString(value.id) && isFiniteNonNegative(value.principal)
+    && isFiniteNonNegative(value.annualRate) && Number.isInteger(value.startedOnDay) && (value.startedOnDay as number) >= 1
+    && Number.isInteger(value.maturityDay) && (value.maturityDay as number) >= (value.startedOnDay as number)
+    && (value.status === 'active' || value.status === 'paid' || value.status === 'withdrawn')
+    && (value.settledAmount === undefined || isFiniteNonNegative(value.settledAmount));
+}
+
+function isLoan(value: unknown): value is LoanRecord {
+  return isRecord(value) && isNonEmptyString(value.id) && (value.collateralType === 'land' || value.collateralType === 'company')
+    && isNonEmptyString(value.collateralId) && isFiniteNonNegative(value.principal) && isFiniteNonNegative(value.totalRepayment)
+    && isFiniteNonNegative(value.annualRate) && Number.isInteger(value.startedOnDay) && (value.startedOnDay as number) >= 1
+    && Number.isInteger(value.termDays) && (value.termDays as number) > 0 && Number.isInteger(value.nextPaymentDay)
+    && isFiniteNonNegative(value.installmentAmount) && isFiniteNonNegative(value.remainingBalance)
+    && (value.status === 'active' || value.status === 'paid' || value.status === 'defaulted');
 }
 
 function isSale(value: unknown): value is ProductSale {
@@ -184,6 +201,11 @@ function migrateProfile(value: unknown): PlayerProfile | null {
   }
   const totalRevenue = sumCategory(ledger, 'revenue');
   const totalExpenses = sumCategory(ledger, 'expense');
+  const rawBanking = isRecord(value.banking) ? value.banking : {};
+  const banking = {
+    deposits: Array.isArray(rawBanking.deposits) && rawBanking.deposits.every(isDeposit) ? rawBanking.deposits : [],
+    loans: Array.isArray(rawBanking.loans) && rawBanking.loans.every(isLoan) ? rawBanking.loans : [],
+  };
 
   return {
     id: value.id as string,
@@ -203,6 +225,7 @@ function migrateProfile(value: unknown): PlayerProfile | null {
     inventory: Array.isArray(value.inventory) && value.inventory.every(isInventoryLot) ? value.inventory : [],
     licenses: Array.isArray(value.licenses) && value.licenses.every(isLicense) ? value.licenses : [],
     investments: Array.isArray(value.investments) && value.investments.every(isInvestment) ? value.investments : [],
+    banking,
     sales: Array.isArray(value.sales) && value.sales.every(isSale) ? value.sales : [],
     ledger,
     events: Array.isArray(value.events) ? value.events as PlayerProfile['events'] : [],

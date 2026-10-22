@@ -1,6 +1,6 @@
 import { findCountry, type IndustryId } from '../domain/countries';
 import type { PlayerAsset, PlayerCompany, PlayerLand, PlayerProfile } from '../domain/player';
-import type { FinanceLedgerEntry, GameEventRecord, InventoryLot, InvestmentRecord } from '../domain/futureSystems';
+import type { DepositRecord, FinanceLedgerEntry, GameEventRecord, InventoryLot, InvestmentRecord, LoanRecord } from '../domain/futureSystems';
 import {
   AUCTION_CATALOG,
   GOLD_PRICE_PER_GRAM,
@@ -28,6 +28,8 @@ export type GameErrorCode =
   | 'auction-lost'
   | 'storage-limit'
   | 'market-limit'
+  | 'collateral-in-use'
+  | 'deposit-not-mature'
   | 'already-claimed'
   | 'condition-not-met';
 
@@ -462,6 +464,68 @@ export function getDayBriefing(profile: PlayerProfile): DayBriefing {
   return { day, operatingCost, existingPayables: profile.payables, maturingInvestments, event, availableEnergy, energyPaused: profile.payables > 0 };
 }
 
+const DEPOSIT_OPTIONS = [
+  { durationDays: 3, annualRate: 0.05 },
+  { durationDays: 7, annualRate: 0.08 },
+  { durationDays: 14, annualRate: 0.12 },
+] as const;
+
+export function createDeposit(profile: PlayerProfile, amount: number, durationDays: number): GameResult<DepositRecord> {
+  const option = DEPOSIT_OPTIONS.find((item) => item.durationDays === durationDays);
+  if (!option) return failure(profile, 'invalid-input', 'مدة الوديعة غير متاحة. اختر 3 أو 7 أو 14 يومًا.');
+  if (!Number.isInteger(amount) || amount < 50_000) return failure(profile, 'invalid-input', 'الحد الأدنى للوديعة 50,000 جنيه محاكاة.');
+  if (amount > profile.bankBalance) return failure(profile, 'insufficient-funds', 'لا يكفي الرصيد لإنشاء هذه الوديعة.');
+  const deposit: DepositRecord = { id: nextId(profile, 'deposit', profile.banking.deposits.length), principal: amount, annualRate: option.annualRate, startedOnDay: profile.day, maturityDay: profile.day + durationDays, status: 'active' };
+  const nextProfile = addLedger(
+    { ...profile, banking: { ...profile.banking, deposits: [...profile.banking.deposits, deposit] } },
+    [ledgerEntry(profile, 'asset', amount, `إيداع وديعة لمدة ${durationDays} أيام`, 0)],
+    profile.bankBalance - amount,
+  );
+  return success(nextProfile, `تم إنشاء وديعة محاكاة تستحق في اليوم ${deposit.maturityDay}.`, deposit);
+}
+
+export function withdrawDeposit(profile: PlayerProfile, depositId: string): GameResult<{ depositId: string; amount: number; interest: number }> {
+  const deposit = profile.banking.deposits.find((item) => item.id === depositId);
+  if (!deposit) return failure(profile, 'not-found', 'الوديعة غير موجودة.');
+  if (deposit.status !== 'active') return failure(profile, 'invalid-input', 'هذه الوديعة تمت تسويتها من قبل.');
+  if (profile.day < deposit.maturityDay) return failure(profile, 'deposit-not-mature', `تستحق الوديعة في اليوم ${deposit.maturityDay}.`);
+  const interest = Math.round(deposit.principal * deposit.annualRate * (deposit.maturityDay - deposit.startedOnDay) / 30);
+  const amount = deposit.principal + interest;
+  const updatedDeposit = { ...deposit, status: 'paid' as const, settledAmount: amount };
+  const nextProfile = addLedger(
+    { ...profile, banking: { ...profile.banking, deposits: profile.banking.deposits.map((item) => item.id === depositId ? updatedDeposit : item) } },
+    [ledgerEntry(profile, 'revenue', interest, `فائدة وديعة محاكاة ${deposit.id}`, 0), ledgerEntry(profile, 'settlement', deposit.principal, `استرداد أصل الوديعة ${deposit.id}`, 1)],
+    profile.bankBalance + amount,
+  );
+  return success(nextProfile, `تم استرداد الوديعة مع فائدة محاكاة ${interest.toLocaleString('ar-EG')} ج.م.`, { depositId, amount, interest });
+}
+
+function collateralValue(profile: PlayerProfile, collateralType: LoanRecord['collateralType'], collateralId: string): number {
+  if (collateralType === 'land') return profile.lands.find((land) => land.id === collateralId)?.purchasePrice ?? 0;
+  const company = profile.companies.find((item) => item.id === collateralId);
+  const industry = company ? findIndustry(company.industryId) : undefined;
+  const country = company ? findCountry(company.countryId) : undefined;
+  return company && industry ? industry.setupFee + (country?.economy.licenseFeesByIndustry[company.industryId] ?? industry.licenseFee) + 100_000 : 0;
+}
+
+export function takeLoan(profile: PlayerProfile, collateralType: LoanRecord['collateralType'], collateralId: string, amount: number, termDays: number): GameResult<LoanRecord> {
+  const collateralAmount = collateralValue(profile, collateralType, collateralId);
+  if (collateralAmount <= 0) return failure(profile, 'not-found', 'الضمان غير موجود أو غير مؤهل للتمويل.');
+  if (profile.banking.loans.some((loan) => loan.status === 'active' && loan.collateralType === collateralType && loan.collateralId === collateralId)) return failure(profile, 'collateral-in-use', 'هذا الضمان مرتبط بقرض قائم بالفعل.');
+  if (![7, 14, 30].includes(termDays)) return failure(profile, 'invalid-input', 'مدة القرض المتاحة 7 أو 14 أو 30 يومًا.');
+  const maximumLoan = Math.floor(collateralAmount * 0.6);
+  if (!Number.isInteger(amount) || amount < 25_000 || amount > maximumLoan) return failure(profile, 'invalid-input', `الحد الأقصى لهذا الضمان ${maximumLoan.toLocaleString('ar-EG')} ج.م محاكاة.`);
+  const annualRate = termDays === 7 ? 0.18 : termDays === 14 ? 0.22 : 0.28;
+  const totalRepayment = Math.round(amount * (1 + annualRate * termDays / 30));
+  const loan: LoanRecord = { id: nextId(profile, 'loan', profile.banking.loans.length), collateralType, collateralId, principal: amount, totalRepayment, annualRate, startedOnDay: profile.day, termDays, nextPaymentDay: profile.day + 1, installmentAmount: Math.ceil(totalRepayment / termDays), remainingBalance: totalRepayment, status: 'active' };
+  const nextProfile = addLedger(
+    { ...profile, banking: { ...profile.banking, loans: [...profile.banking.loans, loan] } },
+    [ledgerEntry(profile, 'liability', amount, `صرف قرض بضمان ${collateralType === 'land' ? 'أرض' : 'شركة'}`, 0)],
+    profile.bankBalance + amount,
+  );
+  return success(nextProfile, `تم صرف قرض محاكاة بقيمة ${amount.toLocaleString('ar-EG')} ج.م؛ يبدأ القسط في اليوم التالي.`, loan);
+}
+
 export function createInvestment(profile: PlayerProfile, investmentId: string, amount: number): GameResult<InvestmentOutcome> {
   const countryError = ensureEgypt(profile);
   if (countryError) return countryError;
@@ -502,6 +566,23 @@ export function advanceDay(profile: PlayerProfile): GameResult<DayOutcome> {
     payables -= paidPriorPayables;
     entries.push(ledgerEntry(profile, 'settlement', paidPriorPayables, 'سداد التزامات سابقة', entries.length));
   }
+  const loans = profile.banking.loans.map((loan) => {
+    if (loan.status !== 'active' || loan.nextPaymentDay > nextDay) return loan;
+    const due = Math.min(loan.remainingBalance, loan.installmentAmount);
+    const paid = Math.min(balance, due);
+    balance -= paid;
+    const unpaid = due - paid;
+    const interestShare = Math.min(due, Math.max(0, loan.totalRepayment - loan.principal) / loan.termDays);
+    const principalShare = due - interestShare;
+    if (interestShare > 0) entries.push(ledgerEntry(profile, 'expense', Math.round(interestShare), `فائدة قسط القرض ${loan.id}`, entries.length));
+    if (principalShare > 0 && paid > 0) entries.push(ledgerEntry(profile, 'settlement', Math.min(paid, Math.round(principalShare)), `سداد أصل قسط القرض ${loan.id}`, entries.length));
+    if (unpaid > 0) {
+      payables += unpaid;
+      entries.push(ledgerEntry(profile, 'liability', unpaid, `قسط قرض غير مسدد ${loan.id}`, entries.length));
+    }
+    const remainingBalance = Math.max(0, loan.remainingBalance - due);
+    return { ...loan, remainingBalance, nextPaymentDay: nextDay + 1, status: remainingBalance === 0 ? 'paid' as const : 'active' as const };
+  });
   const paidOperatingCost = Math.min(balance, operatingCost);
   balance -= paidOperatingCost;
   if (operatingCost > 0) entries.push(ledgerEntry(profile, 'expense', operatingCost, 'مصروفات التشغيل اليومية المستحقة', entries.length));
@@ -558,7 +639,7 @@ export function advanceDay(profile: PlayerProfile): GameResult<DayOutcome> {
   });
   const event: GameEventRecord = { id: `event-${nextDay}`, day: nextDay, title: briefing.event.title, cashImpact: eventImpact, occurredAt: now };
   const nextProfile = addLedger(
-    { ...profile, day: nextDay, companies, investments, events: [...profile.events, event], payables },
+    { ...profile, day: nextDay, companies, investments, banking: { ...profile.banking, loans }, events: [...profile.events, event], payables },
     entries,
     balance,
   );

@@ -4,7 +4,7 @@ import type { PlayerProfile } from '../domain/player';
 import type { NotificationTheme } from '../storage/userPreferences';
 import type { SectionItem } from '../domain/navigation';
 import { formatMoney, formatNumber } from '../domain/formatters';
-import { buyGold, buyMaterial, claimTask, createInvestment, foundCompany, placeBid, runProduction, sellGold, sellProduct, type GameResult } from '../game/engine';
+import { buyGold, buyMaterial, claimTask, createDeposit, createInvestment, foundCompany, placeBid, runProduction, sellGold, sellProduct, takeLoan, withdrawDeposit, type GameResult } from '../game/engine';
 import { AUCTION_CATALOG, GOLD_PRICE_PER_GRAM, INDUSTRY_CATALOG, INVESTMENT_CATALOG, MATERIAL_CATALOG, PRODUCT_CATALOG, RECIPE_CATALOG } from '../game/catalog';
 import { getMarketQuote } from '../game/market';
 import { selectActiveInvestments, selectAvailableAuctions, selectFinancialReport, selectInventorySummary, selectSalesSummary, selectTaskBoard } from '../game/selectors';
@@ -35,6 +35,11 @@ export function SectionPage({ section, profile, country, notificationTheme, onNo
   const [productQuantities, setProductQuantities] = useState<Record<string, string>>({});
   const [investmentAmounts, setInvestmentAmounts] = useState<Record<string, string>>({});
   const [goldAmount, setGoldAmount] = useState('1.0');
+  const [depositAmount, setDepositAmount] = useState('50000');
+  const [depositDuration, setDepositDuration] = useState('7');
+  const [loanAmount, setLoanAmount] = useState('25000');
+  const [loanTerm, setLoanTerm] = useState('14');
+  const [loanCollateral, setLoanCollateral] = useState('');
 
   const dayLabel = `اليوم ${formatNumber(profile.day)}`;
   const balanceLabel = `الرصيد ${formatMoney(profile.bankBalance, country)}`;
@@ -72,6 +77,32 @@ export function SectionPage({ section, profile, country, notificationTheme, onNo
           <div className="settings-credit">تطوير شركة <strong>Suly- Technologies</strong></div>
         </div>
       </EconomyPanel>,
+    )}</div>;
+  }
+
+  if (section.id === 'bank') {
+    const collateralOptions = [
+      ...profile.lands.map((land) => ({ id: land.id, label: land.label, type: 'land' as const, value: land.purchasePrice })),
+      ...profile.companies.map((company) => ({ id: company.id, label: company.name, type: 'company' as const, value: 0 })),
+    ];
+    const selectedCollateral = collateralOptions.find((item) => item.id === (loanCollateral || collateralOptions[0]?.id));
+    const activeLoans = profile.banking.loans.filter((loan) => loan.status === 'active');
+    const activeDeposits = profile.banking.deposits.filter((deposit) => deposit.status === 'active');
+    return <div className="section-page">{heading}{pageShell(
+      <>
+        <div className="economy-grid economy-grid--three-mobile"><EconomyStat label="الرصيد المتاح" value={formatMoney(profile.bankBalance, country)} /><EconomyStat label="ودائع نشطة" value={formatNumber(activeDeposits.length)} /><EconomyStat label="أقساط قروض نشطة" value={formatNumber(activeLoans.length)} /></div>
+        <EconomyPanel title="حساب البنك" description="محاكاة مصرفية محلية: أموالك المودعة تُحجز حتى الاستحقاق، ولا تمثل فائدة أو خدمة مالية حقيقية.">
+          <form className="economy-form" onSubmit={(event: FormEvent<HTMLFormElement>) => { event.preventDefault(); run((current) => createDeposit(current, Number(depositAmount), Number(depositDuration))); }}>
+            <div className="economy-form-row"><div className="economy-field"><label htmlFor="deposit-amount">مبلغ الوديعة</label><input id="deposit-amount" type="number" min="50000" step="1000" value={depositAmount} onChange={(event) => setDepositAmount(event.target.value)} /></div><div className="economy-field"><label htmlFor="deposit-duration">المدة</label><select id="deposit-duration" value={depositDuration} onChange={(event) => setDepositDuration(event.target.value)}><option value="3">3 أيام · عائد محاكى 5%</option><option value="7">7 أيام · عائد محاكى 8%</option><option value="14">14 يومًا · عائد محاكى 12%</option></select></div></div>
+            <button className="button button-primary" type="submit" disabled={Number(depositAmount) < 50000 || Number(depositAmount) > profile.bankBalance}>فتح وديعة</button>
+          </form>
+          <div className="economy-list">{profile.banking.deposits.slice().reverse().map((deposit) => <article className="economy-card economy-card--soft" key={deposit.id}><div className="economy-card-head"><div className="economy-card-title"><span><strong>{formatMoney(deposit.principal, country)}</strong><small>تستحق في اليوم {formatNumber(deposit.maturityDay)} · عائد {Math.round(deposit.annualRate * 100)}%</small></span></div><span className={`economy-pill ${deposit.status === 'active' ? 'economy-pill--gold' : 'economy-pill--green'}`}>{deposit.status === 'active' ? 'نشطة' : 'تمت التسوية'}</span></div>{deposit.status === 'active' && <button className="button button-secondary" type="button" disabled={profile.day < deposit.maturityDay} onClick={() => run((current) => withdrawDeposit(current, deposit.id))}>{profile.day < deposit.maturityDay ? `تستحق بعد ${formatNumber(deposit.maturityDay - profile.day)} يوم` : 'استرداد الوديعة'}</button>}</article>)}</div>
+        </EconomyPanel>
+        <EconomyPanel title="قرض بضمان" description="يمكن تمويل 60% كحد أقصى من قيمة أرض أو شركة مؤهلة. لكل ضمان قرض نشط واحد وجدول قسط واضح.">
+          {selectedCollateral ? <form className="economy-form" onSubmit={(event: FormEvent<HTMLFormElement>) => { event.preventDefault(); run((current) => takeLoan(current, selectedCollateral.type, selectedCollateral.id, Number(loanAmount), Number(loanTerm))); }}><div className="economy-form-row"><div className="economy-field"><label htmlFor="loan-collateral">الضمان</label><select id="loan-collateral" value={selectedCollateral.id} onChange={(event) => setLoanCollateral(event.target.value)}>{collateralOptions.map((item) => <option value={item.id} key={item.id}>{item.label} · {item.type === 'land' ? 'أرض' : 'شركة'}</option>)}</select></div><div className="economy-field"><label htmlFor="loan-amount">مبلغ القرض</label><input id="loan-amount" type="number" min="25000" step="1000" value={loanAmount} onChange={(event) => setLoanAmount(event.target.value)} /></div><div className="economy-field"><label htmlFor="loan-term">مدة السداد</label><select id="loan-term" value={loanTerm} onChange={(event) => setLoanTerm(event.target.value)}><option value="7">7 أيام · 18%</option><option value="14">14 يومًا · 22%</option><option value="30">30 يومًا · 28%</option></select></div></div><div className="economy-meta"><span>القسط يبدأ في اليوم التالي</span><span>القيمة المسجلة للضمان {selectedCollateral.value > 0 ? formatMoney(selectedCollateral.value, country) : 'تُحسب حسب القطاع'}</span></div><button className="button button-primary" type="submit" disabled={Number(loanAmount) < 25000}>طلب القرض</button></form> : <EconomyEmpty title="لا يوجد ضمان مؤهل" message="اشترِ أرضًا أو أسس شركة أولًا حتى يظهر خيار التمويل بضمان." />}
+          <div className="economy-list">{profile.banking.loans.slice().reverse().map((loan) => <article className="economy-card economy-card--soft" key={loan.id}><div className="economy-card-head"><div className="economy-card-title"><span><strong>{formatMoney(loan.principal, country)}</strong><small>المتبقي {formatMoney(loan.remainingBalance, country)} · القسط {formatMoney(loan.installmentAmount, country)}</small></span></div><span className={`economy-pill ${loan.status === 'active' ? 'economy-pill--red' : 'economy-pill--green'}`}>{loan.status === 'active' ? `القسط يوم ${formatNumber(loan.nextPaymentDay)}` : 'مغلق'}</span></div></article>)}</div>
+        </EconomyPanel>
+      </>,
     )}</div>;
   }
 

@@ -80,6 +80,31 @@ export interface InvestmentRecord {
   settledAmount?: number;
 }
 
+export interface DepositRecord {
+  id: string;
+  principal: number;
+  annualRate: number;
+  startedOnDay: number;
+  maturityDay: number;
+  status: 'active' | 'paid' | 'withdrawn';
+  settledAmount?: number;
+}
+
+export interface LoanRecord {
+  id: string;
+  collateralType: 'land' | 'company';
+  collateralId: string;
+  principal: number;
+  totalRepayment: number;
+  annualRate: number;
+  startedOnDay: number;
+  termDays: number;
+  nextPaymentDay: number;
+  installmentAmount: number;
+  remainingBalance: number;
+  status: 'active' | 'paid' | 'defaulted';
+}
+
 export type FinanceLedgerCategory = 'revenue' | 'expense' | 'asset' | 'liability' | 'settlement';
 
 export interface FinanceLedgerEntry {
