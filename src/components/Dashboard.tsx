@@ -105,7 +105,6 @@ export function Dashboard({ profile, country, onNavigate }: DashboardProps) {
         <div className="section-cards">
           {quickSections.map((section) => (
             <button className={`section-card${section.id === 'settings' ? ' section-card--settings' : ''}`} type="button" key={section.id} onClick={() => onNavigate(section.id)}>
-              <span className="section-card-icon"><Icon name={section.icon} size={21} /></span>
               <span className="section-card-copy"><strong>{section.label}</strong><small>{section.subtitle}</small></span>
               <Icon name="chevron" size={17} className="section-chevron" />
             </button>

@@ -182,10 +182,11 @@ button:disabled { cursor: not-allowed; opacity: .55; }
 .sections-area { padding: 18px; background: #fff; border: 1px solid #e5ebf0; border-radius: 14px; box-shadow: 0 6px 18px rgba(9,27,45,.03); }
 .sections-heading { margin-bottom: 13px; }
 .section-cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 9px; }
-.section-card { display: flex; align-items: center; gap: 10px; min-height: 61px; min-width: 0; padding: 9px 10px; text-align: right; background: #fbfcfd; border: 1px solid #ebeff3; border-radius: 11px; cursor: pointer; transition: background .15s, border .15s, transform .15s; }
+.section-card { display: flex; align-items: center; gap: 10px; min-height: 61px; min-width: 0; padding: 12px 14px; text-align: right; background: linear-gradient(110deg, #fff, #fbfcfd); border: 1px solid #e7ecef; border-radius: 12px; cursor: pointer; transition: background .15s, border .15s, transform .15s, box-shadow .15s; }
 .section-card:hover { background: #fffdf7; border-color: #e5d7ad; transform: translateY(-1px); }
 .section-card--settings { background: #f5f8fa; }
-.section-card-icon { display: grid; place-items: center; flex: 0 0 auto; width: 36px; height: 36px; color: #315b76; background: #edf3f7; border-radius: 10px; }
+.section-card:hover { box-shadow: 0 8px 22px rgba(9,27,45,.06); }
+.section-card-icon { display: none; }
 .section-card--settings .section-card-icon { color: #ae882e; background: #f5edd8; }
 .section-card-copy { display: grid; flex: 1; min-width: 0; gap: 3px; }
 .section-card-copy strong { overflow: hidden; color: #2c4053; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
