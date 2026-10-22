@@ -3,6 +3,8 @@ import type { PlayerAsset, PlayerCompany, PlayerLand, PlayerProfile } from '../d
 import type { AuctionBidRecord, DepositRecord, FinanceLedgerEntry, GameEventRecord, InventoryLot, InvestmentRecord, LoanRecord, ProductionOrder, StaffContract, StaffRole } from '../domain/futureSystems';
 import {
   AUCTION_CATALOG,
+  DIRECT_COMPANY_CATALOG,
+  DIRECT_LAND_CATALOG,
   GOLD_PRICE_PER_GRAM,
   findIndustry,
   findInvestment,
@@ -13,7 +15,7 @@ import {
   TASK_CATALOG,
 } from './catalog';
 import { getMarketQuote } from './market';
-import { isAuctionOpen } from './auctions';
+import { isAuctionOpen, resolveAuctionListing } from './auctions';
 import { getInvestmentPayoutRate, getOperatingCostProgression } from './economyBalance';
 
 export type GameErrorCode =
@@ -193,13 +195,14 @@ export function placeBid(profile: PlayerProfile, listingId: string, amount: numb
   const countryError = ensureEgypt(profile);
   if (countryError) return countryError;
   if (!Number.isFinite(amount) || !Number.isInteger(amount) || amount <= 0) return failure(profile, 'invalid-input', 'قيمة العرض يجب أن تكون مبلغًا صحيحًا موجبًا.');
-  const listing = AUCTION_CATALOG.find((entry) => entry.id === listingId && isAuctionOpen(profile, entry));
+  const listing = resolveAuctionListing(profile, listingId);
+  if (listing && !isAuctionOpen(profile, listing)) return failure(profile, 'not-found', 'المزاد غير موجود أو مغلق.');
   if (!listing) return failure(profile, 'not-found', 'المزاد غير موجود أو مغلق.');
   if (profile.lands.some((land) => land.id === listing.id) || profile.assets.some((asset) => asset.id === listing.id)
     || profile.ledger.some((entry) => entry.note.includes(listing.label))) return failure(profile, 'already-owned', 'لقد فزت بهذا المزاد بالفعل.');
   if (amount < listing.minimumBid) return failure(profile, 'invalid-input', 'يجب أن يساوي العرض الحد الأدنى للمزاد أو يتجاوزه.');
 
-  const listingIndex = AUCTION_CATALOG.findIndex((entry) => entry.id === listingId);
+  const listingIndex = AUCTION_CATALOG.findIndex((entry) => listing.id.startsWith(entry.id));
   const highestBotBid = listing.minimumBid + listing.bidIncrement * (2 + Math.max(0, listingIndex));
   const botBids = [
     { bidderId: `${listing.id}-bot-a`, amount: listing.minimumBid + listing.bidIncrement },
@@ -271,6 +274,73 @@ export function placeBid(profile: PlayerProfile, listingId: string, amount: numb
     botBids,
     landId: land.id,
   });
+}
+
+export function buyDirectLand(profile: PlayerProfile, listingId: string): GameResult<{ landId: string; price: number }> {
+  const countryError = ensureEgypt(profile);
+  if (countryError) return countryError;
+  const listing = DIRECT_LAND_CATALOG.find((entry) => entry.id === listingId);
+  if (!listing) return failure(profile, 'not-found', 'عرض الأرض غير موجود.');
+  if (profile.lands.some((land) => land.id === listing.id)) return failure(profile, 'already-owned', 'تم شراء هذه الأرض بالفعل.');
+  if (profile.bankBalance < listing.price) return failure(profile, 'insufficient-funds', 'لا يكفي رصيدك لشراء الأرض مباشرة.');
+  const land: PlayerLand = { id: listing.id, label: listing.label, areaSquareMeters: listing.areaSquareMeters, purchasePrice: listing.price, acquiredAt: timestampFor(profile), landType: listing.landType };
+  const nextProfile = addLedger(
+    { ...profile, lands: [...profile.lands, land] },
+    [ledgerEntry(profile, 'asset', listing.price, `شراء أرض مباشر: ${listing.label}`, 0)],
+    profile.bankBalance - listing.price,
+  );
+  return success(syncTasks(nextProfile), `تم شراء ${listing.label} مباشرة.`, { landId: land.id, price: listing.price });
+}
+
+export function buyDirectCompany(profile: PlayerProfile, listingId: string): GameResult<{ companyId: string; landId: string; price: number }> {
+  const countryError = ensureEgypt(profile);
+  if (countryError) return countryError;
+  const listing = DIRECT_COMPANY_CATALOG.find((entry) => entry.id === listingId);
+  const industry = listing ? findIndustry(listing.industryId) : undefined;
+  if (!listing || !industry) return failure(profile, 'not-found', 'عرض الشركة غير موجود.');
+  if (profile.companies.some((company) => company.id === listing.id)) return failure(profile, 'already-owned', 'تم شراء هذه الشركة بالفعل.');
+  if (profile.bankBalance < listing.price) return failure(profile, 'insufficient-funds', 'لا يكفي رصيدك لشراء الشركة مباشرة.');
+  const landId = `${listing.id}-land`;
+  const licenseId = `${listing.id}-license`;
+  const land: PlayerLand = { id: landId, label: `${listing.name} · أرض الشركة`, areaSquareMeters: listing.areaSquareMeters, purchasePrice: Math.floor(listing.price * 0.45), acquiredAt: timestampFor(profile), landType: listing.landType };
+  const company: PlayerCompany = { id: listing.id, name: listing.name, industryId: listing.industryId, countryId: profile.countryId, foundedAt: timestampFor(profile), landId, licenseIds: [licenseId], energyUnits: industry.energyCapacity, energyCapacity: industry.energyCapacity, operatingCostPerDay: industry.dailyOperatingCost };
+  const license = { id: licenseId, countryId: profile.countryId, industryId: listing.industryId, feePaid: Math.floor(listing.price * 0.15), issuedAt: timestampFor(profile) };
+  const nextProfile = addLedger(
+    { ...profile, lands: [...profile.lands, land], companies: [...profile.companies, company], licenses: [...profile.licenses, license] },
+    [ledgerEntry(profile, 'asset', listing.price, `شراء شركة مباشر: ${listing.name}`, 0)],
+    profile.bankBalance - listing.price,
+  );
+  return success(syncTasks(nextProfile), `تم شراء ${listing.name} مع أرضها وتجهيزها للتشغيل.`, { companyId: company.id, landId, price: listing.price });
+}
+
+export function sellLand(profile: PlayerProfile, landId: string): GameResult<{ landId: string; payout: number }> {
+  const land = profile.lands.find((item) => item.id === landId);
+  if (!land) return failure(profile, 'not-found', 'الأرض غير موجودة.');
+  if (profile.companies.some((company) => company.landId === landId)) return failure(profile, 'condition-not-met', 'لا يمكن بيع أرض مرتبطة بشركة. بع الشركة أو انقلها أولًا.');
+  const payout = Math.floor(land.purchasePrice * 0.5);
+  const nextProfile = addLedger({ ...profile, lands: profile.lands.filter((item) => item.id !== landId) }, [ledgerEntry(profile, 'revenue', payout, `بيع أرض: ${land.label} بنصف القيمة`, 0)], profile.bankBalance + payout);
+  return success(nextProfile, `تم بيع ${land.label} واسترداد 50% من قيمتها.`, { landId, payout });
+}
+
+export function sellCompany(profile: PlayerProfile, companyId: string): GameResult<{ companyId: string; payout: number }> {
+  const company = profile.companies.find((item) => item.id === companyId);
+  if (!company) return failure(profile, 'not-found', 'الشركة غير موجودة.');
+  if (profile.productionOrders.some((order) => order.companyId === companyId && order.status === 'active')) return failure(profile, 'condition-not-met', 'أوقف أو أكمل أوامر الإنتاج قبل بيع الشركة.');
+  if (profile.staff.some((member) => member.companyId === companyId && member.status === 'active')) return failure(profile, 'condition-not-met', 'أنه عقود موظفي الشركة قبل بيعها.');
+  const industry = findIndustry(company.industryId);
+  const land = company.landId ? profile.lands.find((item) => item.id === company.landId) : undefined;
+  const value = (industry?.setupFee ?? 0) + (industry?.licenseFee ?? 0) + (land?.purchasePrice ?? 0);
+  const payout = Math.floor(value * 0.5);
+  const nextProfile = addLedger({ ...profile, companies: profile.companies.filter((item) => item.id !== companyId), lands: land ? profile.lands.filter((item) => item.id !== land.id) : profile.lands, licenses: profile.licenses.filter((license) => !company.licenseIds?.includes(license.id)) }, [ledgerEntry(profile, 'revenue', payout, `بيع شركة: ${company.name} بنصف القيمة`, 0)], profile.bankBalance + payout);
+  return success(nextProfile, `تم بيع ${company.name} واسترداد 50% من قيمة الشركة وأرضها.`, { companyId, payout });
+}
+
+export function sellAsset(profile: PlayerProfile, assetId: string): GameResult<{ assetId: string; payout: number }> {
+  const asset = profile.assets.find((item) => item.id === assetId);
+  if (!asset) return failure(profile, 'not-found', 'الأصل غير موجود.');
+  const payout = Math.floor(asset.value * 0.5);
+  const nextProfile = addLedger({ ...profile, assets: profile.assets.filter((item) => item.id !== assetId) }, [ledgerEntry(profile, 'revenue', payout, `بيع أصل: ${asset.label} بنصف القيمة`, 0)], profile.bankBalance + payout);
+  return success(nextProfile, `تم بيع ${asset.label} واسترداد 50% من قيمته.`, { assetId, payout });
 }
 
 export function buyMaterial(profile: PlayerProfile, materialId: string, quantity: number): GameResult<{ materialId: string; quantity: number; totalCost: number }> {

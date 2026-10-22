@@ -55,6 +55,23 @@ export interface InvestmentCatalogEntry {
   riskRate: number;
 }
 
+export interface DirectLandListing {
+  id: string;
+  label: string;
+  landType: 'industrial' | 'agricultural' | 'commercial';
+  areaSquareMeters: number;
+  price: number;
+}
+
+export interface DirectCompanyListing {
+  id: string;
+  name: string;
+  industryId: IndustryId;
+  landType: 'industrial' | 'agricultural' | 'commercial';
+  areaSquareMeters: number;
+  price: number;
+}
+
 export type TaskCondition =
   | 'own-land'
   | 'own-company'
@@ -128,6 +145,18 @@ export const AUCTION_CATALOG: readonly AuctionListing[] = [
   { id: 'land-suez-commerce', countryId: 'egypt', lotType: 'land', label: 'موقع السويس التجاري', landType: 'commercial', areaSquareMeters: 300, minimumBid: 210_000, bidIncrement: 15_000, closesAt: '2099-12-31T00:00:00.000Z', status: 'open' },
   { id: 'factory-petroleum-expansion', countryId: 'egypt', lotType: 'factory', label: 'خط تكرير إضافي', landType: 'industrial', areaSquareMeters: 0, minimumBid: 240_000, bidIncrement: 20_000, closesAt: '2099-12-31T00:00:00.000Z', status: 'open', energyCapacityBonus: 40 },
   { id: 'bulk-crude-oil', countryId: 'egypt', lotType: 'raw-material', label: 'شحنة خام نفط كبيرة', landType: 'industrial', areaSquareMeters: 0, minimumBid: 30_000, bidIncrement: 4_000, closesAt: '2099-12-31T00:00:00.000Z', status: 'open', materialId: 'crude-oil', quantity: 15 },
+];
+
+export const DIRECT_LAND_CATALOG: readonly DirectLandListing[] = [
+  { id: 'direct-land-port-said', label: 'أرض بورسعيد اللوجستية', landType: 'commercial', areaSquareMeters: 420, price: 285_000 },
+  { id: 'direct-land-minya-farm', label: 'مزرعة المنيا الإنتاجية', landType: 'agricultural', areaSquareMeters: 900, price: 240_000 },
+  { id: 'direct-land-sokhna-industrial', label: 'موقع العين السخنة الصناعي', landType: 'industrial', areaSquareMeters: 520, price: 360_000 },
+];
+
+export const DIRECT_COMPANY_CATALOG: readonly DirectCompanyListing[] = [
+  { id: 'direct-company-food', name: 'شركة النيل للمنتجات الغذائية', industryId: 'food', landType: 'agricultural', areaSquareMeters: 650, price: 430_000 },
+  { id: 'direct-company-logistics', name: 'شركة الممرات اللوجستية', industryId: 'transport', landType: 'commercial', areaSquareMeters: 500, price: 520_000 },
+  { id: 'direct-company-energy', name: 'شركة طاقة المستقبل', industryId: 'electricity', landType: 'industrial', areaSquareMeters: 600, price: 680_000 },
 ];
 
 export const INVESTMENT_CATALOG: readonly InvestmentCatalogEntry[] = [

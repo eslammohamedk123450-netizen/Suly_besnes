@@ -13,6 +13,24 @@ export function getAuctionCloseAt(profile: PlayerProfile, listing: AuctionListin
   return new Date(cycleStart + closeHour * 60 * 60 * 1000).toISOString();
 }
 
+function wasWon(profile: PlayerProfile, listingId: string): boolean {
+  return profile.lands.some((land) => land.id === listingId || land.id.startsWith(`${listingId}-renewed-`))
+    || profile.assets.some((asset) => asset.id === listingId || asset.id.startsWith(`${listingId}-renewed-`))
+    || profile.auctionHistory.some((bid) => bid.listingId.startsWith(listingId) && bid.bidder === 'player');
+}
+
+export function getAuctionListings(profile: PlayerProfile): AuctionListing[] {
+  return AUCTION_CATALOG.map((base) => {
+    if (!wasWon(profile, base.id)) return base;
+    const cycle = Math.max(1, profile.auctionHistory.filter((bid) => bid.listingId.startsWith(base.id) && bid.bidder === 'player').length);
+    return { ...base, id: `${base.id}-renewed-${cycle}`, label: `${base.label} · عرض جديد ${cycle}` };
+  });
+}
+
+export function resolveAuctionListing(profile: PlayerProfile, listingId: string): AuctionListing | undefined {
+  return getAuctionListings(profile).find((listing) => listing.id === listingId);
+}
+
 export function isAuctionOpen(profile: PlayerProfile, listing: AuctionListing): boolean {
   return listing.status === 'open' && Date.now() < Date.parse(getAuctionCloseAt(profile, listing));
 }

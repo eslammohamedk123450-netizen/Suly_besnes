@@ -1,7 +1,7 @@
 import type { SectionId } from '../domain/navigation';
 import type { PlayerProfile } from '../domain/player';
 import { AUCTION_CATALOG, findIndustry, findMaterial, findInvestment, PRODUCT_CATALOG, RECIPE_CATALOG, TASK_CATALOG } from './catalog';
-import { isAuctionOpen } from './auctions';
+import { getAuctionListings, isAuctionOpen } from './auctions';
 import { getOperatingCostProgression } from './economyBalance';
 
 export interface InventorySummaryRow {
@@ -70,7 +70,7 @@ export interface EmpirePulse {
 }
 
 export function selectAvailableAuctions(profile: PlayerProfile): typeof AUCTION_CATALOG {
-  return AUCTION_CATALOG.filter((listing) => isAuctionOpen(profile, listing));
+  return getAuctionListings(profile).filter((listing) => isAuctionOpen(profile, listing));
 }
 
 export function selectEmpirePulse(profile: PlayerProfile): EmpirePulse {
