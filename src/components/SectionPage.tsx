@@ -1,4 +1,4 @@
-import { useState, type FormEvent, type ReactNode } from 'react';
+import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import type { CountryDefinition, IndustryId } from '../domain/countries';
 import type { PlayerProfile } from '../domain/player';
 import type { NotificationTheme } from '../storage/userPreferences';
@@ -50,6 +50,13 @@ export function SectionPage({ section, profile, country, notificationTheme, onNo
   const [staffRole, setStaffRole] = useState<StaffRole>('manager');
   const [staffCompany, setStaffCompany] = useState('');
   const [auctionCompanyIds, setAuctionCompanyIds] = useState<Record<string, string>>({});
+  const [, setAuctionTick] = useState(0);
+
+  useEffect(() => {
+    if (section.id !== 'auctions') return undefined;
+    const timer = window.setInterval(() => setAuctionTick((value) => value + 1), 1000);
+    return () => window.clearInterval(timer);
+  }, [section.id]);
 
   const dayLabel = `اليوم ${formatNumber(profile.day)}`;
   const balanceLabel = `الرصيد ${formatMoney(profile.bankBalance, country)}`;
@@ -166,7 +173,9 @@ export function SectionPage({ section, profile, country, notificationTheme, onNo
               const value = bidAmounts[listing.id] ?? String(recommended);
               const material = MATERIAL_CATALOG.find((item) => item.id === listing.materialId);
               const closeAt = getAuctionCloseAt(profile, listing);
-              const bidHistory = profile.auctionHistory.filter((bid) => bid.listingId === listing.id).slice(-3).reverse();
+              const listingHistory = profile.auctionHistory.filter((bid) => bid.listingId === listing.id);
+              const highestBid = listingHistory.reduce((highest, bid) => Math.max(highest, bid.amount), 0);
+              const bidHistory = listingHistory.slice(-3).reverse();
               const lotSummary = listing.lotType === 'land'
                 ? `${formatNumber(listing.areaSquareMeters)} م² · أرض ${landTypeNames[listing.landType]}`
                 : listing.lotType === 'factory'
@@ -179,7 +188,7 @@ export function SectionPage({ section, profile, country, notificationTheme, onNo
                   <span className="economy-price">{formatMoney(listing.minimumBid, country)}</span>
                 </div>
                 <div className="economy-card-body">
-                  <div className="economy-meta"><span>الحد الأدنى للعرض {formatMoney(listing.minimumBid, country)}</span><span>الزيادة {formatMoney(listing.bidIncrement, country)}</span><span className="economy-pill economy-pill--gold">الإغلاق خلال {formatAuctionCountdown(closeAt)}</span></div>
+                  <div className="economy-meta"><span>الحد الأدنى للعرض {formatMoney(listing.minimumBid, country)}</span><span>أعلى عرض حالي {highestBid > 0 ? formatMoney(highestBid, country) : 'لا يوجد'}</span><span>الزيادة {formatMoney(listing.bidIncrement, country)}</span><span className="economy-pill economy-pill--gold">الإغلاق خلال {formatAuctionCountdown(closeAt)}</span></div>
                   {bidHistory.length > 0 && <div className="economy-inline-note">آخر المنافسات: {bidHistory.map((bid) => `${bid.bidder === 'player' ? 'أنت' : 'منافس آلي'} ${formatMoney(bid.amount, country)}`).join(' · ')}</div>}
                   <form className="economy-form" onSubmit={(event: FormEvent<HTMLFormElement>) => { event.preventDefault(); run((current) => placeBid(current, listing.id, Number(value), listing.lotType === 'factory' ? auctionCompanyIds[listing.id] : undefined)); }}>
                     <div className="economy-form-row"><div className="economy-field"><label htmlFor={`bid-${listing.id}`}>عرضك ({country.currency.symbol})</label><input id={`bid-${listing.id}`} type="number" min={listing.minimumBid} step={listing.bidIncrement} value={value} onChange={(event) => setBidAmounts((previous) => ({ ...previous, [listing.id]: event.target.value }))} /></div><div className="economy-field"><label>عرض مرجّح للفوز</label><input value={formatMoney(recommended, country)} readOnly /></div></div>
