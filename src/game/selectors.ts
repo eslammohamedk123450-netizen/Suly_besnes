@@ -39,12 +39,30 @@ export interface OperationsSnapshot {
   productUnits: number;
 }
 
+export interface ObligationRow {
+  id: string;
+  category: 'payable' | 'salary' | 'loan' | 'operating';
+  label: string;
+  amount: number;
+  dueDay: number;
+  overdue: boolean;
+}
+
+export interface ObligationsSummary {
+  rows: ObligationRow[];
+  totalDue: number;
+  overdueAmount: number;
+  dailyPayroll: number;
+  dailyOperatingCost: number;
+}
+
 export function selectAvailableAuctions(): typeof AUCTION_CATALOG {
   return AUCTION_CATALOG.filter((listing) => listing.status === 'open');
 }
 
 export function selectOperationsSnapshot(profile: PlayerProfile, operatingCostMultiplier = 1): OperationsSnapshot {
-  const dailyOperatingCost = profile.companies.reduce((sum, company) => sum + (company.operatingCostPerDay ?? 0), 0) * operatingCostMultiplier;
+  const managedCompanyIds = new Set(profile.staff.filter((member) => member.status === 'active' && member.role === 'manager' && member.companyId).map((member) => member.companyId));
+  const dailyOperatingCost = profile.companies.reduce((sum, company) => sum + (company.operatingCostPerDay ?? 0) * (managedCompanyIds.has(company.id) ? 0.92 : 1), 0) * operatingCostMultiplier;
   const runwayDays = dailyOperatingCost > 0 ? Math.floor(profile.bankBalance / dailyOperatingCost) : null;
   const productUnits = (profile.inventory ?? []).reduce((sum, lot) => (
     PRODUCT_CATALOG.some((product) => product.id === lot.materialOrProductId) ? sum + lot.quantity : sum
@@ -56,7 +74,9 @@ export function selectOperationsSnapshot(profile: PlayerProfile, operatingCostMu
     ) >= input.quantity));
   }).length;
   let nextStep: OperationsNextStep;
-  if (profile.lands.length === 0) {
+  if (profile.payables > 0) {
+    nextStep = { section: 'obligations', title: 'سدّد الالتزامات الحرجة', description: `لديك ${Math.round(profile.payables).toLocaleString('ar-EG')} ج.م مسجلة كالتزامات. راجع الأولويات قبل التوسع حتى لا تتوقف الطاقة.`, actionLabel: 'فتح الالتزامات', tone: 'gold' };
+  } else if (profile.lands.length === 0) {
     nextStep = { section: 'auctions', title: 'اشترِ أول أرض', description: 'الأرض هي مفتاح تأسيس أول نشاط. ابدأ بمزاد يناسب القطاع الذي تريد دخوله.', actionLabel: 'فتح المزادات', tone: 'gold' };
   } else if (profile.companies.length === 0) {
     nextStep = { section: 'companies', title: 'أسس أول شركة', description: 'لديك أصل يمكن تشغيله. اختر قطاعًا يناسب نوع الأرض واترك احتياطيًا للتشغيل.', actionLabel: 'تأسيس شركة', tone: 'blue' };
@@ -68,6 +88,19 @@ export function selectOperationsSnapshot(profile: PlayerProfile, operatingCostMu
     nextStep = { section: 'inventory', title: 'أمّن مدخلات التشغيل', description: 'الشركات متوقفة بانتظار مواد خام. اشترِ الكمية الضرورية فقط حتى تحافظ على السيولة.', actionLabel: 'فتح المخازن', tone: 'gold' };
   }
   return { nextStep, dailyOperatingCost, runwayDays, readyProductionCompanies, productUnits };
+}
+
+export function selectObligations(profile: PlayerProfile, operatingCostMultiplier = 1): ObligationsSummary {
+  const managedCompanyIds = new Set(profile.staff.filter((member) => member.status === 'active' && member.role === 'manager' && member.companyId).map((member) => member.companyId));
+  const dailyOperatingCost = profile.companies.reduce((sum, company) => sum + (company.operatingCostPerDay ?? 0) * (managedCompanyIds.has(company.id) ? 0.92 : 1), 0) * operatingCostMultiplier;
+  const dailyPayroll = profile.staff.filter((member) => member.status === 'active').reduce((sum, member) => sum + member.dailySalary, 0);
+  const rows: ObligationRow[] = [];
+  if (profile.payables > 0) rows.push({ id: 'payables', category: 'payable', label: 'التزامات متأخرة من التشغيل والأحداث', amount: profile.payables, dueDay: profile.day, overdue: true });
+  profile.staff.filter((member) => member.status === 'active').forEach((member) => rows.push({ id: member.id, category: 'salary', label: `راتب ${member.name}`, amount: member.dailySalary, dueDay: member.nextPayDay, overdue: member.nextPayDay <= profile.day }));
+  profile.banking.loans.filter((loan) => loan.status === 'active').forEach((loan) => rows.push({ id: loan.id, category: 'loan', label: `قسط قرض بضمان ${loan.collateralType === 'land' ? 'أرض' : 'شركة'}`, amount: loan.installmentAmount, dueDay: loan.nextPaymentDay, overdue: loan.nextPaymentDay <= profile.day }));
+  if (dailyOperatingCost > 0) rows.push({ id: 'operating-daily', category: 'operating', label: 'تشغيل الشركات لليوم التالي', amount: dailyOperatingCost, dueDay: profile.day + 1, overdue: false });
+  const overdueAmount = rows.filter((row) => row.overdue).reduce((sum, row) => sum + row.amount, 0);
+  return { rows, totalDue: rows.reduce((sum, row) => sum + row.amount, 0), overdueAmount, dailyPayroll, dailyOperatingCost };
 }
 
 export function selectInventorySummary(profile: PlayerProfile): { rows: InventorySummaryRow[]; totalValue: number } {

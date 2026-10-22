@@ -8,7 +8,7 @@ import { buyGold, buyMaterial, claimTask, createDeposit, createInvestment, found
 import type { StaffRole } from '../domain/futureSystems';
 import { AUCTION_CATALOG, GOLD_PRICE_PER_GRAM, INDUSTRY_CATALOG, INVESTMENT_CATALOG, MATERIAL_CATALOG, PRODUCT_CATALOG, RECIPE_CATALOG } from '../game/catalog';
 import { getMarketQuote } from '../game/market';
-import { selectActiveInvestments, selectAvailableAuctions, selectFinancialReport, selectInventorySummary, selectSalesSummary, selectTaskBoard } from '../game/selectors';
+import { selectActiveInvestments, selectAvailableAuctions, selectFinancialReport, selectInventorySummary, selectObligations, selectSalesSummary, selectTaskBoard } from '../game/selectors';
 import { Icon } from './Icon';
 import { EconomyEmpty, EconomyPageShell, EconomyPanel, EconomyStat } from './EconomyUI';
 
@@ -59,6 +59,19 @@ export function SectionPage({ section, profile, country, notificationTheme, onNo
       <div><span className="section-kicker">إدارة واقتصاد اللعبة</span><h1>{section.label}</h1></div>
     </div>
   );
+
+  if (section.id === 'obligations') {
+    const obligations = selectObligations(profile, country.economy.operatingCostMultiplier ?? 1);
+    const categoryLabels = { payable: 'متأخر', salary: 'راتب', loan: 'قسط قرض', operating: 'تشغيل' } as const;
+    return <div className="section-page">{heading}{pageShell(
+      <>
+        <div className="economy-grid economy-grid--three-mobile"><EconomyStat label="إجمالي الاستحقاقات" value={formatMoney(obligations.totalDue, country)} /><EconomyStat label="متأخر عن السداد" value={formatMoney(obligations.overdueAmount, country)} /><EconomyStat label="الرواتب اليومية" value={formatMoney(obligations.dailyPayroll, country)} /></div>
+        <EconomyPanel title="خريطة الالتزامات" description="تُسدد الرواتب والأقساط والتشغيل تلقائيًا عند ترحيل اليوم. إذا لم تكفِ السيولة، يظهر الجزء غير المدفوع كالتزام ويوقف الطاقة عند الحاجة.">
+          {obligations.rows.length === 0 ? <EconomyEmpty title="لا توجد التزامات مسجلة" message="ابدأ التشغيل أو التوظيف أو التمويل حتى تظهر المواعيد والتكاليف هنا." /> : <div className="economy-list">{obligations.rows.map((row) => <article className={`economy-card economy-card--soft${row.overdue ? ' obligation-card--overdue' : ''}`} key={row.id}><div className="economy-card-head"><div className="economy-card-title"><span><strong>{row.label}</strong><small>{categoryLabels[row.category]} · موعد السداد {row.overdue ? 'متأخر' : `اليوم ${formatNumber(row.dueDay)}`}</small></span></div><span className={`economy-pill ${row.overdue ? 'economy-pill--red' : 'economy-pill--gold'}`}>{formatMoney(row.amount, country)}</span></div></article>)}</div>}
+        </EconomyPanel>
+      </>,
+    )}</div>;
+  }
 
   if (section.id === 'settings') {
     return <div className="section-page">{heading}{pageShell(

@@ -384,7 +384,8 @@ export function sellProduct(profile: PlayerProfile, productId: string, quantity:
   if (!marketQuote) return failure(profile, 'not-found', 'لا يوجد عرض سوق لهذا المنتج اليوم.');
   if (quantity > marketQuote.demandUnits) return failure(profile, 'market-limit', `الطلب المتاح اليوم ${marketQuote.demandUnits} وحدة فقط؛ خفّض الكمية أو انتظر يومًا آخر.`);
   const grossRevenue = quantity * marketQuote.currentPrice;
-  const taxRate = findCountry(profile.countryId)?.economy.taxRate ?? 0;
+  const hasAccountant = profile.staff.some((member) => member.status === 'active' && member.role === 'accountant');
+  const taxRate = (findCountry(profile.countryId)?.economy.taxRate ?? 0) * (hasAccountant ? 0.9 : 1);
   const tax = Math.round(grossRevenue * taxRate);
   const costOfGoods = Math.round(lot.unitCost * quantity);
   const nextInventory = profile.inventory.map((item) => item.materialOrProductId === productId ? { ...item, quantity: item.quantity - quantity } : item).filter((item) => item.quantity > 0);
@@ -477,12 +478,14 @@ export function hireStaff(profile: PlayerProfile, role: StaffRole, name: string,
   if (!option || name.trim().length < 2) return failure(profile, 'invalid-input', 'أدخل اسمًا صحيحًا واختر دورًا معروفًا.');
   if (option.companyRequired && !profile.companies.some((company) => company.id === companyId)) return failure(profile, 'not-found', 'المدير يجب أن يرتبط بشركة موجودة.');
   if (role === 'manager' && profile.staff.some((member) => member.status === 'active' && member.role === 'manager' && member.companyId === companyId)) return failure(profile, 'invalid-input', 'هذه الشركة لديها مدير نشط بالفعل.');
-  if (profile.bankBalance < option.dailySalary) return failure(profile, 'insufficient-funds', 'لا يكفي الرصيد لتوقيع عقد الموظف ودفع يوم التعاقد.');
+  const hasHr = profile.staff.some((member) => member.status === 'active' && member.role === 'hr');
+  const contractCost = Math.round(option.dailySalary * (hasHr ? 0.8 : 1));
+  if (profile.bankBalance < contractCost) return failure(profile, 'insufficient-funds', 'لا يكفي الرصيد لتوقيع عقد الموظف ودفع يوم التعاقد.');
   const staff: StaffContract = { id: nextId(profile, 'staff', profile.staff.length), role, name: name.trim(), companyId, dailySalary: option.dailySalary, hiredOnDay: profile.day, nextPayDay: profile.day + 1, status: 'active' };
   const nextProfile = addLedger(
     { ...profile, staff: [...profile.staff, staff] },
-    [ledgerEntry(profile, 'expense', option.dailySalary, `توقيع عقد ${option.label}: ${staff.name}`, 0)],
-    profile.bankBalance - option.dailySalary,
+    [ledgerEntry(profile, 'expense', contractCost, `توقيع عقد ${option.label}: ${staff.name}`, 0)],
+    profile.bankBalance - contractCost,
   );
   return success(nextProfile, `تم تعيين ${staff.name} بوظيفة ${option.label}؛ أول راتب دوري في اليوم التالي.`, staff);
 }
@@ -655,7 +658,8 @@ export function advanceDay(profile: PlayerProfile): GameResult<DayOutcome> {
     balance += briefing.event.cashImpact;
     entries.push(ledgerEntry(profile, 'revenue', briefing.event.cashImpact, briefing.event.title, entries.length));
   } else if (briefing.event.cashImpact < 0) {
-    const eventCost = Math.abs(briefing.event.cashImpact);
+    const hasLawyer = profile.staff.some((member) => member.status === 'active' && member.role === 'lawyer');
+    const eventCost = Math.round(Math.abs(briefing.event.cashImpact) * (hasLawyer ? 0.85 : 1));
     const paidEventCost = Math.min(balance, eventCost);
     balance -= paidEventCost;
     eventImpact = -paidEventCost;
