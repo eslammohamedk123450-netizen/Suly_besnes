@@ -1,6 +1,6 @@
 import { findCountry, type IndustryId } from '../domain/countries';
 import type { PlayerAsset, PlayerCompany, PlayerLand, PlayerProfile } from '../domain/player';
-import type { DepositRecord, FinanceLedgerEntry, GameEventRecord, InventoryLot, InvestmentRecord, LoanRecord, StaffContract, StaffRole } from '../domain/futureSystems';
+import type { DepositRecord, FinanceLedgerEntry, GameEventRecord, InventoryLot, InvestmentRecord, LoanRecord, ProductionOrder, StaffContract, StaffRole } from '../domain/futureSystems';
 import {
   AUCTION_CATALOG,
   GOLD_PRICE_PER_GRAM,
@@ -45,10 +45,12 @@ export interface AuctionOutcome {
 }
 
 export interface ProductionOutcome {
+  orderId: string;
   companyId: string;
   productId: string;
   batches: number;
   outputQuantity: number;
+  completesOnDay: number;
 }
 
 export interface SaleOutcome {
@@ -351,25 +353,20 @@ export function runProduction(profile: PlayerProfile, companyId: string, batches
     return sum + input.quantity * batches * (lot?.unitCost ?? 0);
   }, 0);
 
-  let inventory = profile.inventory.map((lot) => {
+  const inventory = profile.inventory.map((lot) => {
     const input = recipe.inputs.find((item) => item.materialId === lot.materialOrProductId);
     return input ? { ...lot, quantity: lot.quantity - input.quantity * batches } : lot;
   }).filter((lot) => lot.quantity > 0);
   const outputQuantity = batches * recipe.outputQuantity;
-  const outputLot = inventory.find((lot) => lot.materialOrProductId === recipe.productId);
-  const outputUnitCost = materialCost / outputQuantity;
-  inventory = outputLot
-    ? inventory.map((lot) => lot.materialOrProductId === recipe.productId
-      ? { ...lot, quantity: lot.quantity + outputQuantity, unitCost: (lot.quantity * lot.unitCost + outputQuantity * outputUnitCost) / (lot.quantity + outputQuantity) }
-      : lot)
-    : [...inventory, { id: nextId(profile, 'inventory', inventory.length), materialOrProductId: recipe.productId, quantity: outputQuantity, unit: recipe.outputUnit, unitCost: outputUnitCost }];
   const companies = profile.companies.map((item) => item.id === companyId ? { ...item, energyUnits: energyAvailable - batches * recipe.energyUnits } : item);
+  const durationDays = Math.min(3, Math.max(1, Math.ceil(batches / 3)));
+  const order: ProductionOrder = { id: nextId(profile, 'production', profile.productionOrders.length), companyId, productId: recipe.productId, productName: recipe.productName, batches, outputQuantity, outputUnit: recipe.outputUnit, materialCost, energyCost, startedOnDay: profile.day, completesOnDay: profile.day + durationDays, status: 'active' };
   const nextProfile = addLedger(
-    { ...profile, inventory, companies },
-    [ledgerEntry(profile, 'expense', energyCost, `تشغيل ${batches} دفعة من ${recipe.productName}`, 0)],
+    { ...profile, inventory, companies, productionOrders: [...profile.productionOrders, order] },
+    [ledgerEntry(profile, 'expense', energyCost, `حجز طاقة لأمر إنتاج ${recipe.productName}`, 0), ledgerEntry(profile, 'asset', materialCost, `حجز مواد لأمر إنتاج ${recipe.productName}`, 1)],
     profile.bankBalance - energyCost,
   );
-  return success(syncTasks(nextProfile), `تم إنتاج ${outputQuantity} من ${recipe.productName}.`, { companyId, productId: recipe.productId, batches, outputQuantity });
+  return success(syncTasks(nextProfile), `بدأ أمر إنتاج ${recipe.productName} ويكتمل في اليوم ${order.completesOnDay}.`, { orderId: order.id, companyId, productId: recipe.productId, batches, outputQuantity, completesOnDay: order.completesOnDay });
 }
 
 export function sellProduct(profile: PlayerProfile, productId: string, quantity: number): GameResult<SaleOutcome> {
@@ -628,6 +625,19 @@ export function advanceDay(profile: PlayerProfile): GameResult<DayOutcome> {
     }
     return { ...employee, nextPayDay: nextDay + 1 };
   });
+  let inventory = [...profile.inventory];
+  const productionOrders = profile.productionOrders.map((order) => {
+    if (order.status !== 'active' || order.completesOnDay > nextDay) return order;
+    const unitCost = order.materialCost / order.outputQuantity;
+    const existingLot = inventory.find((lot) => lot.materialOrProductId === order.productId);
+    inventory = existingLot
+      ? inventory.map((lot) => lot.materialOrProductId === order.productId
+        ? { ...lot, quantity: lot.quantity + order.outputQuantity, unitCost: (lot.quantity * lot.unitCost + order.outputQuantity * unitCost) / (lot.quantity + order.outputQuantity) }
+        : lot)
+      : [...inventory, { id: nextId(profile, 'inventory', inventory.length), materialOrProductId: order.productId, quantity: order.outputQuantity, unit: order.outputUnit, unitCost }];
+    entries.push(ledgerEntry(profile, 'asset', order.materialCost, `اكتمل أمر إنتاج ${order.productName}`, entries.length));
+    return { ...order, status: 'completed' as const };
+  });
   const paidOperatingCost = Math.min(balance, operatingCost);
   balance -= paidOperatingCost;
   if (operatingCost > 0) entries.push(ledgerEntry(profile, 'expense', operatingCost, 'مصروفات التشغيل اليومية المستحقة', entries.length));
@@ -685,7 +695,7 @@ export function advanceDay(profile: PlayerProfile): GameResult<DayOutcome> {
   });
   const event: GameEventRecord = { id: `event-${nextDay}`, day: nextDay, title: briefing.event.title, cashImpact: eventImpact, occurredAt: now };
   const nextProfile = addLedger(
-    { ...profile, day: nextDay, companies, investments, banking: { ...profile.banking, loans }, staff, events: [...profile.events, event], payables },
+    { ...profile, day: nextDay, companies, investments, banking: { ...profile.banking, loans }, staff, productionOrders, inventory, events: [...profile.events, event], payables },
     entries,
     balance,
   );

@@ -1,6 +1,6 @@
 import { findCountry, type CountryId, type IndustryId } from '../domain/countries';
 import type { PlayerAsset, PlayerCompany, PlayerLand, PlayerProfile } from '../domain/player';
-import type { DepositRecord, FinanceLedgerEntry, InventoryLot, InvestmentRecord, LicenseRecord, LoanRecord, ProductSale, StaffContract, TaskProgress } from '../domain/futureSystems';
+import type { DepositRecord, FinanceLedgerEntry, InventoryLot, InvestmentRecord, LicenseRecord, LoanRecord, ProductSale, ProductionOrder, StaffContract, TaskProgress } from '../domain/futureSystems';
 import { findIndustry, GOLD_PRICE_PER_GRAM } from '../game/catalog';
 
 const SAVE_KEY = 'business-empire.save.v1';
@@ -107,6 +107,16 @@ function isStaffContract(value: unknown): value is StaffContract {
     && Number.isInteger(value.hiredOnDay) && (value.hiredOnDay as number) >= 1
     && Number.isInteger(value.nextPayDay) && (value.nextPayDay as number) >= (value.hiredOnDay as number)
     && (value.status === 'active' || value.status === 'terminated');
+}
+
+function isProductionOrder(value: unknown): value is ProductionOrder {
+  return isRecord(value) && isNonEmptyString(value.id) && isNonEmptyString(value.companyId) && isNonEmptyString(value.productId)
+    && isNonEmptyString(value.productName) && Number.isInteger(value.batches) && (value.batches as number) > 0
+    && Number.isInteger(value.outputQuantity) && (value.outputQuantity as number) > 0 && isNonEmptyString(value.outputUnit)
+    && isFiniteNonNegative(value.materialCost) && isFiniteNonNegative(value.energyCost)
+    && Number.isInteger(value.startedOnDay) && (value.startedOnDay as number) >= 1
+    && Number.isInteger(value.completesOnDay) && (value.completesOnDay as number) >= (value.startedOnDay as number)
+    && (value.status === 'active' || value.status === 'completed' || value.status === 'cancelled');
 }
 
 function isSale(value: unknown): value is ProductSale {
@@ -216,6 +226,7 @@ function migrateProfile(value: unknown): PlayerProfile | null {
     loans: Array.isArray(rawBanking.loans) && rawBanking.loans.every(isLoan) ? rawBanking.loans : [],
   };
   const staff = Array.isArray(value.staff) && value.staff.every(isStaffContract) ? value.staff : [];
+  const productionOrders = Array.isArray(value.productionOrders) && value.productionOrders.every(isProductionOrder) ? value.productionOrders : [];
 
   return {
     id: value.id as string,
@@ -237,6 +248,7 @@ function migrateProfile(value: unknown): PlayerProfile | null {
     investments: Array.isArray(value.investments) && value.investments.every(isInvestment) ? value.investments : [],
     banking,
     staff,
+    productionOrders,
     sales: Array.isArray(value.sales) && value.sales.every(isSale) ? value.sales : [],
     ledger,
     events: Array.isArray(value.events) ? value.events as PlayerProfile['events'] : [],

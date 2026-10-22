@@ -118,6 +118,21 @@ export interface StaffContract {
   status: 'active' | 'terminated';
 }
 
+export interface ProductionOrder {
+  id: string;
+  companyId: string;
+  productId: string;
+  productName: string;
+  batches: number;
+  outputQuantity: number;
+  outputUnit: string;
+  materialCost: number;
+  energyCost: number;
+  startedOnDay: number;
+  completesOnDay: number;
+  status: 'active' | 'completed' | 'cancelled';
+}
+
 export type FinanceLedgerCategory = 'revenue' | 'expense' | 'asset' | 'liability' | 'settlement';
 
 export interface FinanceLedgerEntry {

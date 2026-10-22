@@ -9,6 +9,7 @@ import type {
   StaffContract,
   LicenseRecord,
   ProductSale,
+  ProductionOrder,
   TaskProgress,
 } from './futureSystems';
 
@@ -69,6 +70,7 @@ export interface PlayerProfile {
     loans: LoanRecord[];
   };
   staff: StaffContract[];
+  productionOrders: ProductionOrder[];
   sales: ProductSale[];
   ledger: FinanceLedgerEntry[];
   events: GameEventRecord[];
@@ -106,6 +108,7 @@ export function createNewPlayer(
     investments: [],
     banking: { deposits: [], loans: [] },
     staff: [],
+    productionOrders: [],
     sales: [],
     ledger: [],
     events: [],
