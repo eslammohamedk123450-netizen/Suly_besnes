@@ -1,0 +1,22 @@
+{
+  "id": "/",
+  "name": "إمبراطورية الأعمال | Business Empire",
+  "short_name": "إمبراطورية الأعمال",
+  "description": "محاكاة إدارة أعمال عربية تعمل محليًا على جهازك.",
+  "lang": "ar",
+  "dir": "rtl",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#07192a",
+  "theme_color": "#07192a",
+  "icons": [
+    {
+      "src": "/icons/app-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
