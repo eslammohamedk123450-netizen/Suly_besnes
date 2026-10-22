@@ -81,6 +81,13 @@ export default function App() {
     handleGameResult(action(profile));
   }
 
+  function handleRedeemed(nextProfile: PlayerProfile, message: string) {
+    const saved = saveGame(nextProfile, account?.id);
+    setProfile(nextProfile);
+    setNotice(saved.ok ? message : `${message} تعذر تثبيت الحفظ على هذا الجهاز.`);
+    setNoticeTone(saved.ok ? 'success' : 'error');
+  }
+
   function handleDaysElapsed(days: number) {
     if (!profile) return;
     let current = profile;
@@ -163,7 +170,7 @@ export default function App() {
           {activeSection === 'home' ? (
             <Dashboard profile={profile} country={country} onNavigate={navigate} />
           ) : (
-            <SectionPage section={active} profile={profile} country={country} notificationTheme={notificationTheme} onNotificationThemeChange={setNotificationTheme} onHome={() => navigate('home')} onAction={handleGameResult} />
+            <SectionPage section={active} profile={profile} country={country} notificationTheme={notificationTheme} onNotificationThemeChange={setNotificationTheme} onHome={() => navigate('home')} onAction={handleGameResult} onRedeemed={handleRedeemed} />
           )}
         </main>
       </div>

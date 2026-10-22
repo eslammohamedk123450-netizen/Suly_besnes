@@ -74,6 +74,7 @@ export interface PlayerProfile {
   staff: StaffContract[];
   productionOrders: ProductionOrder[];
   auctionHistory: AuctionBidRecord[];
+  redeemedCodeIds: string[];
   sales: ProductSale[];
   ledger: FinanceLedgerEntry[];
   events: GameEventRecord[];
@@ -113,6 +114,7 @@ export function createNewPlayer(
     staff: [],
     productionOrders: [],
     auctionHistory: [],
+    redeemedCodeIds: [],
     sales: [],
     ledger: [],
     events: [],

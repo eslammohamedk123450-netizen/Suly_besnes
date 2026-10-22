@@ -187,6 +187,16 @@
 .settings-theme-switch button.is-selected { color: #fff; background: #102b43; box-shadow: 0 2px 7px rgba(7,25,42,.18); }
 .settings-credit { margin-top: 19px; padding-top: 14px; color: #7b8995; border-top: 1px solid #e9eef2; font-size: 10px; text-align: center; }
 .settings-credit strong { margin-inline-start: 4px; color: #a17f2b; direction: ltr; display: inline-block; letter-spacing: .25px; }
+.code-redemption { display: grid; gap: 10px; margin-top: 18px; padding: 15px; background: linear-gradient(135deg, #fffaf0, #fff); border: 1px solid #eadfbd; border-radius: 13px; }
+.code-redemption > div:first-child { display: grid; gap: 3px; }
+.code-redemption strong { color: #203b52; font-size: 12px; }
+.code-redemption p { margin: 0; color: #82909c; font-size: 9px; line-height: 1.7; }
+.code-redemption-form { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
+.code-redemption-form input { min-width: 0; height: 38px; padding: 0 10px; direction: ltr; text-align: left; color: #263d52; background: #fff; border: 1px solid #ded6bd; border-radius: 9px; font: 10px/1 Arial, sans-serif; }
+.code-redemption-form .button { min-height: 38px; padding-inline: 11px; font-size: 10px; }
+.code-redemption-notice { padding: 8px 10px; color: #9a3d43; background: #fff3f3; border-radius: 8px; font-size: 9px; }
+.code-redemption-notice.is-success { color: #257457; background: #effaf5; }
+.code-redemption > small { color: #9b8a5a; font-size: 8px; }
 @keyframes toast-enter { from { opacity: 0; transform: translate(50%, -8px); } to { opacity: 1; transform: translate(50%, 0); } }
 @media (prefers-reduced-motion: reduce) { .toast { animation: none; } }
 @media (max-width: 760px) {

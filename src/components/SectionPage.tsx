@@ -13,6 +13,7 @@ import { getInvestmentPayoutRate, getOperatingCostProgression } from '../game/ec
 import { selectActiveInvestments, selectAvailableAuctions, selectFinancialReport, selectInventorySummary, selectObligations, selectSalesSummary, selectTaskBoard } from '../game/selectors';
 import { Icon } from './Icon';
 import { EconomyEmpty, EconomyPageShell, EconomyPanel, EconomyStat } from './EconomyUI';
+import { CodeRedemption } from './CodeRedemption';
 
 interface SectionPageProps {
   section: SectionItem;
@@ -22,12 +23,13 @@ interface SectionPageProps {
   onNotificationThemeChange: (theme: NotificationTheme) => void;
   onHome: () => void;
   onAction: (result: GameResult<unknown>) => void;
+  onRedeemed: (profile: PlayerProfile, message: string) => void;
 }
 
 const landTypeNames = { industrial: 'صناعية', agricultural: 'زراعية', commercial: 'تجارية' } as const;
 const ledgerLabels = { revenue: 'إيراد', expense: 'مصروف', asset: 'أصل', liability: 'التزام', settlement: 'سداد التزام' } as const;
 
-export function SectionPage({ section, profile, country, notificationTheme, onNotificationThemeChange, onHome, onAction }: SectionPageProps) {
+export function SectionPage({ section, profile, country, notificationTheme, onNotificationThemeChange, onHome, onAction, onRedeemed }: SectionPageProps) {
   const [bidAmounts, setBidAmounts] = useState<Record<string, string>>({});
   const [companyName, setCompanyName] = useState('شركة جديدة');
   const [industryId, setIndustryId] = useState<IndustryId>('food');
@@ -85,7 +87,8 @@ export function SectionPage({ section, profile, country, notificationTheme, onNo
           <div className="settings-row"><span>اليوم داخل العالم</span><strong>{formatNumber(profile.day)}</strong></div>
           <div className="settings-row"><span>المستوى</span><strong>{formatNumber(profile.level)}</strong></div>
           <div className="settings-row"><span>طريقة الحفظ</span><strong className="saved-status"><span /> على هذا الجهاز</strong></div>
-          <div className="settings-note"><Icon name="shield" size={17} /><p>لا يوجد خادم أو تسجيل دخول. تقدمك محفوظ محليًا على هذا الجهاز.</p></div>
+          <div className="settings-note"><Icon name="shield" size={17} /><p>الحساب وتقدمك محفوظان محليًا على هذا الجهاز. لا توجد أكواد تحقق لتسجيل الدخول.</p></div>
+          <CodeRedemption profile={profile} onRedeemed={onRedeemed} />
           <div className="settings-notice-theme">
             <span>مظهر الإشعارات</span>
             <div className="settings-theme-switch" role="group" aria-label="اختيار مظهر الإشعارات">

@@ -243,6 +243,7 @@ function migrateProfile(value: unknown): PlayerProfile | null {
   const staff = Array.isArray(value.staff) && value.staff.every(isStaffContract) ? value.staff : [];
   const productionOrders = Array.isArray(value.productionOrders) && value.productionOrders.every(isProductionOrder) ? value.productionOrders : [];
   const auctionHistory = Array.isArray(value.auctionHistory) && value.auctionHistory.every(isAuctionBidRecord) ? value.auctionHistory : [];
+  const redeemedCodeIds = Array.isArray(value.redeemedCodeIds) && value.redeemedCodeIds.every(isNonEmptyString) ? value.redeemedCodeIds : [];
 
   return {
     id: value.id as string,
@@ -266,6 +267,7 @@ function migrateProfile(value: unknown): PlayerProfile | null {
     staff,
     productionOrders,
     auctionHistory,
+    redeemedCodeIds,
     sales: Array.isArray(value.sales) && value.sales.every(isSale) ? value.sales : [],
     ledger,
     events: Array.isArray(value.events) ? value.events as PlayerProfile['events'] : [],
