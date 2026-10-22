@@ -24,7 +24,7 @@ interface SectionPageProps {
   onNotificationThemeChange: (theme: NotificationTheme) => void;
   onHome: () => void;
   onAction: (result: GameResult<unknown>) => void;
-  onRedeemed: (profile: PlayerProfile, message: string) => void;
+  onRedeemed: (profile: PlayerProfile, message: string, codeId: string) => Promise<boolean>;
 }
 
 const landTypeNames = { industrial: 'صناعية', agricultural: 'زراعية', commercial: 'تجارية' } as const;

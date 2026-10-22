@@ -2,7 +2,7 @@ import { useState, type FormEvent } from 'react';
 import type { PlayerProfile } from '../domain/player';
 import { redeemRewardCode } from '../game/rewards';
 
-interface CodeRedemptionProps { profile: PlayerProfile; onRedeemed: (profile: PlayerProfile, message: string) => void }
+interface CodeRedemptionProps { profile: PlayerProfile; onRedeemed: (profile: PlayerProfile, message: string, codeId: string) => Promise<boolean> }
 
 export function CodeRedemption({ profile, onRedeemed }: CodeRedemptionProps) {
   const [code, setCode] = useState('');
@@ -14,7 +14,12 @@ export function CodeRedemption({ profile, onRedeemed }: CodeRedemptionProps) {
     setBusy(true); setNotice('');
     const result = await redeemRewardCode(profile, code);
     setBusy(false); setSuccess(result.ok); setNotice(result.message);
-    if (result.ok) { setCode(''); onRedeemed(result.profile, result.message); }
+    if (result.ok && result.codeId) {
+      const committed = await onRedeemed(result.profile, result.message, result.codeId);
+      setSuccess(committed);
+      setNotice(committed ? result.message.replace('جارٍ تسجيل المكافأة عالميًا؛ ', '') : 'تعذر تسجيل الكود سحابيًا. لم تُمنح المكافأة؛ حاول مرة أخرى مع اتصال بالإنترنت.');
+      if (committed) setCode('');
+    }
   }
   return <div className="code-redemption"><div><strong>كود مكافأة</strong><p>الأكواد منفصلة عن تسجيل الدخول، وموقعة لحماية قيمة المكافأة.</p></div><form className="code-redemption-form" onSubmit={submit}><input value={code} onChange={(event) => setCode(event.target.value)} placeholder="SULY1...." aria-label="كود المكافأة" required /><button className="button button-primary" type="submit" disabled={busy}>{busy ? 'جارٍ التحقق...' : 'استرداد الكود'}</button></form>{notice && <div className={`code-redemption-notice${success ? ' is-success' : ''}`} role="status">{notice}</div>}<small>الأكواد المستخدمة على هذا الحساب: {profile.redeemedCodeIds.length}</small></div>;
 }

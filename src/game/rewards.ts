@@ -5,7 +5,7 @@ const PUBLIC_KEY_DER_BASE64 = 'MCowBQYDK2VwAyEA84UjrthL2DPvb0nU4FJv519tEWgUpuHEB
 
 type Reward = { type: 'cash'; amount: number } | { type: 'gold'; grams: number };
 interface RewardPayload { version: 1; codeId: string; issuedAt: string; expiresAt: string; rewards: Reward[] }
-export interface RedeemResult { ok: boolean; profile: PlayerProfile; message: string }
+export interface RedeemResult { ok: boolean; profile: PlayerProfile; message: string; codeId?: string }
 
 function decodeBase64Url(value: string): Uint8Array {
   const normalized = value.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - value.length % 4) % 4);
@@ -40,7 +40,7 @@ export async function redeemRewardCode(profile: PlayerProfile, rawCode: string):
     const ledger = cash > 0 ? [...profile.ledger, makeLedger(profile, cash, `مكافأة كود ${payload.codeId}`)] : profile.ledger;
     const nextProfile: PlayerProfile = { ...profile, bankBalance: profile.bankBalance + cash, goldGrams: profile.goldGrams + gold, goldCostBasis: profile.goldCostBasis + gold * 6_000, redeemedCodeIds: [...profile.redeemedCodeIds, payload.codeId], ledger, finances: { ...profile.finances, totalRevenue: profile.finances.totalRevenue + cash, netProfit: profile.finances.netProfit + cash } };
     const summary = [cash > 0 ? `${cash.toLocaleString('ar-EG')} ج.م` : '', gold > 0 ? `${gold} غ ذهب` : ''].filter(Boolean).join(' و');
-    return { ok: true, profile: nextProfile, message: `تم استرداد الكود بنجاح وحصلت على ${summary}.` };
+    return { ok: true, profile: nextProfile, codeId: payload.codeId, message: `تم التحقق من الكود. جارٍ تسجيل المكافأة عالميًا؛ حصلت على ${summary}.` };
   } catch {
     return { ok: false, profile, message: 'تعذر قراءة الكود أو التحقق من توقيعه.' };
   }

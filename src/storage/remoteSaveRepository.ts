@@ -11,3 +11,14 @@ export async function saveRemoteGame(accountId: string, profile: PlayerProfile):
   const { error } = await supabase.from('game_profiles').upsert({ user_id: accountId, player_name: profile.name, game_day: profile.day, save_data: profile, updated_at: new Date().toISOString() }, { onConflict: 'user_id' });
   return !error;
 }
+
+export async function redeemRemoteReward(accountId: string, profile: PlayerProfile, codeId: string): Promise<boolean> {
+  const { data, error } = await supabase.rpc('redeem_reward_code', {
+    p_code_id: codeId,
+    p_user_id: accountId,
+    p_player_name: profile.name,
+    p_game_day: profile.day,
+    p_save_data: profile,
+  });
+  return !error && data === true;
+}

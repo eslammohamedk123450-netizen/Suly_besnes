@@ -17,7 +17,7 @@ import { advanceDay, type GameResult } from './game/engine';
 import { loadSavedGame, saveGame } from './storage/saveRepository';
 import { loadNotificationTheme, saveNotificationTheme } from './storage/userPreferences';
 import { loadCurrentAccount, logoutAccount, type LocalAccount } from './storage/authRepository';
-import { loadRemoteGame, saveRemoteGame } from './storage/remoteSaveRepository';
+import { loadRemoteGame, redeemRemoteReward, saveRemoteGame } from './storage/remoteSaveRepository';
 
 export default function App() {
   const [account, setAccount] = useState<LocalAccount | null>(null);
@@ -97,12 +97,15 @@ export default function App() {
     handleGameResult(action(profile));
   }
 
-  function handleRedeemed(nextProfile: PlayerProfile, message: string) {
-    const saved = saveGame(nextProfile, account?.id);
-    if (account) void saveRemoteGame(account.id, nextProfile);
+  async function handleRedeemed(nextProfile: PlayerProfile, message: string, codeId: string): Promise<boolean> {
+    if (!account) return false;
+    const committedRemotely = await redeemRemoteReward(account.id, nextProfile, codeId);
+    if (!committedRemotely) return false;
+    const saved = saveGame(nextProfile, account.id);
     setProfile(nextProfile);
     setNotice(saved.ok ? message : `${message} تعذر تثبيت الحفظ على هذا الجهاز.`);
     setNoticeTone(saved.ok ? 'success' : 'error');
+    return true;
   }
 
   function handleDaysElapsed(days: number) {
