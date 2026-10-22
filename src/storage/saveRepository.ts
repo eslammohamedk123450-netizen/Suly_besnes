@@ -5,6 +5,10 @@ import { findIndustry, GOLD_PRICE_PER_GRAM } from '../game/catalog';
 
 const SAVE_KEY = 'business-empire.save.v1';
 const SAVE_VERSION = 4;
+
+function saveKey(accountId?: string): string {
+  return accountId ? `${SAVE_KEY}.${accountId}` : SAVE_KEY;
+}
 const INDUSTRY_IDS = new Set<string>([
   'petroleum', 'electricity', 'gas', 'water', 'detergents', 'food', 'construction', 'electronics', 'transport',
 ]);
@@ -274,27 +278,27 @@ function isProfile(value: unknown): value is PlayerProfile {
   return migrateProfile(value) !== null;
 }
 
-export function loadSavedGame(): PlayerProfile | null {
+export function loadSavedGame(accountId?: string): PlayerProfile | null {
   try {
-    const raw = globalThis.localStorage?.getItem(SAVE_KEY);
+    const raw = globalThis.localStorage?.getItem(saveKey(accountId)) ?? (accountId ? globalThis.localStorage?.getItem(SAVE_KEY) : null);
     if (!raw) return null;
     const value: unknown = JSON.parse(raw);
     if (!isRecord(value) || ![1, 2, 3, SAVE_VERSION].includes(value.version as number) || !isDateString(value.savedAt)) return null;
     const profile = migrateProfile(value.profile);
     if (!profile || !isProfile(profile)) return null;
-    if (value.version !== SAVE_VERSION || JSON.stringify(value.profile) !== JSON.stringify(profile)) saveGame(profile);
+    if (value.version !== SAVE_VERSION || JSON.stringify(value.profile) !== JSON.stringify(profile)) saveGame(profile, accountId);
     return profile;
   } catch {
     return null;
   }
 }
 
-export function saveGame(profile: PlayerProfile): StorageResult {
+export function saveGame(profile: PlayerProfile, accountId?: string): StorageResult {
   const canonical = migrateProfile(profile);
   if (!canonical || !isProfile(canonical)) return { ok: false, reason: 'invalid' };
   try {
     const envelope: SaveEnvelope = { version: SAVE_VERSION, savedAt: new Date().toISOString(), profile: canonical };
-    globalThis.localStorage.setItem(SAVE_KEY, JSON.stringify(envelope));
+    globalThis.localStorage.setItem(saveKey(accountId), JSON.stringify(envelope));
     return { ok: true };
   } catch {
     return { ok: false, reason: 'unavailable' };

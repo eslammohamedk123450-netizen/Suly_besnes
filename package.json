@@ -12,7 +12,8 @@
     "preview": "vite preview --host 0.0.0.0 --port 3000 --strictPort",
     "cap:sync": "pnpm build && cap sync",
     "cap:add:android": "cap add android",
-    "cap:apk:debug": "pnpm cap:sync && cd android && ./gradlew assembleDebug"
+    "cap:apk:debug": "pnpm cap:sync && cd android && ./gradlew assembleDebug",
+    "code:issue": "node tools/issue-code.mjs"
   },
   "dependencies": {
     "@capacitor/android": "8.5.3",
