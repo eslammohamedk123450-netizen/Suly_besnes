@@ -17,10 +17,12 @@ import { advanceDay, type GameResult } from './game/engine';
 import { loadSavedGame, saveGame } from './storage/saveRepository';
 import { loadNotificationTheme, saveNotificationTheme } from './storage/userPreferences';
 import { loadCurrentAccount, logoutAccount, type LocalAccount } from './storage/authRepository';
+import { loadRemoteGame, saveRemoteGame } from './storage/remoteSaveRepository';
 
 export default function App() {
-  const [account, setAccount] = useState<LocalAccount | null>(() => loadCurrentAccount());
-  const [profile, setProfile] = useState<PlayerProfile | null>(() => { const current = loadCurrentAccount(); return current ? loadSavedGame(current.id) : null; });
+  const [account, setAccount] = useState<LocalAccount | null>(null);
+  const [profile, setProfile] = useState<PlayerProfile | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
   const [selectedCountryId, setSelectedCountryId] = useState<CountryId>(() => profile?.countryId ?? COUNTRIES[0].id);
   const [playerName, setPlayerName] = useState(() => profile?.name ?? 'أحمد المستثمر');
   const [activeSection, setActiveSection] = useState<SectionId>('home');
@@ -29,9 +31,21 @@ export default function App() {
   const [notice, setNotice] = useState('');
   const [noticeTone, setNoticeTone] = useState<'success' | 'error'>('success');
 
-  function handleAuthenticated(nextAccount: LocalAccount) {
+  useEffect(() => {
+    loadCurrentAccount().then(async (current) => {
+      setAccount(current);
+      const local = current ? loadSavedGame(current.id) : null;
+      const remote = current ? await loadRemoteGame(current.id) : null;
+      setProfile(remote ?? local);
+      setAuthLoading(false);
+    });
+  }, []);
+
+  async function handleAuthenticated(nextAccount: LocalAccount) {
     setAccount(nextAccount);
-    setProfile(loadSavedGame(nextAccount.id));
+    const local = loadSavedGame(nextAccount.id);
+    const remote = await loadRemoteGame(nextAccount.id);
+    setProfile(remote ?? local);
     setActiveSection('home');
     setNotice('تم تسجيل الدخول مباشرة.');
     setNoticeTone('success');
@@ -55,6 +69,7 @@ export default function App() {
     if (!chosenCountry) return;
     const newProfile = createNewPlayer(chosenCountry, playerName);
     const result = saveGame(newProfile, account?.id);
+    if (account) void saveRemoteGame(account.id, newProfile);
     setProfile(newProfile);
     setActiveSection('home');
     setMobileMenuOpen(false);
@@ -69,6 +84,7 @@ export default function App() {
       return;
     }
     const saved = saveGame(result.profile, account?.id);
+    if (account) void saveRemoteGame(account.id, result.profile);
     const settledAmount = Math.max(0, (profile?.payables ?? result.profile.payables) - result.profile.payables);
     const settlementNote = settledAmount > 0 ? ` وُجّه ${formatMoney(settledAmount, country)} لسداد التزامات سابقة.` : '';
     setProfile(result.profile);
@@ -83,6 +99,7 @@ export default function App() {
 
   function handleRedeemed(nextProfile: PlayerProfile, message: string) {
     const saved = saveGame(nextProfile, account?.id);
+    if (account) void saveRemoteGame(account.id, nextProfile);
     setProfile(nextProfile);
     setNotice(saved.ok ? message : `${message} تعذر تثبيت الحفظ على هذا الجهاز.`);
     setNoticeTone(saved.ok ? 'success' : 'error');
@@ -104,6 +121,7 @@ export default function App() {
     }
     if (completedDays === 0) return;
     const saved = saveGame(current, account?.id);
+    if (account) void saveRemoteGame(account.id, current);
     setProfile(current);
     setNotice(saved.ok ? `تم ترحيل ${completedDays} ${completedDays === 1 ? 'يوم تلقائيًا' : 'أيام تلقائيًا'} بعد مرور 24 ساعة حقيقية.` : 'تم ترحيل الأيام، لكن تعذر تثبيت الحفظ على هذا الجهاز.');
     setNoticeTone(saved.ok ? 'success' : 'error');
@@ -115,6 +133,7 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
+  if (authLoading) return <div className="account-loading">جارٍ فتح حسابك...</div>;
   if (!account) return <AccountGate onAuthenticated={handleAuthenticated} />;
 
   if (!profile) {
