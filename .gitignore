@@ -2,5 +2,11 @@ node_modules/
 dist/
 android/.gradle/
 android/build/
+android/app/build/
+android/local.properties
+*.jks
+*.keystore
+*.apk
+*.aab
 .DS_Store
 *.log

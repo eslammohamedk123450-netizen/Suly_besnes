@@ -1,4 +1,13 @@
 import type { CountryDefinition, CountryId, IndustryId } from './countries';
+import type {
+  FinanceLedgerEntry,
+  GameEventRecord,
+  InventoryLot,
+  InvestmentRecord,
+  LicenseRecord,
+  ProductSale,
+  TaskProgress,
+} from './futureSystems';
 
 export interface PlayerAsset {
   id: string;
@@ -13,6 +22,7 @@ export interface PlayerLand {
   areaSquareMeters: number;
   purchasePrice: number;
   acquiredAt: string;
+  landType?: 'industrial' | 'agricultural' | 'commercial';
 }
 
 export interface PlayerCompany {
@@ -21,6 +31,11 @@ export interface PlayerCompany {
   industryId: IndustryId;
   countryId: CountryId;
   foundedAt: string;
+  landId?: string;
+  licenseIds?: string[];
+  energyUnits?: number;
+  energyCapacity?: number;
+  operatingCostPerDay?: number;
 }
 
 export interface PlayerProfile {
@@ -30,13 +45,27 @@ export interface PlayerProfile {
   countryId: CountryId;
   createdAt: string;
   bankBalance: number;
+  payables: number;
   goldGrams: number;
+  goldCostBasis: number;
   assets: PlayerAsset[];
   lands: PlayerLand[];
   companies: PlayerCompany[];
   finances: {
     netProfit: number;
+    totalRevenue: number;
+    totalExpenses: number;
   };
+  /** Current simulation day. Day one is the day the world is created. */
+  day: number;
+  inventory: InventoryLot[];
+  licenses: LicenseRecord[];
+  investments: InvestmentRecord[];
+  sales: ProductSale[];
+  ledger: FinanceLedgerEntry[];
+  events: GameEventRecord[];
+  tasks: TaskProgress[];
+  completedTaskIds: string[];
 }
 
 function createId(): string {
@@ -56,16 +85,31 @@ export function createNewPlayer(
     countryId: country.id,
     createdAt,
     bankBalance: country.startingBalance,
+    payables: 0,
     goldGrams: 0,
+    goldCostBasis: 0,
     assets: [],
     lands: [],
     companies: [],
-    finances: { netProfit: 0 },
+    finances: { netProfit: 0, totalRevenue: 0, totalExpenses: 0 },
+    day: 1,
+    inventory: [],
+    licenses: [],
+    investments: [],
+    sales: [],
+    ledger: [],
+    events: [],
+    tasks: [],
+    completedTaskIds: [],
   };
 }
 
 export function calculateTotalAssets(profile: PlayerProfile): number {
   const movableAssets = profile.assets.reduce((sum, asset) => sum + asset.value, 0);
   const landAssets = profile.lands.reduce((sum, land) => sum + land.purchasePrice, 0);
-  return profile.bankBalance + movableAssets + landAssets;
+  const inventoryAssets = (profile.inventory ?? []).reduce((sum, lot) => sum + lot.quantity * lot.unitCost, 0);
+  const activeInvestments = (profile.investments ?? [])
+    .filter((investment) => investment.status === 'active')
+    .reduce((sum, investment) => sum + investment.principal, 0);
+  return profile.bankBalance + movableAssets + landAssets + inventoryAssets + activeInvestments + profile.goldCostBasis;
 }

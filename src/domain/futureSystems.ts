@@ -1,13 +1,21 @@
 import type { CountryId, IndustryId } from './countries';
 
-/** Data contracts for later phases only; no auction, production or market simulation is enabled yet. */
+export type AuctionLotType = 'land' | 'factory' | 'raw-material';
+
 export interface AuctionListing {
   id: string;
   countryId: CountryId;
-  lotType: 'land' | 'factory' | 'raw-material';
+  lotType: AuctionLotType;
+  label: string;
+  landType: 'industrial' | 'agricultural' | 'commercial';
+  areaSquareMeters: number;
   minimumBid: number;
+  bidIncrement: number;
   closesAt: string;
   status: 'scheduled' | 'open' | 'closed';
+  energyCapacityBonus?: number;
+  materialId?: string;
+  quantity?: number;
 }
 
 export interface BotBid {
@@ -47,6 +55,8 @@ export interface ProductSale {
   productId: string;
   quantity: number;
   unitPrice: number;
+  grossRevenue: number;
+  tax: number;
   soldAt: string;
 }
 
@@ -55,19 +65,26 @@ export interface LicenseRecord {
   countryId: CountryId;
   industryId: IndustryId;
   feePaid: number;
+  issuedAt: string;
   expiresAt?: string;
 }
 
-export interface InternationalBranch {
+export interface InvestmentRecord {
   id: string;
-  parentCompanyId: string;
-  countryId: CountryId;
-  setupCost: number;
+  investmentTypeId: string;
+  principal: number;
+  expectedReturnRate: number;
+  startedOnDay: number;
+  maturityDay: number;
+  status: 'active' | 'paid' | 'loss';
+  settledAmount?: number;
 }
+
+export type FinanceLedgerCategory = 'revenue' | 'expense' | 'asset' | 'liability' | 'settlement';
 
 export interface FinanceLedgerEntry {
   id: string;
-  category: 'revenue' | 'expense' | 'asset' | 'liability';
+  category: FinanceLedgerCategory;
   amount: number;
   countryId: CountryId;
   occurredAt: string;
@@ -81,4 +98,19 @@ export interface EconomicEvent {
   impact: number;
   startsAt: string;
   endsAt: string;
+  kind?: 'bonus' | 'cost';
+}
+
+export interface TaskProgress {
+  taskId: string;
+  claimed: boolean;
+  claimedAt?: string;
+}
+
+export interface GameEventRecord {
+  id: string;
+  day: number;
+  title: string;
+  cashImpact: number;
+  occurredAt: string;
 }

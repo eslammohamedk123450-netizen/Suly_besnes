@@ -9,16 +9,18 @@ import type { CountryId } from './domain/countries';
 import { GAME_SECTIONS, getSection, type SectionId } from './domain/navigation';
 import { createNewPlayer } from './domain/player';
 import type { PlayerProfile } from './domain/player';
-import { clearSavedGame, loadSavedGame, saveGame } from './storage/saveRepository';
+import { formatMoney } from './domain/formatters';
+import { advanceDay, type GameResult } from './game/engine';
+import { loadSavedGame, saveGame } from './storage/saveRepository';
 
 export default function App() {
   const [profile, setProfile] = useState<PlayerProfile | null>(() => loadSavedGame());
-  const [selectedCountryId, setSelectedCountryId] = useState<CountryId>(() => loadSavedGame()?.countryId ?? COUNTRIES[0].id);
-  const [playerName, setPlayerName] = useState(() => loadSavedGame()?.name ?? 'أحمد المستثمر');
+  const [selectedCountryId, setSelectedCountryId] = useState<CountryId>(() => profile?.countryId ?? COUNTRIES[0].id);
+  const [playerName, setPlayerName] = useState(() => profile?.name ?? 'أحمد المستثمر');
   const [activeSection, setActiveSection] = useState<SectionId>('home');
-  const [confirmNewGame, setConfirmNewGame] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [notice, setNotice] = useState('');
+  const [noticeTone, setNoticeTone] = useState<'success' | 'error'>('success');
 
   const country = findCountry(profile?.countryId ?? selectedCountryId) ?? COUNTRIES[0];
   const active = getSection(activeSection);
@@ -38,24 +40,26 @@ export default function App() {
     setActiveSection('home');
     setMobileMenuOpen(false);
     setNotice(result.ok ? 'تم إنشاء عالمك وحفظه على هذا الجهاز.' : 'تعذر حفظ البيانات محليًا؛ قد لا يستمر التقدم بعد إغلاق الصفحة.');
+    setNoticeTone(result.ok ? 'success' : 'error');
   }
 
-  function confirmRestart() {
-    const result = clearSavedGame();
+  function handleGameResult<T>(result: GameResult<T>) {
     if (!result.ok) {
-      setNotice('تعذر مسح ملف الحفظ من هذا المتصفح.');
-      setConfirmNewGame(false);
+      setNotice(result.message);
+      setNoticeTone('error');
       return;
     }
-    if (profile) {
-      setSelectedCountryId(profile.countryId);
-      setPlayerName(profile.name);
-    }
-    setProfile(null);
-    setActiveSection('home');
-    setMobileMenuOpen(false);
-    setConfirmNewGame(false);
-    setNotice('تم مسح التقدم بعد التأكيد. اختر الدولة لبدء عالم جديد.');
+    const saved = saveGame(result.profile);
+    const settledAmount = Math.max(0, (profile?.payables ?? result.profile.payables) - result.profile.payables);
+    const settlementNote = settledAmount > 0 ? ` وُجّه ${formatMoney(settledAmount, country)} لسداد التزامات سابقة.` : '';
+    setProfile(result.profile);
+    setNotice(saved.ok ? `${result.message}${settlementNote}` : `${result.message}${settlementNote} تعذر تثبيت الحفظ على هذا الجهاز.`);
+    setNoticeTone(saved.ok ? 'success' : 'error');
+  }
+
+  function runGameAction(action: (current: PlayerProfile) => GameResult<unknown>) {
+    if (!profile) return;
+    handleGameResult(action(profile));
   }
 
   function navigate(section: SectionId) {
@@ -74,7 +78,7 @@ export default function App() {
           onPlayerNameChange={setPlayerName}
           onStart={startNewWorld}
         />
-        {notice && <div className="toast" role="status">{notice}</div>}
+        {notice && <div className={`toast toast--${noticeTone}`} role="status">{notice}</div>}
       </>
     );
   }
@@ -99,7 +103,7 @@ export default function App() {
           <div className="side-nav-caption">إدارة الإمبراطورية</div>
           {GAME_SECTIONS.map((section) => (
             <button className={`nav-item${activeSection === section.id ? ' is-active' : ''}`} type="button" key={section.id} onClick={() => navigate(section.id)}>
-              <Icon name={section.icon} size={19} /><span>{section.label}</span>{section.id !== 'home' && section.id !== 'settings' && <Icon name="lock" size={13} className="nav-lock" />}
+              <Icon name={section.icon} size={19} /><span>{section.label}</span>
             </button>
           ))}
           <div className="side-nav-note"><Icon name="shield" size={16} /><span>حفظ محلي<br />بدون إنترنت</span></div>
@@ -107,9 +111,9 @@ export default function App() {
 
         <main className="main-content">
           {activeSection === 'home' ? (
-            <Dashboard profile={profile} country={country} onNavigate={navigate} />
+            <Dashboard profile={profile} country={country} onNavigate={navigate} onAdvanceDay={() => runGameAction(advanceDay)} />
           ) : (
-            <SectionPage section={active} profile={profile} country={country} onHome={() => navigate('home')} onNewGame={() => setConfirmNewGame(true)} />
+            <SectionPage section={active} profile={profile} country={country} onHome={() => navigate('home')} onAction={handleGameResult} />
           )}
         </main>
       </div>
@@ -129,17 +133,8 @@ export default function App() {
         </nav>
       </div>}
 
-      {confirmNewGame && <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setConfirmNewGame(false); }}>
-        <section className="confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="confirm-title">
-          <span className="dialog-icon"><Icon name="shield" size={24} /></span>
-          <h2 id="confirm-title">بدء لعبة جديدة؟</h2>
-          <p>سيُحذف ملف التقدم الحالي من هذا الجهاز، ثم تعود لاختيار الدولة وإنشاء لاعب جديد. لا يمكن التراجع عن الحذف.</p>
-          <div className="dialog-actions"><button className="button button-secondary" type="button" onClick={() => setConfirmNewGame(false)}>إلغاء</button><button className="button button-danger" type="button" onClick={confirmRestart}>نعم، ابدأ من جديد</button></div>
-        </section>
-      </div>}
-
-      {notice && <div className="toast" role="status">{notice}</div>}
-      <footer className="app-footer"><span>إمبراطورية الأعمال</span><span>النسخة الأولية · البيانات محفوظة محليًا</span></footer>
+      {notice && <div className={`toast toast--${noticeTone}`} role="status">{notice}</div>}
+      <footer className="app-footer"><span>إمبراطورية الأعمال</span><span>محاكاة محلية · الأسعار والأحداث لأغراض اللعبة</span></footer>
     </div>
   );
 }

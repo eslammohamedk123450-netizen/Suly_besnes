@@ -1,19 +1,12 @@
-import { findCountry } from '../domain/countries';
-import type { IndustryId } from '../domain/countries';
+import { findCountry, type CountryId, type IndustryId } from '../domain/countries';
 import type { PlayerAsset, PlayerCompany, PlayerLand, PlayerProfile } from '../domain/player';
+import type { FinanceLedgerEntry, InventoryLot, InvestmentRecord, LicenseRecord, ProductSale, TaskProgress } from '../domain/futureSystems';
+import { findIndustry, GOLD_PRICE_PER_GRAM } from '../game/catalog';
 
 const SAVE_KEY = 'business-empire.save.v1';
-const SAVE_VERSION = 1;
+const SAVE_VERSION = 4;
 const INDUSTRY_IDS = new Set<string>([
-  'petroleum',
-  'electricity',
-  'gas',
-  'water',
-  'detergents',
-  'food',
-  'construction',
-  'electronics',
-  'transport',
+  'petroleum', 'electricity', 'gas', 'water', 'detergents', 'food', 'construction', 'electronics', 'transport',
 ]);
 
 interface SaveEnvelope {
@@ -32,73 +25,194 @@ function isFiniteNonNegative(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value) && value >= 0;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function isDateString(value: unknown): value is string {
+  return isNonEmptyString(value) && Number.isFinite(Date.parse(value));
+}
+
 function isAsset(value: unknown): value is PlayerAsset {
-  if (!value || typeof value !== 'object') return false;
-  const asset = value as Partial<PlayerAsset>;
-  return (
-    isNonEmptyString(asset.id) &&
-    isNonEmptyString(asset.label) &&
-    isFiniteNonNegative(asset.value) &&
-    isNonEmptyString(asset.acquiredAt) &&
-    Number.isFinite(Date.parse(asset.acquiredAt))
-  );
+  if (!isRecord(value)) return false;
+  return isNonEmptyString(value.id) && isNonEmptyString(value.label) && isFiniteNonNegative(value.value) && isDateString(value.acquiredAt);
 }
 
 function isLand(value: unknown): value is PlayerLand {
-  if (!value || typeof value !== 'object') return false;
-  const land = value as Partial<PlayerLand>;
-  return (
-    isNonEmptyString(land.id) &&
-    isNonEmptyString(land.label) &&
-    isFiniteNonNegative(land.areaSquareMeters) &&
-    isFiniteNonNegative(land.purchasePrice) &&
-    isNonEmptyString(land.acquiredAt) &&
-    Number.isFinite(Date.parse(land.acquiredAt))
-  );
+  if (!isRecord(value)) return false;
+  return isNonEmptyString(value.id)
+    && isNonEmptyString(value.label)
+    && isFiniteNonNegative(value.areaSquareMeters)
+    && isFiniteNonNegative(value.purchasePrice)
+    && isDateString(value.acquiredAt)
+    && (value.landType === undefined || value.landType === 'industrial' || value.landType === 'agricultural' || value.landType === 'commercial');
 }
 
 function isCompany(value: unknown): value is PlayerCompany {
-  if (!value || typeof value !== 'object') return false;
-  const company = value as Partial<PlayerCompany>;
-  return (
-    isNonEmptyString(company.id) &&
-    isNonEmptyString(company.name) &&
-    typeof company.industryId === 'string' &&
-    INDUSTRY_IDS.has(company.industryId) &&
-    typeof company.countryId === 'string' &&
-    findCountry(company.countryId) !== undefined &&
-    isNonEmptyString(company.foundedAt) &&
-    Number.isFinite(Date.parse(company.foundedAt))
-  );
+  if (!isRecord(value)) return false;
+  return isNonEmptyString(value.id)
+    && isNonEmptyString(value.name)
+    && typeof value.industryId === 'string'
+    && INDUSTRY_IDS.has(value.industryId)
+    && typeof value.countryId === 'string'
+    && findCountry(value.countryId) !== undefined
+    && isDateString(value.foundedAt)
+    && (value.landId === undefined || isNonEmptyString(value.landId))
+    && (value.licenseIds === undefined || (Array.isArray(value.licenseIds) && value.licenseIds.every(isNonEmptyString)))
+    && (value.energyUnits === undefined || isFiniteNonNegative(value.energyUnits))
+    && (value.energyCapacity === undefined || isFiniteNonNegative(value.energyCapacity))
+    && (value.operatingCostPerDay === undefined || isFiniteNonNegative(value.operatingCostPerDay));
+}
+
+function isInventoryLot(value: unknown): value is InventoryLot {
+  return isRecord(value) && isNonEmptyString(value.id) && isNonEmptyString(value.materialOrProductId)
+    && isFiniteNonNegative(value.quantity) && isNonEmptyString(value.unit) && isFiniteNonNegative(value.unitCost);
+}
+
+function isLicense(value: unknown): value is LicenseRecord {
+  return isRecord(value) && isNonEmptyString(value.id) && typeof value.countryId === 'string'
+    && findCountry(value.countryId) !== undefined && typeof value.industryId === 'string'
+    && INDUSTRY_IDS.has(value.industryId) && isFiniteNonNegative(value.feePaid) && isDateString(value.issuedAt);
+}
+
+function isInvestment(value: unknown): value is InvestmentRecord {
+  return isRecord(value) && isNonEmptyString(value.id) && isNonEmptyString(value.investmentTypeId)
+    && isFiniteNonNegative(value.principal) && isFiniteNonNegative(value.expectedReturnRate)
+    && typeof value.startedOnDay === 'number' && Number.isInteger(value.startedOnDay) && value.startedOnDay >= 1
+    && typeof value.maturityDay === 'number' && Number.isInteger(value.maturityDay) && value.maturityDay >= value.startedOnDay
+    && (value.status === 'active' || value.status === 'paid' || value.status === 'loss');
+}
+
+function isSale(value: unknown): value is ProductSale {
+  return isRecord(value) && isNonEmptyString(value.id) && isNonEmptyString(value.productId)
+    && isFiniteNonNegative(value.quantity) && isFiniteNonNegative(value.unitPrice)
+    && isFiniteNonNegative(value.grossRevenue) && isFiniteNonNegative(value.tax) && isDateString(value.soldAt);
+}
+
+function isLedgerEntry(value: unknown): value is FinanceLedgerEntry {
+  return isRecord(value) && isNonEmptyString(value.id)
+    && (value.category === 'revenue' || value.category === 'expense' || value.category === 'asset' || value.category === 'liability' || value.category === 'settlement')
+    && isFiniteNonNegative(value.amount) && typeof value.countryId === 'string'
+    && findCountry(value.countryId) !== undefined && isDateString(value.occurredAt) && isNonEmptyString(value.note);
+}
+
+function isTaskProgress(value: unknown): value is TaskProgress {
+  return isRecord(value) && isNonEmptyString(value.taskId) && typeof value.claimed === 'boolean'
+    && (value.claimedAt === undefined || isDateString(value.claimedAt));
+}
+
+function inferLandType(label: string): PlayerLand['landType'] | undefined {
+  const normalized = label.toLocaleLowerCase();
+  if (normalized.includes('زراع') || normalized.includes('farm') || normalized.includes('agric')) return 'agricultural';
+  if (normalized.includes('تجار') || normalized.includes('commercial')) return 'commercial';
+  if (normalized.includes('صناع') || normalized.includes('industrial') || normalized.includes('مصنع')) return 'industrial';
+  return undefined;
+}
+
+function sumCategory(entries: readonly FinanceLedgerEntry[], category: FinanceLedgerEntry['category']): number {
+  return entries.filter((entry) => entry.category === category).reduce((sum, entry) => sum + entry.amount, 0);
+}
+
+function isLegacyProfile(value: unknown): value is Record<string, unknown> {
+  if (!isRecord(value) || !isRecord(value.finances)) return false;
+  const finances = value.finances;
+  return isNonEmptyString(value.id)
+    && isNonEmptyString(value.name)
+    && typeof value.level === 'number' && Number.isInteger(value.level) && value.level >= 1
+    && typeof value.countryId === 'string' && findCountry(value.countryId) !== undefined
+    && isDateString(value.createdAt)
+    && isFiniteNonNegative(value.bankBalance)
+    && isFiniteNonNegative(value.goldGrams)
+    && (value.goldCostBasis === undefined || isFiniteNonNegative(value.goldCostBasis))
+    && (value.payables === undefined || isFiniteNonNegative(value.payables))
+    && Array.isArray(value.assets) && value.assets.every(isAsset)
+    && Array.isArray(value.lands) && value.lands.every(isLand)
+    && Array.isArray(value.companies) && value.companies.every(isCompany)
+    && Number.isFinite(finances.netProfit)
+    && (finances.totalRevenue === undefined || isFiniteNonNegative(finances.totalRevenue))
+    && (finances.totalExpenses === undefined || isFiniteNonNegative(finances.totalExpenses));
+}
+
+/** Converts old v1-v3 profiles into one canonical v4 shape without dropping ownership or financial history. */
+function migrateProfile(value: unknown): PlayerProfile | null {
+  if (!isLegacyProfile(value)) return null;
+  const rawFinances = value.finances as { netProfit: number; totalRevenue?: number; totalExpenses?: number };
+  const countryId = value.countryId as CountryId;
+  const createdAt = value.createdAt as string;
+  const day = typeof value.day === 'number' && Number.isInteger(value.day) && value.day >= 1 ? value.day : 1;
+  const originalLands = value.lands as PlayerLand[];
+  const originalCompanies = value.companies as PlayerCompany[];
+  const lands = originalLands.map((land) => ({ ...land }));
+  const assignedLandIds = new Set<string>();
+  const companies = originalCompanies.map((company) => {
+    const industry = findIndustry(company.industryId);
+    const energyCapacity = isFiniteNonNegative(company.energyCapacity) && company.energyCapacity > 0
+      ? company.energyCapacity
+      : industry?.energyCapacity ?? 0;
+    const normalizedCompany: PlayerCompany = {
+      ...company,
+      licenseIds: Array.isArray(company.licenseIds) && company.licenseIds.every(isNonEmptyString) ? company.licenseIds : [],
+      energyCapacity,
+      energyUnits: isFiniteNonNegative(company.energyUnits)
+        ? Math.min(company.energyUnits, energyCapacity)
+        : Math.min(energyCapacity, industry?.dailyEnergySupply ?? 0),
+      operatingCostPerDay: isFiniteNonNegative(company.operatingCostPerDay) && company.operatingCostPerDay > 0
+        ? company.operatingCostPerDay
+        : industry?.dailyOperatingCost ?? 0,
+    };
+    const explicitLand = normalizedCompany.landId ? lands.find((land) => land.id === normalizedCompany.landId && !assignedLandIds.has(land.id)) : undefined;
+    const linkedLand = explicitLand ?? (!normalizedCompany.landId ? lands.find((land) => !assignedLandIds.has(land.id)) : undefined);
+    if (!linkedLand) return normalizedCompany;
+    assignedLandIds.add(linkedLand.id);
+    linkedLand.landType ??= findIndustry(company.industryId)?.requiredLandType ?? inferLandType(linkedLand.label) ?? 'industrial';
+    return { ...normalizedCompany, landId: linkedLand.id };
+  });
+  for (const land of lands) land.landType ??= inferLandType(land.label) ?? 'industrial';
+
+  const existingLedger = Array.isArray(value.ledger) && value.ledger.every(isLedgerEntry) ? value.ledger : [];
+  let ledger = existingLedger;
+  if (ledger.length === 0) {
+    const priorRevenue = rawFinances.totalRevenue ?? Math.max(0, rawFinances.netProfit);
+    const priorExpenses = rawFinances.totalExpenses ?? Math.max(0, -rawFinances.netProfit);
+    const migratedEntries: FinanceLedgerEntry[] = [];
+    if (priorRevenue > 0) migratedEntries.push({ id: `legacy-revenue-${value.id as string}`, category: 'revenue', amount: priorRevenue, countryId, occurredAt: createdAt, note: 'إيرادات مرحّلة من ملف الحفظ السابق' });
+    if (priorExpenses > 0) migratedEntries.push({ id: `legacy-expenses-${value.id as string}`, category: 'expense', amount: priorExpenses, countryId, occurredAt: createdAt, note: 'مصروفات مرحّلة من ملف الحفظ السابق' });
+    const difference = rawFinances.netProfit - (priorRevenue - priorExpenses);
+    if (difference > 0) migratedEntries.push({ id: `legacy-adjustment-${value.id as string}`, category: 'revenue', amount: difference, countryId, occurredAt: createdAt, note: 'تسوية صافي الأرباح المرحّل' });
+    if (difference < 0) migratedEntries.push({ id: `legacy-adjustment-${value.id as string}`, category: 'expense', amount: Math.abs(difference), countryId, occurredAt: createdAt, note: 'تسوية صافي الأرباح المرحّل' });
+    ledger = migratedEntries;
+  }
+  const totalRevenue = sumCategory(ledger, 'revenue');
+  const totalExpenses = sumCategory(ledger, 'expense');
+
+  return {
+    id: value.id as string,
+    name: value.name as string,
+    level: value.level as number,
+    countryId,
+    createdAt,
+    bankBalance: value.bankBalance as number,
+    payables: isFiniteNonNegative(value.payables) ? value.payables : 0,
+    goldGrams: value.goldGrams as number,
+    goldCostBasis: isFiniteNonNegative(value.goldCostBasis) ? value.goldCostBasis : (value.goldGrams as number) * GOLD_PRICE_PER_GRAM,
+    assets: value.assets as PlayerAsset[],
+    lands,
+    companies,
+    finances: { netProfit: totalRevenue - totalExpenses, totalRevenue, totalExpenses },
+    day,
+    inventory: Array.isArray(value.inventory) && value.inventory.every(isInventoryLot) ? value.inventory : [],
+    licenses: Array.isArray(value.licenses) && value.licenses.every(isLicense) ? value.licenses : [],
+    investments: Array.isArray(value.investments) && value.investments.every(isInvestment) ? value.investments : [],
+    sales: Array.isArray(value.sales) && value.sales.every(isSale) ? value.sales : [],
+    ledger,
+    events: Array.isArray(value.events) ? value.events as PlayerProfile['events'] : [],
+    tasks: Array.isArray(value.tasks) && value.tasks.every(isTaskProgress) ? value.tasks : [],
+    completedTaskIds: Array.isArray(value.completedTaskIds) && value.completedTaskIds.every(isNonEmptyString) ? value.completedTaskIds : [],
+  };
 }
 
 function isProfile(value: unknown): value is PlayerProfile {
-  if (!value || typeof value !== 'object') return false;
-  const profile = value as Partial<PlayerProfile>;
-  const finances = profile.finances;
-  return (
-    isNonEmptyString(profile.id) &&
-    isNonEmptyString(profile.name) &&
-    typeof profile.level === 'number' &&
-    Number.isInteger(profile.level) &&
-    Number.isFinite(profile.level) &&
-    profile.level >= 1 &&
-    typeof profile.countryId === 'string' &&
-    findCountry(profile.countryId) !== undefined &&
-    isNonEmptyString(profile.createdAt) &&
-    Number.isFinite(Date.parse(profile.createdAt)) &&
-    isFiniteNonNegative(profile.bankBalance) &&
-    isFiniteNonNegative(profile.goldGrams) &&
-    Array.isArray(profile.assets) &&
-    profile.assets.every(isAsset) &&
-    Array.isArray(profile.lands) &&
-    profile.lands.every(isLand) &&
-    Array.isArray(profile.companies) &&
-    profile.companies.every(isCompany) &&
-    typeof finances === 'object' &&
-    finances !== null &&
-    Number.isFinite(finances.netProfit)
-  );
+  return migrateProfile(value) !== null;
 }
 
 export function loadSavedGame(): PlayerProfile | null {
@@ -106,40 +220,22 @@ export function loadSavedGame(): PlayerProfile | null {
     const raw = globalThis.localStorage?.getItem(SAVE_KEY);
     if (!raw) return null;
     const value: unknown = JSON.parse(raw);
-    if (!value || typeof value !== 'object') return null;
-    const envelope = value as Partial<SaveEnvelope>;
-    if (
-      envelope.version !== SAVE_VERSION ||
-      !isNonEmptyString(envelope.savedAt) ||
-      !Number.isFinite(Date.parse(envelope.savedAt)) ||
-      !isProfile(envelope.profile)
-    ) {
-      return null;
-    }
-    return envelope.profile;
+    if (!isRecord(value) || ![1, 2, 3, SAVE_VERSION].includes(value.version as number) || !isDateString(value.savedAt)) return null;
+    const profile = migrateProfile(value.profile);
+    if (!profile || !isProfile(profile)) return null;
+    if (value.version !== SAVE_VERSION || JSON.stringify(value.profile) !== JSON.stringify(profile)) saveGame(profile);
+    return profile;
   } catch {
     return null;
   }
 }
 
 export function saveGame(profile: PlayerProfile): StorageResult {
-  if (!isProfile(profile)) return { ok: false, reason: 'invalid' };
+  const canonical = migrateProfile(profile);
+  if (!canonical || !isProfile(canonical)) return { ok: false, reason: 'invalid' };
   try {
-    const envelope: SaveEnvelope = {
-      version: SAVE_VERSION,
-      savedAt: new Date().toISOString(),
-      profile,
-    };
+    const envelope: SaveEnvelope = { version: SAVE_VERSION, savedAt: new Date().toISOString(), profile: canonical };
     globalThis.localStorage.setItem(SAVE_KEY, JSON.stringify(envelope));
-    return { ok: true };
-  } catch {
-    return { ok: false, reason: 'unavailable' };
-  }
-}
-
-export function clearSavedGame(): StorageResult {
-  try {
-    globalThis.localStorage.removeItem(SAVE_KEY);
     return { ok: true };
   } catch {
     return { ok: false, reason: 'unavailable' };
