@@ -1,6 +1,6 @@
 import { findCountry, type IndustryId } from '../domain/countries';
 import type { PlayerAsset, PlayerCompany, PlayerLand, PlayerProfile } from '../domain/player';
-import type { DepositRecord, FinanceLedgerEntry, GameEventRecord, InventoryLot, InvestmentRecord, LoanRecord } from '../domain/futureSystems';
+import type { DepositRecord, FinanceLedgerEntry, GameEventRecord, InventoryLot, InvestmentRecord, LoanRecord, StaffContract, StaffRole } from '../domain/futureSystems';
 import {
   AUCTION_CATALOG,
   GOLD_PRICE_PER_GRAM,
@@ -450,7 +450,8 @@ export function sellGold(profile: PlayerProfile, grams: number): GameResult<Gold
 export function getDayBriefing(profile: PlayerProfile): DayBriefing {
   const day = profile.day + 1;
   const multiplier = findCountry(profile.countryId)?.economy.operatingCostMultiplier ?? 1;
-  const operatingCost = profile.companies.reduce((sum, company) => sum + (company.operatingCostPerDay ?? 0), 0) * multiplier;
+  const managedCompanyIds = new Set(profile.staff.filter((member) => member.status === 'active' && member.role === 'manager' && member.companyId).map((member) => member.companyId));
+  const operatingCost = profile.companies.reduce((sum, company) => sum + (company.operatingCostPerDay ?? 0) * (managedCompanyIds.has(company.id) ? 0.92 : 1), 0) * multiplier;
   const maturingInvestments = profile.investments
     .filter((investment) => investment.status === 'active' && investment.maturityDay <= day)
     .map((investment) => ({ id: investment.id, name: findInvestment(investment.investmentTypeId)?.name ?? investment.investmentTypeId }));
@@ -462,6 +463,35 @@ export function getDayBriefing(profile: PlayerProfile): DayBriefing {
   const event = eventTemplates[(day - 1) % eventTemplates.length];
   const availableEnergy = profile.companies.reduce((sum, company) => sum + (company.energyUnits ?? 0), 0);
   return { day, operatingCost, existingPayables: profile.payables, maturingInvestments, event, availableEnergy, energyPaused: profile.payables > 0 };
+}
+
+const STAFF_ROLE_OPTIONS: Record<StaffRole, { label: string; dailySalary: number; companyRequired: boolean }> = {
+  manager: { label: 'مدير شركة', dailySalary: 7_000, companyRequired: true },
+  accountant: { label: 'محاسب', dailySalary: 4_500, companyRequired: false },
+  lawyer: { label: 'محامٍ', dailySalary: 4_000, companyRequired: false },
+  hr: { label: 'مدير موارد بشرية', dailySalary: 3_500, companyRequired: false },
+};
+
+export function hireStaff(profile: PlayerProfile, role: StaffRole, name: string, companyId?: string): GameResult<StaffContract> {
+  const option = STAFF_ROLE_OPTIONS[role];
+  if (!option || name.trim().length < 2) return failure(profile, 'invalid-input', 'أدخل اسمًا صحيحًا واختر دورًا معروفًا.');
+  if (option.companyRequired && !profile.companies.some((company) => company.id === companyId)) return failure(profile, 'not-found', 'المدير يجب أن يرتبط بشركة موجودة.');
+  if (role === 'manager' && profile.staff.some((member) => member.status === 'active' && member.role === 'manager' && member.companyId === companyId)) return failure(profile, 'invalid-input', 'هذه الشركة لديها مدير نشط بالفعل.');
+  if (profile.bankBalance < option.dailySalary) return failure(profile, 'insufficient-funds', 'لا يكفي الرصيد لتوقيع عقد الموظف ودفع يوم التعاقد.');
+  const staff: StaffContract = { id: nextId(profile, 'staff', profile.staff.length), role, name: name.trim(), companyId, dailySalary: option.dailySalary, hiredOnDay: profile.day, nextPayDay: profile.day + 1, status: 'active' };
+  const nextProfile = addLedger(
+    { ...profile, staff: [...profile.staff, staff] },
+    [ledgerEntry(profile, 'expense', option.dailySalary, `توقيع عقد ${option.label}: ${staff.name}`, 0)],
+    profile.bankBalance - option.dailySalary,
+  );
+  return success(nextProfile, `تم تعيين ${staff.name} بوظيفة ${option.label}؛ أول راتب دوري في اليوم التالي.`, staff);
+}
+
+export function terminateStaff(profile: PlayerProfile, staffId: string): GameResult<StaffContract> {
+  const employee = profile.staff.find((member) => member.id === staffId && member.status === 'active');
+  if (!employee) return failure(profile, 'not-found', 'عقد الموظف غير موجود أو تم إنهاؤه.');
+  const updated = { ...employee, status: 'terminated' as const };
+  return success({ ...profile, staff: profile.staff.map((member) => member.id === staffId ? updated : member) }, `تم إنهاء عقد ${employee.name}.`, updated);
 }
 
 const DEPOSIT_OPTIONS = [
@@ -583,6 +613,18 @@ export function advanceDay(profile: PlayerProfile): GameResult<DayOutcome> {
     const remainingBalance = Math.max(0, loan.remainingBalance - due);
     return { ...loan, remainingBalance, nextPaymentDay: nextDay + 1, status: remainingBalance === 0 ? 'paid' as const : 'active' as const };
   });
+  const staff = profile.staff.map((employee) => {
+    if (employee.status !== 'active' || employee.nextPayDay > nextDay) return employee;
+    const paid = Math.min(balance, employee.dailySalary);
+    balance -= paid;
+    entries.push(ledgerEntry(profile, 'expense', employee.dailySalary, `راتب ${employee.role}: ${employee.name}`, entries.length));
+    if (paid < employee.dailySalary) {
+      const unpaid = employee.dailySalary - paid;
+      payables += unpaid;
+      entries.push(ledgerEntry(profile, 'liability', unpaid, `راتب غير مسدد: ${employee.name}`, entries.length));
+    }
+    return { ...employee, nextPayDay: nextDay + 1 };
+  });
   const paidOperatingCost = Math.min(balance, operatingCost);
   balance -= paidOperatingCost;
   if (operatingCost > 0) entries.push(ledgerEntry(profile, 'expense', operatingCost, 'مصروفات التشغيل اليومية المستحقة', entries.length));
@@ -639,7 +681,7 @@ export function advanceDay(profile: PlayerProfile): GameResult<DayOutcome> {
   });
   const event: GameEventRecord = { id: `event-${nextDay}`, day: nextDay, title: briefing.event.title, cashImpact: eventImpact, occurredAt: now };
   const nextProfile = addLedger(
-    { ...profile, day: nextDay, companies, investments, banking: { ...profile.banking, loans }, events: [...profile.events, event], payables },
+    { ...profile, day: nextDay, companies, investments, banking: { ...profile.banking, loans }, staff, events: [...profile.events, event], payables },
     entries,
     balance,
   );

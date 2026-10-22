@@ -6,6 +6,7 @@ import type {
   InvestmentRecord,
   DepositRecord,
   LoanRecord,
+  StaffContract,
   LicenseRecord,
   ProductSale,
   TaskProgress,
@@ -67,6 +68,7 @@ export interface PlayerProfile {
     deposits: DepositRecord[];
     loans: LoanRecord[];
   };
+  staff: StaffContract[];
   sales: ProductSale[];
   ledger: FinanceLedgerEntry[];
   events: GameEventRecord[];
@@ -103,6 +105,7 @@ export function createNewPlayer(
     licenses: [],
     investments: [],
     banking: { deposits: [], loans: [] },
+    staff: [],
     sales: [],
     ledger: [],
     events: [],

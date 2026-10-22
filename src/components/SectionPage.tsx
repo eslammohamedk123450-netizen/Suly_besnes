@@ -4,7 +4,8 @@ import type { PlayerProfile } from '../domain/player';
 import type { NotificationTheme } from '../storage/userPreferences';
 import type { SectionItem } from '../domain/navigation';
 import { formatMoney, formatNumber } from '../domain/formatters';
-import { buyGold, buyMaterial, claimTask, createDeposit, createInvestment, foundCompany, placeBid, runProduction, sellGold, sellProduct, takeLoan, withdrawDeposit, type GameResult } from '../game/engine';
+import { buyGold, buyMaterial, claimTask, createDeposit, createInvestment, foundCompany, hireStaff, placeBid, runProduction, sellGold, sellProduct, takeLoan, terminateStaff, withdrawDeposit, type GameResult } from '../game/engine';
+import type { StaffRole } from '../domain/futureSystems';
 import { AUCTION_CATALOG, GOLD_PRICE_PER_GRAM, INDUSTRY_CATALOG, INVESTMENT_CATALOG, MATERIAL_CATALOG, PRODUCT_CATALOG, RECIPE_CATALOG } from '../game/catalog';
 import { getMarketQuote } from '../game/market';
 import { selectActiveInvestments, selectAvailableAuctions, selectFinancialReport, selectInventorySummary, selectSalesSummary, selectTaskBoard } from '../game/selectors';
@@ -40,6 +41,9 @@ export function SectionPage({ section, profile, country, notificationTheme, onNo
   const [loanAmount, setLoanAmount] = useState('25000');
   const [loanTerm, setLoanTerm] = useState('14');
   const [loanCollateral, setLoanCollateral] = useState('');
+  const [staffName, setStaffName] = useState('');
+  const [staffRole, setStaffRole] = useState<StaffRole>('manager');
+  const [staffCompany, setStaffCompany] = useState('');
 
   const dayLabel = `اليوم ${formatNumber(profile.day)}`;
   const balanceLabel = `الرصيد ${formatMoney(profile.bankBalance, country)}`;
@@ -101,6 +105,25 @@ export function SectionPage({ section, profile, country, notificationTheme, onNo
         <EconomyPanel title="قرض بضمان" description="يمكن تمويل 60% كحد أقصى من قيمة أرض أو شركة مؤهلة. لكل ضمان قرض نشط واحد وجدول قسط واضح.">
           {selectedCollateral ? <form className="economy-form" onSubmit={(event: FormEvent<HTMLFormElement>) => { event.preventDefault(); run((current) => takeLoan(current, selectedCollateral.type, selectedCollateral.id, Number(loanAmount), Number(loanTerm))); }}><div className="economy-form-row"><div className="economy-field"><label htmlFor="loan-collateral">الضمان</label><select id="loan-collateral" value={selectedCollateral.id} onChange={(event) => setLoanCollateral(event.target.value)}>{collateralOptions.map((item) => <option value={item.id} key={item.id}>{item.label} · {item.type === 'land' ? 'أرض' : 'شركة'}</option>)}</select></div><div className="economy-field"><label htmlFor="loan-amount">مبلغ القرض</label><input id="loan-amount" type="number" min="25000" step="1000" value={loanAmount} onChange={(event) => setLoanAmount(event.target.value)} /></div><div className="economy-field"><label htmlFor="loan-term">مدة السداد</label><select id="loan-term" value={loanTerm} onChange={(event) => setLoanTerm(event.target.value)}><option value="7">7 أيام · 18%</option><option value="14">14 يومًا · 22%</option><option value="30">30 يومًا · 28%</option></select></div></div><div className="economy-meta"><span>القسط يبدأ في اليوم التالي</span><span>القيمة المسجلة للضمان {selectedCollateral.value > 0 ? formatMoney(selectedCollateral.value, country) : 'تُحسب حسب القطاع'}</span></div><button className="button button-primary" type="submit" disabled={Number(loanAmount) < 25000}>طلب القرض</button></form> : <EconomyEmpty title="لا يوجد ضمان مؤهل" message="اشترِ أرضًا أو أسس شركة أولًا حتى يظهر خيار التمويل بضمان." />}
           <div className="economy-list">{profile.banking.loans.slice().reverse().map((loan) => <article className="economy-card economy-card--soft" key={loan.id}><div className="economy-card-head"><div className="economy-card-title"><span><strong>{formatMoney(loan.principal, country)}</strong><small>المتبقي {formatMoney(loan.remainingBalance, country)} · القسط {formatMoney(loan.installmentAmount, country)}</small></span></div><span className={`economy-pill ${loan.status === 'active' ? 'economy-pill--red' : 'economy-pill--green'}`}>{loan.status === 'active' ? `القسط يوم ${formatNumber(loan.nextPaymentDay)}` : 'مغلق'}</span></div></article>)}</div>
+        </EconomyPanel>
+      </>,
+    )}</div>;
+  }
+
+  if (section.id === 'staff') {
+    const activeStaff = profile.staff.filter((member) => member.status === 'active');
+    const roleLabels: Record<StaffRole, string> = { manager: 'مدير شركة', accountant: 'محاسب', lawyer: 'محامٍ', hr: 'مدير موارد بشرية' };
+    return <div className="section-page">{heading}{pageShell(
+      <>
+        <div className="economy-grid economy-grid--three-mobile"><EconomyStat label="موظفون نشطون" value={formatNumber(activeStaff.length)} /><EconomyStat label="الرواتب اليومية" value={formatMoney(activeStaff.reduce((sum, member) => sum + member.dailySalary, 0), country)} /><EconomyStat label="الراتب القادم" value={activeStaff.length > 0 ? `اليوم ${formatNumber(Math.min(...activeStaff.map((member) => member.nextPayDay)))}` : '—'} /></div>
+        <EconomyPanel title="التعيين والإدارة" description="كل عقد له راتب يومي وموعد دفع وصلاحية واضحة. المدير المرتبط بشركة يخفض مصروف تشغيلها محاكيًا مقابل أجره.">
+          <form className="economy-form" onSubmit={(event: FormEvent<HTMLFormElement>) => { event.preventDefault(); run((current) => hireStaff(current, staffRole, staffName, staffRole === 'manager' ? staffCompany : undefined)); }}>
+            <div className="economy-form-row"><div className="economy-field"><label htmlFor="staff-name">اسم الموظف</label><input id="staff-name" value={staffName} onChange={(event) => setStaffName(event.target.value)} placeholder="مثال: أحمد سالم" /></div><div className="economy-field"><label htmlFor="staff-role">الدور</label><select id="staff-role" value={staffRole} onChange={(event) => setStaffRole(event.target.value as StaffRole)}>{Object.entries(roleLabels).map(([role, label]) => <option value={role} key={role}>{label}</option>)}</select></div>{staffRole === 'manager' && <div className="economy-field"><label htmlFor="staff-company">الشركة</label><select id="staff-company" value={staffCompany} onChange={(event) => setStaffCompany(event.target.value)}><option value="">اختر شركة</option>{profile.companies.map((company) => <option value={company.id} key={company.id}>{company.name}</option>)}</select></div>}</div>
+            <button className="button button-primary" type="submit" disabled={staffName.trim().length < 2 || (staffRole === 'manager' && !staffCompany)}>توقيع العقد ودفع يوم التعاقد</button>
+          </form>
+        </EconomyPanel>
+        <EconomyPanel title="العقود والرواتب" description="تُسدد الرواتب تلقائيًا عند ترحيل اليوم. عند عدم كفاية السيولة تتحول القيمة غير المدفوعة إلى التزام ظاهر في التقارير.">
+          {profile.staff.length === 0 ? <EconomyEmpty title="لا يوجد موظفون" message="ابدأ بمدير لشركة قائمة أو وظّف محاسبًا ومحاسميًا عند اتساع العمليات." /> : <div className="economy-list">{profile.staff.slice().reverse().map((member) => <article className="economy-card economy-card--soft" key={member.id}><div className="economy-card-head"><div className="economy-card-title"><span><strong>{member.name}</strong><small>{roleLabels[member.role]} · {formatMoney(member.dailySalary, country)} يوميًا · الراتب التالي يوم {formatNumber(member.nextPayDay)}</small></span></div><span className={`economy-pill ${member.status === 'active' ? 'economy-pill--gold' : 'economy-pill--red'}`}>{member.status === 'active' ? 'عقد نشط' : 'منتهٍ'}</span></div>{member.status === 'active' && <button className="button button-secondary" type="button" onClick={() => run((current) => terminateStaff(current, member.id))}>إنهاء العقد</button>}</article>)}</div>}
         </EconomyPanel>
       </>,
     )}</div>;

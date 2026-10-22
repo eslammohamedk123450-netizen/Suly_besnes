@@ -105,6 +105,19 @@ export interface LoanRecord {
   status: 'active' | 'paid' | 'defaulted';
 }
 
+export type StaffRole = 'manager' | 'accountant' | 'lawyer' | 'hr';
+
+export interface StaffContract {
+  id: string;
+  role: StaffRole;
+  name: string;
+  companyId?: string;
+  dailySalary: number;
+  hiredOnDay: number;
+  nextPayDay: number;
+  status: 'active' | 'terminated';
+}
+
 export type FinanceLedgerCategory = 'revenue' | 'expense' | 'asset' | 'liability' | 'settlement';
 
 export interface FinanceLedgerEntry {

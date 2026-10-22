@@ -1,6 +1,6 @@
 import { findCountry, type CountryId, type IndustryId } from '../domain/countries';
 import type { PlayerAsset, PlayerCompany, PlayerLand, PlayerProfile } from '../domain/player';
-import type { DepositRecord, FinanceLedgerEntry, InventoryLot, InvestmentRecord, LicenseRecord, LoanRecord, ProductSale, TaskProgress } from '../domain/futureSystems';
+import type { DepositRecord, FinanceLedgerEntry, InventoryLot, InvestmentRecord, LicenseRecord, LoanRecord, ProductSale, StaffContract, TaskProgress } from '../domain/futureSystems';
 import { findIndustry, GOLD_PRICE_PER_GRAM } from '../game/catalog';
 
 const SAVE_KEY = 'business-empire.save.v1';
@@ -98,6 +98,15 @@ function isLoan(value: unknown): value is LoanRecord {
     && Number.isInteger(value.termDays) && (value.termDays as number) > 0 && Number.isInteger(value.nextPaymentDay)
     && isFiniteNonNegative(value.installmentAmount) && isFiniteNonNegative(value.remainingBalance)
     && (value.status === 'active' || value.status === 'paid' || value.status === 'defaulted');
+}
+
+function isStaffContract(value: unknown): value is StaffContract {
+  return isRecord(value) && isNonEmptyString(value.id) && isNonEmptyString(value.name)
+    && (value.role === 'manager' || value.role === 'accountant' || value.role === 'lawyer' || value.role === 'hr')
+    && (value.companyId === undefined || isNonEmptyString(value.companyId)) && isFiniteNonNegative(value.dailySalary)
+    && Number.isInteger(value.hiredOnDay) && (value.hiredOnDay as number) >= 1
+    && Number.isInteger(value.nextPayDay) && (value.nextPayDay as number) >= (value.hiredOnDay as number)
+    && (value.status === 'active' || value.status === 'terminated');
 }
 
 function isSale(value: unknown): value is ProductSale {
@@ -206,6 +215,7 @@ function migrateProfile(value: unknown): PlayerProfile | null {
     deposits: Array.isArray(rawBanking.deposits) && rawBanking.deposits.every(isDeposit) ? rawBanking.deposits : [],
     loans: Array.isArray(rawBanking.loans) && rawBanking.loans.every(isLoan) ? rawBanking.loans : [],
   };
+  const staff = Array.isArray(value.staff) && value.staff.every(isStaffContract) ? value.staff : [];
 
   return {
     id: value.id as string,
@@ -226,6 +236,7 @@ function migrateProfile(value: unknown): PlayerProfile | null {
     licenses: Array.isArray(value.licenses) && value.licenses.every(isLicense) ? value.licenses : [],
     investments: Array.isArray(value.investments) && value.investments.every(isInvestment) ? value.investments : [],
     banking,
+    staff,
     sales: Array.isArray(value.sales) && value.sales.every(isSale) ? value.sales : [],
     ledger,
     events: Array.isArray(value.events) ? value.events as PlayerProfile['events'] : [],
