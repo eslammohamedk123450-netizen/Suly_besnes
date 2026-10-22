@@ -3,6 +3,7 @@ import { Brand } from './components/Brand';
 import { CountrySelection } from './components/CountrySelection';
 import { Dashboard } from './components/Dashboard';
 import { Icon } from './components/Icon';
+import { NoticeToast } from './components/NoticeToast';
 import { SectionPage } from './components/SectionPage';
 import { COUNTRIES, findCountry } from './domain/countries';
 import type { CountryId } from './domain/countries';
@@ -12,6 +13,7 @@ import type { PlayerProfile } from './domain/player';
 import { formatMoney } from './domain/formatters';
 import { advanceDay, type GameResult } from './game/engine';
 import { loadSavedGame, saveGame } from './storage/saveRepository';
+import { loadNotificationTheme, saveNotificationTheme } from './storage/userPreferences';
 
 export default function App() {
   const [profile, setProfile] = useState<PlayerProfile | null>(() => loadSavedGame());
@@ -19,6 +21,7 @@ export default function App() {
   const [playerName, setPlayerName] = useState(() => profile?.name ?? 'أحمد المستثمر');
   const [activeSection, setActiveSection] = useState<SectionId>('home');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [notificationTheme, setNotificationTheme] = useState(loadNotificationTheme);
   const [notice, setNotice] = useState('');
   const [noticeTone, setNoticeTone] = useState<'success' | 'error'>('success');
 
@@ -30,6 +33,10 @@ export default function App() {
     const timer = window.setTimeout(() => setNotice(''), 4200);
     return () => window.clearTimeout(timer);
   }, [notice]);
+
+  useEffect(() => {
+    saveNotificationTheme(notificationTheme);
+  }, [notificationTheme]);
 
   function startNewWorld() {
     const chosenCountry = findCountry(selectedCountryId);
@@ -78,7 +85,7 @@ export default function App() {
           onPlayerNameChange={setPlayerName}
           onStart={startNewWorld}
         />
-        {notice && <div className={`toast toast--${noticeTone}`} role="status">{notice}</div>}
+        {notice && <NoticeToast message={notice} tone={noticeTone} theme={notificationTheme} onDismiss={() => setNotice('')} />}
       </>
     );
   }
@@ -113,7 +120,7 @@ export default function App() {
           {activeSection === 'home' ? (
             <Dashboard profile={profile} country={country} onNavigate={navigate} onAdvanceDay={() => runGameAction(advanceDay)} />
           ) : (
-            <SectionPage section={active} profile={profile} country={country} onHome={() => navigate('home')} onAction={handleGameResult} />
+            <SectionPage section={active} profile={profile} country={country} notificationTheme={notificationTheme} onNotificationThemeChange={setNotificationTheme} onHome={() => navigate('home')} onAction={handleGameResult} />
           )}
         </main>
       </div>
@@ -133,7 +140,7 @@ export default function App() {
         </nav>
       </div>}
 
-      {notice && <div className={`toast toast--${noticeTone}`} role="status">{notice}</div>}
+      {notice && <NoticeToast message={notice} tone={noticeTone} theme={notificationTheme} onDismiss={() => setNotice('')} />}
       <footer className="app-footer"><span>إمبراطورية الأعمال</span><span>محاكاة محلية · الأسعار والأحداث لأغراض اللعبة</span></footer>
     </div>
   );

@@ -2,6 +2,7 @@ import type { CountryDefinition } from '../domain/countries';
 import type { PlayerProfile } from '../domain/player';
 import { calculateTotalAssets } from '../domain/player';
 import { formatGold, formatMoney, formatNumber } from '../domain/formatters';
+import { GOLD_PRICE_PER_GRAM } from '../game/catalog';
 import { GAME_SECTIONS, type SectionId } from '../domain/navigation';
 import { Icon } from './Icon';
 
@@ -14,6 +15,7 @@ interface DashboardProps {
 
 export function Dashboard({ profile, country, onNavigate, onAdvanceDay }: DashboardProps) {
   const totalAssets = calculateTotalAssets(profile);
+  const goldMarketValue = Math.round(profile.goldGrams * GOLD_PRICE_PER_GRAM);
   const quickSections = GAME_SECTIONS.filter((section) => section.id !== 'home');
   const latestEntries = profile.ledger.slice(-5).reverse();
 
@@ -43,12 +45,12 @@ export function Dashboard({ profile, country, onNavigate, onAdvanceDay }: Dashbo
         <article className="stat-card">
           <div className="stat-heading"><span className="stat-icon"><Icon name="briefcase" /></span><span>إجمالي الأصول</span></div>
           <strong className="stat-value">{formatMoney(totalAssets, country)}</strong>
-          <span className="stat-footnote">النقد والأراضي والذهب والمخزون والاستثمارات</span>
+          <span className="stat-footnote">النقد والأراضي والمخزون والاستثمارات والقيمة الدفترية للذهب</span>
         </article>
         <article className="stat-card">
           <div className="stat-heading"><span className="stat-icon"><Icon name="gold" /></span><span>احتياطي الذهب</span></div>
           <strong className="stat-value">{formatGold(profile.goldGrams)}</strong>
-          <span className="stat-footnote">كمية الذهب المسجلة</span>
+          <span className="stat-footnote">تقديريًا {formatMoney(goldMarketValue, country)} بسعر اللعبة {formatMoney(GOLD_PRICE_PER_GRAM, country)} لكل غرام</span>
         </article>
         <article className="stat-card">
           <div className="stat-heading"><span className="stat-icon"><Icon name="investment" /></span><span>صافي الأرباح</span></div>

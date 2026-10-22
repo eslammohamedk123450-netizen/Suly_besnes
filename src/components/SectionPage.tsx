@@ -1,6 +1,7 @@
 import { useState, type FormEvent, type ReactNode } from 'react';
 import type { CountryDefinition, IndustryId } from '../domain/countries';
 import type { PlayerProfile } from '../domain/player';
+import type { NotificationTheme } from '../storage/userPreferences';
 import type { SectionItem } from '../domain/navigation';
 import { formatMoney, formatNumber } from '../domain/formatters';
 import { advanceDay, buyGold, buyMaterial, claimTask, createInvestment, foundCompany, placeBid, runProduction, sellGold, sellProduct, type GameResult } from '../game/engine';
@@ -13,6 +14,8 @@ interface SectionPageProps {
   section: SectionItem;
   profile: PlayerProfile;
   country: CountryDefinition;
+  notificationTheme: NotificationTheme;
+  onNotificationThemeChange: (theme: NotificationTheme) => void;
   onHome: () => void;
   onAction: (result: GameResult<unknown>) => void;
 }
@@ -20,7 +23,7 @@ interface SectionPageProps {
 const landTypeNames = { industrial: 'صناعية', agricultural: 'زراعية', commercial: 'تجارية' } as const;
 const ledgerLabels = { revenue: 'إيراد', expense: 'مصروف', asset: 'أصل', liability: 'التزام', settlement: 'سداد التزام' } as const;
 
-export function SectionPage({ section, profile, country, onHome, onAction }: SectionPageProps) {
+export function SectionPage({ section, profile, country, notificationTheme, onNotificationThemeChange, onHome, onAction }: SectionPageProps) {
   const [bidAmounts, setBidAmounts] = useState<Record<string, string>>({});
   const [companyName, setCompanyName] = useState('شركة جديدة');
   const [industryId, setIndustryId] = useState<IndustryId>('food');
@@ -57,7 +60,15 @@ export function SectionPage({ section, profile, country, onHome, onAction }: Sec
           <div className="settings-row"><span>المستوى</span><strong>{formatNumber(profile.level)}</strong></div>
           <div className="settings-row"><span>طريقة الحفظ</span><strong className="saved-status"><span /> على هذا الجهاز</strong></div>
           <div className="settings-note"><Icon name="shield" size={17} /><p>لا يوجد خادم أو تسجيل دخول. تقدمك محفوظ محليًا على هذا الجهاز.</p></div>
+          <div className="settings-notice-theme">
+            <span>مظهر الإشعارات</span>
+            <div className="settings-theme-switch" role="group" aria-label="اختيار مظهر الإشعارات">
+              <button className={notificationTheme === 'dark' ? 'is-selected' : ''} type="button" aria-pressed={notificationTheme === 'dark'} onClick={() => onNotificationThemeChange('dark')}>داكن</button>
+              <button className={notificationTheme === 'light' ? 'is-selected' : ''} type="button" aria-pressed={notificationTheme === 'light'} onClick={() => onNotificationThemeChange('light')}>فاتح</button>
+            </div>
+          </div>
           <div className="settings-actions"><button className="button button-secondary" type="button" onClick={onHome}>العودة للرئيسية</button></div>
+          <div className="settings-credit">تطوير شركة <strong>Suly- Technologies</strong></div>
         </div>
       </EconomyPanel>,
     )}</div>;
@@ -210,6 +221,8 @@ export function SectionPage({ section, profile, country, onHome, onAction }: Sec
     const goldQuantity = Number(goldAmount);
     const goldBuyEstimate = Math.round(goldQuantity * GOLD_PRICE_PER_GRAM);
     const goldSellEstimate = Math.round(goldQuantity * GOLD_PRICE_PER_GRAM * 0.97);
+    const goldHoldingMarketValue = Math.round(profile.goldGrams * GOLD_PRICE_PER_GRAM);
+    const goldHoldingSellEstimate = Math.round(profile.goldGrams * GOLD_PRICE_PER_GRAM * 0.97);
     return <div className="section-page">{heading}{pageShell(
       <>
         <div className="economy-grid economy-grid--three-mobile"><EconomyStat label="استثمارات نشطة" value={formatNumber(activeInvestments.length)} /><EconomyStat label="إجمالي المبيعات" value={formatMoney(sales.grossRevenue, country)} /><EconomyStat label="صافي بعد الضريبة" value={formatMoney(sales.netRevenue, country)} /></div>
@@ -217,8 +230,9 @@ export function SectionPage({ section, profile, country, onHome, onAction }: Sec
           <div className="economy-grid economy-grid--three-mobile">
             <EconomyStat label="الذهب المملوك" value={`${formatNumber(profile.goldGrams)} غ`} />
             <EconomyStat label="سعر اللعبة للغرام" value={formatMoney(GOLD_PRICE_PER_GRAM, country)} />
-            <EconomyStat label="القيمة الدفترية" value={formatMoney(profile.goldCostBasis, country)} />
+            <EconomyStat label="قيمة الاحتياطي بالسعر المحاكى" value={formatMoney(goldHoldingMarketValue, country)} />
           </div>
+          <div className="economy-meta"><span>القيمة الدفترية للذهب {formatMoney(profile.goldCostBasis, country)}</span><span>المتحصل المتوقع عند بيع الاحتياطي الآن بعد فرق 3%: {formatMoney(goldHoldingSellEstimate, country)}</span></div>
           <div className="economy-card-body">
             <div className="economy-form-row">
               <div className="economy-field"><label htmlFor="gold-quantity">الكمية (غرام، بخطوة 0.1)</label><input id="gold-quantity" type="number" min="0.1" step="0.1" value={goldAmount} onChange={(event) => setGoldAmount(event.target.value)} /></div>
