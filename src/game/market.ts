@@ -1,5 +1,6 @@
 import type { PlayerProfile } from '../domain/player';
 import { PRODUCT_CATALOG } from './catalog';
+import { getMarketPriceProgression } from './economyBalance';
 
 export type MarketTrend = 'up' | 'down' | 'steady';
 
@@ -33,7 +34,7 @@ export function getMarketQuote(profile: PlayerProfile, productId: string, day = 
   const priceShift = (seed % 31) - 15;
   const demandShift = (Math.floor(seed / 31) % 11) - 5;
   const baseDemand = 16 + ((productIndex * 5) % 13);
-  const currentPrice = Math.max(1, Math.round(product.baseSellPrice * (1 + priceShift / 100)));
+  const currentPrice = Math.max(1, Math.round(product.baseSellPrice * getMarketPriceProgression(day) * (1 + priceShift / 100)));
   const trend: MarketTrend = priceShift >= 6 ? 'up' : priceShift <= -6 ? 'down' : 'steady';
   return {
     productId,

@@ -99,27 +99,27 @@ export const MATERIAL_CATALOG: readonly MaterialCatalogEntry[] = [
 ];
 
 export const PRODUCT_CATALOG: readonly ProductCatalogEntry[] = [
-  { id: 'refined-fuel', name: 'وقود مكرر', unit: 'وحدة', baseSellPrice: 24_000 },
-  { id: 'power-units', name: 'وحدات كهرباء', unit: 'وحدة', baseSellPrice: 8_000 },
-  { id: 'bottled-gas', name: 'غاز معبأ', unit: 'وحدة', baseSellPrice: 18_000 },
-  { id: 'clean-water', name: 'مياه نظيفة', unit: 'وحدة', baseSellPrice: 5_000 },
-  { id: 'detergent', name: 'منظفات', unit: 'عبوة', baseSellPrice: 8_000 },
-  { id: 'food-pack', name: 'عبوات غذائية', unit: 'عبوة', baseSellPrice: 7_000 },
-  { id: 'building-blocks', name: 'مواد بناء', unit: 'وحدة', baseSellPrice: 20_000 },
-  { id: 'electronics', name: 'أجهزة إلكترونية', unit: 'جهاز', baseSellPrice: 60_000 },
-  { id: 'freight-service', name: 'خدمات نقل', unit: 'رحلة', baseSellPrice: 30_000 },
+  { id: 'refined-fuel', name: 'وقود مكرر', unit: 'وحدة', baseSellPrice: 14_000 },
+  { id: 'power-units', name: 'وحدات كهرباء', unit: 'وحدة', baseSellPrice: 3_000 },
+  { id: 'bottled-gas', name: 'غاز معبأ', unit: 'وحدة', baseSellPrice: 10_000 },
+  { id: 'clean-water', name: 'مياه نظيفة', unit: 'وحدة', baseSellPrice: 2_000 },
+  { id: 'detergent', name: 'منظفات', unit: 'عبوة', baseSellPrice: 4_000 },
+  { id: 'food-pack', name: 'عبوات غذائية', unit: 'عبوة', baseSellPrice: 2_500 },
+  { id: 'building-blocks', name: 'مواد بناء', unit: 'وحدة', baseSellPrice: 16_000 },
+  { id: 'electronics', name: 'أجهزة إلكترونية', unit: 'جهاز', baseSellPrice: 45_000 },
+  { id: 'freight-service', name: 'خدمات نقل', unit: 'رحلة', baseSellPrice: 22_000 },
 ];
 
 export const RECIPE_CATALOG: readonly RecipeCatalogEntry[] = [
-  { id: 'recipe-petroleum', industryId: 'petroleum', productId: 'refined-fuel', productName: 'وقود مكرر', outputQuantity: 4, outputUnit: 'وحدة', inputs: [{ materialId: 'crude-oil', quantity: 5 }], energyUnits: 10, energyCost: 1_500, baseSellPrice: 24_000 },
-  { id: 'recipe-electricity', industryId: 'electricity', productId: 'power-units', productName: 'وحدات كهرباء', outputQuantity: 12, outputUnit: 'وحدة', inputs: [{ materialId: 'fuel', quantity: 2 }], energyUnits: 18, energyCost: 1_000, baseSellPrice: 8_000 },
-  { id: 'recipe-gas', industryId: 'gas', productId: 'bottled-gas', productName: 'غاز معبأ', outputQuantity: 3, outputUnit: 'وحدة', inputs: [{ materialId: 'natural-gas', quantity: 4 }], energyUnits: 8, energyCost: 1_200, baseSellPrice: 18_000 },
-  { id: 'recipe-water', industryId: 'water', productId: 'clean-water', productName: 'مياه نظيفة', outputQuantity: 12, outputUnit: 'وحدة', inputs: [{ materialId: 'water', quantity: 8 }], energyUnits: 6, energyCost: 700, baseSellPrice: 5_000 },
-  { id: 'recipe-detergents', industryId: 'detergents', productId: 'detergent', productName: 'منظفات', outputQuantity: 5, outputUnit: 'عبوة', inputs: [{ materialId: 'chemicals', quantity: 2 }, { materialId: 'water', quantity: 2 }], energyUnits: 5, energyCost: 600, baseSellPrice: 8_000 },
-  { id: 'recipe-food', industryId: 'food', productId: 'food-pack', productName: 'عبوات غذائية', outputQuantity: 8, outputUnit: 'عبوة', inputs: [{ materialId: 'grain', quantity: 4 }, { materialId: 'packaging', quantity: 1 }], energyUnits: 6, energyCost: 550, baseSellPrice: 7_000 },
-  { id: 'recipe-construction', industryId: 'construction', productId: 'building-blocks', productName: 'مواد بناء', outputQuantity: 4, outputUnit: 'وحدة', inputs: [{ materialId: 'steel', quantity: 2 }, { materialId: 'cement', quantity: 4 }], energyUnits: 10, energyCost: 1_000, baseSellPrice: 20_000 },
-  { id: 'recipe-electronics', industryId: 'electronics', productId: 'electronics', productName: 'أجهزة إلكترونية', outputQuantity: 1, outputUnit: 'جهاز', inputs: [{ materialId: 'silicon', quantity: 1 }, { materialId: 'components', quantity: 2 }], energyUnits: 12, energyCost: 1_400, baseSellPrice: 60_000 },
-  { id: 'recipe-transport', industryId: 'transport', productId: 'freight-service', productName: 'خدمات نقل', outputQuantity: 2, outputUnit: 'رحلة', inputs: [{ materialId: 'fuel', quantity: 3 }, { materialId: 'components', quantity: 1 }], energyUnits: 14, energyCost: 900, baseSellPrice: 30_000 },
+  { id: 'recipe-petroleum', industryId: 'petroleum', productId: 'refined-fuel', productName: 'وقود مكرر', outputQuantity: 4, outputUnit: 'وحدة', inputs: [{ materialId: 'crude-oil', quantity: 5 }], energyUnits: 10, energyCost: 1_500, baseSellPrice: 14_000 },
+  { id: 'recipe-electricity', industryId: 'electricity', productId: 'power-units', productName: 'وحدات كهرباء', outputQuantity: 12, outputUnit: 'وحدة', inputs: [{ materialId: 'fuel', quantity: 2 }], energyUnits: 18, energyCost: 1_000, baseSellPrice: 3_000 },
+  { id: 'recipe-gas', industryId: 'gas', productId: 'bottled-gas', productName: 'غاز معبأ', outputQuantity: 3, outputUnit: 'وحدة', inputs: [{ materialId: 'natural-gas', quantity: 4 }], energyUnits: 8, energyCost: 1_200, baseSellPrice: 10_000 },
+  { id: 'recipe-water', industryId: 'water', productId: 'clean-water', productName: 'مياه نظيفة', outputQuantity: 12, outputUnit: 'وحدة', inputs: [{ materialId: 'water', quantity: 8 }], energyUnits: 6, energyCost: 700, baseSellPrice: 2_000 },
+  { id: 'recipe-detergents', industryId: 'detergents', productId: 'detergent', productName: 'منظفات', outputQuantity: 5, outputUnit: 'عبوة', inputs: [{ materialId: 'chemicals', quantity: 2 }, { materialId: 'water', quantity: 2 }], energyUnits: 5, energyCost: 600, baseSellPrice: 4_000 },
+  { id: 'recipe-food', industryId: 'food', productId: 'food-pack', productName: 'عبوات غذائية', outputQuantity: 8, outputUnit: 'عبوة', inputs: [{ materialId: 'grain', quantity: 4 }, { materialId: 'packaging', quantity: 1 }], energyUnits: 6, energyCost: 550, baseSellPrice: 2_500 },
+  { id: 'recipe-construction', industryId: 'construction', productId: 'building-blocks', productName: 'مواد بناء', outputQuantity: 4, outputUnit: 'وحدة', inputs: [{ materialId: 'steel', quantity: 2 }, { materialId: 'cement', quantity: 4 }], energyUnits: 10, energyCost: 1_000, baseSellPrice: 16_000 },
+  { id: 'recipe-electronics', industryId: 'electronics', productId: 'electronics', productName: 'أجهزة إلكترونية', outputQuantity: 1, outputUnit: 'جهاز', inputs: [{ materialId: 'silicon', quantity: 1 }, { materialId: 'components', quantity: 2 }], energyUnits: 12, energyCost: 1_400, baseSellPrice: 45_000 },
+  { id: 'recipe-transport', industryId: 'transport', productId: 'freight-service', productName: 'خدمات نقل', outputQuantity: 2, outputUnit: 'رحلة', inputs: [{ materialId: 'fuel', quantity: 3 }, { materialId: 'components', quantity: 1 }], energyUnits: 14, energyCost: 900, baseSellPrice: 22_000 },
 ];
 
 export const AUCTION_CATALOG: readonly AuctionListing[] = [

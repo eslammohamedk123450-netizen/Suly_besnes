@@ -14,6 +14,7 @@ import {
 } from './catalog';
 import { getMarketQuote } from './market';
 import { isAuctionOpen } from './auctions';
+import { getInvestmentPayoutRate, getOperatingCostProgression } from './economyBalance';
 
 export type GameErrorCode =
   | 'invalid-input'
@@ -175,7 +176,7 @@ function conditionMet(profile: PlayerProfile, condition: (typeof TASK_CATALOG)[n
     case 'own-land': return profile.lands.length > 0;
     case 'own-company': return profile.companies.length > 0;
     case 'buy-material': return profile.ledger.some((entry) => entry.note.startsWith('شراء '));
-    case 'run-production': return profile.ledger.some((entry) => entry.note.startsWith('تشغيل '));
+    case 'run-production': return profile.productionOrders.length > 0;
     case 'sell-product': return profile.sales.length > 0;
     case 'make-investment': return profile.investments.length > 0;
     case 'reach-day-3': return profile.day >= 3;
@@ -357,7 +358,7 @@ export function runProduction(profile: PlayerProfile, companyId: string, batches
     if (!lot || lot.quantity < input.quantity * batches) return failure(profile, 'insufficient-materials', 'المواد الخام لا تكفي لهذه الدفعات.');
   }
   const energyCost = batches * recipe.energyCost;
-  const maintenanceCost = Math.round((company.operatingCostPerDay ?? 0) * 0.15);
+  const maintenanceCost = Math.round((company.operatingCostPerDay ?? 0) * 0.15 * getOperatingCostProgression(profile.day));
   if (profile.bankBalance < energyCost + maintenanceCost) return failure(profile, 'insufficient-funds', 'لا يكفي الرصيد لتكلفة الطاقة والصيانة لهذا الأمر.');
   const materialCost = recipe.inputs.reduce((sum, input) => {
     const lot = profile.inventory.find((item) => item.materialOrProductId === input.materialId);
@@ -389,7 +390,7 @@ export function runProduction(profile: PlayerProfile, companyId: string, batches
 export function serviceCompany(profile: PlayerProfile, companyId: string): GameResult<{ companyId: string; cost: number }> {
   const company = profile.companies.find((item) => item.id === companyId);
   if (!company) return failure(profile, 'not-found', 'الشركة غير موجودة.');
-  const cost = Math.max(5_000, Math.round((company.operatingCostPerDay ?? 0) * 0.4));
+  const cost = Math.max(5_000, Math.round((company.operatingCostPerDay ?? 0) * 0.4 * getOperatingCostProgression(profile.day)));
   if (profile.bankBalance < cost) return failure(profile, 'insufficient-funds', 'لا يكفي الرصيد لإجراء صيانة المصنع.');
   const nextProfile = addLedger(
     { ...profile, companies: profile.companies.map((item) => item.id === companyId ? { ...item, maintenanceCondition: 100 } : item) },
@@ -493,7 +494,7 @@ export function getDayBriefing(profile: PlayerProfile): DayBriefing {
   const day = profile.day + 1;
   const multiplier = findCountry(profile.countryId)?.economy.operatingCostMultiplier ?? 1;
   const managedCompanyIds = new Set(profile.staff.filter((member) => member.status === 'active' && member.role === 'manager' && member.companyId).map((member) => member.companyId));
-  const operatingCost = profile.companies.reduce((sum, company) => sum + (company.operatingCostPerDay ?? 0) * (managedCompanyIds.has(company.id) ? 0.92 : 1), 0) * multiplier;
+  const operatingCost = profile.companies.reduce((sum, company) => sum + (company.operatingCostPerDay ?? 0) * (managedCompanyIds.has(company.id) ? 0.92 : 1), 0) * multiplier * getOperatingCostProgression(profile.day);
   const maturingInvestments = profile.investments
     .filter((investment) => investment.status === 'active' && investment.maturityDay <= day)
     .map((investment) => ({ id: investment.id, name: findInvestment(investment.investmentTypeId)?.name ?? investment.investmentTypeId }));
@@ -698,7 +699,8 @@ export function advanceDay(profile: PlayerProfile): GameResult<DayOutcome> {
     const riskRoll = (nextDay * 7_919 + (index + 1) * 104_729) % 10_000;
     const riskThreshold = Math.round((definition?.riskRate ?? 0) * 10_000);
     const hadLoss = Boolean(definition && riskThreshold > 0 && riskRoll < riskThreshold);
-    const payout = Math.round(investment.principal * (hadLoss ? 1 - (definition?.riskRate ?? 0) : 1 + investment.expectedReturnRate));
+    const payoutRate = getInvestmentPayoutRate(investment.expectedReturnRate, definition?.durationDays ?? 1);
+    const payout = Math.round(investment.principal * (hadLoss ? 1 - (definition?.riskRate ?? 0) : 1 + payoutRate));
     investmentPayout += payout;
     balance += payout;
     const difference = payout - investment.principal;

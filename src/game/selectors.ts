@@ -2,6 +2,7 @@ import type { SectionId } from '../domain/navigation';
 import type { PlayerProfile } from '../domain/player';
 import { AUCTION_CATALOG, findIndustry, findMaterial, findInvestment, PRODUCT_CATALOG, RECIPE_CATALOG, TASK_CATALOG } from './catalog';
 import { isAuctionOpen } from './auctions';
+import { getOperatingCostProgression } from './economyBalance';
 
 export interface InventorySummaryRow {
   id: string;
@@ -98,7 +99,7 @@ export function selectEmpirePulse(profile: PlayerProfile): EmpirePulse {
 
 export function selectOperationsSnapshot(profile: PlayerProfile, operatingCostMultiplier = 1): OperationsSnapshot {
   const managedCompanyIds = new Set(profile.staff.filter((member) => member.status === 'active' && member.role === 'manager' && member.companyId).map((member) => member.companyId));
-  const dailyOperatingCost = profile.companies.reduce((sum, company) => sum + (company.operatingCostPerDay ?? 0) * (managedCompanyIds.has(company.id) ? 0.92 : 1), 0) * operatingCostMultiplier;
+  const dailyOperatingCost = profile.companies.reduce((sum, company) => sum + (company.operatingCostPerDay ?? 0) * (managedCompanyIds.has(company.id) ? 0.92 : 1), 0) * operatingCostMultiplier * getOperatingCostProgression(profile.day);
   const runwayDays = dailyOperatingCost > 0 ? Math.floor(profile.bankBalance / dailyOperatingCost) : null;
   const productUnits = (profile.inventory ?? []).reduce((sum, lot) => (
     PRODUCT_CATALOG.some((product) => product.id === lot.materialOrProductId) ? sum + lot.quantity : sum
@@ -128,7 +129,7 @@ export function selectOperationsSnapshot(profile: PlayerProfile, operatingCostMu
 
 export function selectObligations(profile: PlayerProfile, operatingCostMultiplier = 1): ObligationsSummary {
   const managedCompanyIds = new Set(profile.staff.filter((member) => member.status === 'active' && member.role === 'manager' && member.companyId).map((member) => member.companyId));
-  const dailyOperatingCost = profile.companies.reduce((sum, company) => sum + (company.operatingCostPerDay ?? 0) * (managedCompanyIds.has(company.id) ? 0.92 : 1), 0) * operatingCostMultiplier;
+  const dailyOperatingCost = profile.companies.reduce((sum, company) => sum + (company.operatingCostPerDay ?? 0) * (managedCompanyIds.has(company.id) ? 0.92 : 1), 0) * operatingCostMultiplier * getOperatingCostProgression(profile.day);
   const dailyPayroll = profile.staff.filter((member) => member.status === 'active').reduce((sum, member) => sum + member.dailySalary, 0);
   const rows: ObligationRow[] = [];
   if (profile.payables > 0) rows.push({ id: 'payables', category: 'payable', label: 'التزامات متأخرة من التشغيل والأحداث', amount: profile.payables, dueDay: profile.day, overdue: true });
@@ -183,7 +184,7 @@ export function selectTaskBoard(profile: PlayerProfile): Array<(typeof TASK_CATA
         case 'own-land': return profile.lands.length > 0;
         case 'own-company': return profile.companies.length > 0;
         case 'buy-material': return profile.ledger.some((entry) => entry.note.startsWith('شراء '));
-        case 'run-production': return profile.ledger.some((entry) => entry.note.startsWith('تشغيل '));
+        case 'run-production': return profile.productionOrders.length > 0;
         case 'sell-product': return profile.sales.length > 0;
         case 'make-investment': return profile.investments.length > 0;
         case 'reach-day-3': return profile.day >= 3;
