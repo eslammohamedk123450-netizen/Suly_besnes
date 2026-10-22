@@ -1,6 +1,7 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App';
+import AdminApp from './AdminApp';
 import './styles.css';
 import './game-ui.css';
 
@@ -9,7 +10,7 @@ if (!rootElement) throw new Error('Root element was not found.');
 
 createRoot(rootElement).render(
   <StrictMode>
-    <App />
+    {window.location.pathname.startsWith('/admin') ? <AdminApp /> : <App />}
   </StrictMode>,
 );
 
