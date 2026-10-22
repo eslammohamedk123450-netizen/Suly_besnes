@@ -15,6 +15,7 @@ import { Icon } from './Icon';
 import { EconomyEmpty, EconomyPageShell, EconomyPanel, EconomyStat } from './EconomyUI';
 import { CodeRedemption } from './CodeRedemption';
 import { PurchaseSupport } from './PurchaseSupport';
+import { AuctionRoom } from './AuctionRoom';
 
 interface SectionPageProps {
   section: SectionItem;
@@ -50,6 +51,7 @@ export function SectionPage({ section, profile, country, notificationTheme, onNo
   const [staffRole, setStaffRole] = useState<StaffRole>('manager');
   const [staffCompany, setStaffCompany] = useState('');
   const [auctionCompanyIds, setAuctionCompanyIds] = useState<Record<string, string>>({});
+  const [selectedAuctionId, setSelectedAuctionId] = useState<string | null>(null);
   const [, setAuctionTick] = useState(0);
 
   useEffect(() => {
@@ -159,6 +161,7 @@ export function SectionPage({ section, profile, country, notificationTheme, onNo
 
   if (section.id === 'auctions') {
     const listings = selectAvailableAuctions(profile);
+    const selectedAuction = selectedAuctionId ? listings.find((listing) => listing.id === selectedAuctionId) : undefined;
     return <div className="section-page">{heading}{pageShell(
       <>
         <div className="economy-grid economy-grid--three-mobile">
@@ -190,12 +193,11 @@ export function SectionPage({ section, profile, country, notificationTheme, onNo
                 <div className="economy-card-body">
                   <div className="economy-meta"><span>الحد الأدنى للعرض {formatMoney(listing.minimumBid, country)}</span><span>أعلى عرض حالي {highestBid > 0 ? formatMoney(highestBid, country) : 'لا يوجد'}</span><span>الزيادة {formatMoney(listing.bidIncrement, country)}</span><span className="economy-pill economy-pill--gold">الإغلاق خلال {formatAuctionCountdown(closeAt)}</span></div>
                   {bidHistory.length > 0 && <div className="economy-inline-note">آخر المنافسات: {bidHistory.map((bid) => `${bid.bidder === 'player' ? 'أنت' : 'منافس آلي'} ${formatMoney(bid.amount, country)}`).join(' · ')}</div>}
-                  <form className="economy-form" onSubmit={(event: FormEvent<HTMLFormElement>) => { event.preventDefault(); run((current) => placeBid(current, listing.id, Number(value), listing.lotType === 'factory' ? auctionCompanyIds[listing.id] : undefined)); }}>
-                    <div className="economy-form-row"><div className="economy-field"><label htmlFor={`bid-${listing.id}`}>عرضك ({country.currency.symbol})</label><input id={`bid-${listing.id}`} type="number" min={listing.minimumBid} step={listing.bidIncrement} value={value} onChange={(event) => setBidAmounts((previous) => ({ ...previous, [listing.id]: event.target.value }))} /></div><div className="economy-field"><label>عرض مرجّح للفوز</label><input value={formatMoney(recommended, country)} readOnly /></div></div>
-                    {listing.lotType === 'factory' && canBuyLot && <div className="economy-field"><label htmlFor={`auction-company-${listing.id}`}>الشركة المستهدفة للتوسعة</label><select id={`auction-company-${listing.id}`} value={auctionCompanyIds[listing.id] ?? profile.companies[0]?.id ?? ''} onChange={(event) => setAuctionCompanyIds((previous) => ({ ...previous, [listing.id]: event.target.value }))}>{profile.companies.map((company) => <option value={company.id} key={company.id}>{company.name}</option>)}</select></div>}
+                  <div className="economy-form">
+                    <div className="economy-form-row"><div className="economy-field"><label>عرض افتتاحي مقترح</label><input value={formatMoney(recommended, country)} readOnly /></div><div className="economy-field"><label>نظام الجلسة</label><input value="طاولة مزاد مباشرة" readOnly /></div></div>
                     {!canBuyLot && <div className="economy-alert"><Icon name="shield" size={16} />أسس شركة أولًا حتى تربط بها المصنع الفائز.</div>}
-                    <button className="button button-primary" type="submit" disabled={!canBuyLot || profile.bankBalance < listing.minimumBid}><Icon name="gavel" size={16} /> تقديم العرض</button>
-                  </form>
+                    <button className="button button-primary" type="button" disabled={!canBuyLot || profile.bankBalance < listing.minimumBid} onClick={() => setSelectedAuctionId(listing.id)}><Icon name="gavel" size={16} /> فتح طاولة المزاد</button>
+                  </div>
                 </div>
               </article>;
             })}
@@ -222,7 +224,7 @@ export function SectionPage({ section, profile, country, notificationTheme, onNo
           {profile.lands.length === 0 ? <EconomyEmpty title="لا توجد أراضٍ مملوكة بعد" message="افتح مزادًا وقدّم عرضًا لتسجيل أول أصل عقاري." /> : <div className="economy-list">{profile.lands.map((land) => <article className="economy-card economy-card--soft" key={land.id}><div className="economy-card-head"><div className="economy-card-title"><span className="economy-card-icon"><Icon name="land" size={18} /></span><span><strong>{land.label}</strong><small>{formatNumber(land.areaSquareMeters)} م² · {land.landType ? landTypeNames[land.landType] : 'أرض'}</small></span></div><span className="economy-price">{formatMoney(land.purchasePrice, country)}</span></div></article>)}</div>}
         </EconomyPanel>
       </>,
-    )}</div>;
+    )}{selectedAuction && <AuctionRoom profile={profile} country={country} listing={selectedAuction} onClose={() => setSelectedAuctionId(null)} onBid={(amount, targetCompanyId) => { const result = placeBid(profile, selectedAuction.id, amount, targetCompanyId); onAction(result); if (result.ok) setSelectedAuctionId(null); return result; }} />}</div>;
   }
 
   if (section.id === 'lands') {
