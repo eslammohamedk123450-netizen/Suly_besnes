@@ -1,5 +1,5 @@
-const CACHE_NAME = 'business-empire-shell-v2';
-const APP_SHELL = ['/', '/manifest.webmanifest', '/icons/app-icon.svg', '/images/cairo-skyline.webp'];
+const CACHE_NAME = 'business-empire-shell-v3';
+const APP_SHELL = ['/', '/manifest.webmanifest', '/icons/app-icon.svg', '/images/cairo-skyline-lite.webp'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil((async () => {

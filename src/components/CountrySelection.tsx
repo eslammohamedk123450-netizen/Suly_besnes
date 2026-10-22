@@ -25,7 +25,7 @@ export function CountrySelection({
       <header className="setup-topbar"><Brand compact /><span className="offline-badge"><span /> تعمل على جهازك</span></header>
       <div className="setup-layout">
         <section className="setup-visual" aria-label="مشهد القاهرة">
-          <img src="/images/cairo-skyline.webp" alt="أفق القاهرة والنيل عند الغروب" />
+          <img src="/images/cairo-skyline-lite.webp" alt="أفق القاهرة والنيل عند الغروب" />
           <div className="setup-visual-shade" />
           <div className="setup-visual-copy">
             <span className="eyebrow">رحلتك تبدأ بقرار</span>

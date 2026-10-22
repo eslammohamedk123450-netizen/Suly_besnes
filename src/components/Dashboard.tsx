@@ -18,7 +18,7 @@ export function Dashboard({ profile, country, onNavigate }: DashboardProps) {
   return (
     <div className="dashboard-page">
       <section className="dashboard-hero">
-        <img src="/images/cairo-skyline.webp" alt="أفق القاهرة على ضفاف النيل" />
+        <img src="/images/cairo-skyline-lite.webp" alt="أفق القاهرة على ضفاف النيل" />
         <div className="hero-overlay" />
         <div className="hero-content">
           <span className="eyebrow"><span className="live-dot" /> رحلتك الاستثمارية بدأت</span>
