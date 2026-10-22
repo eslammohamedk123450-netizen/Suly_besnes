@@ -57,8 +57,43 @@ export interface ObligationsSummary {
   dailyOperatingCost: number;
 }
 
+export interface EmpirePulse {
+  score: number;
+  rank: string;
+  rankTone: 'bronze' | 'silver' | 'gold' | 'royal';
+  nextRank: string;
+  nextRankScore: number;
+  focusTitle: string;
+  focusDescription: string;
+  badges: Array<{ id: string; label: string; earned: boolean }>;
+}
+
 export function selectAvailableAuctions(profile: PlayerProfile): typeof AUCTION_CATALOG {
   return AUCTION_CATALOG.filter((listing) => isAuctionOpen(profile, listing));
+}
+
+export function selectEmpirePulse(profile: PlayerProfile): EmpirePulse {
+  const activeStaff = profile.staff.filter((member) => member.status === 'active').length;
+  const activeOrders = profile.productionOrders.filter((order) => order.status === 'active').length;
+  const score = profile.day * 4 + profile.lands.length * 12 + profile.companies.length * 28 + activeStaff * 7 + profile.sales.length * 6 + profile.banking.loans.filter((loan) => loan.status === 'paid').length * 10 + profile.completedTaskIds.length * 12;
+  const ranks = [{ name: 'تاجر ناشئ', tone: 'bronze' as const, score: 0 }, { name: 'صاحب أعمال', tone: 'silver' as const, score: 80 }, { name: 'بارون صناعي', tone: 'gold' as const, score: 180 }, { name: 'إمبراطور اقتصادي', tone: 'royal' as const, score: 360 }];
+  const current = ranks.slice().reverse().find((rank) => score >= rank.score) ?? ranks[0];
+  const next = ranks.find((rank) => rank.score > score) ?? { name: 'القمة', score: current.score + 100 };
+  let focusTitle = 'ابنِ أول أصل مؤثر';
+  let focusDescription = 'اشترِ أرضًا مناسبة أو افتح مسارًا جديدًا حتى يبدأ اقتصادك في الحركة.';
+  if (profile.payables > 0) { focusTitle = 'استعد السيطرة على السيولة'; focusDescription = 'سدّد الالتزامات قبل التوسع حتى لا تتحول السرعة إلى ضغط مالي.'; }
+  else if (activeOrders > 0) { focusTitle = 'احرس خط الإنتاج'; focusDescription = `لديك ${activeOrders} أمر إنتاج في الطابور. راقب الجودة والطلب عند التسليم.`; }
+  else if (profile.companies.length > 0 && profile.staff.length === 0) { focusTitle = 'كوّن فريق القيادة'; focusDescription = 'مدير أو محاسب جيد قد يصنع الفارق بين شركة تعمل وإمبراطورية تتوسع.'; }
+  else if (profile.inventory.some((lot) => PRODUCT_CATALOG.some((product) => product.id === lot.materialOrProductId))) { focusTitle = 'حوّل الإنجاز إلى نقد'; focusDescription = 'السوق يتغير يوميًا؛ اختر توقيت البيع قبل أن تتراجع فرصة الطلب.'; }
+  else if (profile.companies.length > 0) { focusTitle = 'وسّع هامش الربح'; focusDescription = 'وازن بين الصيانة والموظفين والإنتاج قبل شراء أصل جديد.'; }
+  const badges = [
+    { id: 'founder', label: 'أول شركة', earned: profile.companies.length > 0 },
+    { id: 'operator', label: 'مشغّل مصنع', earned: profile.productionOrders.length > 0 },
+    { id: 'banker', label: 'صاحب محفظة', earned: profile.banking.deposits.length > 0 || profile.banking.loans.length > 0 },
+    { id: 'team', label: 'قائد فريق', earned: activeStaff >= 2 },
+    { id: 'trader', label: 'صائد السوق', earned: profile.sales.length >= 3 },
+  ];
+  return { score, rank: current.name, rankTone: current.tone, nextRank: next.name, nextRankScore: next.score, focusTitle, focusDescription, badges };
 }
 
 export function selectOperationsSnapshot(profile: PlayerProfile, operatingCostMultiplier = 1): OperationsSnapshot {

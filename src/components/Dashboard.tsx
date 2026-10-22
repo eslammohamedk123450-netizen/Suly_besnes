@@ -5,7 +5,7 @@ import { formatGold, formatMoney, formatNumber } from '../domain/formatters';
 import { GOLD_PRICE_PER_GRAM } from '../game/catalog';
 import { GAME_SECTIONS, type SectionId } from '../domain/navigation';
 import { Icon } from './Icon';
-import { selectOperationsSnapshot } from '../game/selectors';
+import { selectEmpirePulse, selectOperationsSnapshot } from '../game/selectors';
 
 interface DashboardProps {
   profile: PlayerProfile;
@@ -19,6 +19,7 @@ export function Dashboard({ profile, country, onNavigate }: DashboardProps) {
   const quickSections = GAME_SECTIONS.filter((section) => section.id !== 'home');
   const latestEntries = profile.ledger.slice(-5).reverse();
   const operations = selectOperationsSnapshot(profile, country.economy.operatingCostMultiplier ?? 1);
+  const pulse = selectEmpirePulse(profile);
   const ledgerDay = (occurredAt: string) => {
     const createdAt = Date.parse(profile.createdAt);
     const entryAt = Date.parse(occurredAt);
@@ -58,6 +59,12 @@ export function Dashboard({ profile, country, onNavigate }: DashboardProps) {
         <div className={`operations-metric${operations.runwayDays !== null && operations.runwayDays < 5 ? ' operations-metric--warning' : ''}`}><span><Icon name="bank" size={15} /> مدة الصمود بالنقد</span><strong>{operations.runwayDays === null ? '—' : `${formatNumber(operations.runwayDays)} يوم`}</strong></div>
         <div className="operations-metric"><span><Icon name="factory" size={15} /> خطوط جاهزة للتشغيل</span><strong>{formatNumber(operations.readyProductionCompanies)}</strong></div>
         <div className="operations-metric"><span><Icon name="briefcase" size={15} /> منتجات قابلة للبيع</span><strong>{formatNumber(operations.productUnits)}</strong></div>
+      </section>
+
+      <section className={`empire-pulse empire-pulse--${pulse.rankTone}`}>
+        <div className="empire-pulse-rank"><span className="section-kicker">نبض الإمبراطورية</span><strong>{pulse.rank}</strong><small>{formatNumber(pulse.score)} نقطة قيادة · الهدف التالي {pulse.nextRank}</small><div className="empire-pulse-progress"><span style={{ width: `${Math.min(100, Math.round(pulse.score / Math.max(1, pulse.nextRankScore) * 100))}%` }} /></div></div>
+        <div className="empire-pulse-focus"><span className="section-kicker">تركيز اليوم</span><h3>{pulse.focusTitle}</h3><p>{pulse.focusDescription}</p></div>
+        <div className="empire-badges" aria-label="شارات الإمبراطورية">{pulse.badges.map((badge) => <span className={`empire-badge${badge.earned ? ' empire-badge--earned' : ''}`} key={badge.id}>{badge.earned ? '◆' : '◇'} {badge.label}</span>)}</div>
       </section>
 
       <section className="stats-grid" aria-label="المؤشرات المالية">
