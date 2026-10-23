@@ -14,7 +14,7 @@ export interface QueuedGameCommand {
 
 const supportedCommandNames = new Set<GameCommand['name']>([
   'place_bid', 'buy_direct_land', 'buy_direct_company', 'sell_land', 'sell_company', 'sell_asset',
-  'buy_material', 'found_company', 'upgrade_company', 'run_production', 'service_company',
+  'buy_material', 'buy_global_material', 'found_company', 'upgrade_company', 'run_production', 'service_company',
   'cancel_production', 'use_speed_card', 'sell_product', 'buy_gold', 'sell_gold', 'hire_staff',
   'pay_staff_salary', 'terminate_staff', 'create_deposit', 'withdraw_deposit', 'take_loan',
   'create_investment', 'advance_day', 'accept_contract', 'deliver_contract', 'negotiate_contract', 'claim_task',

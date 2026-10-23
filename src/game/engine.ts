@@ -19,6 +19,7 @@ import { getInvestmentPayoutRate, getOperatingCostProgression } from './economyB
 import { GAME_DAY_MS } from './time';
 import { getContractOffers } from './contracts';
 import { getSynergyOperatingMultiplier, getSynergyProductionMultiplier } from './synergy';
+import { resolveGlobalMarketOffer } from './globalMarket';
 import type { SpeedCardKind } from '../domain/accountFeatures';
 
 export type GameErrorCode =
@@ -374,6 +375,33 @@ export function buyMaterial(profile: PlayerProfile, materialId: string, quantity
     profile.bankBalance - totalCost,
   );
   return success(syncTasks(nextProfile), `تم شراء ${quantity} ${material.name} وتخزينها.`, { materialId, quantity, totalCost });
+}
+
+export function buyGlobalMaterial(profile: PlayerProfile, offerId: string, quantity: number, negotiatedUnitPrice?: number): GameResult<{ materialId: string; quantity: number; totalCost: number; unitPrice: number }> {
+  const countryError = ensureEgypt(profile);
+  if (countryError) return countryError;
+  if (!isPositiveInteger(quantity)) return failure(profile, 'invalid-input', 'الكمية يجب أن تكون عددًا صحيحًا موجبًا.');
+  const offer = resolveGlobalMarketOffer(profile, offerId);
+  const material = offer ? findMaterial(offer.materialId) : undefined;
+  if (!offer || !material) return failure(profile, 'not-found', 'عرض السوق العالمي لم يعد متاحًا.');
+  const unitPrice = negotiatedUnitPrice ?? offer.unitPrice;
+  if (!Number.isInteger(unitPrice) || unitPrice < offer.floorPrice || unitPrice > offer.unitPrice || (!offer.negotiable && unitPrice !== offer.unitPrice)) {
+    return failure(profile, 'invalid-input', 'السعر لا يطابق شروط العرض أو التفاوض.');
+  }
+  const totalCost = quantity * unitPrice;
+  if (profile.bankBalance < totalCost) return failure(profile, 'insufficient-funds', 'لا يكفي رصيدك لقبول هذه الصفقة.');
+  const existing = profile.inventory.find((lot) => lot.materialOrProductId === material.id);
+  const inventory = existing
+    ? profile.inventory.map((lot) => lot.materialOrProductId === material.id
+      ? { ...lot, quantity: lot.quantity + quantity, unitCost: (lot.quantity * lot.unitCost + totalCost) / (lot.quantity + quantity) }
+      : lot)
+    : [...profile.inventory, { id: nextId(profile, 'inventory', profile.inventory.length), materialOrProductId: material.id, quantity, unit: material.unit, unitCost: unitPrice }];
+  const nextProfile = addLedger(
+    { ...profile, inventory },
+    [ledgerEntry(profile, 'asset', totalCost, `شراء عالمي ${quantity} ${material.unit} من ${offer.sellerName}`, 0)],
+    profile.bankBalance - totalCost,
+  );
+  return success(syncTasks(nextProfile), `تم قبول عرض ${offer.sellerName} وشراء ${quantity} ${material.name} بلا حد تخزين.`, { materialId: material.id, quantity, totalCost, unitPrice });
 }
 
 export function foundCompany(profile: PlayerProfile, industryId: IndustryId, landId: string, name: string): GameResult<{ companyId: string; totalCost: number }> {
@@ -1003,6 +1031,7 @@ export type GameCommand =
   | { name: 'sell_company'; args: { companyId: string } }
   | { name: 'sell_asset'; args: { assetId: string } }
   | { name: 'buy_material'; args: { materialId: string; quantity: number } }
+  | { name: 'buy_global_material'; args: { offerId: string; quantity: number; negotiatedUnitPrice?: number } }
   | { name: 'found_company'; args: { industryId: IndustryId; landId: string; name: string } }
   | { name: 'upgrade_company'; args: { companyId: string } }
   | { name: 'run_production'; args: { companyId: string; batches: number } }
@@ -1037,6 +1066,7 @@ export function executeGameCommand(profile: PlayerProfile, command: GameCommand)
     case 'sell_company': return sellCompany(profile, command.args.companyId);
     case 'sell_asset': return sellAsset(profile, command.args.assetId);
     case 'buy_material': return buyMaterial(profile, command.args.materialId, command.args.quantity);
+    case 'buy_global_material': return buyGlobalMaterial(profile, command.args.offerId, command.args.quantity, command.args.negotiatedUnitPrice);
     case 'found_company': return foundCompany(profile, command.args.industryId, command.args.landId, command.args.name);
     case 'upgrade_company': return upgradeCompany(profile, command.args.companyId);
     case 'run_production': return runProduction(profile, command.args.companyId, command.args.batches);
