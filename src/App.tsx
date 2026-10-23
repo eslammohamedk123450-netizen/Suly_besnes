@@ -23,6 +23,7 @@ import { SystemGuideModal } from './components/SystemGuideModal';
 import { StarterMissionDock } from './components/StarterMissionDock';
 import { chapterFor, getSectionUnlockHint, getUnlockedSectionIds, isSectionUnlocked } from './game/onboarding';
 import { normalizeAccountFeatures } from './domain/accountFeatures';
+import { claimDailySeasonLogin, getVisibleSeasons } from './storage/leaderboardRepository';
 
 export default function App() {
   const [account, setAccount] = useState<LocalAccount | null>(null);
@@ -38,6 +39,16 @@ export default function App() {
   const [pendingGuide, setPendingGuide] = useState<SectionId | null>(null);
   const [linkingAccount, setLinkingAccount] = useState(false);
 
+  async function claimDailyLogin(nextAccount: LocalAccount) {
+    if (nextAccount.isGuest) return;
+    try {
+      const seasons = await getVisibleSeasons();
+      if (seasons[0]) await claimDailySeasonLogin(seasons[0].id);
+    } catch {
+      // Leaderboard availability must never block local gameplay or login.
+    }
+  }
+
   useEffect(() => {
     loadCurrentAccount().then(async (current) => {
       setAccount(current);
@@ -45,6 +56,7 @@ export default function App() {
       const remote = current && !current.isGuest ? await loadRemoteGame(current.id) : null;
       setProfile(remote || local ? normalizeAccountFeatures(remote ?? local!, current?.id) : null);
       setAuthLoading(false);
+      if (current) void claimDailyLogin(current);
     });
   }, []);
 
@@ -56,6 +68,7 @@ export default function App() {
     setActiveSection('home');
     setNotice('تم تسجيل الدخول مباشرة.');
     setNoticeTone('success');
+    void claimDailyLogin(nextAccount);
   }
 
   function handlePlayAsGuest() {
