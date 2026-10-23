@@ -30,6 +30,17 @@ export const LOGIN_REWARDS = [
   { id: 'gold', title: 'ذهب للمحفظة', description: '0.5 غرام ذهب محاكاة', points: 5 },
 ] as const;
 
+export function getSeasonLeaderboard(profile: PlayerProfile): Array<{ name: string; points: number; isPlayer?: boolean }> {
+  const rivals = [
+    { name: 'شركة النيل القابضة', points: 135, isPlayer: false },
+    { name: 'مستثمر الإسكندرية', points: 92, isPlayer: false },
+    { name: 'رواد السويس', points: 58, isPlayer: false },
+  ];
+  return [...rivals, { name: profile.name, points: getSeasonSnapshot(profile).season.points, isPlayer: true }]
+    .sort((left, right) => right.points - left.points)
+    .map((row, index) => ({ ...row, name: row.isPlayer ? `${row.name} · أنت #${index + 1}` : row.name }));
+}
+
 export function getSeasonId(day: number): string {
   return `${SEASON_ID_PREFIX}${Math.floor(Math.max(0, day - 1) / SEASON_LENGTH_DAYS) + 1}`;
 }

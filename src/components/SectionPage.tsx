@@ -4,7 +4,7 @@ import type { PlayerProfile } from '../domain/player';
 import type { NotificationTheme } from '../storage/userPreferences';
 import type { SectionItem } from '../domain/navigation';
 import { formatMoney, formatNumber } from '../domain/formatters';
-import { buyDirectCompany, buyDirectLand, buyGold, buyMaterial, cancelProductionOrder, claimTask, createDeposit, createInvestment, foundCompany, hireStaff, placeBid, runProduction, sellAsset, sellCompany, sellGold, sellLand, sellProduct, serviceCompany, takeLoan, terminateStaff, withdrawDeposit, type GameResult } from '../game/engine';
+import { buyDirectCompany, buyDirectLand, buyGold, buyMaterial, cancelProductionOrder, claimTask, createDeposit, createInvestment, foundCompany, hireStaff, placeBid, runProduction, sellAsset, sellCompany, sellGold, sellLand, sellProduct, serviceCompany, takeLoan, terminateStaff, upgradeCompany, withdrawDeposit, type GameResult } from '../game/engine';
 import type { StaffRole } from '../domain/futureSystems';
 import { AUCTION_CATALOG, DIRECT_COMPANY_CATALOG, DIRECT_LAND_CATALOG, GOLD_PRICE_PER_GRAM, INDUSTRY_CATALOG, INVESTMENT_CATALOG, MATERIAL_CATALOG, PRODUCT_CATALOG, RECIPE_CATALOG } from '../game/catalog';
 import { getMarketQuote } from '../game/market';
@@ -16,7 +16,7 @@ import { EconomyEmpty, EconomyPageShell, EconomyPanel, EconomyStat } from './Eco
 import { CodeRedemption } from './CodeRedemption';
 import { PurchaseSupport } from './PurchaseSupport';
 import { AuctionRoom } from './AuctionRoom';
-import { claimLoginReward, claimSeasonChallenge, getSeasonSnapshot, LOGIN_REWARDS } from '../game/season';
+import { claimLoginReward, claimSeasonChallenge, getSeasonLeaderboard, getSeasonSnapshot, LOGIN_REWARDS } from '../game/season';
 
 interface SectionPageProps {
   section: SectionItem;
@@ -268,7 +268,9 @@ export function SectionPage({ section, profile, country, notificationTheme, onNo
             {profile.companies.length === 0 ? <EconomyEmpty title="لم تؤسس شركة بعد" message="ابدأ بشراء أرض مناسبة ثم أكمل نموذج التأسيس." /> : <div className="economy-list">{profile.companies.map((company) => {
               const definition = INDUSTRY_CATALOG.find((item) => item.id === company.industryId);
               const land = profile.lands.find((item) => item.id === company.landId);
-              return <article className="economy-card" key={company.id}><div className="economy-card-head"><div className="economy-card-title"><span className="economy-card-icon"><Icon name="factory" size={19} /></span><span><strong>{company.name}</strong><small>{definition?.name ?? company.industryId} · {land?.label ?? 'دون أرض مسجلة'}</small></span></div><span className="economy-pill economy-pill--green">مرخصة</span></div><div className="economy-card-body"><div className="economy-meta"><span>طاقة {formatNumber(company.energyUnits ?? 0)} / {formatNumber(company.energyCapacity ?? definition?.energyCapacity ?? 0)}</span><span>تشغيل يومي {formatMoney(company.operatingCostPerDay ?? 0, country)}</span></div><div className="economy-progress"><span style={{ width: `${Math.min(100, 100 * (company.energyUnits ?? 0) / Math.max(1, company.energyCapacity ?? 1))}%` }} /></div></div></article>;
+              const level = company.upgradeLevel ?? 1;
+              const upgradeCost = 120_000 * level;
+              return <article className="economy-card" key={company.id}><div className="economy-card-head"><div className="economy-card-title"><span className="economy-card-icon"><Icon name="factory" size={19} /></span><span><strong>{company.name}</strong><small>{definition?.name ?? company.industryId} · {land?.label ?? 'دون أرض مسجلة'}</small></span></div><span className="economy-pill economy-pill--green">مستوى {formatNumber(level)}</span></div><div className="economy-card-body"><div className="economy-meta"><span>طاقة {formatNumber(company.energyUnits ?? 0)} / {formatNumber(company.energyCapacity ?? definition?.energyCapacity ?? 0)}</span><span>تشغيل يومي {formatMoney(company.operatingCostPerDay ?? 0, country)}</span><span>التطوير التالي {level < 5 ? formatMoney(upgradeCost, country) : 'مكتمل'}</span></div><div className="economy-progress"><span style={{ width: `${Math.min(100, 100 * (company.energyUnits ?? 0) / Math.max(1, company.energyCapacity ?? 1))}%` }} /></div><button className="button button-secondary" type="button" disabled={level >= 5 || profile.bankBalance < upgradeCost} onClick={() => run((current) => upgradeCompany(current, company.id))}>{level >= 5 ? 'أعلى مستوى' : `تطوير الطاقة إلى المستوى ${level + 1}`}</button></div></article>;
             })}</div>}
           </EconomyPanel>
         </div>
@@ -399,6 +401,7 @@ export function SectionPage({ section, profile, country, notificationTheme, onNo
     const tasks = selectTaskBoard(profile);
     const completed = tasks.filter((task) => task.claimed).length;
     const season = getSeasonSnapshot(profile);
+    const leaderboard = getSeasonLeaderboard(profile);
     return <div className="section-page">{heading}{pageShell(
       <>
         <div className="economy-grid economy-grid--three-mobile"><EconomyStat label="إنجازات مكتملة" value={`${formatNumber(completed)} / ${formatNumber(tasks.length)}`} /><EconomyStat label="مكافآت متاحة" value={formatNumber(tasks.filter((task) => task.available && !task.claimed).length)} /><EconomyStat label="المكافآت المستلمة" value={formatNumber(profile.completedTaskIds.length)} /></div>
@@ -410,6 +413,9 @@ export function SectionPage({ section, profile, country, notificationTheme, onNo
         <EconomyPanel title="مكافأة الدخول" description="اختر مكافأتك مرة واحدة في كل يوم من الموسم.">
           <div className="economy-button-row season-rewards">{LOGIN_REWARDS.map((reward) => <button className="button button-secondary" type="button" key={reward.id} disabled={season.loginRewardClaimed} onClick={() => run((current) => claimLoginReward(current, reward.id))}><strong>{reward.title}</strong><span>{reward.description}</span></button>)}</div>
           {season.loginRewardClaimed && <div className="economy-notice economy-notice--success">تم استلام مكافأة الدخول لهذا اليوم. عد غدًا لاختيار مكافأة جديدة.</div>}
+        </EconomyPanel>
+        <EconomyPanel title="ترتيب موسم التوسع" description="ترتيب محلي محاكى الآن؛ ستصبح المنافسة العالمية متاحة عند إضافة نظام اللاعبين المتصلين.">
+          <div className="season-leaderboard">{leaderboard.map((row, index) => <div className={`season-rank-row${row.isPlayer ? ' season-rank-row--player' : ''}`} key={row.name}><strong>#{index + 1}</strong><span>{row.name}</span><b>{formatNumber(row.points)} نقطة</b></div>)}</div>
         </EconomyPanel>
         <EconomyPanel title="المهام والإنجازات" description="تحقق من شروط المهام ثم استلم كل مكافأة مرة واحدة.">
           <div className="economy-list">{tasks.map((task) => <article className="economy-task" key={task.id}><span className="economy-task-icon"><Icon name={task.claimed ? 'shield' : 'tasks'} size={18} /></span><span className="economy-task-copy"><strong>{task.title}</strong><small>{task.description} المكافأة {formatMoney(task.reward, country)}</small></span>{task.claimed ? <span className="economy-pill economy-pill--green">مكتملة</span> : <button className="button button-primary" type="button" disabled={!task.available} onClick={() => run((current) => claimTask(current, task.id))}>{task.available ? 'استلام المكافأة' : 'لم تكتمل'}</button>}</article>)}</div>

@@ -411,6 +411,21 @@ export function foundCompany(profile: PlayerProfile, industryId: IndustryId, lan
   return success(syncTasks(nextProfile), `تم تأسيس ${companyName} وترخيصها.`, { companyId, totalCost });
 }
 
+export function upgradeCompany(profile: PlayerProfile, companyId: string): GameResult<{ companyId: string; level: number; cost: number }> {
+  const company = profile.companies.find((item) => item.id === companyId);
+  if (!company) return failure(profile, 'not-found', 'الشركة غير موجودة.');
+  const level = company.upgradeLevel ?? 1;
+  if (level >= 5) return failure(profile, 'condition-not-met', 'وصلت هذه الشركة إلى أعلى مستوى تطوير.');
+  const cost = 120_000 * level;
+  if (profile.bankBalance < cost) return failure(profile, 'insufficient-funds', `تحتاج إلى ${cost.toLocaleString('ar-EG')} ج.م لتطوير الشركة.`);
+  const capacityBonus = 20 * level;
+  const companies = profile.companies.map((item) => item.id === companyId
+    ? { ...item, upgradeLevel: level + 1, energyCapacity: (item.energyCapacity ?? 0) + capacityBonus, energyUnits: (item.energyUnits ?? 0) + capacityBonus, maintenanceCondition: 100 }
+    : item);
+  const nextProfile = addLedger({ ...profile, companies }, [ledgerEntry(profile, 'expense', cost, `تطوير ${company.name} إلى المستوى ${level + 1}`, 0)], profile.bankBalance - cost);
+  return success(nextProfile, `تم تطوير ${company.name} إلى المستوى ${level + 1} وزادت طاقتها.`, { companyId, level: level + 1, cost });
+}
+
 export function runProduction(profile: PlayerProfile, companyId: string, batches: number): GameResult<ProductionOutcome> {
   const countryError = ensureEgypt(profile);
   if (countryError) return countryError;

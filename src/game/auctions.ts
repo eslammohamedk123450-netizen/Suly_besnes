@@ -22,7 +22,22 @@ function wasWon(profile: PlayerProfile, listingId: string): boolean {
 
 export function getAuctionListings(profile: PlayerProfile): AuctionListing[] {
   // الفوز يستهلك المزاد نهائيًا؛ لا نعيد إدراج نفس السلعة تلقائيًا.
-  return AUCTION_CATALOG.filter((base) => !wasWon(profile, base.id));
+  const regular = AUCTION_CATALOG.filter((base) => !wasWon(profile, base.id));
+  const rareId = `season-rare-${profile.day}`;
+  const rare: AuctionListing = {
+    id: rareId,
+    countryId: 'egypt',
+    lotType: 'factory',
+    label: `مزاد الموسم النادر · توسعة اليوم ${profile.day}`,
+    landType: 'industrial',
+    areaSquareMeters: 0,
+    minimumBid: 450_000 + (profile.day % 3) * 25_000,
+    bidIncrement: 25_000,
+    closesAt: '2099-12-31T00:00:00.000Z',
+    status: 'open',
+    energyCapacityBonus: 90,
+  };
+  return profile.auctionHistory.some((bid) => bid.listingId === rareId && bid.bidder === 'player') ? regular : [...regular, rare];
 }
 
 export function resolveAuctionListing(profile: PlayerProfile, listingId: string): AuctionListing | undefined {

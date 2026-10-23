@@ -76,6 +76,11 @@
 .season-rewards .button { display: grid; gap: 3px; justify-items: start; min-height: 47px; text-align: right; }
 .season-rewards .button strong { font-size: 10px; }
 .season-rewards .button span { color: inherit; font-size: 8px; opacity: .75; }
+.season-leaderboard { display: grid; gap: 4px; }
+.season-rank-row { display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; gap: 8px; align-items: center; padding: 9px 10px; color: #607484; background: #f7f9fa; border-radius: 8px; font-size: 9px; }
+.season-rank-row strong { color: #a27e2b; }
+.season-rank-row b { color: #29465b; font-size: 9px; }
+.season-rank-row--player { color: #264f67; background: #fff8e5; border: 1px solid #ead9a6; }
 .economy-alert { display: flex; align-items: center; gap: 8px; padding: 10px 12px; color: #806727; background: #fff9e9; border: 1px solid #f1e5c3; border-radius: 9px; font-size: 9px; line-height: 1.8; }
 .economy-divider { height: 1px; background: #edf1f3; }
 .economy-full { grid-column: 1 / -1; }
