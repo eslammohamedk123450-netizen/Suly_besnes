@@ -2,3 +2,6 @@ project_id = "kamxjsddjxowodatafqo"
 
 [functions.season-event]
 verify_jwt = true
+
+[functions.finalize-seasons]
+verify_jwt = false
