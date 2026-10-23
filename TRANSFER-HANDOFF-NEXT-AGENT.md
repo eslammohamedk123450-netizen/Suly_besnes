@@ -27,14 +27,13 @@ b3ce501 feat: add account ids and admin-managed rewards foundation
 79c815c feat: guide first land purchase and refresh app icon
 ```
 
-حالة Git وقت إنشاء هذا الملف:
+حالة Git بعد رفع ملف التسليم:
 
 ```text
 ## main...origin/main
- M src/game/selectors.ts
 ```
 
-أي أن هناك تعديلًا محليًا غير مرفوع في `src/game/selectors.ts` خاص بإضافة حاسبة **نقاط الإمبراطورية**. لم يتم دمجه في GitHub بعد حتى يكمله الحساب التالي ويضيف واجهته ويختبره.
+تم رفع بداية حاسبة **نقاط الإمبراطورية** داخل `src/game/selectors.ts` في Commit WIP أعلاه. المتبقي هو إضافة واجهتها واختبارها؛ لا تعتبر الميزة مكتملة قبل تنفيذ ذلك.
 
 ---
 
