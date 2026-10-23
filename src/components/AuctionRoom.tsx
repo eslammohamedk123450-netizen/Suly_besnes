@@ -69,7 +69,7 @@ export function AuctionRoom({ profile, country, listing, onClose, onBid }: Aucti
         }
         return;
       }
-      if (currentTime - lastBotAtRef.current >= 3_200 && !playerLeadingRef.current && roundBids < 5) {
+      if (currentTime - lastBotAtRef.current >= 3_200 && roundBids < 5) {
         lastBotAtRef.current = currentTime;
         botIndexRef.current = (botIndexRef.current + 1) % AI_PARTICIPANTS.length;
         const bidder = AI_PARTICIPANTS[botIndexRef.current];
@@ -77,6 +77,7 @@ export function AuctionRoom({ profile, country, listing, onClose, onBid }: Aucti
         currentBidRef.current = nextBid;
         setCurrentBid(nextBid);
         setLeader(bidder);
+        playerLeadingRef.current = false;
         setRoundBids((value) => value + 1);
         setFeed((items) => [{ id: `live-${currentTime}`, bidder, amount: nextBid }, ...items].slice(0, 8));
         setAmount((value) => Number(value) <= nextBid ? String(nextBid + AUCTION_DEFAULT_LEAD) : value);
