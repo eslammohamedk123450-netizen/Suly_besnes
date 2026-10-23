@@ -22,7 +22,7 @@ describe('Business Empire economy invariants', () => {
     expect(accepted.ok).toBe(true);
     if (!accepted.ok) return;
     expect(acceptContract(accepted.profile, offer.id).ok).toBe(false);
-    const withStock = { ...accepted.profile, inventory: [{ id: 'lot-1', materialOrProductId: offer.productId, quantity: offer.quantity, unit: 'وحدة', unitCost: 10 }] };
+    const withStock = { ...accepted.profile, inventory: [{ id: 'lot-1', materialOrProductId: offer.productId, quantity: offer.quantity, unit: 'وحدة', unitCost: 10, qualityScore: 100 }] };
     const delivered = deliverContract(withStock, offer.id);
     expect(delivered.ok).toBe(true);
     if (!delivered.ok) return;
