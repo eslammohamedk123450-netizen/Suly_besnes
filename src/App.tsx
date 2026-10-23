@@ -13,11 +13,11 @@ import { GAME_SECTIONS, getSection, SECTION_GROUPS, type SectionId } from './dom
 import { createNewPlayer } from './domain/player';
 import type { PlayerProfile } from './domain/player';
 import { formatMoney } from './domain/formatters';
-import { advanceDay, type GameResult } from './game/engine';
+import { advanceDay, type GameCommand, type GameResult } from './game/engine';
 import { loadSavedGame, saveGame } from './storage/saveRepository';
 import { loadNotificationTheme, saveNotificationTheme } from './storage/userPreferences';
 import { createGuestAccount, loadCurrentAccount, logoutAccount, type LocalAccount } from './storage/authRepository';
-import { loadRemoteGame, redeemRemoteReward, saveRemoteGame } from './storage/remoteSaveRepository';
+import { executeRemoteGameCommand, loadRemoteGame, redeemRemoteReward, saveRemoteGame } from './storage/remoteSaveRepository';
 import { StoryIntro } from './components/StoryIntro';
 import { SystemGuideModal } from './components/SystemGuideModal';
 import { StarterMissionDock } from './components/StarterMissionDock';
@@ -170,7 +170,7 @@ export default function App() {
     setNoticeTone('success');
   }
 
-  function handleGameResult<T>(result: GameResult<T>) {
+  function handleGameResult<T>(result: GameResult<T>, options: { syncRemote?: boolean } = {}) {
     if (!result.ok) {
       setNotice(result.message);
       setNoticeTone('error');
@@ -178,7 +178,7 @@ export default function App() {
     }
     const previousProfile = profile;
     const saved = saveGame(result.profile, account?.id);
-    if (account && !account.isGuest && previousProfile) {
+    if (options.syncRemote !== false && account && !account.isGuest && previousProfile) {
       void saveRemoteGame(account.id, result.profile).then((remoteSaved) => {
         if (remoteSaved) void recordVerifiedTransactions(previousProfile, result.profile);
       });
@@ -193,6 +193,15 @@ export default function App() {
   function runGameAction(action: (current: PlayerProfile) => GameResult<unknown>) {
     if (!profile) return;
     handleGameResult(action(profile));
+  }
+
+  async function handleGameCommand(command: GameCommand, fallback: (current: PlayerProfile) => GameResult<unknown>) {
+    if (!profile) return;
+    if (!account || account.isGuest) { handleGameResult(fallback(profile)); return; }
+    const remoteResult = await executeRemoteGameCommand(command);
+    if (remoteResult) { handleGameResult(remoteResult, { syncRemote: false }); return; }
+    setNotice('تعذر تنفيذ الأمر الخادمي. لم يتم تغيير عالمك؛ تحقق من الاتصال وحاول مرة أخرى.');
+    setNoticeTone('error');
   }
 
   async function handleRedeemed(nextProfile: PlayerProfile, message: string, codeId: string): Promise<boolean> {
@@ -210,8 +219,27 @@ export default function App() {
     return true;
   }
 
-  function handleDaysElapsed(days: number) {
+  async function handleDaysElapsed(days: number) {
     if (!profile) return;
+    if (account && !account.isGuest) {
+      let current = profile;
+      let latestDayMessage = '';
+      for (let index = 0; index < days; index += 1) {
+        const result = await executeRemoteGameCommand({ name: 'advance_day', args: {} });
+        if (!result || !result.ok) {
+          setNotice(result?.message ?? 'تعذر ترحيل اليوم على الخادم. لم يتم تغيير عالمك.');
+          setNoticeTone('error');
+          return;
+        }
+        current = result.profile;
+        latestDayMessage = result.message;
+      }
+      saveGame(current, account.id);
+      setProfile(current);
+      setNotice(days > 1 ? `تم ترحيل ${days} أيام تلقائيًا. آخر ملخص: ${latestDayMessage}` : latestDayMessage);
+      setNoticeTone('success');
+      return;
+    }
     let current = profile;
     let completedDays = 0;
     let latestDayMessage = '';
@@ -315,7 +343,7 @@ export default function App() {
           {activeSection === 'home' ? (
             <Dashboard profile={profile} country={country} onNavigate={navigate} />
           ) : (
-            <SectionPage section={active} profile={profile} country={country} notificationTheme={notificationTheme} isGuest={Boolean(account.isGuest)} onNotificationThemeChange={setNotificationTheme} onHome={() => navigate('home')} onAction={handleGameResult} onRedeemed={handleRedeemed} onLinkAccount={() => setLinkingAccount(true)} onLogout={handleLogout} />
+            <SectionPage section={active} profile={profile} country={country} notificationTheme={notificationTheme} isGuest={Boolean(account.isGuest)} onNotificationThemeChange={setNotificationTheme} onHome={() => navigate('home')} onAction={handleGameResult} onCommand={handleGameCommand} onRedeemed={handleRedeemed} onLinkAccount={() => setLinkingAccount(true)} onLogout={handleLogout} />
           )}
         </main>
       </div>

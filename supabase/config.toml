@@ -14,3 +14,6 @@ verify_jwt = true
 
 [functions.game-save]
 verify_jwt = true
+
+[functions.game-command]
+verify_jwt = true

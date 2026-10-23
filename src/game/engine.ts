@@ -993,3 +993,70 @@ export const produce = runProduction;
 export const sell = sellProduct;
 export const invest = createInvestment;
 export const passDay = advanceDay;
+
+/** Serializable intent sent by authenticated clients; it deliberately contains no profile/save data. */
+export type GameCommand =
+  | { name: 'place_bid'; args: { listingId: string; amount: number; targetCompanyId?: string } }
+  | { name: 'buy_direct_land'; args: { listingId: string } }
+  | { name: 'buy_direct_company'; args: { listingId: string } }
+  | { name: 'sell_land'; args: { landId: string } }
+  | { name: 'sell_company'; args: { companyId: string } }
+  | { name: 'sell_asset'; args: { assetId: string } }
+  | { name: 'buy_material'; args: { materialId: string; quantity: number } }
+  | { name: 'found_company'; args: { industryId: IndustryId; landId: string; name: string } }
+  | { name: 'upgrade_company'; args: { companyId: string } }
+  | { name: 'run_production'; args: { companyId: string; batches: number } }
+  | { name: 'service_company'; args: { companyId: string } }
+  | { name: 'cancel_production'; args: { orderId: string } }
+  | { name: 'use_speed_card'; args: { orderId: string; kind: SpeedCardKind } }
+  | { name: 'sell_product'; args: { productId: string; quantity: number } }
+  | { name: 'buy_gold'; args: { grams: number } }
+  | { name: 'sell_gold'; args: { grams: number } }
+  | { name: 'hire_staff'; args: { role: StaffRole; name: string; companyId?: string } }
+  | { name: 'pay_staff_salary'; args: { staffId: string } }
+  | { name: 'terminate_staff'; args: { staffId: string } }
+  | { name: 'create_deposit'; args: { amount: number; durationDays: number } }
+  | { name: 'withdraw_deposit'; args: { depositId: string } }
+  | { name: 'take_loan'; args: { collateralType: LoanRecord['collateralType']; collateralId: string; amount: number; termDays: number } }
+  | { name: 'create_investment'; args: { investmentId: string; amount: number } }
+  | { name: 'advance_day'; args: {} }
+  | { name: 'accept_contract'; args: { offerId: string } }
+  | { name: 'deliver_contract'; args: { contractId: string } }
+  | { name: 'negotiate_contract'; args: { contractId: string; mode: 'price' | 'deadline' | 'quality' } }
+  | { name: 'claim_task'; args: { taskId: string } };
+
+export type GameCommandHandler = (command: GameCommand, fallback: (profile: PlayerProfile) => GameResult<unknown>) => void | Promise<void>;
+
+/** Execute a client intent against an already-authoritative profile. Never accepts a profile as input. */
+export function executeGameCommand(profile: PlayerProfile, command: GameCommand): GameResult<unknown> {
+  switch (command.name) {
+    case 'place_bid': return placeBid(profile, command.args.listingId, command.args.amount, command.args.targetCompanyId);
+    case 'buy_direct_land': return buyDirectLand(profile, command.args.listingId);
+    case 'buy_direct_company': return buyDirectCompany(profile, command.args.listingId);
+    case 'sell_land': return sellLand(profile, command.args.landId);
+    case 'sell_company': return sellCompany(profile, command.args.companyId);
+    case 'sell_asset': return sellAsset(profile, command.args.assetId);
+    case 'buy_material': return buyMaterial(profile, command.args.materialId, command.args.quantity);
+    case 'found_company': return foundCompany(profile, command.args.industryId, command.args.landId, command.args.name);
+    case 'upgrade_company': return upgradeCompany(profile, command.args.companyId);
+    case 'run_production': return runProduction(profile, command.args.companyId, command.args.batches);
+    case 'service_company': return serviceCompany(profile, command.args.companyId);
+    case 'cancel_production': return cancelProductionOrder(profile, command.args.orderId);
+    case 'use_speed_card': return useProductionSpeedCard(profile, command.args.orderId, command.args.kind);
+    case 'sell_product': return sellProduct(profile, command.args.productId, command.args.quantity);
+    case 'buy_gold': return buyGold(profile, command.args.grams);
+    case 'sell_gold': return sellGold(profile, command.args.grams);
+    case 'hire_staff': return hireStaff(profile, command.args.role, command.args.name, command.args.companyId);
+    case 'pay_staff_salary': return payStaffSalary(profile, command.args.staffId);
+    case 'terminate_staff': return terminateStaff(profile, command.args.staffId);
+    case 'create_deposit': return createDeposit(profile, command.args.amount, command.args.durationDays);
+    case 'withdraw_deposit': return withdrawDeposit(profile, command.args.depositId);
+    case 'take_loan': return takeLoan(profile, command.args.collateralType, command.args.collateralId, command.args.amount, command.args.termDays);
+    case 'create_investment': return createInvestment(profile, command.args.investmentId, command.args.amount);
+    case 'advance_day': return advanceDay(profile);
+    case 'accept_contract': return acceptContract(profile, command.args.offerId);
+    case 'deliver_contract': return deliverContract(profile, command.args.contractId);
+    case 'negotiate_contract': return negotiateContract(profile, command.args.contractId, command.args.mode);
+    case 'claim_task': return claimTask(profile, command.args.taskId);
+  }
+}

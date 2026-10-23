@@ -1,4 +1,5 @@
 import type { PlayerProfile } from '../domain/player';
+import type { GameCommand, GameResult } from '../game/engine';
 import { supabase } from './supabaseClient';
 import { normalizeSavedProfile } from './saveRepository';
 
@@ -26,4 +27,12 @@ export async function redeemRemoteReward(accountId: string, profile: PlayerProfi
     },
   });
   return !error && data?.ok === true;
+}
+
+/** Authenticated command path: the profile is resolved and mutated server-side; no saveData is sent. */
+export async function executeRemoteGameCommand(command: GameCommand): Promise<GameResult<unknown> | null> {
+  const commandKey = globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const { data, error } = await supabase.functions.invoke('game-command', { body: { command, commandKey } });
+  if (error || !data?.ok || !data.profile) return null;
+  return data.result as GameResult<unknown>;
 }
