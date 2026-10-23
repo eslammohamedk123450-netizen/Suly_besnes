@@ -20,6 +20,7 @@ import { loadCurrentAccount, logoutAccount, type LocalAccount } from './storage/
 import { loadRemoteGame, redeemRemoteReward, saveRemoteGame } from './storage/remoteSaveRepository';
 import { StoryIntro } from './components/StoryIntro';
 import { SystemGuideModal } from './components/SystemGuideModal';
+import { StarterMissionDock } from './components/StarterMissionDock';
 import { chapterFor, getUnlockedSectionIds, isSectionUnlocked } from './game/onboarding';
 
 export default function App() {
@@ -190,7 +191,6 @@ export default function App() {
           <span className="header-divider" />
           <span className="player-level"><span className="avatar-initial">{profile.name.trim().charAt(0) || 'م'}</span><span><strong>{profile.name}</strong><small>المستوى {profile.level}</small></span></span>
           <button className="header-settings" type="button" onClick={() => navigate('settings')} aria-label="الإعدادات"><Icon name="settings" size={19} /></button>
-          <button className="header-settings" type="button" onClick={() => { logoutAccount(); setAccount(null); setProfile(null); }} aria-label="تسجيل الخروج" title="تسجيل الخروج"><Icon name="logout" size={19} /></button>
         </div>
       </header>
 
@@ -216,7 +216,7 @@ export default function App() {
           {activeSection === 'home' ? (
             <Dashboard profile={profile} country={country} onNavigate={navigate} />
           ) : (
-            <SectionPage section={active} profile={profile} country={country} notificationTheme={notificationTheme} onNotificationThemeChange={setNotificationTheme} onHome={() => navigate('home')} onAction={handleGameResult} onRedeemed={handleRedeemed} />
+            <SectionPage section={active} profile={profile} country={country} notificationTheme={notificationTheme} onNotificationThemeChange={setNotificationTheme} onHome={() => navigate('home')} onAction={handleGameResult} onRedeemed={handleRedeemed} onLogout={() => { logoutAccount(); setAccount(null); setProfile(null); }} />
           )}
         </main>
       </div>
@@ -238,6 +238,7 @@ export default function App() {
 
       {notice && <NoticeToast message={notice} tone={noticeTone} theme={notificationTheme} onDismiss={() => setNotice('')} />}
       {pendingGuide && <SystemGuideModal section={pendingGuide} onClose={() => { if (!profile) return; const seenGuides = profile.onboarding.seenGuides.includes(pendingGuide) ? profile.onboarding.seenGuides : [...profile.onboarding.seenGuides, pendingGuide]; const nextProfile = { ...profile, onboarding: { ...profile.onboarding, chapter: chapterFor(profile), seenGuides } }; saveGame(nextProfile, account?.id); if (account) void saveRemoteGame(account.id, nextProfile); setProfile(nextProfile); setPendingGuide(null); }} />}
+      <StarterMissionDock profile={profile} onNavigate={navigate} />
       <footer className="app-footer"><span>إمبراطورية الأعمال</span><span>محاكاة محلية · الأسعار والأحداث لأغراض اللعبة</span></footer>
     </div>
   );

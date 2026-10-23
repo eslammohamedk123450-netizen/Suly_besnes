@@ -28,12 +28,13 @@ interface SectionPageProps {
   onHome: () => void;
   onAction: (result: GameResult<unknown>) => void;
   onRedeemed: (profile: PlayerProfile, message: string, codeId: string) => Promise<boolean>;
+  onLogout: () => void;
 }
 
 const landTypeNames = { industrial: 'صناعية', agricultural: 'زراعية', commercial: 'تجارية' } as const;
 const ledgerLabels = { revenue: 'إيراد', expense: 'مصروف', asset: 'أصل', liability: 'التزام', settlement: 'سداد التزام' } as const;
 
-export function SectionPage({ section, profile, country, notificationTheme, onNotificationThemeChange, onHome, onAction, onRedeemed }: SectionPageProps) {
+export function SectionPage({ section, profile, country, notificationTheme, onNotificationThemeChange, onHome, onAction, onRedeemed, onLogout }: SectionPageProps) {
   const [bidAmounts, setBidAmounts] = useState<Record<string, string>>({});
   const [companyName, setCompanyName] = useState('شركة جديدة');
   const [industryId, setIndustryId] = useState<IndustryId>('food');
@@ -109,7 +110,7 @@ export function SectionPage({ section, profile, country, notificationTheme, onNo
               <button className={notificationTheme === 'light' ? 'is-selected' : ''} type="button" aria-pressed={notificationTheme === 'light'} onClick={() => onNotificationThemeChange('light')}>فاتح</button>
             </div>
           </div>
-          <div className="settings-actions"><button className="button button-secondary" type="button" onClick={onHome}>العودة للرئيسية</button></div>
+          <div className="settings-actions"><button className="button button-secondary" type="button" onClick={onHome}>العودة للرئيسية</button><button className="button button-danger" type="button" onClick={onLogout}><Icon name="logout" size={16} /> تسجيل الخروج</button></div>
           <div className="settings-credit">تطوير شركة <strong>Suly- Technologies</strong></div>
         </div>
       </EconomyPanel>,
@@ -207,7 +208,7 @@ export function SectionPage({ section, profile, country, notificationTheme, onNo
         </EconomyPanel>
         <EconomyPanel title="شراء مباشر من السوق" description="عروض أراضٍ وشركات يطرحها التطبيق مباشرة. يمكنك الشراء فورًا دون انتظار مزاد، وتختفي السلعة من قائمتك بعد الشراء.">
           <div className="economy-list">
-            {DIRECT_LAND_CATALOG.filter((listing) => !profile.lands.some((land) => land.id === listing.id)).map((listing) => <article className="economy-card economy-card--soft" key={listing.id}><div className="economy-card-head"><div className="economy-card-title"><span className="economy-card-icon"><Icon name="land" size={18} /></span><span><strong>{listing.label}</strong><small>{formatNumber(listing.areaSquareMeters)} م² · أرض {landTypeNames[listing.landType]}</small></span></div><span className="economy-price">{formatMoney(listing.price, country)}</span></div><button className="button button-primary" type="button" disabled={profile.bankBalance < listing.price} onClick={() => run((current) => buyDirectLand(current, listing.id))}>شراء الأرض مباشرة</button></article>)}
+            {DIRECT_LAND_CATALOG.filter((listing) => listing.id !== 'starter-village-land' && !profile.lands.some((land) => land.id === listing.id)).map((listing) => <article className="economy-card economy-card--soft" key={listing.id}><div className="economy-card-head"><div className="economy-card-title"><span className="economy-card-icon"><Icon name="land" size={18} /></span><span><strong>{listing.label}</strong><small>{formatNumber(listing.areaSquareMeters)} م² · أرض {landTypeNames[listing.landType]}</small></span></div><span className="economy-price">{formatMoney(listing.price, country)}</span></div><button className="button button-primary" type="button" disabled={profile.bankBalance < listing.price} onClick={() => run((current) => buyDirectLand(current, listing.id))}>شراء الأرض مباشرة</button></article>)}
             {DIRECT_COMPANY_CATALOG.filter((listing) => !profile.companies.some((company) => company.id === listing.id)).map((listing) => { const industry = INDUSTRY_CATALOG.find((item) => item.id === listing.industryId); return <article className="economy-card economy-card--soft" key={listing.id}><div className="economy-card-head"><div className="economy-card-title"><span className="economy-card-icon"><Icon name="factory" size={18} /></span><span><strong>{listing.name}</strong><small>{industry?.name ?? listing.industryId} · شركة مع أرض وتجهيز أولي</small></span></div><span className="economy-price">{formatMoney(listing.price, country)}</span></div><button className="button button-primary" type="button" disabled={profile.bankBalance < listing.price} onClick={() => run((current) => buyDirectCompany(current, listing.id))}>شراء الشركة مباشرة</button></article>; })}
           </div>
         </EconomyPanel>
@@ -235,8 +236,9 @@ export function SectionPage({ section, profile, country, notificationTheme, onNo
     return <div className="section-page">{heading}{pageShell(
       <>
         <div className="economy-grid economy-grid--three-mobile"><EconomyStat label="قطع الأراضي" value={formatNumber(profile.lands.length)} /><EconomyStat label="أراضٍ مرتبطة بشركات" value={formatNumber(usedLandIds.size)} /><EconomyStat label="القيمة الدفترية" value={formatMoney(totalLandValue, country)} /></div>
+        {!profile.lands.some((land) => land.id === 'starter-village-land') && <EconomyPanel title="عرض البداية · أرض قرية النخيل" description="وصلتك رسالة من وجيه القرية: يريد بيع أرض عائلته لتبدأ مشروعك. هذا العرض الافتتاحي مضمون ولا يحتاج مزادًا أو منافسة."><article className="economy-card starter-land-offer"><div className="economy-card-head"><div className="economy-card-title"><span className="economy-card-icon"><Icon name="land" size={21} /></span><span><strong>الوجيه سالم من قرية النخيل</strong><small>أرض زراعية 520 م² · عرض مباشر للاعب الجديد</small></span></div><span className="economy-price">{formatMoney(180_000, country)}</span></div><div className="economy-card-body"><p className="economy-card-description">«أعرف أن عائلتك تبدأ من جديد. سأقبل هذا السعر كما هو، لكن لا أستطيع البيع بأقل من 150,000 ج.م.»</p><div className="economy-meta"><span className="economy-pill economy-pill--gold">لا مزاد</span><span className="economy-pill economy-pill--green">عرض مضمون</span><span>الحد الأدنى 150,000 ج.م</span></div><button className="button button-primary" type="button" disabled={profile.bankBalance < 180_000} onClick={() => run((current) => buyDirectLand(current, 'starter-village-land'))}>قبول عرض الوجيه وشراء الأرض</button></div></article></EconomyPanel>}
         <EconomyPanel title="أراضي الإمبراطورية" description="تُسجل قيمة الشراء ضمن أصولك، ويمكن تخصيص كل أرض لشركة واحدة.">
-          {profile.lands.length === 0 ? <div className="economy-list"><EconomyEmpty title="ابدأ بشراء أول أرض" message="الأرض شرط لتأسيس شركة. انتقل إلى المزادات واختر موقعًا صناعيًا أو زراعيًا أو تجاريًا." /><button className="button button-primary" type="button" onClick={onHome}>فتح المزادات</button></div> : <div className="economy-list">{profile.lands.map((land) => {
+          {profile.lands.length === 0 ? <div className="economy-list"><EconomyEmpty title="ابدأ بشراء أول أرض" message="الأرض شرط لتأسيس شركة. افتح عرض البداية من أعلى الصفحة، ولا تحتاج للمزاد في أول خطوة." /><button className="button button-primary" type="button" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>عرض أرض القرية أعلاه</button></div> : <div className="economy-list">{profile.lands.map((land) => {
             const owner = profile.companies.find((company) => company.landId === land.id);
             return <article className="economy-card" key={land.id}><div className="economy-card-head"><div className="economy-card-title"><span className="economy-card-icon"><Icon name={owner ? 'factory' : 'land'} size={19} /></span><span><strong>{land.label}</strong><small>{formatNumber(land.areaSquareMeters)} م² · {land.landType ? landTypeNames[land.landType] : 'نوع عام'}</small></span></div><span className={`economy-pill ${owner ? 'economy-pill--green' : 'economy-pill--gold'}`}>{owner ? `تشغلها ${owner.name}` : 'متاحة للتأسيس'}</span></div><div className="economy-card-body"><div className="economy-meta"><span>سعر الشراء {formatMoney(land.purchasePrice, country)}</span><span>تاريخ التسجيل {new Date(land.acquiredAt).toLocaleDateString('ar-EG')}</span></div></div></article>;
           })}</div>}

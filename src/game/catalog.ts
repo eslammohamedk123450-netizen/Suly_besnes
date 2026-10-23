@@ -148,6 +148,7 @@ export const AUCTION_CATALOG: readonly AuctionListing[] = [
 ];
 
 export const DIRECT_LAND_CATALOG: readonly DirectLandListing[] = [
+  { id: 'starter-village-land', label: 'أرض قرية النخيل · عرض وجيه القرية', landType: 'agricultural', areaSquareMeters: 520, price: 180_000 },
   { id: 'direct-land-port-said', label: 'أرض بورسعيد اللوجستية', landType: 'commercial', areaSquareMeters: 420, price: 285_000 },
   { id: 'direct-land-minya-farm', label: 'مزرعة المنيا الإنتاجية', landType: 'agricultural', areaSquareMeters: 900, price: 240_000 },
   { id: 'direct-land-sokhna-industrial', label: 'موقع العين السخنة الصناعي', landType: 'industrial', areaSquareMeters: 520, price: 360_000 },
