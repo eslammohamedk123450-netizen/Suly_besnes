@@ -3,16 +3,12 @@ import type { PlayerProfile } from '../domain/player';
 import { AUCTION_CATALOG } from './catalog';
 import { GAME_DAY_MS } from './time';
 
-const REGULAR_AUCTION_LIFETIME_DAYS = 7;
+const AUCTION_CYCLE_DAYS = 1;
 
 export function getAuctionCloseAt(profile: PlayerProfile, listing: AuctionListing): string {
   const parsedStart = Date.parse(profile.createdAt);
   const worldStart = Number.isFinite(parsedStart) ? parsedStart : Date.now();
-  const dailyListing = listing.id.match(/^season-rare-(\d+)$/);
-  const closeAt = dailyListing
-    ? worldStart + Number(dailyListing[1]) * GAME_DAY_MS
-    : worldStart + REGULAR_AUCTION_LIFETIME_DAYS * GAME_DAY_MS;
-  return new Date(closeAt).toISOString();
+  return listing.closesAt || new Date(worldStart + AUCTION_CYCLE_DAYS * GAME_DAY_MS).toISOString();
 }
 
 function wasWon(profile: PlayerProfile, listingId: string): boolean {
@@ -22,8 +18,16 @@ function wasWon(profile: PlayerProfile, listingId: string): boolean {
 }
 
 export function getAuctionListings(profile: PlayerProfile): AuctionListing[] {
-  // تفوز كل سلعة مرة واحدة؛ العروض الموسمية الجديدة لها معرّف وموعد إغلاق لكل يوم.
-  const regular = AUCTION_CATALOG.filter((base) => !wasWon(profile, base.id));
+  // كل يوم هو دورة جديدة بمعرّفات مستقلة؛ الفوز يمنع إعادة العرض داخل الدورة فقط.
+  const worldStart = Number.isFinite(Date.parse(profile.createdAt)) ? Date.parse(profile.createdAt) : Date.now();
+  const closesAt = new Date(worldStart + (profile.day + AUCTION_CYCLE_DAYS) * GAME_DAY_MS).toISOString();
+  const regular = AUCTION_CATALOG.map((base) => ({
+    ...base,
+    id: `${base.id}-day-${profile.day}`,
+    label: `${base.label} · دورة اليوم ${profile.day}`,
+    closesAt,
+    status: 'open' as const,
+  })).filter((listing) => !wasWon(profile, listing.id));
   const rareId = `season-rare-${profile.day}`;
   const rare: AuctionListing = {
     id: rareId,
@@ -34,7 +38,7 @@ export function getAuctionListings(profile: PlayerProfile): AuctionListing[] {
     areaSquareMeters: 0,
     minimumBid: 450_000 + (profile.day % 3) * 25_000,
     bidIncrement: 25_000,
-    closesAt: new Date(Date.parse(profile.createdAt) + profile.day * GAME_DAY_MS).toISOString(),
+    closesAt,
     status: 'open',
     energyCapacityBonus: 90,
   };
