@@ -11,3 +11,6 @@ verify_jwt = true
 
 [functions.reward-code]
 verify_jwt = true
+
+[functions.game-save]
+verify_jwt = true
