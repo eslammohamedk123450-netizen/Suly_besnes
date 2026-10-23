@@ -28,6 +28,7 @@ Deno.serve(async (request) => {
   const adminClient = createClient(supabaseUrl, serviceRoleKey, { auth: { persistSession: false, autoRefreshToken: false } });
   const { data: current, error: readError } = await adminClient.from('game_profiles').select('updated_at').eq('user_id', user.id).maybeSingle();
   if (readError) return json({ error: 'profile_lookup_failed' }, 500);
+  if (current?.updated_at) return json({ error: 'full_profile_replacement_disabled' }, 403);
   const { data, error } = await adminClient.rpc('replace_game_profile', {
     p_user_id: user.id,
     p_expected_updated_at: current?.updated_at ?? null,
