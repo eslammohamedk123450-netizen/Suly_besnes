@@ -18,6 +18,7 @@ import { isAuctionOpen, resolveAuctionListing } from './auctions';
 import { getInvestmentPayoutRate, getOperatingCostProgression } from './economyBalance';
 import { GAME_DAY_MS } from './time';
 import { getContractOffers } from './contracts';
+import type { SpeedCardKind } from '../domain/accountFeatures';
 
 export type GameErrorCode =
   | 'invalid-input'
@@ -504,6 +505,20 @@ export function cancelProductionOrder(profile: PlayerProfile, orderId: string): 
     profile.bankBalance + refund,
   );
   return success(nextProfile, `تم إلغاء الأمر واسترداد ${refund.toLocaleString('ar-EG')} ج.م من الحجز.`, { orderId, refund });
+}
+
+export function useProductionSpeedCard(profile: PlayerProfile, orderId: string, kind: SpeedCardKind): GameResult<{ orderId: string; kind: SpeedCardKind; completesOnDay: number }> {
+  const card = profile.speedCards.find((item) => item.kind === kind && item.quantity > 0);
+  if (!card) return failure(profile, 'insufficient-funds', 'لا تملك هذه البطاقة في مخزونك.');
+  if (kind === 'capacity-boost') return failure(profile, 'invalid-input', 'هذه البطاقة تستخدم عند ترقية السعة وليست على أمر إنتاج قائم.');
+  const order = profile.productionOrders.find((item) => item.id === orderId);
+  if (!order || order.status !== 'active') return failure(profile, 'not-found', 'أمر الإنتاج غير نشط أو غير موجود.');
+  const remainingDays = Math.max(1, order.completesOnDay - profile.day);
+  const reduction = kind === 'production-instant' ? remainingDays : Math.max(1, Math.ceil(remainingDays * (kind === 'production-50' ? 0.5 : 0.25)));
+  const completesOnDay = Math.max(profile.day, order.completesOnDay - reduction);
+  const speedCards = profile.speedCards.map((item) => item.kind === kind ? { ...item, quantity: item.quantity - 1 } : item).filter((item) => item.quantity > 0);
+  const productionOrders = profile.productionOrders.map((item) => item.id === orderId ? { ...item, completesOnDay } : item);
+  return success({ ...profile, speedCards, productionOrders }, `تم استخدام بطاقة التسريع؛ يكتمل الأمر في اليوم ${completesOnDay}.`, { orderId, kind, completesOnDay });
 }
 
 export function sellProduct(profile: PlayerProfile, productId: string, quantity: number): GameResult<SaleOutcome> {
