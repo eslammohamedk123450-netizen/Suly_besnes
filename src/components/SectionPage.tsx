@@ -103,7 +103,7 @@ export function SectionPage({ section, profile, country, notificationTheme, isGu
           <div className="settings-row"><span>الدولة الأساسية</span><strong>{country.flag} {country.name} · {country.currency.code}</strong></div>
           <div className="settings-row"><span>اليوم داخل العالم</span><strong>{formatNumber(profile.day)}</strong></div>
           <div className="settings-row"><span>المستوى</span><strong>{formatNumber(profile.level)}</strong></div>
-          <div className="settings-row settings-row--highlight"><span>نقاط الإمبراطورية</span><strong>{formatNumber(empirePoints.total)} / 1000 · {empirePoints.title}</strong></div>
+          <div className="settings-row settings-row--highlight"><span>نقاط الإمبراطورية</span><strong>{formatNumber(empirePoints.total)} نقطة · {empirePoints.title}</strong></div>
           <div className="settings-row"><span>الماس</span><strong>{formatNumber(profile.diamonds)}</strong></div>
           <div className="settings-row"><span>بطاقات التسريع</span><strong>{formatNumber(profile.speedCards.reduce((sum, stack) => sum + stack.quantity, 0))}</strong></div>
           <div className="settings-row"><span>الشارات الخاصة</span><strong>{formatNumber(profile.badges.length)}</strong></div>

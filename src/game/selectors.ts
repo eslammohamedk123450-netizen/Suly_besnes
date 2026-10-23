@@ -117,18 +117,20 @@ export function selectEmpirePulse(profile: PlayerProfile): EmpirePulse {
   return { score, rank: current.name, rankTone: current.tone, nextRank: next.name, nextRankScore: next.score, focusTitle, focusDescription, badges };
 }
 
-/** تقييم مشتق من 0 إلى 1000؛ لا يُحفظ كرقم قابل للتعديل داخل ملف اللاعب. */
+/** تقييم مشتق متزايد بلا سقف؛ لا يُحفظ كرقم قابل للتعديل داخل ملف اللاعب. */
 export function selectEmpirePoints(profile: PlayerProfile): EmpirePoints {
   const totalAssets = calculateTotalAssets(profile);
-  const wealth = Math.min(300, Math.floor(Math.max(0, totalAssets) / 100_000) * 10);
-  const performance = Math.min(220, Math.floor(Math.max(0, profile.finances.netProfit) / 50_000) * 10 + Math.min(60, profile.sales.length * 4) + Math.min(60, (profile.contracts ?? []).filter((contract) => contract.status === 'completed').length * 12));
-  const reputation = Math.min(180, Math.round((profile.reputation ?? 50) * 1.8));
-  const overduePenalty = Math.min(130, Math.floor(Math.max(0, profile.payables) / 25_000) * 10);
-  const defaultPenalty = Math.min(50, profile.banking.loans.filter((loan) => loan.status === 'defaulted').length * 25);
-  const stability = Math.max(0, 150 - overduePenalty - defaultPenalty);
-  const expansion = Math.min(150, profile.companies.length * 25 + profile.lands.length * 10 + profile.staff.filter((member) => member.status === 'active').length * 5);
-  const total = Math.min(1000, wealth + performance + reputation + stability + expansion);
-  const title = total >= 850 ? 'إمبراطورية رائدة' : total >= 650 ? 'إمبراطورية متقدمة' : total >= 400 ? 'إمبراطورية صاعدة' : total >= 200 ? 'تاجر واعد' : 'بداية الإمبراطورية';
+  const wealth = Math.floor(Math.log1p(Math.max(0, totalAssets) / 100_000) * 45);
+  const completedContracts = (profile.contracts ?? []).filter((contract) => contract.status === 'completed').length;
+  const performance = Math.floor(Math.log1p(Math.max(0, profile.finances.netProfit) / 50_000) * 28) + profile.sales.length * 3 + completedContracts * 10;
+  const reputation = Math.max(0, Math.round((profile.reputation ?? 50) * 0.8));
+  const overduePenalty = Math.floor(Math.max(0, profile.payables) / 50_000) * 8;
+  const defaultPenalty = profile.banking.loans.filter((loan) => loan.status === 'defaulted').length * 20;
+  const stability = Math.max(0, 75 - overduePenalty - defaultPenalty);
+  const activeStaff = profile.staff.filter((member) => member.status === 'active').length;
+  const expansion = profile.companies.length * 15 + profile.lands.length * 6 + activeStaff * 3;
+  const total = wealth + performance + reputation + stability + expansion;
+  const title = total >= 2_000 ? 'إمبراطورية أسطورية' : total >= 1_500 ? 'إمبراطورية كبرى' : total >= 1_100 ? 'قوة اقتصادية' : total >= 750 ? 'إمبراطورية راسخة' : total >= 450 ? 'إمبراطورية صاعدة' : total >= 200 ? 'تاجر واعد' : 'بداية الإمبراطورية';
   return { total, title, wealth, performance, reputation, stability, expansion };
 }
 

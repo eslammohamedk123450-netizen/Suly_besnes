@@ -183,10 +183,7 @@ button:disabled { cursor: not-allowed; opacity: .55; }
 .empire-points-icon { display: grid; place-items: center; width: 40px; height: 40px; color: #a17b25; background: #f5edd8; border-radius: 12px; }
 .empire-points-total { display: grid; gap: 2px; text-align: left; }
 .empire-points-total strong { color: var(--navy); font-size: 22px; font-variant-numeric: tabular-nums; }
-.empire-points-total strong small { color: #87939e; font-size: 12px; font-weight: 700; }
 .empire-points-total span { color: #a17f2b; font-size: 10px; font-weight: 800; }
-.empire-points-progress { height: 7px; margin-top: 16px; overflow: hidden; background: #f0eadb; border-radius: 99px; }
-.empire-points-progress span { display: block; height: 100%; background: linear-gradient(90deg, #c39a3d, #e3c978); border-radius: inherit; }
 .empire-points-breakdown { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 9px; margin-top: 14px; }
 .empire-points-breakdown div { display: grid; gap: 4px; padding: 9px 10px; background: rgba(250,247,237,.78); border: 1px solid #f0e7cf; border-radius: 9px; }
 .empire-points-breakdown span { color: #7c8994; font-size: 9px; }
@@ -346,7 +343,6 @@ button:disabled { cursor: not-allowed; opacity: .55; }
   .empire-points-icon { width: 33px; height: 33px; border-radius: 9px; }
   .empire-points-icon svg { width: 17px; height: 17px; }
   .empire-points-total strong { font-size: 17px; }
-  .empire-points-total strong small { font-size: 10px; }
   .empire-points-total span { font-size: 8px; }
   .empire-points-breakdown { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; margin-top: 10px; }
   .empire-points-breakdown div { padding: 7px 8px; }

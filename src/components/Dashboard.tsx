@@ -69,15 +69,14 @@ export function Dashboard({ profile, country, onNavigate }: DashboardProps) {
       <section className="empire-points-card" aria-label="نقاط الإمبراطورية">
         <div className="empire-points-heading">
           <div className="empire-points-title"><span className="empire-points-icon"><Icon name="crown" size={20} /></span><div><span className="section-kicker">التقييم الموحد للحساب</span><h2>نقاط الإمبراطورية</h2></div></div>
-          <div className="empire-points-total"><strong>{formatNumber(empirePoints.total)} <small>/ 1000</small></strong><span>{empirePoints.title}</span></div>
+          <div className="empire-points-total"><strong>{formatNumber(empirePoints.total)} نقطة</strong><span>{empirePoints.title}</span></div>
         </div>
-        <div className="empire-points-progress" aria-hidden="true"><span style={{ width: `${empirePoints.total / 10}%` }} /></div>
         <div className="empire-points-breakdown">
-          <div><span>الثروة والأصول</span><strong>{formatNumber(empirePoints.wealth)} / 300</strong></div>
-          <div><span>الأداء المالي</span><strong>{formatNumber(empirePoints.performance)} / 220</strong></div>
-          <div><span>السمعة</span><strong>{formatNumber(empirePoints.reputation)} / 180</strong></div>
-          <div><span>الاستقرار</span><strong>{formatNumber(empirePoints.stability)} / 150</strong></div>
-          <div><span>التوسع</span><strong>{formatNumber(empirePoints.expansion)} / 150</strong></div>
+          <div><span>الثروة والأصول</span><strong>{formatNumber(empirePoints.wealth)} نقطة</strong></div>
+          <div><span>الأداء المالي</span><strong>{formatNumber(empirePoints.performance)} نقطة</strong></div>
+          <div><span>السمعة</span><strong>{formatNumber(empirePoints.reputation)} نقطة</strong></div>
+          <div><span>الاستقرار</span><strong>{formatNumber(empirePoints.stability)} نقطة</strong></div>
+          <div><span>التوسع</span><strong>{formatNumber(empirePoints.expansion)} نقطة</strong></div>
         </div>
         <p className="empire-points-note"><Icon name="shield" size={14} /> تُعاد حساباتها مباشرة من بيانات الحساب عند العرض، ولا تُحفظ كرصيد قابل للتعديل.</p>
       </section>
