@@ -45,3 +45,22 @@ export async function claimDailySeasonLogin(seasonId: string): Promise<Leaderboa
   if (error) throw error;
   return (data?.seasonScore ?? null) as LeaderboardRow | null;
 }
+
+export type VerifiedGameTransactionType = 'production_completed' | 'sale_completed' | 'contract_delivered' | 'auction_won';
+
+export async function recordVerifiedGameTransaction(
+  seasonId: string,
+  transactionType: VerifiedGameTransactionType,
+  sourceId: string,
+): Promise<boolean> {
+  const { data, error } = await supabase.functions.invoke('game-transaction', {
+    body: {
+      seasonId,
+      eventType: transactionType,
+      sourceId,
+      idempotencyKey: `${transactionType}:${sourceId}`,
+    },
+  });
+  if (error) throw error;
+  return data?.ok === true;
+}

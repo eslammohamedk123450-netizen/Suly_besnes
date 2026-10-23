@@ -14,12 +14,13 @@ export async function saveRemoteGame(accountId: string, profile: PlayerProfile):
 }
 
 export async function redeemRemoteReward(accountId: string, profile: PlayerProfile, codeId: string): Promise<boolean> {
-  const { data, error } = await supabase.rpc('redeem_reward_code', {
-    p_code_id: codeId,
-    p_user_id: accountId,
-    p_player_name: profile.name,
-    p_game_day: profile.day,
-    p_save_data: profile,
+  const { data, error } = await supabase.functions.invoke('reward-code', {
+    body: {
+      codeId,
+      playerName: profile.name,
+      gameDay: profile.day,
+      saveData: profile,
+    },
   });
-  return !error && data === true;
+  return !error && data?.ok === true;
 }

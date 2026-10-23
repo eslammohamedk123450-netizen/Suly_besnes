@@ -5,3 +5,9 @@ verify_jwt = true
 
 [functions.finalize-seasons]
 verify_jwt = false
+
+[functions.game-transaction]
+verify_jwt = true
+
+[functions.reward-code]
+verify_jwt = true

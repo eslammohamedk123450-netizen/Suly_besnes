@@ -23,7 +23,7 @@ import { SystemGuideModal } from './components/SystemGuideModal';
 import { StarterMissionDock } from './components/StarterMissionDock';
 import { chapterFor, getSectionUnlockHint, getUnlockedSectionIds, isSectionUnlocked } from './game/onboarding';
 import { normalizeAccountFeatures } from './domain/accountFeatures';
-import { claimDailySeasonLogin, getVisibleSeasons } from './storage/leaderboardRepository';
+import { claimDailySeasonLogin, getVisibleSeasons, recordVerifiedGameTransaction } from './storage/leaderboardRepository';
 
 export default function App() {
   const [account, setAccount] = useState<LocalAccount | null>(null);
@@ -69,6 +69,33 @@ export default function App() {
     setNotice('تم تسجيل الدخول مباشرة.');
     setNoticeTone('success');
     void claimDailyLogin(nextAccount);
+  }
+
+  async function recordVerifiedTransactions(previous: PlayerProfile, next: PlayerProfile) {
+    if (!account || account.isGuest || !next.season?.seasonId) return;
+    const productionIds = next.productionOrders
+      .filter((order) => order.status === 'completed' && !previous.productionOrders.some((item) => item.id === order.id && item.status === 'completed'))
+      .map((order) => order.id);
+    const saleIds = next.sales.filter((sale) => !previous.sales.some((item) => item.id === sale.id)).map((sale) => sale.id);
+    const contractIds = next.contracts
+      .filter((contract) => contract.status === 'completed' && !previous.contracts.some((item) => item.id === contract.id && item.status === 'completed'))
+      .map((contract) => contract.id);
+    const auctionIds = next.auctionHistory
+      .filter((bid) => bid.bidder === 'player' && !previous.auctionHistory.some((item) => item.id === bid.id))
+      .map((bid) => bid.listingId);
+    const transactions = [
+      ...productionIds.map((sourceId) => ['production_completed', sourceId] as const),
+      ...saleIds.map((sourceId) => ['sale_completed', sourceId] as const),
+      ...contractIds.map((sourceId) => ['contract_delivered', sourceId] as const),
+      ...auctionIds.map((sourceId) => ['auction_won', sourceId] as const),
+    ];
+    for (const [transactionType, sourceId] of transactions) {
+      try {
+        await recordVerifiedGameTransaction(next.season.seasonId, transactionType, sourceId);
+      } catch {
+        // Leaderboard outages must never block local gameplay.
+      }
+    }
   }
 
   function handlePlayAsGuest() {
@@ -149,8 +176,13 @@ export default function App() {
       setNoticeTone('error');
       return;
     }
+    const previousProfile = profile;
     const saved = saveGame(result.profile, account?.id);
-    if (account && !account.isGuest) void saveRemoteGame(account.id, result.profile);
+    if (account && !account.isGuest && previousProfile) {
+      void saveRemoteGame(account.id, result.profile).then((remoteSaved) => {
+        if (remoteSaved) void recordVerifiedTransactions(previousProfile, result.profile);
+      });
+    }
     const settledAmount = Math.max(0, (profile?.payables ?? result.profile.payables) - result.profile.payables);
     const settlementNote = settledAmount > 0 ? ` وُجّه ${formatMoney(settledAmount, country)} لسداد التزامات سابقة.` : '';
     setProfile(result.profile);
