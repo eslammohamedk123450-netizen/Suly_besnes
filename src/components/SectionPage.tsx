@@ -5,7 +5,7 @@ import type { GameCommand } from '../game/engine';
 import type { NotificationTheme } from '../storage/userPreferences';
 import type { SectionItem } from '../domain/navigation';
 import { formatMoney, formatNumber } from '../domain/formatters';
-import { acceptContract, buyDirectCompany, buyDirectLand, buyGlobalMaterial, buyGold, buyMaterial, cancelProductionOrder, claimTask, createDeposit, createInvestment, deliverContract, foundCompany, hireStaff, negotiateContract, payStaffSalary, placeBid, runProduction, sellAsset, sellCompany, sellGold, sellLand, sellProduct, serviceCompany, takeLoan, terminateStaff, upgradeCompany, useProductionSpeedCard, withdrawDeposit, type GameResult } from '../game/engine';
+import { acceptContract, buyDirectCompany, buyDirectLand, buyGlobalMaterial, buyGold, buyMaterial, buySpeedCard, cancelProductionOrder, claimTask, createDeposit, createInvestment, deliverContract, foundCompany, hireStaff, negotiateContract, payStaffSalary, placeBid, runProduction, sellAsset, sellCompany, sellGold, sellLand, sellProduct, serviceCompany, takeLoan, terminateStaff, upgradeCompany, useProductionSpeedCard, withdrawDeposit, type GameResult } from '../game/engine';
 import type { StaffRole } from '../domain/futureSystems';
 import { AUCTION_CATALOG, DIRECT_COMPANY_CATALOG, DIRECT_LAND_CATALOG, GOLD_PRICE_PER_GRAM, INDUSTRY_CATALOG, INVESTMENT_CATALOG, MATERIAL_CATALOG, PRODUCT_CATALOG, RECIPE_CATALOG } from '../game/catalog';
 import { getMarketQuote } from '../game/market';
@@ -21,6 +21,7 @@ import { AuctionRoom } from './AuctionRoom';
 import { claimLoginReward, claimSeasonChallenge, chooseSeasonEvent, getSeasonEventSnapshot, getSeasonLeaderboard, getSeasonSnapshot, LOGIN_REWARDS } from '../game/season';
 import { getSynergyProductionMultiplier } from '../game/synergy';
 import { getGlobalMarketOffers, negotiateGlobalMarketOffer } from '../game/globalMarket';
+import { SPEED_CARD_DIAMOND_COSTS, SPEED_CARD_LABELS, type SpeedCardKind } from '../domain/accountFeatures';
 
 interface SectionPageProps {
   section: SectionItem;
@@ -66,6 +67,7 @@ export function SectionPage({ section, profile, country, notificationTheme, isGu
   const [negotiatedMarketPrices, setNegotiatedMarketPrices] = useState<Record<string, number>>({});
   const [expandedCompanyId, setExpandedCompanyId] = useState<string | null>(null);
   const [expandedLandId, setExpandedLandId] = useState<string | null>(null);
+  const [speedCardQuantities, setSpeedCardQuantities] = useState<Record<string, string>>({});
   const [, setAuctionTick] = useState(0);
 
   useEffect(() => {
@@ -122,6 +124,7 @@ export function SectionPage({ section, profile, country, notificationTheme, isGu
           <div className="settings-note"><Icon name="shield" size={17} /><p>{isGuest ? 'عالم الضيف محفوظ على هذا الجهاز. اربط حسابًا سحابيًا لنسخ العالم واستعادته على أجهزة أخرى.' : 'يُحفظ العالم محليًا ويُزامن سحابيًا عند الاتصال؛ اللعب الأساسي متاح دون اتصال.'}</p></div>
           {isGuest && <button className="button button-primary account-link-button" type="button" onClick={onLinkAccount}>ربط الحساب ونسخ العالم سحابيًا</button>}
           <CodeRedemption profile={profile} onRedeemed={onRedeemed} />
+          <div className="diamond-shop"><div className="diamond-shop-heading"><div><strong>متجر بطاقات السرعة</strong><small>100 ماسة = 1 دولار مرجعيًا · لا يوجد شراء خارجي حاليًا</small></div><span className="economy-pill economy-pill--gold">◆ {formatNumber(profile.diamonds)} ماسة</span></div><div className="diamond-shop-grid">{(Object.keys(SPEED_CARD_DIAMOND_COSTS) as SpeedCardKind[]).map((kind) => { const quantity = speedCardQuantities[kind] ?? '1'; const cost = SPEED_CARD_DIAMOND_COSTS[kind]; const available = profile.speedCards.find((card) => card.kind === kind)?.quantity ?? 0; return <article className="diamond-shop-card" key={kind}><strong>{SPEED_CARD_LABELS[kind]}</strong><small>الرصيد الحالي: {formatNumber(available)} · {formatNumber(cost)} ماسة للبطاقة</small><div className="diamond-shop-buy"><input aria-label={`كمية ${SPEED_CARD_LABELS[kind]}`} type="number" min="1" step="1" value={quantity} onChange={(event) => setSpeedCardQuantities((previous) => ({ ...previous, [kind]: event.target.value }))} /><button className="button button-secondary" type="button" disabled={profile.diamonds < cost * Number(quantity || 0) || Number(quantity) < 1} onClick={() => runCommand({ name: 'buy_speed_card', args: { kind, quantity: Number(quantity) } }, (current) => buySpeedCard(current, kind, Number(quantity)))}>شراء بالماس</button></div></article>; })}</div></div>
           <PurchaseSupport />
           <div className="settings-notice-theme">
             <span>مظهر الإشعارات</span>

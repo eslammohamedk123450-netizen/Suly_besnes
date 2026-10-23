@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { COUNTRIES } from '../domain/countries';
 import { createNewPlayer, type PlayerProfile } from '../domain/player';
 import { getContractOffers } from './contracts';
-import { advanceDay, acceptContract, deliverContract, payStaffSalary, runProduction } from './engine';
+import { advanceDay, acceptContract, buySpeedCard, deliverContract, payStaffSalary, runProduction } from './engine';
 import { negotiateContract } from './engine';
 import { getSynergyBonuses } from './synergy';
 import { normalizeSavedProfile } from '../storage/saveRepository';
@@ -108,5 +108,15 @@ describe('Business Empire economy invariants', () => {
     expect(negotiated.profile.contracts[0].unitPrice).toBeGreaterThan(offer.unitPrice);
     expect(negotiateContract(negotiated.profile, offer.id, 'deadline').ok).toBe(false);
     expect(getSynergyBonuses(negotiated.profile).length).toBeGreaterThan(0);
+  });
+
+  it('buys speed cards with diamonds and rejects unaffordable quantities', () => {
+    const base = profile({ diamonds: 60 });
+    const bought = buySpeedCard(base, 'production-50', 2);
+    expect(bought.ok).toBe(true);
+    if (!bought.ok) return;
+    expect(bought.profile.diamonds).toBe(12);
+    expect(bought.profile.speedCards.find((card) => card.kind === 'production-50')?.quantity).toBe(2);
+    expect(buySpeedCard(bought.profile, 'production-instant', 1).ok).toBe(false);
   });
 });

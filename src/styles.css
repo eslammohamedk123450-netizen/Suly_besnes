@@ -264,7 +264,18 @@ button:disabled { cursor: not-allowed; opacity: .55; }
 .confirm-dialog h2 { margin: 0 0 9px; color: var(--navy); font-size: 20px; }
 .confirm-dialog p { margin: 0; color: #718091; font-size: 11px; line-height: 2; }
 .dialog-actions { display: flex; justify-content: center; gap: 9px; margin-top: 21px; }
-.toast { position: fixed; z-index: 1000; top: calc(env(safe-area-inset-top, 0px) + 14px); right: 50%; bottom: auto; display: flex; align-items: flex-start; gap: 12px; width: max-content; max-width: min(92vw, 540px); padding: 12px 14px; color: #fff; background: #09243b; border: 1px solid rgba(217,184,91,.42); border-inline-start: 4px solid var(--gold); border-radius: 12px; box-shadow: 0 12px 34px rgba(4,18,32,.3); font-size: 11px; line-height: 1.7; text-align: start; transform: translateX(50%); animation: toast-enter .22s ease-out; }
+.notice-overlay { position: fixed; z-index: 1000; inset: 0; display: grid; place-items: center; padding: 20px; background: rgba(3,13,24,.48); backdrop-filter: blur(3px); animation: notice-overlay-enter .18s ease-out; }
+.toast { position: relative; display: flex; align-items: flex-start; gap: 14px; width: min(52vw, 620px); min-height: 150px; padding: 26px 28px; color: #fff; background: #09243b; border: 1px solid rgba(217,184,91,.55); border-inline-start: 5px solid var(--gold); border-radius: 18px; box-shadow: 0 24px 80px rgba(4,18,32,.42); font-size: 14px; line-height: 1.8; text-align: start; animation: notice-enter .22s ease-out; }
+.toast-icon { display: grid; flex: 0 0 auto; place-items: center; width: 42px; height: 42px; color: #f3d681; background: rgba(246,196,83,.12); border: 1px solid rgba(246,196,83,.26); border-radius: 13px; }
+.toast-copy { display: grid; flex: 1; gap: 5px; min-width: 0; }
+.toast-copy strong { color: #ffe29a; font-size: 17px; }
+.toast-copy small { color: rgba(255,255,255,.6); font-size: 10px; }
+.toast--error .toast-icon { color: #ffaaa2; background: rgba(255,120,106,.12); border-color: rgba(255,120,106,.3); }
+.toast--error .toast-copy strong { color: #ffb7b0; }
+.toast--light { color: #203b52; background: #fff; }
+.toast--light .toast-copy small { color: #7b8995; }
+.toast--light .toast-icon { background: #fbf4df; }
+.toast--light .toast-copy strong { color: #8c6d23; }
 .app-footer { display: flex; justify-content: space-between; max-width: 1440px; margin: 20px auto 0; padding: 0 28px; color: #95a0aa; font-size: 9px; }
 
 @media (max-width: 1080px) {

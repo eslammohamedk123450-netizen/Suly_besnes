@@ -20,7 +20,7 @@ import { GAME_DAY_MS } from './time';
 import { getContractOffers } from './contracts';
 import { getSynergyOperatingMultiplier, getSynergyProductionMultiplier } from './synergy';
 import { resolveGlobalMarketOffer } from './globalMarket';
-import type { SpeedCardKind } from '../domain/accountFeatures';
+import { SPEED_CARD_DIAMOND_COSTS, type SpeedCardKind } from '../domain/accountFeatures';
 
 export type GameErrorCode =
   | 'invalid-input'
@@ -564,6 +564,19 @@ export function useProductionSpeedCard(profile: PlayerProfile, orderId: string, 
   return success({ ...profile, speedCards, productionOrders }, `تم استخدام بطاقة التسريع؛ يكتمل الأمر في اليوم ${completesOnDay}.`, { orderId, kind, completesOnDay });
 }
 
+export function buySpeedCard(profile: PlayerProfile, kind: SpeedCardKind, quantity: number): GameResult<{ kind: SpeedCardKind; quantity: number; diamondsSpent: number }> {
+  if (!isPositiveInteger(quantity)) return failure(profile, 'invalid-input', 'عدد البطاقات يجب أن يكون عددًا صحيحًا موجبًا.');
+  const cost = SPEED_CARD_DIAMOND_COSTS[kind];
+  if (!cost) return failure(profile, 'not-found', 'نوع بطاقة السرعة غير معروف.');
+  const diamondsSpent = cost * quantity;
+  if (profile.diamonds < diamondsSpent) return failure(profile, 'insufficient-funds', 'لا يكفي رصيد الماس لشراء هذه البطاقات.');
+  const existing = profile.speedCards.find((card) => card.kind === kind);
+  const speedCards = existing
+    ? profile.speedCards.map((card) => card.kind === kind ? { ...card, quantity: card.quantity + quantity } : card)
+    : [...profile.speedCards, { kind, quantity }];
+  return success({ ...profile, diamonds: profile.diamonds - diamondsSpent, speedCards }, `تم شراء ${quantity} بطاقة باستخدام ${diamondsSpent} ماسة.`, { kind, quantity, diamondsSpent });
+}
+
 export function sellProduct(profile: PlayerProfile, productId: string, quantity: number): GameResult<SaleOutcome> {
   const countryError = ensureEgypt(profile);
   if (countryError) return countryError;
@@ -1038,6 +1051,7 @@ export type GameCommand =
   | { name: 'service_company'; args: { companyId: string } }
   | { name: 'cancel_production'; args: { orderId: string } }
   | { name: 'use_speed_card'; args: { orderId: string; kind: SpeedCardKind } }
+  | { name: 'buy_speed_card'; args: { kind: SpeedCardKind; quantity: number } }
   | { name: 'sell_product'; args: { productId: string; quantity: number } }
   | { name: 'buy_gold'; args: { grams: number } }
   | { name: 'sell_gold'; args: { grams: number } }
@@ -1073,6 +1087,7 @@ export function executeGameCommand(profile: PlayerProfile, command: GameCommand)
     case 'service_company': return serviceCompany(profile, command.args.companyId);
     case 'cancel_production': return cancelProductionOrder(profile, command.args.orderId);
     case 'use_speed_card': return useProductionSpeedCard(profile, command.args.orderId, command.args.kind);
+    case 'buy_speed_card': return buySpeedCard(profile, command.args.kind, command.args.quantity);
     case 'sell_product': return sellProduct(profile, command.args.productId, command.args.quantity);
     case 'buy_gold': return buyGold(profile, command.args.grams);
     case 'sell_gold': return sellGold(profile, command.args.grams);

@@ -14,6 +14,13 @@ export const SPEED_CARD_LABELS: Record<SpeedCardKind, string> = {
   'capacity-boost': 'زيادة السعة المؤقتة',
 };
 
+export const SPEED_CARD_DIAMOND_COSTS: Record<SpeedCardKind, number> = {
+  'production-25': 12,
+  'production-50': 24,
+  'production-instant': 60,
+  'capacity-boost': 36,
+};
+
 function hashSeed(seed: string): number {
   let hash = 2166136261;
   for (const character of seed) hash = Math.imul(hash ^ character.charCodeAt(0), 16777619);

@@ -1076,6 +1076,17 @@ function buyGlobalMaterial(profile, offerId, quantity, negotiatedUnitPrice) {
   const nextProfile = addLedger({ ...profile, inventory }, [ledgerEntry(profile, "asset", totalCost, `شراء عالمي ${quantity} ${material.unit} من السوق العالمي`, 0)], profile.bankBalance - totalCost);
   return success(syncTasks(nextProfile), `تم شراء ${quantity} ${material.name} من السوق العالمي بلا حد تخزين.`, { materialId: material.id, quantity, totalCost, unitPrice: agreedPrice });
 }
+function buySpeedCard(profile, kind, quantity) {
+  const costs = { "production-25": 12, "production-50": 24, "production-instant": 60, "capacity-boost": 36 };
+  if (!isPositiveInteger(quantity)) return failure(profile, "invalid-input", "عدد البطاقات يجب أن يكون عددًا صحيحًا موجبًا.");
+  const cost = costs[kind];
+  if (!cost) return failure(profile, "not-found", "نوع بطاقة السرعة غير معروف.");
+  const diamondsSpent = cost * quantity;
+  if (profile.diamonds < diamondsSpent) return failure(profile, "insufficient-funds", "لا يكفي رصيد الماس لشراء هذه البطاقات.");
+  const existing = profile.speedCards.find((card) => card.kind === kind);
+  const speedCards = existing ? profile.speedCards.map((card) => card.kind === kind ? { ...card, quantity: card.quantity + quantity } : card) : [...profile.speedCards, { kind, quantity }];
+  return success({ ...profile, diamonds: profile.diamonds - diamondsSpent, speedCards }, `تم شراء ${quantity} بطاقة باستخدام ${diamondsSpent} ماسة.`, { kind, quantity, diamondsSpent });
+}
 function executeGameCommand(profile, command) {
   switch (command.name) {
     case "place_bid":
@@ -1106,6 +1117,8 @@ function executeGameCommand(profile, command) {
       return cancelProductionOrder(profile, command.args.orderId);
     case "use_speed_card":
       return useProductionSpeedCard(profile, command.args.orderId, command.args.kind);
+    case "buy_speed_card":
+      return buySpeedCard(profile, command.args.kind, command.args.quantity);
     case "sell_product":
       return sellProduct(profile, command.args.productId, command.args.quantity);
     case "buy_gold":
