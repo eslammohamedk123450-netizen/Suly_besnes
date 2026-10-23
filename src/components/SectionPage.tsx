@@ -16,7 +16,7 @@ import { EconomyEmpty, EconomyPageShell, EconomyPanel, EconomyStat } from './Eco
 import { CodeRedemption } from './CodeRedemption';
 import { PurchaseSupport } from './PurchaseSupport';
 import { AuctionRoom } from './AuctionRoom';
-import { claimLoginReward, claimSeasonChallenge, getSeasonLeaderboard, getSeasonSnapshot, LOGIN_REWARDS } from '../game/season';
+import { claimLoginReward, claimSeasonChallenge, chooseSeasonEvent, getSeasonEventSnapshot, getSeasonLeaderboard, getSeasonSnapshot, LOGIN_REWARDS } from '../game/season';
 
 interface SectionPageProps {
   section: SectionItem;
@@ -402,6 +402,7 @@ export function SectionPage({ section, profile, country, notificationTheme, onNo
     const completed = tasks.filter((task) => task.claimed).length;
     const season = getSeasonSnapshot(profile);
     const leaderboard = getSeasonLeaderboard(profile);
+    const seasonEvent = getSeasonEventSnapshot(profile);
     return <div className="section-page">{heading}{pageShell(
       <>
         <div className="economy-grid economy-grid--three-mobile"><EconomyStat label="إنجازات مكتملة" value={`${formatNumber(completed)} / ${formatNumber(tasks.length)}`} /><EconomyStat label="مكافآت متاحة" value={formatNumber(tasks.filter((task) => task.available && !task.claimed).length)} /><EconomyStat label="المكافآت المستلمة" value={formatNumber(profile.completedTaskIds.length)} /></div>
@@ -416,6 +417,9 @@ export function SectionPage({ section, profile, country, notificationTheme, onNo
         </EconomyPanel>
         <EconomyPanel title="ترتيب موسم التوسع" description="ترتيب محلي محاكى الآن؛ ستصبح المنافسة العالمية متاحة عند إضافة نظام اللاعبين المتصلين.">
           <div className="season-leaderboard">{leaderboard.map((row, index) => <div className={`season-rank-row${row.isPlayer ? ' season-rank-row--player' : ''}`} key={row.name}><strong>#{index + 1}</strong><span>{row.name}</span><b>{formatNumber(row.points)} نقطة</b></div>)}</div>
+        </EconomyPanel>
+        <EconomyPanel title={`حدث اليوم · ${seasonEvent.event.title}`} description={seasonEvent.claimed ? 'تم تنفيذ قرار اليوم. سيظهر حدث جديد عند انتقال اليوم.' : seasonEvent.event.description}>
+          {seasonEvent.claimed ? <div className="economy-notice economy-notice--success">تم اتخاذ القرار اليومي. استمر في إدارة إمبراطوريتك حتى يبدأ الحدث التالي.</div> : <div className="season-event-choices">{seasonEvent.event.choices.map((choice) => <button className="button button-secondary" type="button" key={choice.id} onClick={() => run((current) => chooseSeasonEvent(current, choice.id))}><strong>{choice.label}</strong><span>{choice.description}</span></button>)}</div>}
         </EconomyPanel>
         <EconomyPanel title="المهام والإنجازات" description="تحقق من شروط المهام ثم استلم كل مكافأة مرة واحدة.">
           <div className="economy-list">{tasks.map((task) => <article className="economy-task" key={task.id}><span className="economy-task-icon"><Icon name={task.claimed ? 'shield' : 'tasks'} size={18} /></span><span className="economy-task-copy"><strong>{task.title}</strong><small>{task.description} المكافأة {formatMoney(task.reward, country)}</small></span>{task.claimed ? <span className="economy-pill economy-pill--green">مكتملة</span> : <button className="button button-primary" type="button" disabled={!task.available} onClick={() => run((current) => claimTask(current, task.id))}>{task.available ? 'استلام المكافأة' : 'لم تكتمل'}</button>}</article>)}</div>
