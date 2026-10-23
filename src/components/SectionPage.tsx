@@ -16,6 +16,7 @@ import { EconomyEmpty, EconomyPageShell, EconomyPanel, EconomyStat } from './Eco
 import { CodeRedemption } from './CodeRedemption';
 import { PurchaseSupport } from './PurchaseSupport';
 import { AuctionRoom } from './AuctionRoom';
+import { claimLoginReward, claimSeasonChallenge, getSeasonSnapshot, LOGIN_REWARDS } from '../game/season';
 
 interface SectionPageProps {
   section: SectionItem;
@@ -397,9 +398,19 @@ export function SectionPage({ section, profile, country, notificationTheme, onNo
   if (section.id === 'tasks') {
     const tasks = selectTaskBoard(profile);
     const completed = tasks.filter((task) => task.claimed).length;
+    const season = getSeasonSnapshot(profile);
     return <div className="section-page">{heading}{pageShell(
       <>
         <div className="economy-grid economy-grid--three-mobile"><EconomyStat label="إنجازات مكتملة" value={`${formatNumber(completed)} / ${formatNumber(tasks.length)}`} /><EconomyStat label="مكافآت متاحة" value={formatNumber(tasks.filter((task) => task.available && !task.claimed).length)} /><EconomyStat label="المكافآت المستلمة" value={formatNumber(profile.completedTaskIds.length)} /></div>
+        <EconomyPanel title="موسم التوسع الأول" description={`الموسم من اليوم ${season.season.startedOnDay} إلى اليوم ${season.season.endsOnDay}. اجمع النقاط وافتح مكافآت متكررة.`}>
+          <div className="season-progress-head"><strong>{formatNumber(season.season.points)} نقطة موسم</strong><span>المرحلة التالية بعد {formatNumber(season.nextReward)} نقطة</span></div>
+          <div className="season-progress"><span style={{ width: `${season.progressPercent}%` }} /></div>
+          <div className="economy-list season-challenges">{season.challenges.map((challenge) => <article className="economy-task" key={challenge.id}><span className="economy-task-icon"><Icon name={challenge.kind === 'daily' ? 'clock' : 'tasks'} size={18} /></span><span className="economy-task-copy"><strong>{challenge.title} · {challenge.kind === 'daily' ? 'يومي' : 'أسبوعي'}</strong><small>{challenge.description} · {formatNumber(challenge.points)} نقطة · {formatMoney(challenge.reward, country)}</small></span>{challenge.claimed ? <span className="economy-pill economy-pill--green">تم الاستلام</span> : <button className="button button-primary" type="button" disabled={!challenge.available} onClick={() => run((current) => claimSeasonChallenge(current, challenge.id))}>{challenge.available ? 'استلام' : 'لم تكتمل'}</button>}</article>)}</div>
+        </EconomyPanel>
+        <EconomyPanel title="مكافأة الدخول" description="اختر مكافأتك مرة واحدة في كل يوم من الموسم.">
+          <div className="economy-button-row season-rewards">{LOGIN_REWARDS.map((reward) => <button className="button button-secondary" type="button" key={reward.id} disabled={season.loginRewardClaimed} onClick={() => run((current) => claimLoginReward(current, reward.id))}><strong>{reward.title}</strong><span>{reward.description}</span></button>)}</div>
+          {season.loginRewardClaimed && <div className="economy-notice economy-notice--success">تم استلام مكافأة الدخول لهذا اليوم. عد غدًا لاختيار مكافأة جديدة.</div>}
+        </EconomyPanel>
         <EconomyPanel title="المهام والإنجازات" description="تحقق من شروط المهام ثم استلم كل مكافأة مرة واحدة.">
           <div className="economy-list">{tasks.map((task) => <article className="economy-task" key={task.id}><span className="economy-task-icon"><Icon name={task.claimed ? 'shield' : 'tasks'} size={18} /></span><span className="economy-task-copy"><strong>{task.title}</strong><small>{task.description} المكافأة {formatMoney(task.reward, country)}</small></span>{task.claimed ? <span className="economy-pill economy-pill--green">مكتملة</span> : <button className="button button-primary" type="button" disabled={!task.available} onClick={() => run((current) => claimTask(current, task.id))}>{task.available ? 'استلام المكافأة' : 'لم تكتمل'}</button>}</article>)}</div>
         </EconomyPanel>

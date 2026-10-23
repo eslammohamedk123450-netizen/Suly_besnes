@@ -12,6 +12,7 @@ import type {
   ProductSale,
   ProductionOrder,
   TaskProgress,
+  SeasonProgress,
 } from './futureSystems';
 
 export interface PlayerAsset {
@@ -80,6 +81,7 @@ export interface PlayerProfile {
   events: GameEventRecord[];
   tasks: TaskProgress[];
   completedTaskIds: string[];
+  season?: SeasonProgress;
 }
 
 function createId(): string {
@@ -120,6 +122,7 @@ export function createNewPlayer(
     events: [],
     tasks: [],
     completedTaskIds: [],
+    season: { seasonId: 'expansion-season-1', startedOnDay: 1, endsOnDay: 30, points: 0, claimedChallengeKeys: [] },
   };
 }
 

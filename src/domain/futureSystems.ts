@@ -182,3 +182,12 @@ export interface GameEventRecord {
   cashImpact: number;
   occurredAt: string;
 }
+
+export interface SeasonProgress {
+  seasonId: string;
+  startedOnDay: number;
+  endsOnDay: number;
+  points: number;
+  claimedChallengeKeys: string[];
+  claimedLoginRewardDay?: number;
+}
