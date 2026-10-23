@@ -9,35 +9,44 @@ export interface GameNotification {
   detail: string;
   tone: NotificationTone;
   section: 'home' | 'contracts' | 'staff' | 'bank' | 'auctions' | 'reports' | 'obligations' | 'companies' | 'inventory';
+  count?: number;
 }
+function money(value: number): string { return `${Math.round(value).toLocaleString('ar-EG')} ج.م`; }
+function plural(count: number, one: string, two: string, many: string): string { return count === 1 ? one : count === 2 ? two : many; }
 
 export function selectNotifications(profile: PlayerProfile): GameNotification[] {
   const notifications: GameNotification[] = [];
   const unpaidSalary = profile.staff.filter((item) => item.status === 'active' && (item.unpaidSalary ?? 0) > 0);
+  const salaryTotal = unpaidSalary.reduce((sum, item) => sum + (item.unpaidSalary ?? 0), 0);
   if (unpaidSalary.length > 0) {
-    notifications.push({ id: 'salary-overdue', title: 'رواتب متأخرة', detail: `لديك ${unpaidSalary.length} موظف يحتاج إلى تسوية راتبه.`, tone: 'danger', section: 'staff' });
+    notifications.push({ id: 'salary-overdue', title: 'رواتب متأخرة', detail: `يوجد ${unpaidSalary.length} ${plural(unpaidSalary.length, 'موظف', 'موظفان', 'موظفين')} · الإجمالي ${money(salaryTotal)}.`, tone: 'danger', section: 'staff', count: unpaidSalary.length });
   }
   if (profile.payables > 0) {
-    notifications.push({ id: 'payables', title: 'التزامات غير مسددة', detail: `الرصيد المستحق ${Math.round(profile.payables).toLocaleString('ar-EG')} ج.م ويؤثر على الطاقة.`, tone: 'danger', section: 'obligations' });
+    notifications.push({ id: 'payables', title: 'التزامات غير مسددة', detail: `إجمالي الالتزامات ${money(profile.payables)} وتؤثر على الطاقة.`, tone: 'danger', section: 'obligations' });
   }
-  profile.productionOrders.filter((item) => item.status === 'completed').slice(-3).forEach((order) => {
-    notifications.push({ id: `production-${order.id}`, title: 'اكتمل الإنتاج', detail: `${order.productName} جاهز في المخزن (${order.outputQuantity} وحدة).`, tone: 'success', section: 'companies' });
-  });
-  profile.banking.loans.filter((loan) => loan.status === 'active' && loan.nextPaymentDay - profile.day <= 2).forEach((loan) => {
-    notifications.push({ id: `loan-${loan.id}`, title: 'قسط قرض قريب', detail: `يستحق القسط في اليوم ${loan.nextPaymentDay}.`, tone: 'warning', section: 'bank' });
-  });
-  profile.contracts.filter((contract) => contract.status === 'active' && contract.deadlineDay - profile.day <= 2).forEach((contract) => {
-    notifications.push({ id: `contract-${contract.id}`, title: 'عقد يقترب من الموعد', detail: `${contract.clientName} · الموعد اليوم ${contract.deadlineDay}.`, tone: 'warning', section: 'contracts' });
-  });
-  profile.events.slice(-3).reverse().forEach((event) => {
-    notifications.push({ id: event.id, title: 'تغير اقتصادي', detail: `${event.title} · ${event.cashImpact >= 0 ? '+' : '−'}${Math.abs(event.cashImpact).toLocaleString('ar-EG')} ج.م`, tone: event.cashImpact >= 0 ? 'success' : 'warning', section: 'reports' });
-  });
-  if (selectAvailableAuctions(profile).length > 0) {
-    notifications.push({ id: 'auctions-open', title: 'فرص مزادات متاحة', detail: 'توجد أصول أو شحنات يمكن المنافسة عليها الآن.', tone: 'info', section: 'auctions' });
+  const completedProduction = profile.productionOrders.filter((item) => item.status === 'completed');
+  if (completedProduction.length > 0) {
+    const output = completedProduction.reduce((sum, item) => sum + item.outputQuantity, 0);
+    notifications.push({ id: 'production-completed', title: 'إنتاج مكتمل', detail: `اكتملت ${completedProduction.length} أوامر إنتاج · إجمالي ${output.toLocaleString('ar-EG')} وحدة جاهزة في المخزن.`, tone: 'success', section: 'companies', count: completedProduction.length });
   }
-  selectEmpirePulse(profile).badges.filter((badge) => badge.earned).slice(-3).forEach((badge) => {
-    notifications.push({ id: `badge-${badge.id}`, title: 'شارة إمبراطورية مكتسبة', detail: `أصبحت شارة «${badge.label}» ضمن إنجازاتك.`, tone: 'success', section: 'home' });
-  });
-  notifications.push({ id: 'global-market-open', title: 'السوق العالمي مفتوح', detail: 'تتوفر عروض روبوتية جديدة للمواد الخام، وبعضها يقبل التفاوض.', tone: 'info', section: 'inventory' });
-  return notifications.slice(0, 12);
+  const dueLoans = profile.banking.loans.filter((loan) => loan.status === 'active' && loan.nextPaymentDay - profile.day <= 2);
+  if (dueLoans.length > 0) {
+    const dueTotal = dueLoans.reduce((sum, loan) => sum + Math.min(loan.remainingBalance, loan.installmentAmount), 0);
+    const nearestDay = Math.min(...dueLoans.map((loan) => loan.nextPaymentDay));
+    notifications.push({ id: 'loans-due', title: 'أقساط قروض قريبة', detail: `يوجد ${dueLoans.length} ${plural(dueLoans.length, 'قسط قرض', 'قسطا قرض', 'أقساط قروض')} · مجموعها ${money(dueTotal)} · أقرب استحقاق اليوم ${nearestDay}.`, tone: 'warning', section: 'bank', count: dueLoans.length });
+  }
+  const dueContracts = profile.contracts.filter((contract) => contract.status === 'active' && contract.deadlineDay - profile.day <= 2);
+  if (dueContracts.length > 0) {
+    const contractValue = dueContracts.reduce((sum, contract) => sum + contract.quantity * contract.unitPrice + contract.reward, 0);
+    const nearestDay = Math.min(...dueContracts.map((contract) => contract.deadlineDay));
+    notifications.push({ id: 'contracts-due', title: 'عقود تقترب من الموعد', detail: `يوجد ${dueContracts.length} عقود قريبة · قيمة التسليم ${money(contractValue)} · أقرب موعد اليوم ${nearestDay}.`, tone: 'warning', section: 'contracts', count: dueContracts.length });
+  }
+  const recentEvents = profile.events.slice(-3).reverse();
+  recentEvents.forEach((event) => notifications.push({ id: event.id, title: 'تغير اقتصادي', detail: `${event.title} · ${event.cashImpact >= 0 ? '+' : '−'}${money(Math.abs(event.cashImpact))}`, tone: event.cashImpact >= 0 ? 'success' : 'warning', section: 'reports' }));
+  const auctions = selectAvailableAuctions(profile);
+  if (auctions.length > 0) notifications.push({ id: 'auctions-open', title: 'فرص مزادات متاحة', detail: `يوجد ${auctions.length} ${plural(auctions.length, 'مزاد مفتوح', 'مزادان مفتوحان', 'مزادات مفتوحة')} للمنافسة الآن.`, tone: 'info', section: 'auctions', count: auctions.length });
+  const earnedBadges = selectEmpirePulse(profile).badges.filter((badge) => badge.earned);
+  if (earnedBadges.length > 0) notifications.push({ id: 'badges-earned', title: 'شارات الإمبراطورية', detail: `لديك ${earnedBadges.length} شارات مكتسبة: ${earnedBadges.slice(-3).map((badge) => badge.label).join('، ')}.`, tone: 'success', section: 'home', count: earnedBadges.length });
+  notifications.push({ id: 'global-market-open', title: 'السوق العالمي مفتوح', detail: 'عروض روبوتية متاحة للمواد الخام، وبعضها يقبل التفاوض.', tone: 'info', section: 'inventory' });
+  return notifications.slice(0, 10);
 }
