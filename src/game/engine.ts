@@ -887,7 +887,10 @@ function awardAchievements(profile: PlayerProfile): { achievements: AchievementR
 export function acceptContract(profile: PlayerProfile, offerId: string): GameResult<BusinessContract> {
   const offer = getContractOffers(profile).find((item) => item.id === offerId);
   if (!offer) return failure(profile, 'not-found', 'انتهت صلاحية هذا العقد؛ افتح لوحة العقود لرؤية عروض اليوم.');
-  if ((profile.contracts ?? []).some((contract) => contract.status === 'active' && contract.id === offerId)) return failure(profile, 'already-owned', 'هذا العقد مقبول بالفعل.');
+  const previousContract = (profile.contracts ?? []).find((contract) => contract.id === offerId);
+  if (previousContract?.status === 'active') return failure(profile, 'already-owned', 'هذا العقد مقبول بالفعل.');
+  if (previousContract?.status === 'completed') return failure(profile, 'already-owned', 'تم تنفيذ هذا العرض من قبل ولا يمكن تكراره.');
+  if (previousContract?.status === 'failed') return failure(profile, 'already-owned', 'انتهى هذا العرض بعد فشله ولا يمكن إعادة استخدامه.');
   if ((profile.contracts ?? []).filter((contract) => contract.status === 'active').length >= 3) return failure(profile, 'condition-not-met', 'لا يمكنك إدارة أكثر من ثلاثة عقود نشطة في وقت واحد.');
   const contract: BusinessContract = { ...offer, status: 'active', acceptedOnDay: profile.day };
   return success({ ...profile, contracts: [...(profile.contracts ?? []), contract] }, `تم قبول عقد ${contract.clientName} حتى اليوم ${contract.deadlineDay}.`, contract);
