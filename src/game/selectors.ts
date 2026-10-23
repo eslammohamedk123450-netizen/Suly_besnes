@@ -25,6 +25,12 @@ export interface FinancialReport {
   recentEntries: PlayerProfile['ledger'];
 }
 
+export interface AdvancedStatistics {
+  production: { totalOrders: number; completedOrders: number; activeOrders: number; cancelledOrders: number; totalBatches: number; totalOutput: number; totalProductionCost: number; averageQuality: number; companies: Array<{ id: string; name: string; level: number; batches: number; completedOrders: number; output: number; cost: number; quality: number; utilization: number }> };
+  sales: { totalUnits: number; totalRevenue: number; totalTax: number; netRevenue: number; averageUnitPrice: number; products: Array<{ id: string; name: string; units: number; revenue: number; tax: number; averagePrice: number }> };
+  profit: { grossMargin: number; operatingExpenses: number; investmentIncome: number; payroll: number; productionExpenses: number; otherExpenses: number; marginPercent: number };
+}
+
 export interface OperationsNextStep {
   section: SectionId;
   title: string;
@@ -162,6 +168,40 @@ export function selectSalesSummary(profile: PlayerProfile): { count: number; gro
   const grossRevenue = (profile.sales ?? []).reduce((sum, sale) => sum + sale.grossRevenue, 0);
   const tax = (profile.sales ?? []).reduce((sum, sale) => sum + sale.tax, 0);
   return { count: profile.sales.length, grossRevenue, tax, netRevenue: grossRevenue - tax, recent: profile.sales.slice(-10).reverse() };
+}
+
+export function selectAdvancedStatistics(profile: PlayerProfile): AdvancedStatistics {
+  const orders = profile.productionOrders ?? [];
+  const completedOrders = orders.filter((order) => order.status === 'completed');
+  const activeOrders = orders.filter((order) => order.status === 'active');
+  const cancelledOrders = orders.filter((order) => order.status === 'cancelled');
+  const totalBatches = orders.reduce((sum, order) => sum + order.batches, 0);
+  const totalOutput = completedOrders.reduce((sum, order) => sum + order.outputQuantity, 0);
+  const totalProductionCost = orders.reduce((sum, order) => sum + order.materialCost + order.energyCost + order.maintenanceCost, 0);
+  const averageQuality = completedOrders.length > 0 ? completedOrders.reduce((sum, order) => sum + order.qualityScore, 0) / completedOrders.length : 0;
+  const companies = profile.companies.map((company) => {
+    const companyOrders = orders.filter((order) => order.companyId === company.id);
+    const finished = companyOrders.filter((order) => order.status === 'completed');
+    const batches = companyOrders.reduce((sum, order) => sum + order.batches, 0);
+    return { id: company.id, name: company.name, level: company.upgradeLevel ?? 1, batches, completedOrders: finished.length, output: finished.reduce((sum, order) => sum + order.outputQuantity, 0), cost: companyOrders.reduce((sum, order) => sum + order.materialCost + order.energyCost + order.maintenanceCost, 0), quality: finished.length > 0 ? finished.reduce((sum, order) => sum + order.qualityScore, 0) / finished.length : 0, utilization: companyOrders.length > 0 ? Math.round((finished.length / companyOrders.length) * 100) : 0 };
+  });
+  const sales = profile.sales ?? [];
+  const products = PRODUCT_CATALOG.map((product) => {
+    const rows = sales.filter((sale) => sale.productId === product.id);
+    const revenue = rows.reduce((sum, sale) => sum + sale.grossRevenue, 0);
+    const units = rows.reduce((sum, sale) => sum + sale.quantity, 0);
+    return { id: product.id, name: product.name, units, revenue, tax: rows.reduce((sum, sale) => sum + sale.tax, 0), averagePrice: units > 0 ? revenue / units : 0 };
+  }).filter((row) => row.units > 0);
+  const totalRevenue = sales.reduce((sum, sale) => sum + sale.grossRevenue, 0);
+  const totalTax = sales.reduce((sum, sale) => sum + sale.tax, 0);
+  const payroll = profile.ledger.filter((entry) => entry.note.startsWith('دفع راتب') || entry.note.startsWith('توقيع عقد')).reduce((sum, entry) => sum + entry.amount, 0);
+  const productionExpenses = profile.ledger.filter((entry) => entry.note.includes('أمر إنتاج') || entry.note.includes('صيانة كاملة للمصنع')).reduce((sum, entry) => sum + entry.amount, 0);
+  const investmentIncome = profile.ledger.filter((entry) => entry.note.includes('استثمار رابح') || entry.note.includes('فائدة وديعة')).reduce((sum, entry) => sum + entry.amount, 0);
+  const operatingExpenses = profile.ledger.filter((entry) => entry.note.includes('تشغيل')).reduce((sum, entry) => sum + entry.amount, 0);
+  const otherExpenses = Math.max(0, profile.finances.totalExpenses - payroll - productionExpenses - operatingExpenses);
+  const grossMargin = totalRevenue - totalTax - totalProductionCost;
+  const totalUnits = sales.reduce((sum, sale) => sum + sale.quantity, 0);
+  return { production: { totalOrders: orders.length, completedOrders: completedOrders.length, activeOrders: activeOrders.length, cancelledOrders: cancelledOrders.length, totalBatches, totalOutput, totalProductionCost, averageQuality, companies }, sales: { totalUnits, totalRevenue, totalTax, netRevenue: totalRevenue - totalTax, averageUnitPrice: totalUnits > 0 ? totalRevenue / totalUnits : 0, products }, profit: { grossMargin, operatingExpenses, investmentIncome, payroll, productionExpenses, otherExpenses, marginPercent: totalRevenue > 0 ? (grossMargin / totalRevenue) * 100 : 0 } };
 }
 
 export function selectFinancialReport(profile: PlayerProfile): FinancialReport {
