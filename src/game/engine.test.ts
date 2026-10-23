@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { COUNTRIES } from '../domain/countries';
 import { createNewPlayer, type PlayerProfile } from '../domain/player';
 import { getContractOffers } from './contracts';
-import { advanceDay, acceptContract, buySpeedCard, deliverContract, payStaffSalary, runProduction } from './engine';
+import { advanceDay, acceptContract, buySpeedCard, deliverContract, foundCompany, payStaffSalary, runProduction } from './engine';
 import { negotiateContract } from './engine';
 import { getSynergyBonuses } from './synergy';
 import { normalizeSavedProfile } from '../storage/saveRepository';
@@ -118,5 +118,12 @@ describe('Business Empire economy invariants', () => {
     expect(bought.profile.diamonds).toBe(12);
     expect(bought.profile.speedCards.find((card) => card.kind === 'production-50')?.quantity).toBe(2);
     expect(buySpeedCard(bought.profile, 'production-instant', 1).ok).toBe(false);
+  });
+
+  it('awards the founder badge automatically after creating a company', () => {
+    const base = profile({ lands: [{ id: 'land-1', label: 'أرض اختبار', landType: 'agricultural', areaSquareMeters: 500, purchasePrice: 100_000, acquiredAt: '2026-01-01T00:00:00.000Z', acquiredOnDay: 1 }] });
+    const result = foundCompany(base, 'food', 'land-1', 'شركة الاختبار');
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.profile.badges).toContain('شارة المؤسس');
   });
 });

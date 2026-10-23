@@ -175,9 +175,17 @@ function ledgerEntry(
 
 function syncTasks(profile: PlayerProfile): PlayerProfile {
   const existing = new Map((profile.tasks ?? []).map((task) => [task.taskId, task]));
+  const automaticBadges = [
+    profile.companies.length > 0 ? 'شارة المؤسس' : null,
+    profile.productionOrders.length > 0 ? 'مشغّل مصنع' : null,
+    profile.sales.length >= 3 ? 'صائد السوق' : null,
+    profile.staff.filter((member) => member.status === 'active').length >= 2 ? 'قائد فريق' : null,
+    profile.investments.length > 0 || profile.banking.deposits.length > 0 ? 'عين على المستقبل' : null,
+  ].filter((badge): badge is string => Boolean(badge));
   return {
     ...profile,
     tasks: TASK_CATALOG.map((task) => existing.get(task.id) ?? { taskId: task.id, claimed: false }),
+    badges: [...new Set([...(profile.badges ?? []), ...automaticBadges])],
   };
 }
 
