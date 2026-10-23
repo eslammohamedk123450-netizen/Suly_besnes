@@ -18,6 +18,9 @@ import { loadSavedGame, saveGame } from './storage/saveRepository';
 import { loadNotificationTheme, saveNotificationTheme } from './storage/userPreferences';
 import { loadCurrentAccount, logoutAccount, type LocalAccount } from './storage/authRepository';
 import { loadRemoteGame, redeemRemoteReward, saveRemoteGame } from './storage/remoteSaveRepository';
+import { StoryIntro } from './components/StoryIntro';
+import { SystemGuideModal } from './components/SystemGuideModal';
+import { chapterFor, getUnlockedSectionIds, isSectionUnlocked } from './game/onboarding';
 
 export default function App() {
   const [account, setAccount] = useState<LocalAccount | null>(null);
@@ -30,6 +33,7 @@ export default function App() {
   const [notificationTheme, setNotificationTheme] = useState(loadNotificationTheme);
   const [notice, setNotice] = useState('');
   const [noticeTone, setNoticeTone] = useState<'success' | 'error'>('success');
+  const [pendingGuide, setPendingGuide] = useState<SectionId | null>(null);
 
   useEffect(() => {
     loadCurrentAccount().then(async (current) => {
@@ -75,6 +79,16 @@ export default function App() {
     setMobileMenuOpen(false);
     setNotice(result.ok ? 'تم إنشاء عالمك وحفظه على هذا الجهاز.' : 'تعذر حفظ البيانات محليًا؛ قد لا يستمر التقدم بعد إغلاق الصفحة.');
     setNoticeTone(result.ok ? 'success' : 'error');
+  }
+
+  function completeIntro() {
+    if (!profile) return;
+    const nextProfile = { ...profile, onboarding: { ...profile.onboarding, introCompleted: true, chapter: 1 } };
+    saveGame(nextProfile, account?.id);
+    if (account) void saveRemoteGame(account.id, nextProfile);
+    setProfile(nextProfile);
+    setNotice('بدأ الفصل الأول. ابدأ بالأرض ثم أسس شركتك الأولى.');
+    setNoticeTone('success');
   }
 
   function handleGameResult<T>(result: GameResult<T>) {
@@ -131,7 +145,13 @@ export default function App() {
   }
 
   function navigate(section: SectionId) {
+    if (!profile || !isSectionUnlocked(profile, section)) {
+      setNotice('هذا النظام سيفتح تلقائيًا بعد إكمال خطوات الفصل الحالي.');
+      setNoticeTone('error');
+      return;
+    }
     setActiveSection(section);
+    if (section !== 'home' && !profile.onboarding.seenGuides.includes(section)) setPendingGuide(section);
     setMobileMenuOpen(false);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
@@ -154,6 +174,9 @@ export default function App() {
     );
   }
 
+  if (!profile.onboarding?.introCompleted) return <StoryIntro profile={profile} onComplete={completeIntro} />;
+
+  const unlockedSections = new Set(getUnlockedSectionIds(profile));
   const fixedBottomItems: SectionId[] = ['home', 'auctions', 'companies', 'lands'];
   const otherSections = GAME_SECTIONS.filter((section) => !fixedBottomItems.includes(section.id));
 
@@ -179,8 +202,9 @@ export default function App() {
               <div className="nav-group-label">{group.label}</div>
               {group.sections.map((sectionId) => {
                 const section = getSection(sectionId);
-                return <button className={`nav-item${activeSection === section.id ? ' is-active' : ''}`} type="button" key={section.id} onClick={() => navigate(section.id)} aria-current={activeSection === section.id ? 'page' : undefined}>
-                  <Icon name={section.icon} size={19} /><span>{section.label}</span>
+                const unlocked = unlockedSections.has(section.id);
+                return <button className={`nav-item${activeSection === section.id ? ' is-active' : ''}${!unlocked ? ' is-locked' : ''}`} type="button" key={section.id} onClick={() => navigate(section.id)} aria-current={activeSection === section.id ? 'page' : undefined} disabled={!unlocked}>
+                  <Icon name={unlocked ? section.icon : 'lock'} size={19} /><span>{section.label}</span>
                 </button>;
               })}
             </div>
@@ -208,11 +232,12 @@ export default function App() {
       {mobileMenuOpen && <div className="mobile-menu-backdrop" onClick={() => setMobileMenuOpen(false)}>
         <nav className="mobile-more-menu" aria-label="المزيد من الأقسام" onClick={(event) => event.stopPropagation()}>
           <div className="mobile-more-heading"><strong>كل الأقسام</strong><button type="button" className="icon-button" onClick={() => setMobileMenuOpen(false)} aria-label="إغلاق"><Icon name="close" /></button></div>
-          {otherSections.map((section) => <button type="button" className="mobile-more-item" key={section.id} onClick={() => navigate(section.id)}><Icon name={section.icon} size={18} /><span>{section.label}</span><Icon name="chevron" size={16} /></button>)}
+          {otherSections.map((section) => { const unlocked = unlockedSections.has(section.id); return <button type="button" className={`mobile-more-item${!unlocked ? ' is-locked' : ''}`} key={section.id} onClick={() => navigate(section.id)} disabled={!unlocked}><Icon name={unlocked ? section.icon : 'lock'} size={18} /><span>{section.label}</span><Icon name="chevron" size={16} /></button>; })}
         </nav>
       </div>}
 
       {notice && <NoticeToast message={notice} tone={noticeTone} theme={notificationTheme} onDismiss={() => setNotice('')} />}
+      {pendingGuide && <SystemGuideModal section={pendingGuide} onClose={() => { if (!profile) return; const seenGuides = profile.onboarding.seenGuides.includes(pendingGuide) ? profile.onboarding.seenGuides : [...profile.onboarding.seenGuides, pendingGuide]; const nextProfile = { ...profile, onboarding: { ...profile.onboarding, chapter: chapterFor(profile), seenGuides } }; saveGame(nextProfile, account?.id); if (account) void saveRemoteGame(account.id, nextProfile); setProfile(nextProfile); setPendingGuide(null); }} />}
       <footer className="app-footer"><span>إمبراطورية الأعمال</span><span>محاكاة محلية · الأسعار والأحداث لأغراض اللعبة</span></footer>
     </div>
   );

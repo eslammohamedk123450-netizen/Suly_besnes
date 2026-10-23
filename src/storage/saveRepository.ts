@@ -1,6 +1,6 @@
 import { findCountry, type CountryId, type IndustryId } from '../domain/countries';
 import type { PlayerAsset, PlayerCompany, PlayerLand, PlayerProfile } from '../domain/player';
-import type { AchievementRecord, AuctionBidRecord, BusinessContract, DepositRecord, FinanceLedgerEntry, InventoryLot, InvestmentRecord, LicenseRecord, LoanRecord, ProductSale, ProductionOrder, StaffContract, TaskProgress } from '../domain/futureSystems';
+import type { AchievementRecord, AuctionBidRecord, BusinessContract, DepositRecord, FinanceLedgerEntry, InventoryLot, InvestmentRecord, LicenseRecord, LoanRecord, OnboardingProgress, ProductSale, ProductionOrder, StaffContract, TaskProgress } from '../domain/futureSystems';
 import { findIndustry, GOLD_PRICE_PER_GRAM } from '../game/catalog';
 
 const SAVE_KEY = 'business-empire.save.v1';
@@ -163,6 +163,11 @@ function isAchievement(value: unknown): value is AchievementRecord {
     && Number.isInteger(value.earnedAtDay) && (value.earnedAtDay as number) >= 1;
 }
 
+function isOnboardingProgress(value: unknown): value is OnboardingProgress {
+  return isRecord(value) && typeof value.introCompleted === 'boolean' && Number.isInteger(value.chapter)
+    && (value.chapter as number) >= 0 && Array.isArray(value.seenGuides) && value.seenGuides.every(isNonEmptyString);
+}
+
 function inferLandType(label: string): PlayerLand['landType'] | undefined {
   const normalized = label.toLocaleLowerCase();
   if (normalized.includes('زراع') || normalized.includes('farm') || normalized.includes('agric')) return 'agricultural';
@@ -288,6 +293,7 @@ function migrateProfile(value: unknown): PlayerProfile | null {
     reputation: isFiniteNonNegative(value.reputation) ? Math.min(100, value.reputation as number) : 50,
     contracts: Array.isArray(value.contracts) && value.contracts.every(isBusinessContract) ? value.contracts : [],
     achievements: Array.isArray(value.achievements) && value.achievements.every(isAchievement) ? value.achievements : [],
+    onboarding: isOnboardingProgress(value.onboarding) ? value.onboarding : { introCompleted: true, chapter: 1, seenGuides: [] },
   };
 }
 

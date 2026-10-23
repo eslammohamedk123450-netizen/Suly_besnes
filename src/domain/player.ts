@@ -15,6 +15,7 @@ import type {
   SeasonProgress,
   BusinessContract,
   AchievementRecord,
+  OnboardingProgress,
 } from './futureSystems';
 
 export interface PlayerAsset {
@@ -88,6 +89,7 @@ export interface PlayerProfile {
   reputation: number;
   contracts: BusinessContract[];
   achievements: AchievementRecord[];
+  onboarding: OnboardingProgress;
 }
 
 function createId(): string {
@@ -131,6 +133,7 @@ export function createNewPlayer(
     reputation: 50,
     contracts: [],
     achievements: [],
+    onboarding: { introCompleted: false, chapter: 0, seenGuides: [] },
     season: { seasonId: 'expansion-season-1', startedOnDay: 1, endsOnDay: 30, points: 0, claimedChallengeKeys: [] },
   };
 }

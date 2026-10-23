@@ -217,3 +217,9 @@ export interface AchievementRecord {
   earnedAtDay: number;
   title: string;
 }
+
+export interface OnboardingProgress {
+  introCompleted: boolean;
+  chapter: number;
+  seenGuides: string[];
+}
