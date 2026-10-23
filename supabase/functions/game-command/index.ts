@@ -1,5 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-const ENGINE_URL = 'https://raw.githubusercontent.com/eslammohamedk123450-netizen/Suly_besnes/main/supabase/functions/game-command/game-engine.ts';
+import { executeGameCommand } from 'https://raw.githubusercontent.com/eslammohamedk123450-netizen/Suly_besnes/main/supabase/functions/game-command/game-engine.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -53,10 +53,12 @@ Deno.serve(async (request) => {
   if (!command || typeof command !== 'object' || typeof command.name !== 'string' || !allowedCommands.has(command.name) || !command.args || typeof command.args !== 'object' || Array.isArray(command.args)) return json({ error: 'invalid_command' }, 400);
   const commandKey = typeof payload.commandKey === 'string' && payload.commandKey.length >= 16 ? payload.commandKey : crypto.randomUUID();
   const admin = createClient(supabaseUrl, serviceRoleKey, { auth: { persistSession: false, autoRefreshToken: false } });
+  const { data: existingReceipt, error: receiptError } = await admin.from('game_command_receipts').select('result').eq('user_id', user.id).eq('command_key', commandKey).maybeSingle();
+  if (receiptError) return json({ error: 'receipt_lookup_failed' }, 500);
+  if (existingReceipt?.result && typeof existingReceipt.result === 'object') return json({ ...(existingReceipt.result as Record<string, unknown>), duplicate: true });
   const { data: row, error: readError } = await admin.from('game_profiles').select('save_data, updated_at').eq('user_id', user.id).maybeSingle();
   if (readError || !row?.save_data || typeof row.save_data !== 'object') return json({ error: 'profile_not_found' }, 404);
   const before = row.save_data as Record<string, unknown>;
-  const { executeGameCommand } = await import(ENGINE_URL);
   const result = executeGameCommand(before as never, command as never) as { ok: boolean; profile: Record<string, unknown>; message: string; data?: unknown; reason?: string };
   if (!result.ok) return json({ ok: true, result });
   const nextProfile = result.profile;
