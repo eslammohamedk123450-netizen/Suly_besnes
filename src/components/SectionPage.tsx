@@ -31,7 +31,7 @@ interface SectionPageProps {
   onHome: () => void;
   onAction: (result: GameResult<unknown>) => void;
   onCommand: (command: GameCommand, fallback: (current: PlayerProfile) => GameResult<unknown>) => void;
-  onRedeemed: (profile: PlayerProfile, message: string, codeId: string) => Promise<boolean>;
+  onRedeemed: (profile: PlayerProfile, message: string, codeId: string, rawCode: string) => Promise<boolean>;
   onLinkAccount: () => void;
   onLogout: () => void;
   onShowGuide: () => void;

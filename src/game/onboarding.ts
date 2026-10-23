@@ -23,7 +23,7 @@ export interface PlayerProgress {
 }
 
 const EXPERIENCE_PER_LEVEL = 150;
-const INTRO_UNLOCKS: SectionId[] = ['home', 'lands', 'companies', 'settings', 'tasks', 'auctions'];
+const INTRO_UNLOCKS: SectionId[] = ['home', 'profile', 'lands', 'companies', 'settings', 'tasks', 'auctions'];
 
 /** Experience is derived from durable accomplishments so old saves migrate without data loss. */
 export function getPlayerProgress(profile: PlayerProfile): PlayerProgress {

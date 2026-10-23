@@ -14,6 +14,7 @@ export type SectionId =
   | 'reports'
   | 'contracts'
   | 'tasks'
+  | 'profile'
   | 'settings';
 
 export interface SectionItem {
@@ -44,6 +45,7 @@ export const GAME_SECTIONS: readonly SectionItem[] = [
   { id: 'reports', label: 'التقارير المالية', shortLabel: 'التقارير', subtitle: 'صورة واضحة عن الأداء المالي', icon: 'report' },
   { id: 'contracts', label: 'العقود والعملاء', shortLabel: 'العقود', subtitle: 'طلبات السوق والسمعة التجارية', icon: 'briefcase' },
   { id: 'tasks', label: 'المهام والإنجازات', shortLabel: 'المهام', subtitle: 'أهداف وتحديات مستقبلية', icon: 'tasks' },
+  { id: 'profile', label: 'الملف الشخصي', shortLabel: 'ملفي', subtitle: 'معرفك وتقدمك وشاراتك', icon: 'user' },
   { id: 'settings', label: 'الإعدادات', shortLabel: 'الإعدادات', subtitle: 'إدارة ملفك المحلي', icon: 'settings' },
 ];
 
@@ -52,7 +54,7 @@ export const SECTION_GROUPS: readonly SectionGroup[] = [
   { id: 'market', label: 'السوق والتوسع', sections: ['auctions', 'lands', 'companies'] },
   { id: 'operations', label: 'التشغيل', sections: ['production', 'inventory'] },
   { id: 'finance', label: 'المال والتقدم', sections: ['investments', 'bank', 'staff', 'obligations', 'reports', 'contracts', 'tasks'] },
-  { id: 'settings', label: 'النظام', sections: ['settings'] },
+  { id: 'settings', label: 'الحساب والنظام', sections: ['profile', 'settings'] },
 ];
 
 export function getSection(id: SectionId): SectionItem {

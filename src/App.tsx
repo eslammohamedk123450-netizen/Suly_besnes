@@ -5,6 +5,7 @@ import { Brand } from './components/Brand';
 import { AccountGate } from './components/AccountGate';
 import { CountrySelection } from './components/CountrySelection';
 import { Dashboard } from './components/Dashboard';
+import { ProfilePage } from './components/ProfilePage';
 import { GameDayTimer } from './components/GameDayTimer';
 import { Icon } from './components/Icon';
 import { NoticeToast } from './components/NoticeToast';
@@ -30,7 +31,7 @@ import { normalizeAccountFeatures } from './domain/accountFeatures';
 import { claimDailySeasonLogin, getVisibleSeasons, recordVerifiedGameTransaction } from './storage/leaderboardRepository';
 import { ResourceBar, type ResourceSyncState } from './components/ResourceBar';
 import { acknowledgeGameCommand, blockGameCommand, createGameCommandKey, enqueueGameCommand, loadQueuedGameCommands } from './storage/commandOutbox';
-import { blockInitialProfile, clearPendingInitialProfile, loadPendingInitialProfile, queueInitialProfile } from './storage/pendingInitialProfile';
+import { clearPendingInitialProfile, loadPendingInitialProfile, queueInitialProfile } from './storage/pendingInitialProfile';
 
 function getPendingSyncCount(accountId: string): number {
   return loadQueuedGameCommands(accountId).length + (loadPendingInitialProfile(accountId) ? 1 : 0);
@@ -196,11 +197,13 @@ export default function App() {
     }
     const refreshStatus = () => {
       const queue = loadQueuedGameCommands(account.id);
-      const pendingCount = getPendingSyncCount(account.id);
+      const initialProfile = loadPendingInitialProfile(account.id);
+      const pendingCount = getPendingSyncCount(account.id) + Number(Boolean(initialProfile));
       setPendingCommandCount(pendingCount);
-      if (queue.some((entry) => entry.status === 'blocked') || loadPendingInitialProfile(account.id)?.status === 'blocked') setSyncState('blocked');
+      if (queue.some((entry) => entry.status === 'blocked') || initialProfile?.status === 'blocked') setSyncState('blocked');
       else if (pendingCount && typeof navigator !== 'undefined' && !navigator.onLine) setSyncState('offline');
-      else if (!pendingCount) setSyncState('synced');
+      else if (pendingCount) setSyncState('syncing');
+      else setSyncState('synced');
     };
     const handleOnline = () => { void synchronizePendingCommands(true); };
     const handleOffline = () => refreshStatus();
@@ -288,28 +291,21 @@ export default function App() {
           return false;
         }
         const initialized = await saveRemoteGame(account.id, initialProfile.profile);
-        if (initialized) {
-          clearPendingInitialProfile(account.id);
-          synchronizedCount += 1;
-        } else {
-          const existing = await loadRemoteGame(account.id);
-          if (existing && existing.id === initialProfile.profile.id && existing.createdAt === initialProfile.profile.createdAt && existing.name === initialProfile.profile.name) {
-            clearPendingInitialProfile(account.id);
-            setProfile(normalizeAccountFeatures(existing, account.id));
-            synchronizedCount += 1;
-          } else if (existing) {
-            blockInitialProfile(account.id, 'remote_profile_exists');
-            const firstCommand = loadQueuedGameCommands(account.id)[0];
-            if (firstCommand) blockGameCommand(account.id, firstCommand.commandKey, 'initial_profile_conflict');
-            setSyncState('blocked');
-            setNotice('وجدنا عالمًا سحابيًا مختلفًا؛ أوقفنا الدمج كي لا نستبدل تقدمك. عالمك المحلي ما زال محفوظًا على الجهاز.');
-            setNoticeTone('error');
-            return false;
-          } else {
-            setSyncState('offline');
-            return false;
-          }
+        const authoritative = initialized ?? await loadRemoteGame(account.id);
+        if (!authoritative) {
+          setSyncState('offline');
+          return false;
         }
+        const savedInitial = saveGame(authoritative, account.id);
+        if (!savedInitial.ok) {
+          setSyncState('blocked');
+          setNotice('أنشأ الخادم عالمك بأمان، لكن تعذر حفظ نسخته على هذا الجهاز. لم نحذف بيانات المزامنة؛ تحقق من مساحة التخزين.');
+          setNoticeTone('error');
+          return false;
+        }
+        clearPendingInitialProfile(account.id);
+        setProfile(normalizeAccountFeatures(authoritative, account.id));
+        synchronizedCount += 1;
       }
       while (true) {
         const queue = loadQueuedGameCommands(account.id);
@@ -390,17 +386,25 @@ export default function App() {
       return;
     }
     const guestProfile = profile ?? loadSavedGame(account.id);
+    let linkTone: 'success' | 'error' = 'success';
     const existingCloudProfile = await loadRemoteGame(nextAccount.id);
     if (existingCloudProfile) {
       setProfile(existingCloudProfile ? normalizeAccountFeatures(existingCloudProfile, nextAccount.id) : null);
       setNotice('تم فتح عالم الحساب السحابي الموجود. حفظ الضيف لم يُحذف من هذا الجهاز.');
     } else if (guestProfile) {
-      saveGame(guestProfile, nextAccount.id);
-      const queued = queueInitialProfile(nextAccount.id, guestProfile);
-      const synchronized = queued ? await saveRemoteGame(nextAccount.id, guestProfile) : false;
-      if (synchronized) clearPendingInitialProfile(nextAccount.id);
-      setProfile(normalizeAccountFeatures(guestProfile, nextAccount.id));
-      setNotice(synchronized ? 'تم ربط الحساب ونسخ عالم الضيف إلى الحفظ السحابي.' : queued ? 'تم ربط الحساب وحفظ العالم محليًا؛ ستتم المزامنة عند عودة الاتصال.' : 'تم ربط الحساب؛ العالم محفوظ محليًا على هذا الجهاز.');
+      const guestCountry = findCountry(guestProfile.countryId) ?? COUNTRIES[0];
+      const freshCloudProfile = normalizeAccountFeatures(createNewPlayer(guestCountry, guestProfile.name), nextAccount.id);
+      const localCreated = saveGame(freshCloudProfile, nextAccount.id);
+      const queued = localCreated.ok && queueInitialProfile(nextAccount.id, freshCloudProfile);
+      setProfile(freshCloudProfile);
+      if (queued) setSyncState(typeof navigator !== 'undefined' && !navigator.onLine ? 'offline' : 'syncing');
+      else {
+        setSyncState('blocked');
+        linkTone = 'error';
+      }
+      setNotice(queued
+        ? 'تم ربط الحساب وبدأ عالم سحابي جديد لحماية الأرصدة. حفظ الضيف السابق ما زال محليًا على هذا الجهاز ولم يُرفع.'
+        : 'تم ربط الحساب، لكن تعذر تجهيز مزامنة العالم الجديد. لم يُرفع حفظ الضيف؛ تحقق من مساحة التخزين ثم أعد المحاولة.');
     } else {
       setProfile(null);
       setNotice('تم ربط الحساب. ابدأ عالمك الجديد الآن.');
@@ -408,7 +412,7 @@ export default function App() {
     setAccount(nextAccount);
     setActiveSection('home');
     setLinkingAccount(false);
-    setNoticeTone('success');
+    setNoticeTone(linkTone);
   }
 
   const country = findCountry(profile?.countryId ?? selectedCountryId) ?? COUNTRIES[0];
@@ -431,8 +435,8 @@ export default function App() {
     const newProfile = normalizeAccountFeatures(createNewPlayer(chosenCountry, playerName), account?.id);
     const result = saveGame(newProfile, account?.id);
     if (account && !account.isGuest) {
-      const queued = queueInitialProfile(account.id, newProfile);
-      setPendingCommandCount(getPendingSyncCount(account.id));
+    const queued = queueInitialProfile(account.id, newProfile);
+      setPendingCommandCount(getPendingSyncCount(account.id) + Number(Boolean(loadPendingInitialProfile(account.id))));
       setSyncState(queued ? (typeof navigator !== 'undefined' && !navigator.onLine ? 'offline' : 'syncing') : 'blocked');
       if (queued) void synchronizePendingCommands(false);
     }
@@ -536,16 +540,16 @@ export default function App() {
     handleGameResult(execution.result, { syncRemote: false });
   }
 
-  async function handleRedeemed(nextProfile: PlayerProfile, message: string, codeId: string): Promise<boolean> {
+  async function handleRedeemed(_nextProfile: PlayerProfile, message: string, _codeId: string, rawCode: string): Promise<boolean> {
     if (!account || account.isGuest) {
       setNotice('استرداد الأكواد يحتاج حسابًا سحابيًا؛ يمكنك ربط حساب من الإعدادات.');
       setNoticeTone('error');
       return false;
     }
-    const committedRemotely = await redeemRemoteReward(account.id, nextProfile, codeId);
-    if (!committedRemotely) return false;
-    const saved = saveGame(nextProfile, account.id);
-    setProfile(nextProfile);
+    const authoritative = await redeemRemoteReward(rawCode);
+    if (!authoritative) return false;
+    const saved = saveGame(authoritative, account.id);
+    setProfile(authoritative);
     setNotice(saved.ok ? message : `${message} تعذر تثبيت الحفظ على هذا الجهاز.`);
     setNoticeTone(saved.ok ? 'success' : 'error');
     return true;
@@ -587,7 +591,7 @@ export default function App() {
       return;
     }
     setActiveSection(section);
-    if (section !== 'home' && !profile.onboarding.seenGuides.includes(section)) setPendingGuide(section);
+    if (section !== 'home' && section !== 'profile' && !profile.onboarding.seenGuides.includes(section)) setPendingGuide(section);
     setMobileMenuOpen(false);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
@@ -645,7 +649,7 @@ export default function App() {
           <GameDayTimer profile={profile} onDaysElapsed={handleDaysElapsed} />
           <div className="header-location"><span>{country.flag}</span><span>{country.name}</span><small>{country.currency.code}</small></div>
           <span className="header-divider" />
-          <span className="player-level"><span className="avatar-initial">{profile.name.trim().charAt(0) || 'م'}</span><span><strong>{profile.name}</strong><small>المستوى {playerProgress?.level ?? profile.level}</small></span></span>
+          <button className="player-level player-level--button" type="button" onClick={() => navigate('profile')} aria-label="فتح الملف الشخصي"><span className="avatar-initial">{profile.name.trim().charAt(0) || 'م'}</span><span><strong>{profile.name}</strong><small>المستوى {playerProgress?.level ?? profile.level}</small></span></button>
           <button className="header-settings" type="button" onClick={() => navigate('settings')} aria-label="الإعدادات"><Icon name="settings" size={19} /></button>
         </div>
       </header>
@@ -672,6 +676,8 @@ export default function App() {
         <main className="main-content">
           {activeSection === 'home' ? (
             <Dashboard profile={profile} country={country} onNavigate={navigate} />
+          ) : activeSection === 'profile' ? (
+            <ProfilePage profile={profile} country={country} accountId={account.id} isGuest={Boolean(account.isGuest)} isSynced={!account.isGuest && syncState === 'synced' && pendingCommandCount === 0} onLinkAccount={() => setLinkingAccount(true)} />
           ) : (
             <SectionPage section={active} profile={profile} country={country} notificationTheme={notificationTheme} isGuest={Boolean(account.isGuest)} onNotificationThemeChange={setNotificationTheme} onHome={() => navigate('home')} onAction={handleGameResult} onCommand={handleGameCommand} onRedeemed={handleRedeemed} onLinkAccount={() => setLinkingAccount(true)} onLogout={handleLogout} onShowGuide={() => setPendingGuide(activeSection)} />
           )}

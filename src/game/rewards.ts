@@ -2,6 +2,7 @@ import type { FinanceLedgerEntry } from '../domain/futureSystems';
 import type { PlayerProfile } from '../domain/player';
 
 const PUBLIC_KEY_DER_BASE64 = 'MCowBQYDK2VwAyEA84UjrthL2DPvb0nU4FJv519tEWgUpuHEBhP4gdmrAiY=';
+const ROTATED_PUBLIC_KEY_DER_BASE64 = 'MCowBQYDK2VwAyEAE8KYanYlY/M5eQuNNuKP/EMerujT9v9IaC374LZtBCs=';
 
 type Reward = { type: 'cash'; amount: number } | { type: 'gold'; grams: number };
 interface RewardPayload { version: 1; codeId: string; issuedAt: string; expiresAt: string; rewards: Reward[] }
@@ -27,8 +28,16 @@ export async function redeemRewardCode(profile: PlayerProfile, rawCode: string):
     if (payload.version !== 1 || typeof payload.codeId !== 'string' || !Array.isArray(payload.rewards) || !payload.rewards.length || !Number.isFinite(Date.parse(payload.expiresAt ?? ''))) return { ok: false, profile, message: 'الكود ناقص أو غير صالح.' };
     if (Date.parse(payload.expiresAt as string) <= Date.now()) return { ok: false, profile, message: 'انتهت صلاحية هذا الكود.' };
     if (profile.redeemedCodeIds.includes(payload.codeId)) return { ok: false, profile, message: 'تم استخدام هذا الكود من قبل على هذا الحساب.' };
-    const publicKey = await crypto.subtle.importKey('spki', decodeBase64Url(PUBLIC_KEY_DER_BASE64) as unknown as BufferSource, { name: 'Ed25519' } as Algorithm, false, ['verify']);
-    const valid = await crypto.subtle.verify({ name: 'Ed25519' } as Algorithm, publicKey, decodeBase64Url(parts[2]) as unknown as BufferSource, new TextEncoder().encode(encodedPayload));
+    let valid = false;
+    for (const trustedKey of [PUBLIC_KEY_DER_BASE64, ROTATED_PUBLIC_KEY_DER_BASE64]) {
+      try {
+        const publicKey = await crypto.subtle.importKey('spki', decodeBase64Url(trustedKey) as unknown as BufferSource, { name: 'Ed25519' } as Algorithm, false, ['verify']);
+        valid = await crypto.subtle.verify({ name: 'Ed25519' } as Algorithm, publicKey, decodeBase64Url(parts[2]) as unknown as BufferSource, new TextEncoder().encode(encodedPayload));
+        if (valid) break;
+      } catch {
+        // A malformed or unavailable key must not prevent trying the other trusted key.
+      }
+    }
     if (!valid) return { ok: false, profile, message: 'توقيع الكود غير صالح.' };
     let cash = 0;
     let gold = 0;

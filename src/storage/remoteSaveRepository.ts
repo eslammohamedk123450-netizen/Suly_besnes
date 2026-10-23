@@ -9,24 +9,21 @@ export async function loadRemoteGame(accountId: string): Promise<PlayerProfile |
   return normalizeSavedProfile(data.save_data);
 }
 
-export async function saveRemoteGame(accountId: string, profile: PlayerProfile): Promise<boolean> {
+export async function saveRemoteGame(accountId: string, profile: PlayerProfile): Promise<PlayerProfile | null> {
   void accountId;
   const { data, error } = await supabase.functions.invoke('game-save', {
-    body: { playerName: profile.name, gameDay: profile.day, saveData: profile },
+    body: { playerName: profile.name, countryId: profile.countryId },
   });
-  return !error && data?.ok === true;
+  if (error || data?.ok !== true || !data.saveData) return null;
+  return normalizeSavedProfile(data.saveData);
 }
 
-export async function redeemRemoteReward(accountId: string, profile: PlayerProfile, codeId: string): Promise<boolean> {
+export async function redeemRemoteReward(rawCode: string): Promise<PlayerProfile | null> {
   const { data, error } = await supabase.functions.invoke('reward-code', {
-    body: {
-      codeId,
-      playerName: profile.name,
-      gameDay: profile.day,
-      saveData: profile,
-    },
+    body: { rawCode: rawCode.trim() },
   });
-  return !error && data?.ok === true;
+  if (error || data?.ok !== true || !data.profile) return null;
+  return normalizeSavedProfile(data.profile);
 }
 
 export type RemoteGameCommandAttempt =
