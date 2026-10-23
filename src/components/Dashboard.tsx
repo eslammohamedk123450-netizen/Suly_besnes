@@ -23,6 +23,8 @@ export function Dashboard({ profile, country, onNavigate }: DashboardProps) {
   const operations = selectOperationsSnapshot(profile, country.economy.operatingCostMultiplier ?? 1);
   const pulse = selectEmpirePulse(profile);
   const empirePoints = selectEmpirePoints(profile);
+  const unpaidSalary = profile.staff.filter((employee) => employee.status === 'active').reduce((sum, employee) => sum + (employee.unpaidSalary ?? 0), 0);
+  const totalOutstanding = profile.payables + unpaidSalary;
   const ledgerDay = (occurredAt: string) => {
     const createdAt = Date.parse(profile.createdAt);
     const entryAt = Date.parse(occurredAt);
@@ -45,7 +47,7 @@ export function Dashboard({ profile, country, onNavigate }: DashboardProps) {
         <div className="hero-emblem"><Icon name="crown" size={25} /><span>BE</span></div>
       </section>
 
-      {profile.payables > 0 && <div className="operating-warning" role="status">لديك التزامات غير مسددة بقيمة {formatMoney(profile.payables, country)}؛ أُوقفت الطاقة مؤقتًا، وتُخصم الالتزامات من السيولة الجديدة.</div>}
+      {totalOutstanding > 0 && <div className="operating-warning" role="status">لديك التزامات ورواتب غير مسددة بقيمة {formatMoney(totalOutstanding, country)}؛ أُوقفت الطاقة مؤقتًا، وتُخصم الالتزامات من السيولة الجديدة.</div>}
 
       <section className={`operations-next operations-next--${operations.nextStep.tone}`}>
         <div className="operations-next-mark"><Icon name="target" size={21} /></div>

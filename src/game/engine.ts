@@ -132,6 +132,10 @@ function isPositiveInteger(value: number): boolean {
   return Number.isInteger(value) && value > 0;
 }
 
+function unpaidSalaryTotal(profile: PlayerProfile): number {
+  return profile.staff.filter((employee) => employee.status === 'active').reduce((sum, employee) => sum + (employee.unpaidSalary ?? 0), 0);
+}
+
 function addLedger(
   profile: PlayerProfile,
   entries: readonly FinanceLedgerEntry[],
@@ -613,7 +617,8 @@ export function getDayBriefing(profile: PlayerProfile): DayBriefing {
   ];
   const event = eventTemplates[(day - 1) % eventTemplates.length];
   const availableEnergy = profile.companies.reduce((sum, company) => sum + (company.energyUnits ?? 0), 0);
-  return { day, operatingCost, existingPayables: profile.payables, maturingInvestments, event, availableEnergy, energyPaused: profile.payables > 0 };
+  const outstandingSalary = unpaidSalaryTotal(profile);
+  return { day, operatingCost, existingPayables: profile.payables + outstandingSalary, maturingInvestments, event, availableEnergy, energyPaused: profile.payables > 0 || outstandingSalary > 0 };
 }
 
 const STAFF_ROLE_OPTIONS: Record<StaffRole, { label: string; dailySalary: number; companyRequired: boolean }> = {
@@ -648,7 +653,7 @@ export function payStaffSalary(profile: PlayerProfile, staffId: string): GameRes
   if (profile.bankBalance < amount) return failure(profile, 'insufficient-funds', `تحتاج إلى ${amount.toLocaleString('ar-EG')} ج.م لدفع راتب ${employee.name}.`);
   const nextProfile = addLedger(
     { ...profile, staff: profile.staff.map((member) => member.id === staffId ? { ...member, unpaidSalary: 0, nextPayDay: profile.day + 1 } : member) },
-    [ledgerEntry(profile, 'expense', amount, `دفع راتب يدوي: ${employee.name}`, 0)],
+    [ledgerEntry(profile, 'settlement', amount, `سداد راتب مستحق: ${employee.name}`, 0)],
     profile.bankBalance - amount,
   );
   return success(nextProfile, `تم دفع ${amount.toLocaleString('ar-EG')} ج.م للموظف ${employee.name}.`, { staffId, amount });
@@ -785,6 +790,14 @@ export function advanceDay(profile: PlayerProfile): GameResult<DayOutcome> {
     const dueDays = Math.max(1, nextDay - employee.nextPayDay + 1);
     return { ...employee, nextPayDay: nextDay + 1, unpaidSalary: (employee.unpaidSalary ?? 0) + employee.dailySalary * dueDays };
   });
+  const salaryAccrued = staff.reduce((sum, employee) => {
+    const previous = profile.staff.find((item) => item.id === employee.id);
+    return sum + Math.max(0, (employee.unpaidSalary ?? 0) - (previous?.unpaidSalary ?? 0));
+  }, 0);
+  if (salaryAccrued > 0) {
+    entries.push(ledgerEntry(profile, 'expense', salaryAccrued, 'رواتب مستحقة عن اليوم', entries.length));
+    entries.push(ledgerEntry(profile, 'liability', salaryAccrued, 'التزام رواتب غير مسدد', entries.length));
+  }
   let inventory = [...profile.inventory];
   const productionOrders = profile.productionOrders.map((order) => {
     if (order.status !== 'active' || order.completesOnDay > nextDay) return order;
@@ -847,7 +860,8 @@ export function advanceDay(profile: PlayerProfile): GameResult<DayOutcome> {
     payables -= paidAtClose;
     entries.push(ledgerEntry(profile, 'settlement', paidAtClose, 'سداد التزامات من سيولة اليوم', entries.length));
   }
-  const energyPaused = payables > 0;
+  const outstandingSalary = unpaidSalaryTotal({ ...profile, staff });
+  const energyPaused = payables > 0 || outstandingSalary > 0;
   const companies = profile.companies.map((company) => {
     const industry = findIndustry(company.industryId);
     const capacity = company.energyCapacity ?? industry?.energyCapacity ?? 0;
@@ -866,8 +880,9 @@ export function advanceDay(profile: PlayerProfile): GameResult<DayOutcome> {
     entries,
     balance,
   );
-  const message = payables > 0
-    ? `مرّ اليوم ${nextDay}، لكن بقيت التزامات غير مسددة بقيمة ${Math.round(payables).toLocaleString('ar-EG')} ج.م؛ أُوقفت الطاقة مؤقتًا حتى السداد.`
+  const totalOutstanding = payables + outstandingSalary;
+  const message = totalOutstanding > 0
+    ? `مرّ اليوم ${nextDay}، لكن بقيت التزامات ورواتب غير مسددة بقيمة ${Math.round(totalOutstanding).toLocaleString('ar-EG')} ج.م؛ أُوقفت الطاقة مؤقتًا حتى السداد.`
     : `مرّ اليوم ${nextDay} وعولجت المصروفات والأحداث والاستثمارات.`;
   return success(syncTasks(nextProfile), message, { day: nextDay, operatingCost, paidOperatingCost, payables, investmentPayout, event });
 }
