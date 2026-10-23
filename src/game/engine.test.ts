@@ -3,6 +3,8 @@ import { COUNTRIES } from '../domain/countries';
 import { createNewPlayer, type PlayerProfile } from '../domain/player';
 import { getContractOffers } from './contracts';
 import { advanceDay, acceptContract, deliverContract, payStaffSalary, runProduction } from './engine';
+import { negotiateContract } from './engine';
+import { getSynergyBonuses } from './synergy';
 import { normalizeSavedProfile } from '../storage/saveRepository';
 
 function profile(overrides: Partial<PlayerProfile> = {}): PlayerProfile {
@@ -87,5 +89,24 @@ describe('Business Empire economy invariants', () => {
     expect(normalizeSavedProfile({ id: 'x', bankBalance: 'not-a-number' })).toBeNull();
     const valid = profile();
     expect(normalizeSavedProfile(valid)?.id).toBe(valid.id);
+  });
+
+  it('allows one bounded contract negotiation and calculates company synergy', () => {
+    const base = profile({
+      companies: [
+        { id: 'food', name: 'غذاء', industryId: 'food', countryId: 'egypt', foundedAt: '2026-01-01T00:00:00.000Z', foundedOnDay: 1 },
+        { id: 'transport', name: 'نقل', industryId: 'transport', countryId: 'egypt', foundedAt: '2026-01-01T00:00:00.000Z', foundedOnDay: 1 },
+      ],
+    });
+    const offer = getContractOffers(base)[0];
+    const accepted = acceptContract(base, offer.id);
+    expect(accepted.ok).toBe(true);
+    if (!accepted.ok) return;
+    const negotiated = negotiateContract(accepted.profile, offer.id, 'price');
+    expect(negotiated.ok).toBe(true);
+    if (!negotiated.ok) return;
+    expect(negotiated.profile.contracts[0].unitPrice).toBeGreaterThan(offer.unitPrice);
+    expect(negotiateContract(negotiated.profile, offer.id, 'deadline').ok).toBe(false);
+    expect(getSynergyBonuses(negotiated.profile).length).toBeGreaterThan(0);
   });
 });

@@ -18,6 +18,7 @@ import { isAuctionOpen, resolveAuctionListing } from './auctions';
 import { getInvestmentPayoutRate, getOperatingCostProgression } from './economyBalance';
 import { GAME_DAY_MS } from './time';
 import { getContractOffers } from './contracts';
+import { getSynergyOperatingMultiplier, getSynergyProductionMultiplier } from './synergy';
 import type { SpeedCardKind } from '../domain/accountFeatures';
 
 export type GameErrorCode =
@@ -468,7 +469,7 @@ export function runProduction(profile: PlayerProfile, companyId: string, batches
   const plannedProductQuantity = profile.productionOrders
     .filter((order) => order.status === 'active' && order.productId === product.id)
     .reduce((sum, order) => sum + order.outputQuantity, 0);
-  const outputQuantity = batches * recipe.outputQuantity;
+  const outputQuantity = Math.max(recipe.outputQuantity, Math.round(batches * recipe.outputQuantity * getSynergyProductionMultiplier(profile)));
   if (currentProductQuantity + plannedProductQuantity + outputQuantity > product.storageLimit) {
     return failure(profile, 'storage-limit', `سعة تخزين ${product.name} لا تكفي للإنتاج المخطط؛ المتاح ${Math.max(0, product.storageLimit - currentProductQuantity - plannedProductQuantity)} ${product.unit}.`);
   }
@@ -616,7 +617,7 @@ export function getDayBriefing(profile: PlayerProfile): DayBriefing {
   const day = profile.day + 1;
   const multiplier = findCountry(profile.countryId)?.economy.operatingCostMultiplier ?? 1;
   const managedCompanyIds = new Set(profile.staff.filter((member) => member.status === 'active' && member.role === 'manager' && member.companyId).map((member) => member.companyId));
-  const operatingCost = profile.companies.reduce((sum, company) => sum + (company.operatingCostPerDay ?? 0) * (managedCompanyIds.has(company.id) ? 0.92 : 1), 0) * multiplier * getOperatingCostProgression(profile.day);
+  const operatingCost = profile.companies.reduce((sum, company) => sum + (company.operatingCostPerDay ?? 0) * (managedCompanyIds.has(company.id) ? 0.92 : 1), 0) * multiplier * getOperatingCostProgression(profile.day) * getSynergyOperatingMultiplier(profile);
   const maturingInvestments = profile.investments
     .filter((investment) => investment.status === 'active' && investment.maturityDay <= day)
     .map((investment) => ({ id: investment.id, name: findInvestment(investment.investmentTypeId)?.name ?? investment.investmentTypeId }));
@@ -954,6 +955,19 @@ export function deliverContract(profile: PlayerProfile, contractId: string): Gam
     profile.bankBalance + revenue - tax + achievements.bonus,
   );
   return success(syncTasks(nextProfile), `تم تسليم العقد بنجاح. الإيراد ${grossRevenue.toLocaleString('ar-EG')} ج.م والعلاوة ${contract.reward.toLocaleString('ar-EG')} ج.م بعد احتساب الضريبة والتكلفة.`, completed);
+}
+
+export function negotiateContract(profile: PlayerProfile, contractId: string, mode: 'price' | 'deadline' | 'quality'): GameResult<BusinessContract> {
+  const contract = (profile.contracts ?? []).find((item) => item.id === contractId && item.status === 'active');
+  if (!contract) return failure(profile, 'not-found', 'العقد غير موجود أو تمت تسويته.');
+  if (contract.negotiated) return failure(profile, 'already-owned', 'تم التفاوض على هذا العقد من قبل.');
+  const changes = mode === 'price'
+    ? { unitPrice: Math.round(contract.unitPrice * 1.08), negotiationNote: 'رفع السعر 8% مقابل قبول العميل بمهلة وشروط العقد نفسها.' }
+    : mode === 'deadline'
+      ? { deadlineDay: contract.deadlineDay + 1, reward: Math.round(contract.reward * 0.95), negotiationNote: 'تمديد يوم واحد مقابل خفض علاوة التسليم 5%.' }
+      : { minimumQuality: Math.max(0, (contract.minimumQuality ?? 90) - 5), reward: Math.round(contract.reward * 0.92), negotiationNote: 'خفض الجودة المطلوبة 5 نقاط مقابل خفض العلاوة 8%.' };
+  const updated = { ...contract, ...changes, negotiated: true };
+  return success({ ...profile, contracts: profile.contracts.map((item) => item.id === contractId ? updated : item) }, `تم التفاوض: ${updated.negotiationNote}`, updated);
 }
 
 export function claimTask(profile: PlayerProfile, taskId: string): GameResult<TaskOutcome> {

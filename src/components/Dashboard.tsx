@@ -9,6 +9,7 @@ import { selectEmpirePoints, selectEmpirePulse, selectOperationsSnapshot } from 
 import { getSectionUnlockHint, getUnlockedSectionIds } from '../game/onboarding';
 import { selectNotifications } from '../game/notifications';
 import { NotificationCenter } from './NotificationCenter';
+import { getSynergyBonuses } from '../game/synergy';
 
 interface DashboardProps {
   profile: PlayerProfile;
@@ -28,6 +29,7 @@ export function Dashboard({ profile, country, onNavigate }: DashboardProps) {
   const unpaidSalary = profile.staff.filter((employee) => employee.status === 'active').reduce((sum, employee) => sum + (employee.unpaidSalary ?? 0), 0);
   const totalOutstanding = profile.payables + unpaidSalary;
   const notifications = selectNotifications(profile);
+  const synergies = getSynergyBonuses(profile);
   const ledgerDay = (occurredAt: string) => {
     const createdAt = Date.parse(profile.createdAt);
     const entryAt = Date.parse(occurredAt);
@@ -53,6 +55,8 @@ export function Dashboard({ profile, country, onNavigate }: DashboardProps) {
       {totalOutstanding > 0 && <div className="operating-warning" role="status">لديك التزامات ورواتب غير مسددة بقيمة {formatMoney(totalOutstanding, country)}؛ أُوقفت الطاقة مؤقتًا، وتُخصم الالتزامات من السيولة الجديدة.</div>}
 
       <NotificationCenter notifications={notifications} onNavigate={onNavigate} />
+
+      {synergies.length > 0 && <section className="surface synergy-panel"><div className="panel-heading"><div><span className="section-kicker">ميزة تشغيلية</span><h2>التآزر بين الشركات</h2></div><span className="notification-count">{synergies.length} نشط</span></div><div className="economy-list">{synergies.map((synergy) => <article className="economy-card economy-card--soft" key={synergy.id}><div className="economy-card-head"><div className="economy-card-title"><span className="economy-card-icon"><Icon name="company" size={17} /></span><span><strong>{synergy.title}</strong><small>{synergy.description}</small></span></div><span className="economy-pill economy-pill--green">تكلفة −{Math.round((1 - synergy.costMultiplier) * 100)}%</span></div></article>)}</div></section>}
 
       <section className={`operations-next operations-next--${operations.nextStep.tone}`}>
         <div className="operations-next-mark"><Icon name="target" size={21} /></div>

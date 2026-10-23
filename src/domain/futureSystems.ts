@@ -214,6 +214,8 @@ export interface BusinessContract {
   status: ContractStatus;
   completedOnDay?: number;
   failedOnDay?: number;
+  negotiated?: boolean;
+  negotiationNote?: string;
 }
 
 export interface AchievementRecord {
