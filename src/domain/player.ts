@@ -17,6 +17,7 @@ import type {
   AchievementRecord,
   OnboardingProgress,
 } from './futureSystems';
+import type { SpeedCardStack } from './accountFeatures';
 
 export interface PlayerAsset {
   id: string;
@@ -52,6 +53,8 @@ export interface PlayerCompany {
 
 export interface PlayerProfile {
   id: string;
+  /** Public support/admin identifier; never contains the user's email. */
+  accountCode: string;
   name: string;
   level: number;
   countryId: CountryId;
@@ -60,6 +63,9 @@ export interface PlayerProfile {
   payables: number;
   goldGrams: number;
   goldCostBasis: number;
+  diamonds: number;
+  speedCards: SpeedCardStack[];
+  badges: string[];
   assets: PlayerAsset[];
   lands: PlayerLand[];
   companies: PlayerCompany[];
@@ -105,6 +111,7 @@ export function createNewPlayer(
   const createdAt = now.toISOString();
   return {
     id: createId(),
+    accountCode: '',
     name: playerName.trim() || 'المستثمر الجديد',
     level: 1,
     countryId: country.id,
@@ -113,6 +120,9 @@ export function createNewPlayer(
     payables: 0,
     goldGrams: 0,
     goldCostBasis: 0,
+    diamonds: 0,
+    speedCards: [],
+    badges: [],
     assets: [],
     lands: [],
     companies: [],

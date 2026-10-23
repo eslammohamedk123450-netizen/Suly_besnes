@@ -98,9 +98,13 @@ export function SectionPage({ section, profile, country, notificationTheme, isGu
       <EconomyPanel title="ملف اللاعب" description="إعدادات هذا العالم المحلي المحفوظ على الجهاز.">
         <div className="settings-card settings-card--inner">
           <div className="settings-row"><span>اسم المستثمر</span><strong>{profile.name}</strong></div>
+          <div className="settings-row"><span>معرّف الحساب للدعم</span><strong className="account-code-value">{profile.accountCode}</strong></div>
           <div className="settings-row"><span>الدولة الأساسية</span><strong>{country.flag} {country.name} · {country.currency.code}</strong></div>
           <div className="settings-row"><span>اليوم داخل العالم</span><strong>{formatNumber(profile.day)}</strong></div>
           <div className="settings-row"><span>المستوى</span><strong>{formatNumber(profile.level)}</strong></div>
+          <div className="settings-row"><span>الماس</span><strong>{formatNumber(profile.diamonds)}</strong></div>
+          <div className="settings-row"><span>بطاقات التسريع</span><strong>{formatNumber(profile.speedCards.reduce((sum, stack) => sum + stack.quantity, 0))}</strong></div>
+          <div className="settings-row"><span>الشارات الخاصة</span><strong>{formatNumber(profile.badges.length)}</strong></div>
           <div className="settings-row"><span>طريقة الحفظ</span><strong className="saved-status"><span /> {isGuest ? 'ضيف · محلي فقط' : 'محلي ومزامنة سحابية'}</strong></div>
           <div className="settings-note"><Icon name="shield" size={17} /><p>{isGuest ? 'عالم الضيف محفوظ على هذا الجهاز. اربط حسابًا سحابيًا لنسخ العالم واستعادته على أجهزة أخرى.' : 'يُحفظ العالم محليًا ويُزامن سحابيًا عند الاتصال؛ اللعب الأساسي متاح دون اتصال.'}</p></div>
           {isGuest && <button className="button button-primary account-link-button" type="button" onClick={onLinkAccount}>ربط الحساب ونسخ العالم سحابيًا</button>}

@@ -8,7 +8,7 @@ export async function loadRemoteGame(accountId: string): Promise<PlayerProfile |
 }
 
 export async function saveRemoteGame(accountId: string, profile: PlayerProfile): Promise<boolean> {
-  const { error } = await supabase.from('game_profiles').upsert({ user_id: accountId, player_name: profile.name, game_day: profile.day, save_data: profile, updated_at: new Date().toISOString() }, { onConflict: 'user_id' });
+  const { error } = await supabase.from('game_profiles').upsert({ user_id: accountId, account_code: profile.accountCode, player_name: profile.name, game_day: profile.day, save_data: profile, updated_at: new Date().toISOString() }, { onConflict: 'user_id' });
   return !error;
 }
 

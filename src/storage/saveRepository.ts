@@ -2,6 +2,7 @@ import { findCountry, type CountryId, type IndustryId } from '../domain/countrie
 import type { PlayerAsset, PlayerCompany, PlayerLand, PlayerProfile } from '../domain/player';
 import type { AchievementRecord, AuctionBidRecord, BusinessContract, DepositRecord, FinanceLedgerEntry, InventoryLot, InvestmentRecord, LicenseRecord, LoanRecord, OnboardingProgress, ProductSale, ProductionOrder, StaffContract, TaskProgress } from '../domain/futureSystems';
 import { findIndustry, GOLD_PRICE_PER_GRAM } from '../game/catalog';
+import { normalizeAccountFeatures } from '../domain/accountFeatures';
 
 const SAVE_KEY = 'business-empire.save.v1';
 const SAVE_VERSION = 4;
@@ -262,8 +263,9 @@ function migrateProfile(value: unknown): PlayerProfile | null {
   const auctionHistory = Array.isArray(value.auctionHistory) && value.auctionHistory.every(isAuctionBidRecord) ? value.auctionHistory : [];
   const redeemedCodeIds = Array.isArray(value.redeemedCodeIds) && value.redeemedCodeIds.every(isNonEmptyString) ? value.redeemedCodeIds : [];
 
-  return {
+  return normalizeAccountFeatures({
     id: value.id as string,
+    accountCode: typeof value.accountCode === 'string' ? value.accountCode : '',
     name: value.name as string,
     level: value.level as number,
     countryId,
@@ -272,6 +274,9 @@ function migrateProfile(value: unknown): PlayerProfile | null {
     payables: isFiniteNonNegative(value.payables) ? value.payables : 0,
     goldGrams: value.goldGrams as number,
     goldCostBasis: isFiniteNonNegative(value.goldCostBasis) ? value.goldCostBasis : (value.goldGrams as number) * GOLD_PRICE_PER_GRAM,
+    diamonds: isFiniteNonNegative(value.diamonds) ? Math.floor(value.diamonds) : 0,
+    speedCards: Array.isArray(value.speedCards) ? value.speedCards as PlayerProfile['speedCards'] : [],
+    badges: Array.isArray(value.badges) ? value.badges.filter(isNonEmptyString) : [],
     assets: value.assets as PlayerAsset[],
     lands,
     companies,
@@ -294,7 +299,7 @@ function migrateProfile(value: unknown): PlayerProfile | null {
     contracts: Array.isArray(value.contracts) && value.contracts.every(isBusinessContract) ? value.contracts : [],
     achievements: Array.isArray(value.achievements) && value.achievements.every(isAchievement) ? value.achievements : [],
     onboarding: isOnboardingProgress(value.onboarding) ? value.onboarding : { introCompleted: true, chapter: 1, seenGuides: [] },
-  };
+  }, typeof value.accountCode === 'string' ? value.accountCode : value.id as string);
 }
 
 function isProfile(value: unknown): value is PlayerProfile {

@@ -22,6 +22,7 @@ import { StoryIntro } from './components/StoryIntro';
 import { SystemGuideModal } from './components/SystemGuideModal';
 import { StarterMissionDock } from './components/StarterMissionDock';
 import { chapterFor, getSectionUnlockHint, getUnlockedSectionIds, isSectionUnlocked } from './game/onboarding';
+import { normalizeAccountFeatures } from './domain/accountFeatures';
 
 export default function App() {
   const [account, setAccount] = useState<LocalAccount | null>(null);
@@ -42,7 +43,7 @@ export default function App() {
       setAccount(current);
       const local = current ? loadSavedGame(current.id) : null;
       const remote = current && !current.isGuest ? await loadRemoteGame(current.id) : null;
-      setProfile(remote ?? local);
+      setProfile(remote || local ? normalizeAccountFeatures(remote ?? local!, current?.id) : null);
       setAuthLoading(false);
     });
   }, []);
@@ -51,7 +52,7 @@ export default function App() {
     setAccount(nextAccount);
     const local = loadSavedGame(nextAccount.id);
     const remote = nextAccount.isGuest ? null : await loadRemoteGame(nextAccount.id);
-    setProfile(remote ?? local);
+    setProfile(remote || local ? normalizeAccountFeatures(remote ?? local!, nextAccount.id) : null);
     setActiveSection('home');
     setNotice('تم تسجيل الدخول مباشرة.');
     setNoticeTone('success');
@@ -60,7 +61,8 @@ export default function App() {
   function handlePlayAsGuest() {
     const guest = createGuestAccount();
     setAccount(guest);
-    setProfile(loadSavedGame(guest.id));
+    const guestProfile = loadSavedGame(guest.id);
+    setProfile(guestProfile ? normalizeAccountFeatures(guestProfile, guest.id) : null);
     setLinkingAccount(false);
     setNotice('بدأت جلسة ضيف. تقدمك محفوظ محليًا على هذا الجهاز فقط.');
     setNoticeTone('success');
@@ -75,12 +77,12 @@ export default function App() {
     const guestProfile = profile ?? loadSavedGame(account.id);
     const existingCloudProfile = await loadRemoteGame(nextAccount.id);
     if (existingCloudProfile) {
-      setProfile(existingCloudProfile);
+      setProfile(existingCloudProfile ? normalizeAccountFeatures(existingCloudProfile, nextAccount.id) : null);
       setNotice('تم فتح عالم الحساب السحابي الموجود. حفظ الضيف لم يُحذف من هذا الجهاز.');
     } else if (guestProfile) {
       saveGame(guestProfile, nextAccount.id);
       const synchronized = await saveRemoteGame(nextAccount.id, guestProfile);
-      setProfile(guestProfile);
+      setProfile(normalizeAccountFeatures(guestProfile, nextAccount.id));
       setNotice(synchronized ? 'تم ربط الحساب ونسخ عالم الضيف إلى الحفظ السحابي.' : 'تم ربط الحساب وحفظ العالم محليًا؛ ستتم المزامنة عند عودة الاتصال.');
     } else {
       setProfile(null);
@@ -108,7 +110,7 @@ export default function App() {
   function startNewWorld() {
     const chosenCountry = findCountry(selectedCountryId);
     if (!chosenCountry) return;
-    const newProfile = createNewPlayer(chosenCountry, playerName);
+    const newProfile = normalizeAccountFeatures(createNewPlayer(chosenCountry, playerName), account?.id);
     const result = saveGame(newProfile, account?.id);
     if (account && !account.isGuest) void saveRemoteGame(account.id, newProfile);
     setProfile(newProfile);
