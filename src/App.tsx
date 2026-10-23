@@ -169,6 +169,7 @@ export default function App() {
     if (!profile) return;
     let current = profile;
     let completedDays = 0;
+    let latestDayMessage = '';
     for (let index = 0; index < days; index += 1) {
       const result = advanceDay(current);
       if (!result.ok) {
@@ -178,12 +179,15 @@ export default function App() {
       }
       current = result.profile;
       completedDays += 1;
+      latestDayMessage = result.message;
     }
     if (completedDays === 0) return;
     const saved = saveGame(current, account?.id);
     if (account && !account.isGuest) void saveRemoteGame(account.id, current);
     setProfile(current);
-    setNotice(saved.ok ? `تم ترحيل ${completedDays} ${completedDays === 1 ? 'يوم تلقائيًا' : 'أيام تلقائيًا'} بعد مرور 24 دقيقة حقيقية.` : 'تم ترحيل الأيام، لكن تعذر تثبيت الحفظ على هذا الجهاز.');
+    const elapsedLabel = `${completedDays} ${completedDays === 1 ? 'يوم تلقائيًا' : 'أيام تلقائيًا'}`;
+    const summary = completedDays > 1 ? `تم ترحيل ${elapsedLabel}. آخر ملخص: ${latestDayMessage}` : latestDayMessage;
+    setNotice(saved.ok ? summary : `${summary} تعذر تثبيت الحفظ على هذا الجهاز.`);
     setNoticeTone(saved.ok ? 'success' : 'error');
   }
 
