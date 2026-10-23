@@ -266,6 +266,7 @@ export function placeBid(profile: PlayerProfile, listingId: string, amount: numb
     areaSquareMeters: listing.areaSquareMeters,
     purchasePrice: amount,
     acquiredAt,
+    acquiredOnDay: profile.day,
     landType: listing.landType,
   };
   const nextProfile = addLedger(
@@ -289,7 +290,7 @@ export function buyDirectLand(profile: PlayerProfile, listingId: string): GameRe
   if (!listing) return failure(profile, 'not-found', 'عرض الأرض غير موجود.');
   if (profile.lands.some((land) => land.id === listing.id)) return failure(profile, 'already-owned', 'تم شراء هذه الأرض بالفعل.');
   if (profile.bankBalance < listing.price) return failure(profile, 'insufficient-funds', 'لا يكفي رصيدك لشراء الأرض مباشرة.');
-  const land: PlayerLand = { id: listing.id, label: listing.label, areaSquareMeters: listing.areaSquareMeters, purchasePrice: listing.price, acquiredAt: timestampFor(profile), landType: listing.landType };
+  const land: PlayerLand = { id: listing.id, label: listing.label, areaSquareMeters: listing.areaSquareMeters, purchasePrice: listing.price, acquiredAt: timestampFor(profile), acquiredOnDay: profile.day, landType: listing.landType };
   const nextProfile = addLedger(
     { ...profile, lands: [...profile.lands, land] },
     [ledgerEntry(profile, 'asset', listing.price, `شراء أرض مباشر: ${listing.label}`, 0)],
@@ -308,7 +309,7 @@ export function buyDirectCompany(profile: PlayerProfile, listingId: string): Gam
   if (profile.bankBalance < listing.price) return failure(profile, 'insufficient-funds', 'لا يكفي رصيدك لشراء الشركة مباشرة.');
   const landId = `${listing.id}-land`;
   const licenseId = `${listing.id}-license`;
-  const land: PlayerLand = { id: landId, label: `${listing.name} · أرض الشركة`, areaSquareMeters: listing.areaSquareMeters, purchasePrice: Math.floor(listing.price * 0.45), acquiredAt: timestampFor(profile), landType: listing.landType };
+  const land: PlayerLand = { id: landId, label: `${listing.name} · أرض الشركة`, areaSquareMeters: listing.areaSquareMeters, purchasePrice: Math.floor(listing.price * 0.45), acquiredAt: timestampFor(profile), acquiredOnDay: profile.day, landType: listing.landType };
   const company: PlayerCompany = { id: listing.id, name: listing.name, industryId: listing.industryId, countryId: profile.countryId, foundedAt: timestampFor(profile), landId, licenseIds: [licenseId], energyUnits: industry.energyCapacity, energyCapacity: industry.energyCapacity, operatingCostPerDay: industry.dailyOperatingCost };
   const license = { id: licenseId, countryId: profile.countryId, industryId: listing.industryId, feePaid: Math.floor(listing.price * 0.15), issuedAt: timestampFor(profile) };
   const nextProfile = addLedger(

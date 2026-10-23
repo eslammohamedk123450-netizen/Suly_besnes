@@ -32,6 +32,8 @@ export interface PlayerLand {
   areaSquareMeters: number;
   purchasePrice: number;
   acquiredAt: string;
+  /** Day on which the land entered the player's empire; optional for legacy saves. */
+  acquiredOnDay?: number;
   landType?: 'industrial' | 'agricultural' | 'commercial';
 }
 

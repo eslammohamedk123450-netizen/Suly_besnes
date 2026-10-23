@@ -7,6 +7,8 @@ import { GAME_SECTIONS, type SectionId } from '../domain/navigation';
 import { Icon } from './Icon';
 import { selectEmpirePoints, selectEmpirePulse, selectOperationsSnapshot } from '../game/selectors';
 import { getSectionUnlockHint, getUnlockedSectionIds } from '../game/onboarding';
+import { selectNotifications } from '../game/notifications';
+import { NotificationCenter } from './NotificationCenter';
 
 interface DashboardProps {
   profile: PlayerProfile;
@@ -25,6 +27,7 @@ export function Dashboard({ profile, country, onNavigate }: DashboardProps) {
   const empirePoints = selectEmpirePoints(profile);
   const unpaidSalary = profile.staff.filter((employee) => employee.status === 'active').reduce((sum, employee) => sum + (employee.unpaidSalary ?? 0), 0);
   const totalOutstanding = profile.payables + unpaidSalary;
+  const notifications = selectNotifications(profile);
   const ledgerDay = (occurredAt: string) => {
     const createdAt = Date.parse(profile.createdAt);
     const entryAt = Date.parse(occurredAt);
@@ -48,6 +51,8 @@ export function Dashboard({ profile, country, onNavigate }: DashboardProps) {
       </section>
 
       {totalOutstanding > 0 && <div className="operating-warning" role="status">لديك التزامات ورواتب غير مسددة بقيمة {formatMoney(totalOutstanding, country)}؛ أُوقفت الطاقة مؤقتًا، وتُخصم الالتزامات من السيولة الجديدة.</div>}
+
+      <NotificationCenter notifications={notifications} onNavigate={onNavigate} />
 
       <section className={`operations-next operations-next--${operations.nextStep.tone}`}>
         <div className="operations-next-mark"><Icon name="target" size={21} /></div>

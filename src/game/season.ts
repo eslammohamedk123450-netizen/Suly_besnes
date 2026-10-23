@@ -13,16 +13,29 @@ export interface SeasonChallenge {
   description: string;
   points: number;
   reward: number;
-  available: (profile: PlayerProfile) => boolean;
+  available: (profile: PlayerProfile, season: SeasonProgress) => boolean;
+}
+
+function happenedOnDay(day: number | undefined, profile: PlayerProfile, occurredAt?: string): boolean {
+  if (day !== undefined) return day === profile.day;
+  if (!occurredAt) return false;
+  const createdAt = Date.parse(profile.createdAt);
+  const eventAt = Date.parse(occurredAt);
+  return Number.isFinite(createdAt) && Number.isFinite(eventAt)
+    && Math.max(1, Math.floor((eventAt - createdAt) / 86_400_000) + 1) === profile.day;
+}
+
+function startedInSeason(day: number | undefined, season: SeasonProgress): boolean {
+  return day !== undefined && day >= season.startedOnDay && day <= season.endsOnDay;
 }
 
 export const SEASON_CHALLENGES: readonly SeasonChallenge[] = [
-  { id: 'daily-empire', kind: 'daily', title: 'حرّك الإمبراطورية', description: 'امتلك شركة أو أرضًا لتثبت أن الإمبراطورية تتحرك.', points: 10, reward: 10_000, available: (profile) => profile.companies.length > 0 || profile.lands.length > 0 },
-  { id: 'daily-market', kind: 'daily', title: 'نبض السوق', description: 'نفّذ عملية بيع واحدة في السوق.', points: 15, reward: 15_000, available: (profile) => profile.sales.length > 0 },
-  { id: 'daily-auction', kind: 'daily', title: 'صوت المطرقة', description: 'شارك في مزاد واحد على الأقل.', points: 15, reward: 15_000, available: (profile) => profile.auctionHistory.length > 0 },
-  { id: 'weekly-builder', kind: 'weekly', title: 'موسّع الأعمال', description: 'أسس شركتين على الأقل خلال الموسم.', points: 45, reward: 45_000, available: (profile) => profile.companies.length >= 2 },
-  { id: 'weekly-operator', kind: 'weekly', title: 'قائد التشغيل', description: 'شغّل أمر إنتاج واحد على الأقل.', points: 35, reward: 35_000, available: (profile) => profile.productionOrders.length > 0 },
-  { id: 'weekly-investor', kind: 'weekly', title: 'عين على المستقبل', description: 'أنشئ استثمارًا أو وديعة محاكاة.', points: 30, reward: 30_000, available: (profile) => profile.investments.length > 0 || profile.banking.deposits.length > 0 },
+  { id: 'daily-empire', kind: 'daily', title: 'حرّك الإمبراطورية', description: 'امتلك شركة أو أرضًا لتثبت أن الإمبراطورية تتحرك.', points: 10, reward: 10_000, available: (profile) => profile.companies.some((item) => happenedOnDay(item.foundedOnDay, profile, item.foundedAt)) || profile.lands.some((item) => happenedOnDay(item.acquiredOnDay, profile, item.acquiredAt)) },
+  { id: 'daily-market', kind: 'daily', title: 'نبض السوق', description: 'نفّذ عملية بيع واحدة في السوق.', points: 15, reward: 15_000, available: (profile) => profile.sales.some((item) => happenedOnDay(item.soldOnDay, profile, item.soldAt)) },
+  { id: 'daily-auction', kind: 'daily', title: 'صوت المطرقة', description: 'شارك في مزاد واحد على الأقل.', points: 15, reward: 15_000, available: (profile) => profile.auctionHistory.some((item) => item.bidder === 'player' && item.day === profile.day) },
+  { id: 'weekly-builder', kind: 'weekly', title: 'موسّع الأعمال', description: 'أسس شركتين على الأقل خلال الموسم.', points: 45, reward: 45_000, available: (profile, season) => profile.companies.filter((item) => startedInSeason(item.foundedOnDay, season)).length >= 2 },
+  { id: 'weekly-operator', kind: 'weekly', title: 'قائد التشغيل', description: 'شغّل أمر إنتاج واحد على الأقل.', points: 35, reward: 35_000, available: (profile, season) => profile.productionOrders.some((item) => startedInSeason(item.startedOnDay, season)) },
+  { id: 'weekly-investor', kind: 'weekly', title: 'عين على المستقبل', description: 'أنشئ استثمارًا أو وديعة محاكاة.', points: 30, reward: 30_000, available: (profile, season) => profile.investments.some((item) => startedInSeason(item.startedOnDay, season)) || profile.banking.deposits.some((item) => startedInSeason(item.startedOnDay, season)) },
 ];
 
 export const LOGIN_REWARDS = [
@@ -60,7 +73,7 @@ export function getSeasonSnapshot(profile: PlayerProfile) {
     const claimed = challenge.kind === 'daily'
       ? season.claimedChallengeKeys.includes(key)
       : season.claimedChallengeKeys.includes(challenge.id);
-    return { ...challenge, claimed, available: !claimed && challenge.available(profile) };
+    return { ...challenge, claimed, available: !claimed && challenge.available(profile, season) };
   });
   const nextReward = Math.min(100, 100 - (season.points % 100));
   return { season, challenges, nextReward, progressPercent: Math.min(100, season.points % 100), loginRewardClaimed: season.claimedLoginRewardDay === profile.day };
