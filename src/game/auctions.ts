@@ -3,15 +3,16 @@ import type { PlayerProfile } from '../domain/player';
 import { AUCTION_CATALOG } from './catalog';
 import { GAME_DAY_MS } from './time';
 
-const DAY_MS = GAME_DAY_MS;
+const REGULAR_AUCTION_LIFETIME_DAYS = 7;
 
 export function getAuctionCloseAt(profile: PlayerProfile, listing: AuctionListing): string {
-  const base = Date.parse(profile.createdAt);
-  const safeBase = Number.isFinite(base) ? base : Date.now();
-  const cycleStart = safeBase + Math.max(0, profile.day - 1) * DAY_MS;
-  const index = Math.max(0, AUCTION_CATALOG.findIndex((item) => item.id === listing.id));
-  const closeHour = Math.min(23, 20 + index);
-  return new Date(cycleStart + closeHour * 60 * 60 * 1000).toISOString();
+  const parsedStart = Date.parse(profile.createdAt);
+  const worldStart = Number.isFinite(parsedStart) ? parsedStart : Date.now();
+  const dailyListing = listing.id.match(/^season-rare-(\d+)$/);
+  const closeAt = dailyListing
+    ? worldStart + Number(dailyListing[1]) * GAME_DAY_MS
+    : worldStart + REGULAR_AUCTION_LIFETIME_DAYS * GAME_DAY_MS;
+  return new Date(closeAt).toISOString();
 }
 
 function wasWon(profile: PlayerProfile, listingId: string): boolean {
@@ -21,7 +22,7 @@ function wasWon(profile: PlayerProfile, listingId: string): boolean {
 }
 
 export function getAuctionListings(profile: PlayerProfile): AuctionListing[] {
-  // الفوز يستهلك المزاد نهائيًا؛ لا نعيد إدراج نفس السلعة تلقائيًا.
+  // تفوز كل سلعة مرة واحدة؛ العروض الموسمية الجديدة لها معرّف وموعد إغلاق لكل يوم.
   const regular = AUCTION_CATALOG.filter((base) => !wasWon(profile, base.id));
   const rareId = `season-rare-${profile.day}`;
   const rare: AuctionListing = {
@@ -33,7 +34,7 @@ export function getAuctionListings(profile: PlayerProfile): AuctionListing[] {
     areaSquareMeters: 0,
     minimumBid: 450_000 + (profile.day % 3) * 25_000,
     bidIncrement: 25_000,
-    closesAt: '2099-12-31T00:00:00.000Z',
+    closesAt: new Date(Date.parse(profile.createdAt) + profile.day * GAME_DAY_MS).toISOString(),
     status: 'open',
     energyCapacityBonus: 90,
   };

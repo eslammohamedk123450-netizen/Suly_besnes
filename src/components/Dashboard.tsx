@@ -6,6 +6,7 @@ import { GOLD_PRICE_PER_GRAM } from '../game/catalog';
 import { GAME_SECTIONS, type SectionId } from '../domain/navigation';
 import { Icon } from './Icon';
 import { selectEmpirePulse, selectOperationsSnapshot } from '../game/selectors';
+import { getSectionUnlockHint, getUnlockedSectionIds } from '../game/onboarding';
 
 interface DashboardProps {
   profile: PlayerProfile;
@@ -17,6 +18,7 @@ export function Dashboard({ profile, country, onNavigate }: DashboardProps) {
   const totalAssets = calculateTotalAssets(profile);
   const goldMarketValue = Math.round(profile.goldGrams * GOLD_PRICE_PER_GRAM);
   const quickSections = GAME_SECTIONS.filter((section) => section.id !== 'home');
+  const unlockedSections = new Set(getUnlockedSectionIds(profile));
   const latestEntries = profile.ledger.slice(-5).reverse();
   const operations = selectOperationsSnapshot(profile, country.economy.operatingCostMultiplier ?? 1);
   const pulse = selectEmpirePulse(profile);
@@ -112,12 +114,13 @@ export function Dashboard({ profile, country, onNavigate }: DashboardProps) {
       <section className="sections-area">
         <div className="panel-heading sections-heading"><div><span className="section-kicker">إدارة الإمبراطورية</span><h2>أنظمة اللعبة</h2></div><span className="phase-pill">تعمل دون إنترنت</span></div>
         <div className="section-cards">
-          {quickSections.map((section) => (
-            <button className={`section-card${section.id === 'settings' ? ' section-card--settings' : ''}`} type="button" key={section.id} onClick={() => onNavigate(section.id)}>
-              <span className="section-card-copy"><strong>{section.label}</strong><small>{section.subtitle}</small></span>
-              <Icon name="chevron" size={17} className="section-chevron" />
-            </button>
-          ))}
+          {quickSections.map((section) => {
+            const unlocked = unlockedSections.has(section.id);
+            return <button className={`section-card${section.id === 'settings' ? ' section-card--settings' : ''}${unlocked ? '' : ' is-locked'}`} type="button" key={section.id} onClick={() => onNavigate(section.id)} aria-disabled={!unlocked} title={unlocked ? section.subtitle : getSectionUnlockHint(profile, section.id)}>
+              <span className="section-card-copy"><strong>{section.label}</strong><small>{unlocked ? section.subtitle : getSectionUnlockHint(profile, section.id)}</small></span>
+              <Icon name={unlocked ? 'chevron' : 'lock'} size={17} className="section-chevron" />
+            </button>;
+          })}
         </div>
       </section>
       <p className="data-footnote">الأرصدة والأسعار والأحداث محاكاة لأغراض اللعبة <span>·</span> تقدمك محفوظ محليًا على هذا الجهاز</p>

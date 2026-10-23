@@ -24,7 +24,7 @@ export function StoryIntro({ profile, onComplete }: StoryIntroProps) {
       <div className="story-dialogue"><span className="story-quote">“</span><p>{dialogue}</p></div>
       {page === 2 && <div className="story-missions"><div className="story-missions-heading"><span className="section-kicker">مهمتك الأولى</span><strong>أعد بناء الأساس</strong></div>{missions.slice(0, 3).map((mission, index) => <div className="story-mission" key={mission.id}><span className={`story-mission-number${mission.completed ? ' is-done' : ''}`}>{mission.completed ? '✓' : index + 1}</span><span><strong>{mission.title}</strong><small>{mission.description}</small></span></div>)}</div>}
       <div className="story-intro-actions">{page > 0 && <button className="button button-secondary" type="button" onClick={() => setPage((value) => value - 1)}>السابق</button>}{page < 2 ? <button className="button button-primary" type="button" onClick={() => setPage((value) => value + 1)}>تابع القصة <Icon name="arrow" size={17} /></button> : <button className="button button-primary" type="button" onClick={onComplete}>أبدأ الفصل الأول <Icon name="arrow" size={17} /></button>}</div>
-      <p className="story-intro-note"><Icon name="shield" size={15} /> يمكنك متابعة القصة والمهام لاحقًا من قسم المهام.</p>
+      <p className="story-intro-note"><Icon name="shield" size={15} /> تابع مهمات الفصل من لوحة المهام العائمة على الشاشة.</p>
     </section>
   </main>;
 }

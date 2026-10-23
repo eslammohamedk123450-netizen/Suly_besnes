@@ -7,6 +7,7 @@ import { formatMoney, formatNumber } from '../domain/formatters';
 import { AUCTION_BID_STEP, AUCTION_DEFAULT_LEAD } from '../game/time';
 import { MATERIAL_CATALOG } from '../game/catalog';
 import { Icon } from './Icon';
+import { useDialogA11y } from './useDialogA11y';
 
 interface AuctionRoomProps {
   profile: PlayerProfile;
@@ -47,6 +48,8 @@ export function AuctionRoom({ profile, country, listing, onClose, onBid }: Aucti
   const pendingAmountRef = useRef(0);
   const lastBotAtRef = useRef(Date.now());
   const botIndexRef = useRef(0);
+  const dialogRef = useRef<HTMLElement | null>(null);
+  useDialogA11y(dialogRef, onClose);
 
   useEffect(() => { currentBidRef.current = currentBid; }, [currentBid]);
   useEffect(() => { roundEndsAtRef.current = roundEndsAt; }, [roundEndsAt]);
@@ -123,7 +126,7 @@ export function AuctionRoom({ profile, country, listing, onClose, onBid }: Aucti
   const seatNames = useMemo(() => ['أنت', ...AI_PARTICIPANTS.slice(0, 3)], []);
   return (
     <div className="auction-room-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
-      <section className="auction-room" role="dialog" aria-modal="true" aria-labelledby="auction-room-title" dir="rtl">
+      <section ref={dialogRef} className="auction-room" role="dialog" aria-modal="true" aria-labelledby="auction-room-title" dir="rtl" tabIndex={-1}>
         <header className="auction-room-header"><div><span className="section-kicker">قاعة المزاد · منافسون خياليون</span><h2 id="auction-room-title">{listing.label}</h2><p>{lotSummary}</p></div><button className="icon-button auction-room-close" type="button" onClick={onClose} aria-label="إغلاق قاعة المزاد"><Icon name="close" size={19} /></button></header>
         <div className={`auction-room-status${finished ? ' auction-room-status--ended' : ''}`}><span><i className="auction-live-dot" /> {finished ? 'انتهت الجولة' : 'الجولة مفتوحة'} · {totalBids} عروض</span><strong className="auction-countdown"><Icon name="clock" size={14} /> {remainingSeconds} ثوانٍ</strong></div>
         <div className="auction-room-grid"><div className="auction-room-stage">

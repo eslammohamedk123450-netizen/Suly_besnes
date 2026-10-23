@@ -4,15 +4,44 @@ export interface LocalAccount {
   id: string;
   email: string;
   createdAt: string;
+  isGuest?: boolean;
 }
+
+const GUEST_ACCOUNT_KEY = 'business-empire.guest-account.v1';
 
 function toAccount(user: { id: string; email?: string; created_at?: string }): LocalAccount {
   return { id: user.id, email: user.email ?? '', createdAt: user.created_at ?? new Date().toISOString() };
 }
 
+function readGuestAccount(): LocalAccount | null {
+  try {
+    const raw = globalThis.localStorage?.getItem(GUEST_ACCOUNT_KEY);
+    if (!raw) return null;
+    const account = JSON.parse(raw) as Partial<LocalAccount>;
+    if (typeof account.id !== 'string' || !account.id.startsWith('guest-') || typeof account.createdAt !== 'string') return null;
+    return { id: account.id, email: '', createdAt: account.createdAt, isGuest: true };
+  } catch {
+    return null;
+  }
+}
+
+export function createGuestAccount(): LocalAccount {
+  const existing = readGuestAccount();
+  if (existing) return existing;
+  const id = `guest-${globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`}`;
+  const account: LocalAccount = { id, email: '', createdAt: new Date().toISOString(), isGuest: true };
+  try { globalThis.localStorage?.setItem(GUEST_ACCOUNT_KEY, JSON.stringify(account)); } catch { /* best effort; saveRepository reports storage failures */ }
+  return account;
+}
+
 export async function loadCurrentAccount(): Promise<LocalAccount | null> {
-  const { data } = await supabase.auth.getUser();
-  return data.user ? toAccount(data.user) : null;
+  try {
+    const { data } = await supabase.auth.getSession();
+    if (data.session?.user) return toAccount(data.session.user);
+  } catch {
+    // A local guest account remains usable when the authentication service is offline.
+  }
+  return readGuestAccount();
 }
 
 export async function registerAccount(emailInput: string, password: string): Promise<{ ok: true; account: LocalAccount } | { ok: false; message: string }> {

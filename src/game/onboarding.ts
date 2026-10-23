@@ -45,11 +45,20 @@ export function isSectionUnlocked(profile: PlayerProfile, section: SectionId): b
   return getUnlockedSectionIds(profile).includes(section);
 }
 
+export function getSectionUnlockHint(profile: PlayerProfile, section: SectionId): string {
+  if (isSectionUnlocked(profile, section)) return '';
+  if (section === 'production' || section === 'inventory' || section === 'tasks') return 'يفتح بعد تأسيس أول شركة.';
+  if (section === 'auctions' || section === 'contracts') return `يفتح في اليوم 2 (اليوم الحالي ${profile.day}).`;
+  if (section === 'bank' || section === 'investments' || section === 'obligations') return `يفتح في اليوم 3 (اليوم الحالي ${profile.day}).`;
+  if (section === 'staff' || section === 'reports') return `يفتح في اليوم 4 (اليوم الحالي ${profile.day}).`;
+  return 'أكمل خطوة الفصل الحالية لفتح هذا النظام.';
+}
+
 export function getStarterMissions(profile: PlayerProfile): StarterMission[] {
   return [
     { id: 'intro-land', title: 'استعد إرث العائلة', description: 'اشترِ أول قطعة أرض لتبدأ إعادة بناء الإمبراطورية.', section: 'lands', completed: profile.lands.length >= 1 },
     { id: 'intro-company', title: 'أعد تشغيل أول شركة', description: 'أسس شركتك الأولى واختر قطاعًا مناسبًا لرأس مالك.', section: 'companies', completed: profile.companies.length >= 1 },
-    { id: 'intro-production', title: 'أثبت أن العائلة ما زالت قادرة', description: 'شغّل أول أمر إنتاج وحوّل المواد الخام إلى منتج.', section: 'production', completed: profile.productionOrders.length >= 1 || profile.sales.length >= 1 },
+    { id: 'intro-production', title: 'أثبت أن العائلة ما زالت قادرة', description: 'شغّل أمر إنتاج لم يُلغَ وحوّل المواد الخام إلى منتج.', section: 'production', completed: profile.productionOrders.some((order) => order.status !== 'cancelled') },
     { id: 'intro-contract', title: 'استعد ثقة السوق', description: 'افتح العقود لاحقًا وقبل أول طلب تستطيع تسليمه.', section: 'contracts', completed: profile.contracts.some((contract) => contract.status === 'completed') },
   ];
 }

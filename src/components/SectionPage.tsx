@@ -24,17 +24,19 @@ interface SectionPageProps {
   profile: PlayerProfile;
   country: CountryDefinition;
   notificationTheme: NotificationTheme;
+  isGuest: boolean;
   onNotificationThemeChange: (theme: NotificationTheme) => void;
   onHome: () => void;
   onAction: (result: GameResult<unknown>) => void;
   onRedeemed: (profile: PlayerProfile, message: string, codeId: string) => Promise<boolean>;
+  onLinkAccount: () => void;
   onLogout: () => void;
 }
 
 const landTypeNames = { industrial: 'صناعية', agricultural: 'زراعية', commercial: 'تجارية' } as const;
 const ledgerLabels = { revenue: 'إيراد', expense: 'مصروف', asset: 'أصل', liability: 'التزام', settlement: 'سداد التزام' } as const;
 
-export function SectionPage({ section, profile, country, notificationTheme, onNotificationThemeChange, onHome, onAction, onRedeemed, onLogout }: SectionPageProps) {
+export function SectionPage({ section, profile, country, notificationTheme, isGuest, onNotificationThemeChange, onHome, onAction, onRedeemed, onLinkAccount, onLogout }: SectionPageProps) {
   const [bidAmounts, setBidAmounts] = useState<Record<string, string>>({});
   const [companyName, setCompanyName] = useState('شركة جديدة');
   const [industryId, setIndustryId] = useState<IndustryId>('food');
@@ -99,8 +101,9 @@ export function SectionPage({ section, profile, country, notificationTheme, onNo
           <div className="settings-row"><span>الدولة الأساسية</span><strong>{country.flag} {country.name} · {country.currency.code}</strong></div>
           <div className="settings-row"><span>اليوم داخل العالم</span><strong>{formatNumber(profile.day)}</strong></div>
           <div className="settings-row"><span>المستوى</span><strong>{formatNumber(profile.level)}</strong></div>
-          <div className="settings-row"><span>طريقة الحفظ</span><strong className="saved-status"><span /> على هذا الجهاز</strong></div>
-          <div className="settings-note"><Icon name="shield" size={17} /><p>الحساب وتقدمك محفوظان محليًا على هذا الجهاز. لا توجد أكواد تحقق لتسجيل الدخول.</p></div>
+          <div className="settings-row"><span>طريقة الحفظ</span><strong className="saved-status"><span /> {isGuest ? 'ضيف · محلي فقط' : 'محلي ومزامنة سحابية'}</strong></div>
+          <div className="settings-note"><Icon name="shield" size={17} /><p>{isGuest ? 'عالم الضيف محفوظ على هذا الجهاز. اربط حسابًا سحابيًا لنسخ العالم واستعادته على أجهزة أخرى.' : 'يُحفظ العالم محليًا ويُزامن سحابيًا عند الاتصال؛ اللعب الأساسي متاح دون اتصال.'}</p></div>
+          {isGuest && <button className="button button-primary account-link-button" type="button" onClick={onLinkAccount}>ربط الحساب ونسخ العالم سحابيًا</button>}
           <CodeRedemption profile={profile} onRedeemed={onRedeemed} />
           <PurchaseSupport />
           <div className="settings-notice-theme">

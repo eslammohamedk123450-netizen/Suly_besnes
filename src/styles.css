@@ -394,3 +394,28 @@ button:disabled { cursor: not-allowed; opacity: .55; }
 .admin-result textarea { min-height: 100px; padding: 11px; resize: vertical; font: 11px/1.7 ui-monospace, SFMono-Regular, Consolas, monospace; }
 .admin-note { margin-top: 18px; color: #8a7a4c; font-size: 9px; line-height: 1.9; }
 @media (max-width: 560px) { .admin-shell { padding: 14px; } .admin-card { padding: 22px 17px; border-radius: 16px; } .admin-card h1 { font-size: 21px; } .admin-form--grid { grid-template-columns: 1fr; } .admin-topbar .button { min-height: 34px; padding-inline: 10px; font-size: 10px; } }
+
+
+/* Accessibility and onboarding refinements */
+.account-or { display: flex; align-items: center; gap: 12px; margin: 14px 0; color: #8a96a1; font-size: 12px; }
+.account-or::before, .account-or::after { content: ''; flex: 1; height: 1px; background: #e8edf1; }
+.account-guest { width: 100%; min-height: 46px; }
+.account-cancel { display: block; width: 100%; margin-top: 12px; padding: 8px; color: #6d7c89; background: transparent; border: 0; cursor: pointer; }
+.account-link-button { width: 100%; margin: 16px 0 4px; }
+.nav-item.is-locked, .mobile-more-item.is-locked { opacity: .72; cursor: pointer; }
+.nav-item.is-locked:hover, .mobile-more-item.is-locked:hover { opacity: 1; background: #f7f9fa; }
+.section-card.is-locked { background: #f6f8fa; border-style: dashed; }
+.section-card.is-locked .section-card-copy strong { color: #6b7987; }
+.section-card.is-locked .section-card-copy small { color: #66798a; white-space: normal; line-height: 1.5; }
+.mobile-more-item > span { display: grid; gap: 3px; }
+.mobile-more-item > span small { color: #778795; font-size: 11px; line-height: 1.5; }
+@media (max-width: 760px) {
+  .nav-group-label { font-size: 10px; }
+  .section-card-copy strong { font-size: 12px; }
+  .section-card-copy small { font-size: 11px; white-space: normal; line-height: 1.5; }
+  .section-card { min-height: 68px; padding: 11px; }
+  .mobile-nav-item span { font-size: 11px; }
+  .game-day-timer-copy small { font-size: 10px; }
+  .player-level small { font-size: 10px; }
+  .settings-row > span:first-child, .settings-row strong { font-size: 12px; }
+}

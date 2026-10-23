@@ -16,12 +16,12 @@ import { formatMoney } from './domain/formatters';
 import { advanceDay, type GameResult } from './game/engine';
 import { loadSavedGame, saveGame } from './storage/saveRepository';
 import { loadNotificationTheme, saveNotificationTheme } from './storage/userPreferences';
-import { loadCurrentAccount, logoutAccount, type LocalAccount } from './storage/authRepository';
+import { createGuestAccount, loadCurrentAccount, logoutAccount, type LocalAccount } from './storage/authRepository';
 import { loadRemoteGame, redeemRemoteReward, saveRemoteGame } from './storage/remoteSaveRepository';
 import { StoryIntro } from './components/StoryIntro';
 import { SystemGuideModal } from './components/SystemGuideModal';
 import { StarterMissionDock } from './components/StarterMissionDock';
-import { chapterFor, getUnlockedSectionIds, isSectionUnlocked } from './game/onboarding';
+import { chapterFor, getSectionUnlockHint, getUnlockedSectionIds, isSectionUnlocked } from './game/onboarding';
 
 export default function App() {
   const [account, setAccount] = useState<LocalAccount | null>(null);
@@ -35,12 +35,13 @@ export default function App() {
   const [notice, setNotice] = useState('');
   const [noticeTone, setNoticeTone] = useState<'success' | 'error'>('success');
   const [pendingGuide, setPendingGuide] = useState<SectionId | null>(null);
+  const [linkingAccount, setLinkingAccount] = useState(false);
 
   useEffect(() => {
     loadCurrentAccount().then(async (current) => {
       setAccount(current);
       const local = current ? loadSavedGame(current.id) : null;
-      const remote = current ? await loadRemoteGame(current.id) : null;
+      const remote = current && !current.isGuest ? await loadRemoteGame(current.id) : null;
       setProfile(remote ?? local);
       setAuthLoading(false);
     });
@@ -49,10 +50,45 @@ export default function App() {
   async function handleAuthenticated(nextAccount: LocalAccount) {
     setAccount(nextAccount);
     const local = loadSavedGame(nextAccount.id);
-    const remote = await loadRemoteGame(nextAccount.id);
+    const remote = nextAccount.isGuest ? null : await loadRemoteGame(nextAccount.id);
     setProfile(remote ?? local);
     setActiveSection('home');
     setNotice('تم تسجيل الدخول مباشرة.');
+    setNoticeTone('success');
+  }
+
+  function handlePlayAsGuest() {
+    const guest = createGuestAccount();
+    setAccount(guest);
+    setProfile(loadSavedGame(guest.id));
+    setLinkingAccount(false);
+    setNotice('بدأت جلسة ضيف. تقدمك محفوظ محليًا على هذا الجهاز فقط.');
+    setNoticeTone('success');
+  }
+
+  async function handleLinkedAccount(nextAccount: LocalAccount) {
+    if (!account?.isGuest) {
+      setLinkingAccount(false);
+      await handleAuthenticated(nextAccount);
+      return;
+    }
+    const guestProfile = profile ?? loadSavedGame(account.id);
+    const existingCloudProfile = await loadRemoteGame(nextAccount.id);
+    if (existingCloudProfile) {
+      setProfile(existingCloudProfile);
+      setNotice('تم فتح عالم الحساب السحابي الموجود. حفظ الضيف لم يُحذف من هذا الجهاز.');
+    } else if (guestProfile) {
+      saveGame(guestProfile, nextAccount.id);
+      const synchronized = await saveRemoteGame(nextAccount.id, guestProfile);
+      setProfile(guestProfile);
+      setNotice(synchronized ? 'تم ربط الحساب ونسخ عالم الضيف إلى الحفظ السحابي.' : 'تم ربط الحساب وحفظ العالم محليًا؛ ستتم المزامنة عند عودة الاتصال.');
+    } else {
+      setProfile(null);
+      setNotice('تم ربط الحساب. ابدأ عالمك الجديد الآن.');
+    }
+    setAccount(nextAccount);
+    setActiveSection('home');
+    setLinkingAccount(false);
     setNoticeTone('success');
   }
 
@@ -74,7 +110,7 @@ export default function App() {
     if (!chosenCountry) return;
     const newProfile = createNewPlayer(chosenCountry, playerName);
     const result = saveGame(newProfile, account?.id);
-    if (account) void saveRemoteGame(account.id, newProfile);
+    if (account && !account.isGuest) void saveRemoteGame(account.id, newProfile);
     setProfile(newProfile);
     setActiveSection('home');
     setMobileMenuOpen(false);
@@ -86,7 +122,7 @@ export default function App() {
     if (!profile) return;
     const nextProfile = { ...profile, onboarding: { ...profile.onboarding, introCompleted: true, chapter: 1 } };
     saveGame(nextProfile, account?.id);
-    if (account) void saveRemoteGame(account.id, nextProfile);
+    if (account && !account.isGuest) void saveRemoteGame(account.id, nextProfile);
     setProfile(nextProfile);
     setNotice('بدأ الفصل الأول. ابدأ بالأرض ثم أسس شركتك الأولى.');
     setNoticeTone('success');
@@ -99,7 +135,7 @@ export default function App() {
       return;
     }
     const saved = saveGame(result.profile, account?.id);
-    if (account) void saveRemoteGame(account.id, result.profile);
+    if (account && !account.isGuest) void saveRemoteGame(account.id, result.profile);
     const settledAmount = Math.max(0, (profile?.payables ?? result.profile.payables) - result.profile.payables);
     const settlementNote = settledAmount > 0 ? ` وُجّه ${formatMoney(settledAmount, country)} لسداد التزامات سابقة.` : '';
     setProfile(result.profile);
@@ -113,7 +149,11 @@ export default function App() {
   }
 
   async function handleRedeemed(nextProfile: PlayerProfile, message: string, codeId: string): Promise<boolean> {
-    if (!account) return false;
+    if (!account || account.isGuest) {
+      setNotice('استرداد الأكواد يحتاج حسابًا سحابيًا؛ يمكنك ربط حساب من الإعدادات.');
+      setNoticeTone('error');
+      return false;
+    }
     const committedRemotely = await redeemRemoteReward(account.id, nextProfile, codeId);
     if (!committedRemotely) return false;
     const saved = saveGame(nextProfile, account.id);
@@ -139,7 +179,7 @@ export default function App() {
     }
     if (completedDays === 0) return;
     const saved = saveGame(current, account?.id);
-    if (account) void saveRemoteGame(account.id, current);
+    if (account && !account.isGuest) void saveRemoteGame(account.id, current);
     setProfile(current);
     setNotice(saved.ok ? `تم ترحيل ${completedDays} ${completedDays === 1 ? 'يوم تلقائيًا' : 'أيام تلقائيًا'} بعد مرور 24 دقيقة حقيقية.` : 'تم ترحيل الأيام، لكن تعذر تثبيت الحفظ على هذا الجهاز.');
     setNoticeTone(saved.ok ? 'success' : 'error');
@@ -147,7 +187,7 @@ export default function App() {
 
   function navigate(section: SectionId) {
     if (!profile || !isSectionUnlocked(profile, section)) {
-      setNotice('هذا النظام سيفتح تلقائيًا بعد إكمال خطوات الفصل الحالي.');
+      setNotice(profile ? getSectionUnlockHint(profile, section) : 'ابدأ عالمك أولًا لفتح أنظمة اللعبة.');
       setNoticeTone('error');
       return;
     }
@@ -157,8 +197,16 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
+  function handleLogout() {
+    if (account && !account.isGuest) void logoutAccount();
+    setAccount(null);
+    setProfile(null);
+    setLinkingAccount(false);
+  }
+
   if (authLoading) return <div className="account-loading">جارٍ فتح حسابك...</div>;
-  if (!account) return <AccountGate onAuthenticated={handleAuthenticated} />;
+  if (linkingAccount && account?.isGuest) return <AccountGate onAuthenticated={handleLinkedAccount} onPlayAsGuest={() => setLinkingAccount(false)} onCancel={() => setLinkingAccount(false)} />;
+  if (!account) return <AccountGate onAuthenticated={handleAuthenticated} onPlayAsGuest={handlePlayAsGuest} />;
 
   if (!profile) {
     return (
@@ -203,20 +251,20 @@ export default function App() {
               {group.sections.map((sectionId) => {
                 const section = getSection(sectionId);
                 const unlocked = unlockedSections.has(section.id);
-                return <button className={`nav-item${activeSection === section.id ? ' is-active' : ''}${!unlocked ? ' is-locked' : ''}`} type="button" key={section.id} onClick={() => navigate(section.id)} aria-current={activeSection === section.id ? 'page' : undefined} disabled={!unlocked}>
+                return <button className={`nav-item${activeSection === section.id ? ' is-active' : ''}${!unlocked ? ' is-locked' : ''}`} type="button" key={section.id} onClick={() => navigate(section.id)} aria-current={activeSection === section.id ? 'page' : undefined} aria-disabled={!unlocked} title={unlocked ? section.label : getSectionUnlockHint(profile, section.id)}>
                   <Icon name={unlocked ? section.icon : 'lock'} size={19} /><span>{section.label}</span>
                 </button>;
               })}
             </div>
           ))}
-          <div className="side-nav-note"><Icon name="shield" size={16} /><span>حفظ محلي<br />بدون إنترنت</span></div>
+          <div className="side-nav-note"><Icon name="shield" size={16} /><span>حفظ محلي<br />ومزامنة عند الاتصال</span></div>
         </aside>
 
         <main className="main-content">
           {activeSection === 'home' ? (
             <Dashboard profile={profile} country={country} onNavigate={navigate} />
           ) : (
-            <SectionPage section={active} profile={profile} country={country} notificationTheme={notificationTheme} onNotificationThemeChange={setNotificationTheme} onHome={() => navigate('home')} onAction={handleGameResult} onRedeemed={handleRedeemed} onLogout={() => { logoutAccount(); setAccount(null); setProfile(null); }} />
+            <SectionPage section={active} profile={profile} country={country} notificationTheme={notificationTheme} isGuest={Boolean(account.isGuest)} onNotificationThemeChange={setNotificationTheme} onHome={() => navigate('home')} onAction={handleGameResult} onRedeemed={handleRedeemed} onLinkAccount={() => setLinkingAccount(true)} onLogout={handleLogout} />
           )}
         </main>
       </div>
@@ -224,7 +272,8 @@ export default function App() {
       <nav className="mobile-bottom-nav" aria-label="التنقل الرئيسي">
         {fixedBottomItems.map((sectionId) => {
           const section = getSection(sectionId);
-          return <button className={`mobile-nav-item${activeSection === sectionId ? ' is-active' : ''}`} type="button" key={sectionId} onClick={() => navigate(sectionId)}><Icon name={section.icon} size={20} /><span>{section.shortLabel}</span></button>;
+          const unlocked = unlockedSections.has(sectionId);
+          return <button className={`mobile-nav-item${activeSection === sectionId ? ' is-active' : ''}${unlocked ? '' : ' is-locked'}`} type="button" key={sectionId} onClick={() => navigate(sectionId)} aria-disabled={!unlocked} title={unlocked ? section.label : getSectionUnlockHint(profile, sectionId)}><Icon name={unlocked ? section.icon : 'lock'} size={20} /><span>{section.shortLabel}</span></button>;
         })}
         <button className={`mobile-nav-item${mobileMenuOpen ? ' is-active' : ''}`} type="button" aria-expanded={mobileMenuOpen} onClick={() => setMobileMenuOpen((open) => !open)}><Icon name="menu" size={20} /><span>المزيد</span></button>
       </nav>
@@ -232,12 +281,12 @@ export default function App() {
       {mobileMenuOpen && <div className="mobile-menu-backdrop" onClick={() => setMobileMenuOpen(false)}>
         <nav className="mobile-more-menu" aria-label="المزيد من الأقسام" onClick={(event) => event.stopPropagation()}>
           <div className="mobile-more-heading"><strong>كل الأقسام</strong><button type="button" className="icon-button" onClick={() => setMobileMenuOpen(false)} aria-label="إغلاق"><Icon name="close" /></button></div>
-          {otherSections.map((section) => { const unlocked = unlockedSections.has(section.id); return <button type="button" className={`mobile-more-item${!unlocked ? ' is-locked' : ''}`} key={section.id} onClick={() => navigate(section.id)} disabled={!unlocked}><Icon name={unlocked ? section.icon : 'lock'} size={18} /><span>{section.label}</span><Icon name="chevron" size={16} /></button>; })}
+          {otherSections.map((section) => { const unlocked = unlockedSections.has(section.id); return <button type="button" className={`mobile-more-item${!unlocked ? ' is-locked' : ''}`} key={section.id} onClick={() => navigate(section.id)} aria-disabled={!unlocked} title={unlocked ? section.label : getSectionUnlockHint(profile, section.id)}><Icon name={unlocked ? section.icon : 'lock'} size={18} /><span>{section.label}{!unlocked && <small>{getSectionUnlockHint(profile, section.id)}</small>}</span><Icon name="chevron" size={16} /></button>; })}
         </nav>
       </div>}
 
       {notice && <NoticeToast message={notice} tone={noticeTone} theme={notificationTheme} onDismiss={() => setNotice('')} />}
-      {pendingGuide && <SystemGuideModal section={pendingGuide} onClose={() => { if (!profile) return; const seenGuides = profile.onboarding.seenGuides.includes(pendingGuide) ? profile.onboarding.seenGuides : [...profile.onboarding.seenGuides, pendingGuide]; const nextProfile = { ...profile, onboarding: { ...profile.onboarding, chapter: chapterFor(profile), seenGuides } }; saveGame(nextProfile, account?.id); if (account) void saveRemoteGame(account.id, nextProfile); setProfile(nextProfile); setPendingGuide(null); }} />}
+      {pendingGuide && <SystemGuideModal section={pendingGuide} onClose={() => { if (!profile) return; const seenGuides = profile.onboarding.seenGuides.includes(pendingGuide) ? profile.onboarding.seenGuides : [...profile.onboarding.seenGuides, pendingGuide]; const nextProfile = { ...profile, onboarding: { ...profile.onboarding, chapter: chapterFor(profile), seenGuides } }; saveGame(nextProfile, account?.id); if (account && !account.isGuest) void saveRemoteGame(account.id, nextProfile); setProfile(nextProfile); setPendingGuide(null); }} />}
       <StarterMissionDock profile={profile} onNavigate={navigate} />
       <footer className="app-footer"><span>إمبراطورية الأعمال</span><span>محاكاة محلية · الأسعار والأحداث لأغراض اللعبة</span></footer>
     </div>

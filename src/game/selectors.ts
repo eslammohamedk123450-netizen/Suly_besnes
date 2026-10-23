@@ -126,7 +126,7 @@ export function selectOperationsSnapshot(profile: PlayerProfile, operatingCostMu
   } else if (activeContracts > 0) {
     nextStep = { section: 'contracts', title: 'سلّم عقدك قبل الموعد', description: `لديك ${activeContracts} عقد نشط. راجع المخزون وأكمل التوريد يدويًا حتى تحافظ على سمعتك التجارية.`, actionLabel: 'فتح العقود', tone: 'green' };
   } else if (profile.lands.length === 0) {
-    nextStep = { section: 'auctions', title: 'اشترِ أول أرض', description: 'الأرض هي مفتاح تأسيس أول نشاط. ابدأ بمزاد يناسب القطاع الذي تريد دخوله.', actionLabel: 'فتح المزادات', tone: 'gold' };
+    nextStep = { section: 'lands', title: 'اشترِ أول أرض', description: 'عرض البداية في صفحة الأراضي مضمون ولا يحتاج مزادًا. احتفظ بما يكفي من السيولة للتأسيس والتشغيل.', actionLabel: 'عرض الأرض المباشر', tone: 'gold' };
   } else if (profile.companies.length === 0) {
     nextStep = { section: 'companies', title: 'أسس أول شركة', description: 'لديك أصل يمكن تشغيله. اختر قطاعًا يناسب نوع الأرض واترك احتياطيًا للتشغيل.', actionLabel: 'تأسيس شركة', tone: 'blue' };
   } else if (productUnits > 0) {
