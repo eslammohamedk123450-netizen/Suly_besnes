@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { validatePlayerProfile } from 'https://raw.githubusercontent.com/eslammohamedk123450-netizen/Suly_besnes/929b526bb2e3df36ed6abb593b7cf97139ecc879/supabase/functions/game-command/profile-validator.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -25,6 +26,10 @@ Deno.serve(async (request) => {
   let payload: { playerName?: string; gameDay?: number; saveData?: unknown };
   try { payload = await request.json(); } catch { return json({ error: 'invalid_json' }, 400); }
   if (!payload.playerName || !Number.isInteger(payload.gameDay) || !payload.saveData || typeof payload.saveData !== 'object') return json({ error: 'invalid_profile_payload' }, 400);
+  const validation = validatePlayerProfile(payload.saveData);
+  if (!validation.ok) return json({ error: 'invalid_initial_profile', details: validation.errors }, 400);
+  const initial = payload.saveData as Record<string, unknown>;
+  if (initial.name !== payload.playerName || initial.day !== payload.gameDay) return json({ error: 'profile_metadata_mismatch' }, 400);
   const adminClient = createClient(supabaseUrl, serviceRoleKey, { auth: { persistSession: false, autoRefreshToken: false } });
   const { data: current, error: readError } = await adminClient.from('game_profiles').select('updated_at').eq('user_id', user.id).maybeSingle();
   if (readError) return json({ error: 'profile_lookup_failed' }, 500);

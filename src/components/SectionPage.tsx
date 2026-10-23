@@ -34,12 +34,14 @@ interface SectionPageProps {
   onRedeemed: (profile: PlayerProfile, message: string, codeId: string) => Promise<boolean>;
   onLinkAccount: () => void;
   onLogout: () => void;
+  onShowGuide: () => void;
 }
 
 const landTypeNames = { industrial: 'صناعية', agricultural: 'زراعية', commercial: 'تجارية' } as const;
 const ledgerLabels = { revenue: 'إيراد', expense: 'مصروف', asset: 'أصل', liability: 'التزام', settlement: 'سداد التزام' } as const;
 
-export function SectionPage({ section, profile, country, notificationTheme, isGuest, onNotificationThemeChange, onHome, onAction, onCommand, onRedeemed, onLinkAccount, onLogout }: SectionPageProps) {
+export function SectionPage({ section, profile, country, notificationTheme, isGuest, onNotificationThemeChange, onHome, onAction, onCommand, onRedeemed, onLinkAccount, onLogout, onShowGuide }: SectionPageProps) {
+  const playerProgress = getPlayerProgress(profile);
   const [bidAmounts, setBidAmounts] = useState<Record<string, string>>({});
   const [companyName, setCompanyName] = useState('شركة جديدة');
   const [industryId, setIndustryId] = useState<IndustryId>('food');
@@ -80,7 +82,8 @@ export function SectionPage({ section, profile, country, notificationTheme, isGu
   const heading = (
     <div className="page-heading">
       <span className="heading-icon"><Icon name={section.icon} size={23} /></span>
-      <div><span className="section-kicker">إدارة واقتصاد اللعبة</span><h1>{section.label}</h1></div>
+      <div className="page-heading-copy"><span className="section-kicker">إدارة الإمبراطورية</span><h1>{section.label}</h1><p className="page-subtitle">{section.subtitle}</p></div>
+      <button className="page-help-button" type="button" onClick={onShowGuide}><Icon name="target" size={15} /> شرح للمبتدئين</button>
     </div>
   );
 
@@ -106,7 +109,7 @@ export function SectionPage({ section, profile, country, notificationTheme, isGu
           <div className="settings-row"><span>معرّف الحساب للدعم</span><strong className="account-code-value">{profile.accountCode}</strong></div>
           <div className="settings-row"><span>الدولة الأساسية</span><strong>{country.flag} {country.name} · {country.currency.code}</strong></div>
           <div className="settings-row"><span>اليوم داخل العالم</span><strong>{formatNumber(profile.day)}</strong></div>
-          <div className="settings-row"><span>المستوى</span><strong>{formatNumber(profile.level)}</strong></div>
+          <div className="settings-row"><span>المستوى / الخبرة</span><strong>{formatNumber(playerProgress.level)} · {formatNumber(playerProgress.totalExperience)} XP</strong></div>
           <div className="settings-row settings-row--highlight"><span>نقاط الإمبراطورية</span><strong>{formatNumber(empirePoints.total)} نقطة · {empirePoints.title}</strong></div>
           <div className="settings-row"><span>الماس</span><strong>{formatNumber(profile.diamonds)}</strong></div>
           <div className="settings-row"><span>بطاقات التسريع</span><strong>{formatNumber(profile.speedCards.reduce((sum, stack) => sum + stack.quantity, 0))}</strong></div>
@@ -485,3 +488,4 @@ export function SectionPage({ section, profile, country, notificationTheme, isGu
     </>,
   )}</div>;
 }
+import { getPlayerProgress } from '../game/onboarding';

@@ -29,10 +29,36 @@ export async function redeemRemoteReward(accountId: string, profile: PlayerProfi
   return !error && data?.ok === true;
 }
 
-/** Authenticated command path: the profile is resolved and mutated server-side; no saveData is sent. */
-export async function executeRemoteGameCommand(command: GameCommand): Promise<GameResult<unknown> | null> {
-  const commandKey = globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+export type RemoteGameCommandAttempt =
+  | { kind: 'result'; result: GameResult<unknown> }
+  | { kind: 'unavailable' }
+  | { kind: 'rejected'; message: string; status: number };
+
+function responseStatus(error: unknown): number | null {
+  if (!error || typeof error !== 'object' || !('context' in error)) return null;
+  const context = (error as { context?: unknown }).context;
+  if (typeof Response !== 'undefined' && context instanceof Response) return context.status;
+  if (context && typeof context === 'object' && 'status' in context && typeof (context as { status?: unknown }).status === 'number') return (context as { status: number }).status;
+  return null;
+}
+
+/** Authenticated command path: only intents reach the server; the caller supplies a durable idempotency key. */
+export async function executeRemoteGameCommand(command: GameCommand, commandKey: string): Promise<RemoteGameCommandAttempt> {
   const { data, error } = await supabase.functions.invoke('game-command', { body: { command, commandKey } });
-  if (error || !data?.ok || !data.profile) return null;
-  return data.result as GameResult<unknown>;
+  if (error) {
+    const status = responseStatus(error);
+    if (status === null || status === 404 || status === 408 || status === 429 || status >= 500) return { kind: 'unavailable' };
+    return { kind: 'rejected', status, message: status === 409
+      ? 'تعارضت هذه الخطوة مع نسخة أحدث من عالمك؛ أوقفنا مزامنتها لحماية تقدمك.'
+      : 'رفض الخادم هذه الخطوة؛ لم يتغير العالم السحابي.' };
+  }
+  if (data?.ok === true && data.result && typeof data.result === 'object' && typeof data.result.ok === 'boolean' && data.result.profile) {
+    const result = data.result as GameResult<unknown>;
+    if (result.ok && data.profile) {
+      const authoritativeProfile = normalizeSavedProfile(data.profile);
+      if (authoritativeProfile) return { kind: 'result', result: { ...result, profile: authoritativeProfile } };
+    }
+    return { kind: 'result', result };
+  }
+  return { kind: 'rejected', status: 400, message: 'تعذر اعتماد صيغة هذه الخطوة؛ لم يُنفّذها الخادم.' };
 }

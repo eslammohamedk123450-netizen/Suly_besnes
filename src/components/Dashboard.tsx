@@ -6,7 +6,7 @@ import { GOLD_PRICE_PER_GRAM } from '../game/catalog';
 import { GAME_SECTIONS, type SectionId } from '../domain/navigation';
 import { Icon } from './Icon';
 import { selectEmpirePoints, selectEmpirePulse, selectOperationsSnapshot } from '../game/selectors';
-import { getSectionUnlockHint, getUnlockedSectionIds } from '../game/onboarding';
+import { getPlayerProgress, getSectionUnlockHint, getUnlockedSectionIds } from '../game/onboarding';
 import { selectNotifications } from '../game/notifications';
 import { NotificationCenter } from './NotificationCenter';
 import { getSynergyBonuses } from '../game/synergy';
@@ -27,6 +27,7 @@ export function Dashboard({ profile, country, onNavigate }: DashboardProps) {
   const operations = selectOperationsSnapshot(profile, country.economy.operatingCostMultiplier ?? 1);
   const pulse = selectEmpirePulse(profile);
   const empirePoints = selectEmpirePoints(profile);
+  const playerProgress = getPlayerProgress(profile);
   const unpaidSalary = profile.staff.filter((employee) => employee.status === 'active').reduce((sum, employee) => sum + (employee.unpaidSalary ?? 0), 0);
   const totalOutstanding = profile.payables + unpaidSalary;
   const notifications = selectNotifications(profile);
@@ -47,7 +48,7 @@ export function Dashboard({ profile, country, onNavigate }: DashboardProps) {
           <span className="eyebrow"><span className="live-dot" /> {country.name} · اليوم {formatNumber(profile.day)}</span>
           <h1>مرحبًا، {profile.name}</h1>
           <p>الثروة بداية الحكاية؛ قراراتك هي ما يبني الإمبراطورية.</p>
-          <div className="hero-meta"><span className="country-chip">{country.flag} {country.name}</span><span className="hero-divider" /><span>المستوى {profile.level}</span><span className="hero-divider" /><span>{profile.companies.length} شركات</span></div>
+          <div className="hero-meta"><span className="country-chip">{country.flag} {country.name}</span><span className="hero-divider" /><span>المستوى {playerProgress.level}</span><span className="hero-divider" /><span>{profile.companies.length} شركات</span></div>
           <span className="dashboard-auto-note"><Icon name="clock" size={15} /> اليوم يتقدم تلقائيًا كل 24 دقيقة حقيقية</span>
         </div>
         <div className="hero-emblem"><Icon name="crown" size={25} /><span>BE</span></div>
