@@ -45,6 +45,8 @@ export interface OperationsSnapshot {
   runwayDays: number | null;
   readyProductionCompanies: number;
   productUnits: number;
+  activeContracts: number;
+  reputation: number;
 }
 
 export interface ObligationRow {
@@ -82,13 +84,14 @@ export function selectAvailableAuctions(profile: PlayerProfile): typeof AUCTION_
 export function selectEmpirePulse(profile: PlayerProfile): EmpirePulse {
   const activeStaff = profile.staff.filter((member) => member.status === 'active').length;
   const activeOrders = profile.productionOrders.filter((order) => order.status === 'active').length;
-  const score = profile.day * 4 + profile.lands.length * 12 + profile.companies.length * 28 + activeStaff * 7 + profile.sales.length * 6 + profile.banking.loans.filter((loan) => loan.status === 'paid').length * 10 + profile.completedTaskIds.length * 12;
+  const score = profile.day * 4 + profile.lands.length * 12 + profile.companies.length * 28 + activeStaff * 7 + profile.sales.length * 6 + profile.banking.loans.filter((loan) => loan.status === 'paid').length * 10 + profile.completedTaskIds.length * 12 + (profile.reputation ?? 50) + (profile.contracts ?? []).filter((contract) => contract.status === 'completed').length * 18;
   const ranks = [{ name: 'تاجر ناشئ', tone: 'bronze' as const, score: 0 }, { name: 'صاحب أعمال', tone: 'silver' as const, score: 80 }, { name: 'بارون صناعي', tone: 'gold' as const, score: 180 }, { name: 'إمبراطور اقتصادي', tone: 'royal' as const, score: 360 }];
   const current = ranks.slice().reverse().find((rank) => score >= rank.score) ?? ranks[0];
   const next = ranks.find((rank) => rank.score > score) ?? { name: 'القمة', score: current.score + 100 };
   let focusTitle = 'ابنِ أول أصل مؤثر';
   let focusDescription = 'اشترِ أرضًا مناسبة أو افتح مسارًا جديدًا حتى يبدأ اقتصادك في الحركة.';
   if (profile.payables > 0) { focusTitle = 'استعد السيطرة على السيولة'; focusDescription = 'سدّد الالتزامات قبل التوسع حتى لا تتحول السرعة إلى ضغط مالي.'; }
+  else if ((profile.contracts ?? []).some((contract) => contract.status === 'active')) { focusTitle = 'احمِ سمعتك التجارية'; focusDescription = 'لديك عقد نشط. الإنتاج لا يكفي؛ راجع الكمية وسلّم الطلب يدويًا قبل الموعد.'; }
   else if (activeOrders > 0) { focusTitle = 'احرس خط الإنتاج'; focusDescription = `لديك ${activeOrders} أمر إنتاج في الطابور. راقب الجودة والطلب عند التسليم.`; }
   else if (profile.companies.length > 0 && profile.staff.length === 0) { focusTitle = 'كوّن فريق القيادة'; focusDescription = 'مدير أو محاسب جيد قد يصنع الفارق بين شركة تعمل وإمبراطورية تتوسع.'; }
   else if (profile.inventory.some((lot) => PRODUCT_CATALOG.some((product) => product.id === lot.materialOrProductId))) { focusTitle = 'حوّل الإنجاز إلى نقد'; focusDescription = 'السوق يتغير يوميًا؛ اختر توقيت البيع قبل أن تتراجع فرصة الطلب.'; }
@@ -110,6 +113,7 @@ export function selectOperationsSnapshot(profile: PlayerProfile, operatingCostMu
   const productUnits = (profile.inventory ?? []).reduce((sum, lot) => (
     PRODUCT_CATALOG.some((product) => product.id === lot.materialOrProductId) ? sum + lot.quantity : sum
   ), 0);
+  const activeContracts = (profile.contracts ?? []).filter((contract) => contract.status === 'active').length;
   const readyProductionCompanies = profile.companies.filter((company) => {
     const recipe = RECIPE_CATALOG.find((item) => item.industryId === company.industryId);
     return Boolean(recipe && recipe.inputs.every((input) => (
@@ -119,6 +123,8 @@ export function selectOperationsSnapshot(profile: PlayerProfile, operatingCostMu
   let nextStep: OperationsNextStep;
   if (profile.payables > 0) {
     nextStep = { section: 'obligations', title: 'سدّد الالتزامات الحرجة', description: `لديك ${Math.round(profile.payables).toLocaleString('ar-EG')} ج.م مسجلة كالتزامات. راجع الأولويات قبل التوسع حتى لا تتوقف الطاقة.`, actionLabel: 'فتح الالتزامات', tone: 'gold' };
+  } else if (activeContracts > 0) {
+    nextStep = { section: 'contracts', title: 'سلّم عقدك قبل الموعد', description: `لديك ${activeContracts} عقد نشط. راجع المخزون وأكمل التوريد يدويًا حتى تحافظ على سمعتك التجارية.`, actionLabel: 'فتح العقود', tone: 'green' };
   } else if (profile.lands.length === 0) {
     nextStep = { section: 'auctions', title: 'اشترِ أول أرض', description: 'الأرض هي مفتاح تأسيس أول نشاط. ابدأ بمزاد يناسب القطاع الذي تريد دخوله.', actionLabel: 'فتح المزادات', tone: 'gold' };
   } else if (profile.companies.length === 0) {
@@ -130,7 +136,7 @@ export function selectOperationsSnapshot(profile: PlayerProfile, operatingCostMu
   } else {
     nextStep = { section: 'inventory', title: 'أمّن مدخلات التشغيل', description: 'الشركات متوقفة بانتظار مواد خام. اشترِ الكمية الضرورية فقط حتى تحافظ على السيولة.', actionLabel: 'فتح المخازن', tone: 'gold' };
   }
-  return { nextStep, dailyOperatingCost, runwayDays, readyProductionCompanies, productUnits };
+  return { nextStep, dailyOperatingCost, runwayDays, readyProductionCompanies, productUnits, activeContracts, reputation: profile.reputation ?? 50 };
 }
 
 export function selectObligations(profile: PlayerProfile, operatingCostMultiplier = 1): ObligationsSummary {

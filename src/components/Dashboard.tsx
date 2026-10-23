@@ -59,6 +59,8 @@ export function Dashboard({ profile, country, onNavigate }: DashboardProps) {
         <div className={`operations-metric${operations.runwayDays !== null && operations.runwayDays < 5 ? ' operations-metric--warning' : ''}`}><span><Icon name="bank" size={15} /> مدة الصمود بالنقد</span><strong>{operations.runwayDays === null ? '—' : `${formatNumber(operations.runwayDays)} يوم`}</strong></div>
         <div className="operations-metric"><span><Icon name="factory" size={15} /> خطوط جاهزة للتشغيل</span><strong>{formatNumber(operations.readyProductionCompanies)}</strong></div>
         <div className="operations-metric"><span><Icon name="briefcase" size={15} /> منتجات قابلة للبيع</span><strong>{formatNumber(operations.productUnits)}</strong></div>
+        <div className="operations-metric"><span><Icon name="target" size={15} /> عقود نشطة</span><strong>{formatNumber(operations.activeContracts)}</strong></div>
+        <div className="operations-metric"><span><Icon name="shield" size={15} /> السمعة التجارية</span><strong>{formatNumber(operations.reputation)} / 100</strong></div>
       </section>
 
       <section className={`empire-pulse empire-pulse--${pulse.rankTone}`}>
