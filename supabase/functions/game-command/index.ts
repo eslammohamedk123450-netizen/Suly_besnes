@@ -1,5 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-const ENGINE_URL = 'https://files.manuscdn.com/user_upload_by_module/session_file/310519663982499695/MMDLtcccRyLMJmlF.ts';
+const ENGINE_URL = 'https://raw.githubusercontent.com/eslammohamedk123450-netizen/Suly_besnes/main/supabase/functions/game-command/game-engine.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
