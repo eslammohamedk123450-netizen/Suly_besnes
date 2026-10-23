@@ -1,6 +1,6 @@
 import { findCountry, type CountryId, type IndustryId } from '../domain/countries';
 import type { PlayerAsset, PlayerCompany, PlayerLand, PlayerProfile } from '../domain/player';
-import type { AuctionBidRecord, DepositRecord, FinanceLedgerEntry, InventoryLot, InvestmentRecord, LicenseRecord, LoanRecord, ProductSale, ProductionOrder, StaffContract, TaskProgress } from '../domain/futureSystems';
+import type { AchievementRecord, AuctionBidRecord, BusinessContract, DepositRecord, FinanceLedgerEntry, InventoryLot, InvestmentRecord, LicenseRecord, LoanRecord, ProductSale, ProductionOrder, StaffContract, TaskProgress } from '../domain/futureSystems';
 import { findIndustry, GOLD_PRICE_PER_GRAM } from '../game/catalog';
 
 const SAVE_KEY = 'business-empire.save.v1';
@@ -151,6 +151,18 @@ function isTaskProgress(value: unknown): value is TaskProgress {
     && (value.claimedAt === undefined || isDateString(value.claimedAt));
 }
 
+function isBusinessContract(value: unknown): value is BusinessContract {
+  return isRecord(value) && isNonEmptyString(value.id) && isNonEmptyString(value.clientName) && isNonEmptyString(value.productId)
+    && isNonEmptyString(value.productName) && isFiniteNonNegative(value.quantity) && isFiniteNonNegative(value.unitPrice)
+    && isFiniteNonNegative(value.reward) && isFiniteNonNegative(value.reputationReward) && Number.isInteger(value.deadlineDay)
+    && Number.isInteger(value.acceptedOnDay) && (value.status === 'active' || value.status === 'completed' || value.status === 'failed');
+}
+
+function isAchievement(value: unknown): value is AchievementRecord {
+  return isRecord(value) && isNonEmptyString(value.id) && isNonEmptyString(value.title)
+    && Number.isInteger(value.earnedAtDay) && (value.earnedAtDay as number) >= 1;
+}
+
 function inferLandType(label: string): PlayerLand['landType'] | undefined {
   const normalized = label.toLocaleLowerCase();
   if (normalized.includes('زراع') || normalized.includes('farm') || normalized.includes('agric')) return 'agricultural';
@@ -273,6 +285,9 @@ function migrateProfile(value: unknown): PlayerProfile | null {
     events: Array.isArray(value.events) ? value.events as PlayerProfile['events'] : [],
     tasks: Array.isArray(value.tasks) && value.tasks.every(isTaskProgress) ? value.tasks : [],
     completedTaskIds: Array.isArray(value.completedTaskIds) && value.completedTaskIds.every(isNonEmptyString) ? value.completedTaskIds : [],
+    reputation: isFiniteNonNegative(value.reputation) ? Math.min(100, value.reputation as number) : 50,
+    contracts: Array.isArray(value.contracts) && value.contracts.every(isBusinessContract) ? value.contracts : [],
+    achievements: Array.isArray(value.achievements) && value.achievements.every(isAchievement) ? value.achievements : [],
   };
 }
 

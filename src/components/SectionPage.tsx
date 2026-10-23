@@ -4,12 +4,13 @@ import type { PlayerProfile } from '../domain/player';
 import type { NotificationTheme } from '../storage/userPreferences';
 import type { SectionItem } from '../domain/navigation';
 import { formatMoney, formatNumber } from '../domain/formatters';
-import { buyDirectCompany, buyDirectLand, buyGold, buyMaterial, cancelProductionOrder, claimTask, createDeposit, createInvestment, foundCompany, hireStaff, payStaffSalary, placeBid, runProduction, sellAsset, sellCompany, sellGold, sellLand, sellProduct, serviceCompany, takeLoan, terminateStaff, upgradeCompany, withdrawDeposit, type GameResult } from '../game/engine';
+import { acceptContract, buyDirectCompany, buyDirectLand, buyGold, buyMaterial, cancelProductionOrder, claimTask, createDeposit, createInvestment, deliverContract, foundCompany, hireStaff, payStaffSalary, placeBid, runProduction, sellAsset, sellCompany, sellGold, sellLand, sellProduct, serviceCompany, takeLoan, terminateStaff, upgradeCompany, withdrawDeposit, type GameResult } from '../game/engine';
 import type { StaffRole } from '../domain/futureSystems';
 import { AUCTION_CATALOG, DIRECT_COMPANY_CATALOG, DIRECT_LAND_CATALOG, GOLD_PRICE_PER_GRAM, INDUSTRY_CATALOG, INVESTMENT_CATALOG, MATERIAL_CATALOG, PRODUCT_CATALOG, RECIPE_CATALOG } from '../game/catalog';
 import { getMarketQuote } from '../game/market';
 import { formatAuctionCountdown, getAuctionCloseAt } from '../game/auctions';
 import { getInvestmentPayoutRate, getOperatingCostProgression } from '../game/economyBalance';
+import { getContractOffers, getCustomerSegmentLabel } from '../game/contracts';
 import { selectActiveInvestments, selectAdvancedStatistics, selectAvailableAuctions, selectFinancialReport, selectInventorySummary, selectObligations, selectSalesSummary, selectTaskBoard } from '../game/selectors';
 import { Icon } from './Icon';
 import { EconomyEmpty, EconomyPageShell, EconomyPanel, EconomyStat } from './EconomyUI';
@@ -403,6 +404,25 @@ export function SectionPage({ section, profile, country, notificationTheme, onNo
           {report.recentEntries.length === 0 ? <EconomyEmpty title="لا توجد حركات مالية بعد" message="تظهر هنا العمليات بعد أول مزاد أو شراء أو إنتاج أو بيع." /> : <div className="economy-table-wrap"><table className="economy-table"><thead><tr><th>الحركة</th><th>النوع</th><th>القيمة</th><th>التاريخ</th></tr></thead><tbody>{report.recentEntries.map((entry) => <tr key={entry.id}><td><strong>{entry.note}</strong></td><td>{ledgerLabels[entry.category]}</td><td className={categoryClass(entry.category)}>{entry.category === 'expense' ? '−' : entry.category === 'revenue' ? '+' : ''}{formatMoney(entry.amount, country)}</td><td>{new Date(entry.occurredAt).toLocaleDateString('ar-EG')}</td></tr>)}</tbody></table></div>}
         </EconomyPanel>
         {profile.events.length > 0 && <EconomyPanel title="الأحداث الاقتصادية الأخيرة" description="أحداث محاكاة تؤثر في الرصيد عند تقدم اليوم."><div className="economy-list">{profile.events.slice().reverse().slice(0, 5).map((event) => <article className="economy-card economy-card--soft" key={event.id}><div className="economy-card-head"><div className="economy-card-title"><span className="economy-card-icon"><Icon name="globe" size={18} /></span><span><strong>{event.title}</strong><small>اليوم {formatNumber(event.day)}</small></span></div><span className={`economy-pill ${event.cashImpact >= 0 ? 'economy-pill--green' : 'economy-pill--red'}`}>{event.cashImpact >= 0 ? '+' : '−'}{formatMoney(Math.abs(event.cashImpact), country)}</span></div></article>)}</div></EconomyPanel>}
+      </>,
+    )}</div>;
+  }
+
+  if (section.id === 'contracts') {
+    const offers = getContractOffers(profile);
+    const activeContracts = (profile.contracts ?? []).filter((contract) => contract.status === 'active');
+    const completedContracts = (profile.contracts ?? []).filter((contract) => contract.status === 'completed');
+    const failedContracts = (profile.contracts ?? []).filter((contract) => contract.status === 'failed');
+    return <div className="section-page">{heading}{pageShell(
+      <>
+        <div className="economy-grid economy-grid--three-mobile"><EconomyStat label="السمعة التجارية" value={`${formatNumber(profile.reputation ?? 50)} / 100`} /><EconomyStat label="عقود نشطة" value={`${formatNumber(activeContracts.length)} / 3`} /><EconomyStat label="عقود مكتملة" value={formatNumber(completedContracts.length)} /></div>
+        <EconomyPanel title="مركز العملاء والعقود" description="كل عقد يربط الإنتاج والمخزون والسعر والسمعة. اختر ما تستطيع تنفيذه قبل الموعد بدل قبول كل الطلبات.">
+          <div className="economy-list">{offers.map((offer) => { const accepted = activeContracts.some((contract) => contract.id === offer.id); return <article className="economy-card" key={offer.id}><div className="economy-card-head"><div className="economy-card-title"><span className="economy-card-icon"><Icon name="briefcase" size={18} /></span><span><strong>{offer.clientName}</strong><small>{getCustomerSegmentLabel(offer.clientType)} · {offer.description}</small></span></div><span className="economy-price">{formatMoney(offer.quantity * offer.unitPrice + offer.reward, country)}</span></div><div className="economy-card-body"><div className="economy-meta"><span>المنتج: {offer.productName}</span><span>الكمية: {formatNumber(offer.quantity)}</span><span>التسليم قبل اليوم {formatNumber(offer.deadlineDay)}</span><span>سمعة +{formatNumber(offer.reputationReward)}</span></div><button className="button button-primary" type="button" disabled={accepted || activeContracts.length >= 3} onClick={() => run((current) => acceptContract(current, offer.id))}>{accepted ? 'العقد مقبول' : activeContracts.length >= 3 ? 'أكمل عقدًا أولًا' : 'قبول العقد'}</button></div></article>; })}</div>
+        </EconomyPanel>
+        <EconomyPanel title="العقود المقبولة" description="التسليم يدوي من المنتجات الموجودة في المخزن. لا يُحتسب العقد مكتملًا بمجرد الإنتاج.">
+          {activeContracts.length === 0 ? <EconomyEmpty title="لا توجد عقود نشطة" message="اقبل عرضًا من لوحة العملاء عندما تتأكد من قدرتك على الإنتاج والتسليم." /> : <div className="economy-list">{activeContracts.map((contract) => <article className="economy-card economy-card--soft" key={contract.id}><div className="economy-card-head"><div className="economy-card-title"><span><strong>{contract.clientName}</strong><small>{contract.productName} · {formatNumber(contract.quantity)} وحدة · المتبقي {formatNumber(Math.max(0, contract.deadlineDay - profile.day))} يوم</small></span></div><span className="economy-pill economy-pill--gold">{formatMoney(contract.quantity * contract.unitPrice + contract.reward, country)}</span></div><button className="button button-secondary" type="button" onClick={() => run((current) => deliverContract(current, contract.id))}>تسليم العقد الآن</button></article>)}</div>}
+        </EconomyPanel>
+        <EconomyPanel title="سجل السمعة والإنجازات" description="الالتزام بالعقود يفتح ثقة العملاء ويمنح مكافآت إضافية. التأخر يخفض السمعة ويضيف غرامة."><div className="economy-meta"><span className="economy-pill economy-pill--green">سمعة {formatNumber(profile.reputation ?? 50)}%</span><span>مكتملة {formatNumber(completedContracts.length)}</span><span className="economy-pill economy-pill--red">فاشلة {formatNumber(failedContracts.length)}</span></div>{(profile.achievements ?? []).length > 0 && <div className="economy-list">{profile.achievements.map((achievement) => <article className="economy-task" key={achievement.id}><span className="economy-task-icon"><Icon name="shield" size={18} /></span><span className="economy-task-copy"><strong>{achievement.title}</strong><small>تم فتحها في اليوم {formatNumber(achievement.earnedAtDay)}</small></span><span className="economy-pill economy-pill--green">مكتملة</span></article>)}</div>}</EconomyPanel>
       </>,
     )}</div>;
   }

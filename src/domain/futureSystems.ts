@@ -192,3 +192,28 @@ export interface SeasonProgress {
   claimedChallengeKeys: string[];
   claimedLoginRewardDay?: number;
 }
+
+export type ContractStatus = 'active' | 'completed' | 'failed';
+
+export interface BusinessContract {
+  id: string;
+  clientName: string;
+  clientType: 'budget' | 'quality' | 'bulk' | 'urgent';
+  productId: string;
+  productName: string;
+  quantity: number;
+  unitPrice: number;
+  reward: number;
+  reputationReward: number;
+  deadlineDay: number;
+  acceptedOnDay: number;
+  status: ContractStatus;
+  completedOnDay?: number;
+  failedOnDay?: number;
+}
+
+export interface AchievementRecord {
+  id: string;
+  earnedAtDay: number;
+  title: string;
+}

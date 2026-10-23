@@ -1,6 +1,6 @@
 import { findCountry, type IndustryId } from '../domain/countries';
 import type { PlayerAsset, PlayerCompany, PlayerLand, PlayerProfile } from '../domain/player';
-import type { AuctionBidRecord, DepositRecord, FinanceLedgerEntry, GameEventRecord, InventoryLot, InvestmentRecord, LoanRecord, ProductionOrder, StaffContract, StaffRole } from '../domain/futureSystems';
+import type { AuctionBidRecord, BusinessContract, DepositRecord, FinanceLedgerEntry, GameEventRecord, InventoryLot, InvestmentRecord, LoanRecord, ProductionOrder, StaffContract, StaffRole, AchievementRecord } from '../domain/futureSystems';
 import {
   DIRECT_COMPANY_CATALOG,
   DIRECT_LAND_CATALOG,
@@ -17,6 +17,7 @@ import { getMarketQuote } from './market';
 import { isAuctionOpen, resolveAuctionListing } from './auctions';
 import { getInvestmentPayoutRate, getOperatingCostProgression } from './economyBalance';
 import { GAME_DAY_MS } from './time';
+import { getContractOffers } from './contracts';
 
 export type GameErrorCode =
   | 'invalid-input'
@@ -836,9 +837,15 @@ export function advanceDay(profile: PlayerProfile): GameResult<DayOutcome> {
     const supply = industry?.dailyEnergySupply ?? capacity;
     return { ...company, energyUnits: energyPaused ? 0 : Math.min(capacity, (company.energyUnits ?? 0) + supply) };
   });
-  const event: GameEventRecord = { id: `event-${nextDay}`, day: nextDay, title: briefing.event.title, cashImpact: eventImpact, occurredAt: now };
+  const expiredContracts = (profile.contracts ?? []).filter((contract) => contract.status === 'active' && contract.deadlineDay < nextDay);
+  const contracts = (profile.contracts ?? []).map((contract) => contract.status === 'active' && contract.deadlineDay < nextDay
+    ? { ...contract, status: 'failed' as const, failedOnDay: nextDay }
+    : contract);
+  const reputation = Math.max(0, Math.min(100, (profile.reputation ?? 50) - expiredContracts.length * 6));
+  if (expiredContracts.length > 0) entries.push(ledgerEntry(profile, 'expense', expiredContracts.length * 2_000, 'غرامات عقود متأخرة', entries.length));
+  const event: GameEventRecord = { id: `event-${nextDay}`, day: nextDay, title: expiredContracts.length > 0 ? `${briefing.event.title} · تأخر عقد` : briefing.event.title, cashImpact: eventImpact, occurredAt: now };
   const nextProfile = addLedger(
-    { ...profile, day: nextDay, companies, investments, banking: { ...profile.banking, loans }, staff, productionOrders, inventory, events: [...profile.events, event], payables },
+    { ...profile, day: nextDay, companies, investments, banking: { ...profile.banking, loans }, staff, productionOrders, inventory, events: [...profile.events, event], payables, contracts, reputation },
     entries,
     balance,
   );
@@ -846,6 +853,47 @@ export function advanceDay(profile: PlayerProfile): GameResult<DayOutcome> {
     ? `مرّ اليوم ${nextDay}، لكن بقيت التزامات غير مسددة بقيمة ${Math.round(payables).toLocaleString('ar-EG')} ج.م؛ أُوقفت الطاقة مؤقتًا حتى السداد.`
     : `مرّ اليوم ${nextDay} وعولجت المصروفات والأحداث والاستثمارات.`;
   return success(syncTasks(nextProfile), message, { day: nextDay, operatingCost, paidOperatingCost, payables, investmentPayout, event });
+}
+
+function awardAchievements(profile: PlayerProfile): { achievements: AchievementRecord[]; bonus: number } {
+  const current = profile.achievements ?? [];
+  const rules = [
+    { id: 'first-contract', title: 'أول صفقة موثوقة', earned: (item: PlayerProfile) => item.contracts.some((contract) => contract.status === 'completed') },
+    { id: 'trusted-partner', title: 'شريك موثوق', earned: (item: PlayerProfile) => item.reputation >= 75 },
+    { id: 'contract-master', title: 'سيد العقود', earned: (item: PlayerProfile) => item.contracts.filter((contract) => contract.status === 'completed').length >= 5 },
+    { id: 'industrialist', title: 'صناعي صاعد', earned: (item: PlayerProfile) => item.companies.length >= 3 },
+  ];
+  const additions = rules.filter((rule) => rule.earned(profile) && !current.some((achievement) => achievement.id === rule.id)).map((rule) => ({ id: rule.id, title: rule.title, earnedAtDay: profile.day }));
+  return { achievements: [...current, ...additions], bonus: additions.length * 10_000 };
+}
+
+export function acceptContract(profile: PlayerProfile, offerId: string): GameResult<BusinessContract> {
+  const offer = getContractOffers(profile).find((item) => item.id === offerId);
+  if (!offer) return failure(profile, 'not-found', 'انتهت صلاحية هذا العقد؛ افتح لوحة العقود لرؤية عروض اليوم.');
+  if ((profile.contracts ?? []).some((contract) => contract.status === 'active' && contract.id === offerId)) return failure(profile, 'already-owned', 'هذا العقد مقبول بالفعل.');
+  if ((profile.contracts ?? []).filter((contract) => contract.status === 'active').length >= 3) return failure(profile, 'condition-not-met', 'لا يمكنك إدارة أكثر من ثلاثة عقود نشطة في وقت واحد.');
+  const contract: BusinessContract = { ...offer, status: 'active', acceptedOnDay: profile.day };
+  return success({ ...profile, contracts: [...(profile.contracts ?? []), contract] }, `تم قبول عقد ${contract.clientName} حتى اليوم ${contract.deadlineDay}.`, contract);
+}
+
+export function deliverContract(profile: PlayerProfile, contractId: string): GameResult<BusinessContract> {
+  const contract = (profile.contracts ?? []).find((item) => item.id === contractId && item.status === 'active');
+  if (!contract) return failure(profile, 'not-found', 'العقد غير موجود أو تمت تسويته.');
+  if (profile.day > contract.deadlineDay) return failure(profile, 'condition-not-met', 'انتهت مهلة العقد؛ انتظر ترحيل اليوم لتسجيل فشله.');
+  const lot = profile.inventory.find((item) => item.materialOrProductId === contract.productId && item.quantity >= contract.quantity);
+  if (!lot) return failure(profile, 'insufficient-materials', `تحتاج إلى ${contract.quantity} وحدة من ${contract.productName} قبل التسليم.`);
+  const nextInventory = profile.inventory.flatMap((item) => item.id !== lot.id ? [item] : item.quantity === contract.quantity ? [] : [{ ...item, quantity: item.quantity - contract.quantity }]);
+  const revenue = contract.quantity * contract.unitPrice + contract.reward;
+  const completed: BusinessContract = { ...contract, status: 'completed', completedOnDay: profile.day };
+  const contracts = (profile.contracts ?? []).map((item) => item.id === contract.id ? completed : item);
+  const base = { ...profile, inventory: nextInventory, contracts, reputation: Math.min(100, (profile.reputation ?? 50) + contract.reputationReward) };
+  const achievements = awardAchievements(base);
+  const nextProfile = addLedger(
+    { ...base, achievements: achievements.achievements },
+    [ledgerEntry(profile, 'revenue', revenue, `تسليم عقد ${contract.clientName} · ${contract.productName}`, 0), ...(achievements.bonus > 0 ? [ledgerEntry(profile, 'revenue', achievements.bonus, 'مكافأة إنجازات العقود', 1)] : [])],
+    profile.bankBalance + revenue + achievements.bonus,
+  );
+  return success(nextProfile, `تم تسليم العقد بنجاح. حصلت على ${revenue.toLocaleString('ar-EG')} ج.م وارتفعت سمعتك.`, completed);
 }
 
 export function claimTask(profile: PlayerProfile, taskId: string): GameResult<TaskOutcome> {

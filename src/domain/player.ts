@@ -13,6 +13,8 @@ import type {
   ProductionOrder,
   TaskProgress,
   SeasonProgress,
+  BusinessContract,
+  AchievementRecord,
 } from './futureSystems';
 
 export interface PlayerAsset {
@@ -83,6 +85,9 @@ export interface PlayerProfile {
   tasks: TaskProgress[];
   completedTaskIds: string[];
   season?: SeasonProgress;
+  reputation: number;
+  contracts: BusinessContract[];
+  achievements: AchievementRecord[];
 }
 
 function createId(): string {
@@ -123,6 +128,9 @@ export function createNewPlayer(
     events: [],
     tasks: [],
     completedTaskIds: [],
+    reputation: 50,
+    contracts: [],
+    achievements: [],
     season: { seasonId: 'expansion-season-1', startedOnDay: 1, endsOnDay: 30, points: 0, claimedChallengeKeys: [] },
   };
 }

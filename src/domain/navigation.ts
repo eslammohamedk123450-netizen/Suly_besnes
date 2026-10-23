@@ -12,6 +12,7 @@ export type SectionId =
   | 'production'
   | 'inventory'
   | 'reports'
+  | 'contracts'
   | 'tasks'
   | 'settings';
 
@@ -41,6 +42,7 @@ export const GAME_SECTIONS: readonly SectionItem[] = [
   { id: 'production', label: 'المصانع والإنتاج', shortLabel: 'الإنتاج', subtitle: 'مصانعك وسلاسل الإنتاج', icon: 'factory' },
   { id: 'inventory', label: 'المواد الخام والمخازن', shortLabel: 'المخازن', subtitle: 'المواد والمنتجات والمخزون', icon: 'warehouse' },
   { id: 'reports', label: 'التقارير المالية', shortLabel: 'التقارير', subtitle: 'صورة واضحة عن الأداء المالي', icon: 'report' },
+  { id: 'contracts', label: 'العقود والعملاء', shortLabel: 'العقود', subtitle: 'طلبات السوق والسمعة التجارية', icon: 'briefcase' },
   { id: 'tasks', label: 'المهام والإنجازات', shortLabel: 'المهام', subtitle: 'أهداف وتحديات مستقبلية', icon: 'tasks' },
   { id: 'settings', label: 'الإعدادات', shortLabel: 'الإعدادات', subtitle: 'إدارة ملفك المحلي', icon: 'settings' },
 ];
@@ -49,7 +51,7 @@ export const SECTION_GROUPS: readonly SectionGroup[] = [
   { id: 'home', label: 'المركز', sections: ['home'] },
   { id: 'market', label: 'السوق والتوسع', sections: ['auctions', 'lands', 'companies'] },
   { id: 'operations', label: 'التشغيل', sections: ['production', 'inventory'] },
-  { id: 'finance', label: 'المال والتقدم', sections: ['investments', 'bank', 'staff', 'obligations', 'reports', 'tasks'] },
+  { id: 'finance', label: 'المال والتقدم', sections: ['investments', 'bank', 'staff', 'obligations', 'reports', 'contracts', 'tasks'] },
   { id: 'settings', label: 'النظام', sections: ['settings'] },
 ];
 
