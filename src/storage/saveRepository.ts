@@ -305,15 +305,18 @@ function migrateProfile(value: unknown): PlayerProfile | null {
 function isProfile(value: unknown): value is PlayerProfile {
   return migrateProfile(value) !== null;
 }
-
+export function normalizeSavedProfile(value: unknown): PlayerProfile | null {
+  const profile = migrateProfile(value);
+  return profile && isProfile(profile) ? profile : null;
+}
 export function loadSavedGame(accountId?: string): PlayerProfile | null {
   try {
     const raw = globalThis.localStorage?.getItem(saveKey(accountId)) ?? (accountId ? globalThis.localStorage?.getItem(SAVE_KEY) : null);
     if (!raw) return null;
     const value: unknown = JSON.parse(raw);
     if (!isRecord(value) || ![1, 2, 3, SAVE_VERSION].includes(value.version as number) || !isDateString(value.savedAt)) return null;
-    const profile = migrateProfile(value.profile);
-    if (!profile || !isProfile(profile)) return null;
+    const profile = normalizeSavedProfile(value.profile);
+    if (!profile) return null;
     if (value.version !== SAVE_VERSION || JSON.stringify(value.profile) !== JSON.stringify(profile)) saveGame(profile, accountId);
     return profile;
   } catch {

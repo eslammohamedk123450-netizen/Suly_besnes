@@ -446,6 +446,8 @@ export function runProduction(profile: PlayerProfile, companyId: string, batches
   if (!company) return failure(profile, 'not-found', 'الشركة غير موجودة.');
   const recipe = findRecipeForIndustry(company.industryId);
   if (!recipe) return failure(profile, 'not-found', 'لا توجد وصفة لهذا القطاع.');
+  const product = PRODUCT_CATALOG.find((item) => item.id === recipe.productId);
+  if (!product) return failure(profile, 'not-found', 'المنتج الناتج غير موجود في الكتالوج.');
   const maintenanceCondition = company.maintenanceCondition ?? 100;
   if (maintenanceCondition < 25) return failure(profile, 'factory-maintenance', 'المصنع متعطل ويحتاج إلى صيانة قبل بدء أمر جديد.');
   const energyAvailable = company.energyUnits ?? 0;
@@ -461,12 +463,19 @@ export function runProduction(profile: PlayerProfile, companyId: string, batches
     const lot = profile.inventory.find((item) => item.materialOrProductId === input.materialId);
     return sum + input.quantity * batches * (lot?.unitCost ?? 0);
   }, 0);
+  const currentProductQuantity = profile.inventory.find((lot) => lot.materialOrProductId === product.id)?.quantity ?? 0;
+  const plannedProductQuantity = profile.productionOrders
+    .filter((order) => order.status === 'active' && order.productId === product.id)
+    .reduce((sum, order) => sum + order.outputQuantity, 0);
+  const outputQuantity = batches * recipe.outputQuantity;
+  if (currentProductQuantity + plannedProductQuantity + outputQuantity > product.storageLimit) {
+    return failure(profile, 'storage-limit', `سعة تخزين ${product.name} لا تكفي للإنتاج المخطط؛ المتاح ${Math.max(0, product.storageLimit - currentProductQuantity - plannedProductQuantity)} ${product.unit}.`);
+  }
 
   const inventory = profile.inventory.map((lot) => {
     const input = recipe.inputs.find((item) => item.materialId === lot.materialOrProductId);
     return input ? { ...lot, quantity: lot.quantity - input.quantity * batches } : lot;
   }).filter((lot) => lot.quantity > 0);
-  const outputQuantity = batches * recipe.outputQuantity;
   const companies = profile.companies.map((item) => item.id === companyId ? { ...item, energyUnits: energyAvailable - batches * recipe.energyUnits } : item);
   const hasManager = profile.staff.some((member) => member.status === 'active' && member.role === 'manager' && member.companyId === companyId);
   const durationDays = Math.min(3, Math.max(1, Math.ceil(batches / 3) - (hasManager ? 1 : 0)));

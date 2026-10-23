@@ -1,10 +1,11 @@
 import type { PlayerProfile } from '../domain/player';
 import { supabase } from './supabaseClient';
+import { normalizeSavedProfile } from './saveRepository';
 
 export async function loadRemoteGame(accountId: string): Promise<PlayerProfile | null> {
   const { data, error } = await supabase.from('game_profiles').select('save_data').eq('user_id', accountId).maybeSingle();
   if (error || !data?.save_data || typeof data.save_data !== 'object') return null;
-  return data.save_data as PlayerProfile;
+  return normalizeSavedProfile(data.save_data);
 }
 
 export async function saveRemoteGame(accountId: string, profile: PlayerProfile): Promise<boolean> {
