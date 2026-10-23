@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { COUNTRIES } from '../domain/countries';
 import { createNewPlayer, type PlayerProfile } from '../domain/player';
 import { getContractOffers } from './contracts';
-import { advanceDay, acceptContract, buySpeedCard, deliverContract, foundCompany, payStaffSalary, runProduction } from './engine';
+import { advanceDay, acceptContract, buyGoldWithDiamonds, buySpeedCard, deliverContract, foundCompany, payStaffSalary, repayLoan, runProduction, sellGold, takeLoan } from './engine';
 import { negotiateContract } from './engine';
 import { getSynergyBonuses } from './synergy';
 import { normalizeSavedProfile } from '../storage/saveRepository';
@@ -125,5 +125,31 @@ describe('Business Empire economy invariants', () => {
     const result = foundCompany(base, 'food', 'land-1', 'شركة الاختبار');
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.profile.badges).toContain('شارة المؤسس');
+  });
+
+  it('exchanges diamonds for gold and gold for cash without negative balances', () => {
+    const bought = buyGoldWithDiamonds(profile({ diamonds: 120 }), 1);
+    expect(bought.ok).toBe(true);
+    if (!bought.ok) return;
+    expect(bought.profile.diamonds).toBe(60);
+    expect(bought.profile.goldGrams).toBe(1);
+    const sold = sellGold(bought.profile, 0.5);
+    expect(sold.ok).toBe(true);
+    if (sold.ok) expect(sold.profile.bankBalance).toBeGreaterThan(bought.profile.bankBalance);
+    expect(buyGoldWithDiamonds(bought.profile, 2).ok).toBe(false);
+  });
+
+  it('supports paying several loan installments or the full balance at once', () => {
+    const base = profile({ bankBalance: 500_000, lands: [{ id: 'land-loan', label: 'ضمان', landType: 'industrial', areaSquareMeters: 1_000, purchasePrice: 200_000, acquiredAt: '2026-01-01T00:00:00.000Z', acquiredOnDay: 1 }] });
+    const opened = takeLoan(base, 'land', 'land-loan', 100_000, 14);
+    expect(opened.ok).toBe(true);
+    if (!opened.ok) return;
+    const partial = repayLoan(opened.profile, opened.data.id, 2);
+    expect(partial.ok).toBe(true);
+    if (!partial.ok) return;
+    expect(partial.data.remainingBalance).toBeLessThan(opened.data.remainingBalance);
+    const closed = repayLoan(partial.profile, opened.data.id, 'all');
+    expect(closed.ok).toBe(true);
+    if (closed.ok) expect(closed.data.status).toBe('paid');
   });
 });

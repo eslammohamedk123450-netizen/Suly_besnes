@@ -825,6 +825,18 @@ function takeLoan(profile, collateralType, collateralId, amount, termDays) {
   );
   return success(nextProfile, `\u062A\u0645 \u0635\u0631\u0641 \u0642\u0631\u0636 \u0645\u062D\u0627\u0643\u0627\u0629 \u0628\u0642\u064A\u0645\u0629 ${amount.toLocaleString("ar-EG")} \u062C.\u0645\u061B \u064A\u0628\u062F\u0623 \u0627\u0644\u0642\u0633\u0637 \u0641\u064A \u0627\u0644\u064A\u0648\u0645 \u0627\u0644\u062A\u0627\u0644\u064A.`, loan);
 }
+function repayLoan(profile, loanId, installments) {
+  const loan = profile.banking.loans.find((item) => item.id === loanId && item.status === "active");
+  if (!loan) return failure(profile, "not-found", "القرض غير موجود أو تمت تسويته بالفعل.");
+  const count = installments === "all" ? Math.ceil(loan.remainingBalance / loan.installmentAmount) : installments;
+  if (!Number.isInteger(count) || count < 1) return failure(profile, "invalid-input", "اختر قسطًا واحدًا على الأقل.");
+  const amount = installments === "all" ? loan.remainingBalance : Math.min(loan.remainingBalance, loan.installmentAmount * count);
+  if (profile.bankBalance < amount) return failure(profile, "insufficient-funds", "لا يكفي الرصيد لتسديد هذه الدفعة.");
+  const remainingBalance = Math.max(0, loan.remainingBalance - amount);
+  const updatedLoan = { ...loan, remainingBalance, nextPaymentDay: loan.nextPaymentDay + count, status: remainingBalance === 0 ? "paid" : loan.status };
+  const nextProfile = addLedger({ ...profile, banking: { ...profile.banking, loans: profile.banking.loans.map((item) => item.id === loanId ? updatedLoan : item) } }, [ledgerEntry(profile, "settlement", amount, `سداد ${installments === "all" ? "كامل" : `${count} أقساط`} من القرض ${loanId}`, 0)], profile.bankBalance - amount);
+  return success(nextProfile, remainingBalance === 0 ? "تم سداد القرض بالكامل وإغلاقه." : `تم سداد ${count} أقساط دفعة واحدة. المتبقي ${remainingBalance.toLocaleString("ar-EG")} ج.م.`, updatedLoan);
+}
 function createInvestment(profile, investmentId, amount) {
   const countryError = ensureEgypt(profile);
   if (countryError) return countryError;
@@ -1057,6 +1069,13 @@ var produce = runProduction;
 var sell = sellProduct;
 var invest = createInvestment;
 var passDay = advanceDay;
+function buyGoldWithDiamonds(profile, grams) {
+  if (!Number.isFinite(grams) || grams <= 0 || Math.abs(grams * 10 - Math.round(grams * 10)) > 1e-8) return failure(profile, "invalid-input", "أدخل كمية ذهب موجبة بخطوة 0.1 غرام.");
+  const diamonds = Math.round(grams * 60);
+  if (profile.diamonds < diamonds) return failure(profile, "insufficient-funds", "لا يكفي رصيد الماس لشراء هذه الكمية من الذهب.");
+  const nextProfile = { ...profile, diamonds: profile.diamonds - diamonds, goldGrams: Math.round((profile.goldGrams + grams) * 10) / 10, goldCostBasis: profile.goldCostBasis };
+  return success(nextProfile, `تم شراء ${grams.toFixed(1)} غرام ذهب مقابل ${diamonds} ماسة.`, { grams, cashAmount: diamonds, pricePerGram: 60 });
+}
 function buyGlobalMaterial(profile, offerId, quantity, negotiatedUnitPrice) {
   if (profile.countryId !== "egypt") return failure(profile, "wrong-country", "هذه الجولة متاحة لمصر فقط.");
   if (!isPositiveInteger(quantity)) return failure(profile, "invalid-input", "الكمية يجب أن تكون عددًا صحيحًا موجبًا.");
@@ -1125,6 +1144,8 @@ function executeGameCommand(profile, command) {
       return sellProduct(profile, command.args.productId, command.args.quantity);
     case "buy_gold":
       return buyGold(profile, command.args.grams);
+    case "buy_gold_with_diamonds":
+      return buyGoldWithDiamonds(profile, command.args.grams);
     case "sell_gold":
       return sellGold(profile, command.args.grams);
     case "hire_staff":
@@ -1139,6 +1160,8 @@ function executeGameCommand(profile, command) {
       return withdrawDeposit(profile, command.args.depositId);
     case "take_loan":
       return takeLoan(profile, command.args.collateralType, command.args.collateralId, command.args.amount, command.args.termDays);
+    case "repay_loan":
+      return repayLoan(profile, command.args.loanId, command.args.installments);
     case "create_investment":
       return createInvestment(profile, command.args.investmentId, command.args.amount);
     case "advance_day":

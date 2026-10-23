@@ -637,6 +637,15 @@ export function buyGold(profile: PlayerProfile, grams: number): GameResult<GoldT
   return success(nextProfile, `اشتريت ${grams.toFixed(1)} غرام ذهب بسعر محاكاة ${GOLD_PRICE_PER_GRAM} ج.م للغرام.`, { grams, cashAmount: amount, pricePerGram: GOLD_PRICE_PER_GRAM });
 }
 
+const DIAMONDS_PER_GOLD_GRAM = 60;
+export function buyGoldWithDiamonds(profile: PlayerProfile, grams: number): GameResult<GoldTradeOutcome> {
+  if (!isPositiveTenth(grams)) return failure(profile, 'invalid-input', 'أدخل كمية ذهب موجبة بخطوة 0.1 غرام.');
+  const diamonds = Math.round(grams * DIAMONDS_PER_GOLD_GRAM);
+  if (profile.diamonds < diamonds) return failure(profile, 'insufficient-funds', 'لا يكفي رصيد الماس لشراء هذه الكمية من الذهب.');
+  const nextProfile = { ...profile, diamonds: profile.diamonds - diamonds, goldGrams: Math.round((profile.goldGrams + grams) * 10) / 10, goldCostBasis: profile.goldCostBasis };
+  return success(nextProfile, `تم شراء ${grams.toFixed(1)} غرام ذهب مقابل ${diamonds} ماسة.`, { grams, cashAmount: diamonds, pricePerGram: DIAMONDS_PER_GOLD_GRAM });
+}
+
 export function sellGold(profile: PlayerProfile, grams: number): GameResult<GoldTradeOutcome> {
   const countryError = ensureEgypt(profile);
   if (countryError) return countryError;
@@ -786,6 +795,23 @@ export function takeLoan(profile: PlayerProfile, collateralType: LoanRecord['col
     profile.bankBalance + amount,
   );
   return success(nextProfile, `تم صرف قرض محاكاة بقيمة ${amount.toLocaleString('ar-EG')} ج.م؛ يبدأ القسط في اليوم التالي.`, loan);
+}
+
+export function repayLoan(profile: PlayerProfile, loanId: string, installments: number | 'all'): GameResult<LoanRecord> {
+  const loan = profile.banking.loans.find((item) => item.id === loanId && item.status === 'active');
+  if (!loan) return failure(profile, 'not-found', 'القرض غير موجود أو تمت تسويته بالفعل.');
+  const count = installments === 'all' ? Math.ceil(loan.remainingBalance / loan.installmentAmount) : installments;
+  if (!Number.isInteger(count) || count < 1) return failure(profile, 'invalid-input', 'اختر قسطًا واحدًا على الأقل.');
+  const amount = installments === 'all' ? loan.remainingBalance : Math.min(loan.remainingBalance, loan.installmentAmount * count);
+  if (profile.bankBalance < amount) return failure(profile, 'insufficient-funds', 'لا يكفي الرصيد لتسديد هذه الدفعة.');
+  const remainingBalance = Math.max(0, loan.remainingBalance - amount);
+  const updatedLoan = { ...loan, remainingBalance, nextPaymentDay: loan.nextPaymentDay + count, status: remainingBalance === 0 ? 'paid' as const : loan.status };
+  const nextProfile = addLedger(
+    { ...profile, banking: { ...profile.banking, loans: profile.banking.loans.map((item) => item.id === loanId ? updatedLoan : item) } },
+    [ledgerEntry(profile, 'settlement', amount, `سداد ${installments === 'all' ? 'كامل' : `${count} أقساط`} من القرض ${loanId}`, 0)],
+    profile.bankBalance - amount,
+  );
+  return success(nextProfile, remainingBalance === 0 ? 'تم سداد القرض بالكامل وإغلاقه.' : `تم سداد ${count} أقساط دفعة واحدة. المتبقي ${remainingBalance.toLocaleString('ar-EG')} ج.م.`, updatedLoan);
 }
 
 export function createInvestment(profile: PlayerProfile, investmentId: string, amount: number): GameResult<InvestmentOutcome> {
@@ -1062,6 +1088,7 @@ export type GameCommand =
   | { name: 'buy_speed_card'; args: { kind: SpeedCardKind; quantity: number } }
   | { name: 'sell_product'; args: { productId: string; quantity: number } }
   | { name: 'buy_gold'; args: { grams: number } }
+  | { name: 'buy_gold_with_diamonds'; args: { grams: number } }
   | { name: 'sell_gold'; args: { grams: number } }
   | { name: 'hire_staff'; args: { role: StaffRole; name: string; companyId?: string } }
   | { name: 'pay_staff_salary'; args: { staffId: string } }
@@ -1069,6 +1096,7 @@ export type GameCommand =
   | { name: 'create_deposit'; args: { amount: number; durationDays: number } }
   | { name: 'withdraw_deposit'; args: { depositId: string } }
   | { name: 'take_loan'; args: { collateralType: LoanRecord['collateralType']; collateralId: string; amount: number; termDays: number } }
+  | { name: 'repay_loan'; args: { loanId: string; installments: number | 'all' } }
   | { name: 'create_investment'; args: { investmentId: string; amount: number } }
   | { name: 'advance_day'; args: {} }
   | { name: 'accept_contract'; args: { offerId: string } }
@@ -1098,6 +1126,7 @@ export function executeGameCommand(profile: PlayerProfile, command: GameCommand)
     case 'buy_speed_card': return buySpeedCard(profile, command.args.kind, command.args.quantity);
     case 'sell_product': return sellProduct(profile, command.args.productId, command.args.quantity);
     case 'buy_gold': return buyGold(profile, command.args.grams);
+    case 'buy_gold_with_diamonds': return buyGoldWithDiamonds(profile, command.args.grams);
     case 'sell_gold': return sellGold(profile, command.args.grams);
     case 'hire_staff': return hireStaff(profile, command.args.role, command.args.name, command.args.companyId);
     case 'pay_staff_salary': return payStaffSalary(profile, command.args.staffId);
@@ -1105,6 +1134,7 @@ export function executeGameCommand(profile: PlayerProfile, command: GameCommand)
     case 'create_deposit': return createDeposit(profile, command.args.amount, command.args.durationDays);
     case 'withdraw_deposit': return withdrawDeposit(profile, command.args.depositId);
     case 'take_loan': return takeLoan(profile, command.args.collateralType, command.args.collateralId, command.args.amount, command.args.termDays);
+    case 'repay_loan': return repayLoan(profile, command.args.loanId, command.args.installments);
     case 'create_investment': return createInvestment(profile, command.args.investmentId, command.args.amount);
     case 'advance_day': return advanceDay(profile);
     case 'accept_contract': return acceptContract(profile, command.args.offerId);
