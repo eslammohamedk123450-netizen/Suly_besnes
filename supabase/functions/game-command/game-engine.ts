@@ -1055,6 +1055,27 @@ var produce = runProduction;
 var sell = sellProduct;
 var invest = createInvestment;
 var passDay = advanceDay;
+function buyGlobalMaterial(profile, offerId, quantity, negotiatedUnitPrice) {
+  if (profile.countryId !== "egypt") return failure(profile, "wrong-country", "هذه الجولة متاحة لمصر فقط.");
+  if (!isPositiveInteger(quantity)) return failure(profile, "invalid-input", "الكمية يجب أن تكون عددًا صحيحًا موجبًا.");
+  const match = /^global-(.+)-day-(\d+)-offer-(\d+)$/.exec(offerId);
+  if (!match || Number(match[2]) !== profile.day) return failure(profile, "not-found", "عرض السوق العالمي لم يعد متاحًا.");
+  const material = findMaterial(match[1]);
+  if (!material) return failure(profile, "not-found", "المادة الخام غير موجودة في الكتالوج.");
+  const offerIndex = Number(match[3]);
+  const factors = [0.92, 1, 1.12];
+  const unitPrice = Math.max(1, Math.round(material.pricePerUnit * factors[(offerIndex + profile.day + MATERIAL_CATALOG.findIndex((item) => item.id === material.id)) % factors.length]));
+  const negotiable = (offerIndex + profile.day + MATERIAL_CATALOG.findIndex((item) => item.id === material.id)) % 3 !== 1;
+  const floorPrice = negotiable ? Math.max(1, Math.round(unitPrice * 0.9)) : unitPrice;
+  const agreedPrice = negotiatedUnitPrice ?? unitPrice;
+  if (!Number.isInteger(agreedPrice) || agreedPrice < floorPrice || agreedPrice > unitPrice || (!negotiable && agreedPrice !== unitPrice)) return failure(profile, "invalid-input", "السعر لا يطابق شروط العرض أو التفاوض.");
+  const totalCost = quantity * agreedPrice;
+  if (profile.bankBalance < totalCost) return failure(profile, "insufficient-funds", "لا يكفي رصيدك لقبول هذه الصفقة.");
+  const existing = (profile.inventory ?? []).find((lot) => lot.materialOrProductId === material.id);
+  const inventory = existing ? profile.inventory.map((lot) => lot.materialOrProductId === material.id ? { ...lot, quantity: lot.quantity + quantity, unitCost: (lot.quantity * lot.unitCost + totalCost) / (lot.quantity + quantity) } : lot) : [...profile.inventory, { id: nextId(profile, "inventory", profile.inventory.length), materialOrProductId: material.id, quantity, unit: material.unit, unitCost: agreedPrice }];
+  const nextProfile = addLedger({ ...profile, inventory }, [ledgerEntry(profile, "asset", totalCost, `شراء عالمي ${quantity} ${material.unit} من السوق العالمي`, 0)], profile.bankBalance - totalCost);
+  return success(syncTasks(nextProfile), `تم شراء ${quantity} ${material.name} من السوق العالمي بلا حد تخزين.`, { materialId: material.id, quantity, totalCost, unitPrice: agreedPrice });
+}
 function executeGameCommand(profile, command) {
   switch (command.name) {
     case "place_bid":
@@ -1071,6 +1092,8 @@ function executeGameCommand(profile, command) {
       return sellAsset(profile, command.args.assetId);
     case "buy_material":
       return buyMaterial(profile, command.args.materialId, command.args.quantity);
+    case "buy_global_material":
+      return buyGlobalMaterial(profile, command.args.offerId, command.args.quantity, command.args.negotiatedUnitPrice);
     case "found_company":
       return foundCompany(profile, command.args.industryId, command.args.landId, command.args.name);
     case "upgrade_company":
