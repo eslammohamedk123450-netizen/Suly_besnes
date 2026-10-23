@@ -1,3 +1,4 @@
+import { Capacitor } from '@capacitor/core';
 import { supabase } from './supabaseClient';
 
 export interface LocalAccount {
@@ -7,7 +8,22 @@ export interface LocalAccount {
   isGuest?: boolean;
 }
 
+export type PasswordRecoveryRequest =
+  | { ok: true; message: string }
+  | { ok: false; message: string };
+
+export type PasswordRecoveryCallback =
+  | { kind: 'ignored' }
+  | { kind: 'ready' }
+  | { kind: 'error'; message: string };
+
+export type PasswordUpdateResult =
+  | { ok: true; account: LocalAccount }
+  | { ok: false; message: string };
+
 const GUEST_ACCOUNT_KEY = 'business-empire.guest-account.v1';
+const NATIVE_RECOVERY_URL = 'com.businessempire.game://auth/recovery';
+const NATIVE_SCHEME = 'com.businessempire.game:';
 
 function toAccount(user: { id: string; email?: string; created_at?: string }): LocalAccount {
   return { id: user.id, email: user.email ?? '', createdAt: user.created_at ?? new Date().toISOString() };
@@ -42,6 +58,107 @@ export async function loadCurrentAccount(): Promise<LocalAccount | null> {
     // A local guest account remains usable when the authentication service is offline.
   }
   return readGuestAccount();
+}
+
+function getPasswordRecoveryRedirectUrl(): string {
+  if (Capacitor.isNativePlatform()) return NATIVE_RECOVERY_URL;
+
+  const configuredUrl = import.meta.env.VITE_AUTH_RECOVERY_URL?.trim();
+  const defaultUrl = typeof window !== 'undefined' ? window.location.origin : 'http://localhost';
+  const target = new URL(configuredUrl || defaultUrl);
+  target.searchParams.set('auth', 'recovery');
+  return target.toString();
+}
+
+function recoveryRequestError(errorMessage: string): string {
+  const message = errorMessage.toLowerCase();
+  if (message.includes('redirect') || message.includes('url')) {
+    return 'تعذر إعداد رابط الاستعادة. تأكد من إضافة رابط التطبيق إلى قائمة Redirect URLs في Supabase.';
+  }
+  if (message.includes('rate limit') || message.includes('too many') || message.includes('security purposes')) {
+    return 'وصلت إلى حد طلبات الاستعادة المؤقت. انتظر قليلًا ثم حاول مجددًا.';
+  }
+  return 'تعذر إرسال طلب الاستعادة الآن. تحقق من اتصالك وحاول مرة أخرى.';
+}
+
+export async function requestPasswordRecovery(emailInput: string): Promise<PasswordRecoveryRequest> {
+  const email = emailInput.trim().toLowerCase();
+  if (!/^\S+@\S+\.\S+$/.test(email)) return { ok: false, message: 'اكتب بريدًا إلكترونيًا صحيحًا.' };
+
+  try {
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: getPasswordRecoveryRedirectUrl(),
+    });
+    if (error) return { ok: false, message: recoveryRequestError(error.message) };
+    return {
+      ok: true,
+      message: 'إذا كان هذا البريد مرتبطًا بحساب، فستصلك رسالة لاستعادة كلمة المرور. تحقق من صندوق البريد والرسائل غير المرغوب فيها.',
+    };
+  } catch {
+    return { ok: false, message: 'تعذر إرسال طلب الاستعادة الآن. تحقق من اتصالك وحاول مرة أخرى.' };
+  }
+}
+
+export async function handlePasswordRecoveryCallback(rawUrl: string): Promise<PasswordRecoveryCallback> {
+  let callbackUrl: URL;
+  try {
+    callbackUrl = new URL(rawUrl);
+  } catch {
+    return { kind: 'ignored' };
+  }
+
+  if (callbackUrl.protocol !== NATIVE_SCHEME || callbackUrl.hostname !== 'auth' || callbackUrl.pathname !== '/recovery') {
+    return { kind: 'ignored' };
+  }
+
+  const query = callbackUrl.searchParams;
+  const fragment = new URLSearchParams(callbackUrl.hash.replace(/^#/, ''));
+  const getValue = (key: string) => query.get(key) ?? fragment.get(key);
+  const error = getValue('error_description') ?? getValue('error_code') ?? getValue('error');
+  if (error) return { kind: 'error', message: 'رابط الاستعادة غير صالح أو انتهت صلاحيته. ارجع إلى تسجيل الدخول واطلب رابطًا جديدًا.' };
+
+  const type = getValue('type');
+  if (type && type !== 'recovery') return { kind: 'ignored' };
+
+  try {
+    const code = getValue('code');
+    if (code) {
+      const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+      if (exchangeError) return { kind: 'error', message: 'رابط الاستعادة غير صالح أو انتهت صلاحيته. اطلب رابطًا جديدًا من شاشة الدخول.' };
+      return { kind: 'ready' };
+    }
+
+    const accessToken = getValue('access_token');
+    const refreshToken = getValue('refresh_token');
+    if (!accessToken || !refreshToken) {
+      return { kind: 'error', message: 'لم نتمكن من قراءة رابط الاستعادة. اطلب رابطًا جديدًا من شاشة الدخول.' };
+    }
+
+    const { error: sessionError } = await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken });
+    if (sessionError) return { kind: 'error', message: 'رابط الاستعادة غير صالح أو انتهت صلاحيته. اطلب رابطًا جديدًا من شاشة الدخول.' };
+    return { kind: 'ready' };
+  } catch {
+    return { kind: 'error', message: 'تعذر فتح رابط الاستعادة. تحقق من اتصالك ثم اطلب رابطًا جديدًا.' };
+  }
+}
+
+export async function updatePasswordFromRecovery(password: string): Promise<PasswordUpdateResult> {
+  if (password.length < 8) return { ok: false, message: 'كلمة المرور الجديدة يجب أن تتكون من 8 أحرف على الأقل.' };
+
+  try {
+    const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+    if (sessionError || !sessionData.session) {
+      return { ok: false, message: 'جلسة الاستعادة غير موجودة أو انتهت. اطلب رابطًا جديدًا من شاشة الدخول.' };
+    }
+
+    const { data, error } = await supabase.auth.updateUser({ password });
+    if (error || !data.user) {
+      return { ok: false, message: 'تعذر تحديث كلمة المرور. افتح أحدث رابط استعادة ثم حاول مرة أخرى.' };
+    }
+    return { ok: true, account: toAccount(data.user) };
+  } catch {
+    return { ok: false, message: 'تعذر تحديث كلمة المرور الآن. تحقق من اتصالك وحاول مرة أخرى.' };
+  }
 }
 
 export async function registerAccount(emailInput: string, password: string): Promise<{ ok: true; account: LocalAccount } | { ok: false; message: string }> {

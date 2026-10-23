@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
+import { App as CapacitorApp } from '@capacitor/app';
+import { Capacitor } from '@capacitor/core';
 import { Brand } from './components/Brand';
 import { AccountGate } from './components/AccountGate';
 import { CountrySelection } from './components/CountrySelection';
@@ -16,8 +18,10 @@ import { formatMoney } from './domain/formatters';
 import { advanceDay, type GameCommand, type GameResult } from './game/engine';
 import { loadSavedGame, saveGame } from './storage/saveRepository';
 import { loadNotificationTheme, saveNotificationTheme } from './storage/userPreferences';
-import { createGuestAccount, loadCurrentAccount, logoutAccount, type LocalAccount } from './storage/authRepository';
+import { createGuestAccount, handlePasswordRecoveryCallback, loadCurrentAccount, logoutAccount, type LocalAccount } from './storage/authRepository';
 import { executeRemoteGameCommand, loadRemoteGame, redeemRemoteReward, saveRemoteGame, type RemoteGameCommandAttempt } from './storage/remoteSaveRepository';
+import { PasswordResetGate } from './components/PasswordResetGate';
+import { supabase } from './storage/supabaseClient';
 import { StoryIntro } from './components/StoryIntro';
 import { SystemGuideModal } from './components/SystemGuideModal';
 import { StarterMissionDock } from './components/StarterMissionDock';
@@ -30,6 +34,14 @@ import { blockInitialProfile, clearPendingInitialProfile, loadPendingInitialProf
 
 function getPendingSyncCount(accountId: string): number {
   return loadQueuedGameCommands(accountId).length + (loadPendingInitialProfile(accountId) ? 1 : 0);
+}
+
+function clearWebRecoveryMarker() {
+  const url = new URL(window.location.href);
+  if (url.searchParams.get('auth') !== 'recovery') return;
+  url.searchParams.delete('auth');
+  url.hash = '';
+  window.history.replaceState(null, '', `${url.pathname}${url.search}`);
 }
 
 export default function App() {
@@ -47,6 +59,8 @@ export default function App() {
   const [linkingAccount, setLinkingAccount] = useState(false);
   const [syncState, setSyncState] = useState<ResourceSyncState>('synced');
   const [pendingCommandCount, setPendingCommandCount] = useState(0);
+  const [passwordRecovery, setPasswordRecovery] = useState(false);
+  const [recoveryError, setRecoveryError] = useState('');
   const syncLock = useRef(false);
 
   async function claimDailyLogin(nextAccount: LocalAccount) {
@@ -58,6 +72,76 @@ export default function App() {
       // Leaderboard availability must never block local gameplay or login.
     }
   }
+
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        setRecoveryError('');
+        setPasswordRecovery(true);
+        setAuthLoading(false);
+        clearWebRecoveryMarker();
+      }
+    });
+
+    let disposed = false;
+    let removeDeepLinkListener: (() => void) | undefined;
+
+    async function handleRecoveryUrl(url: string) {
+      const result = await handlePasswordRecoveryCallback(url);
+      if (result.kind === 'ignored' || disposed) return;
+      setRecoveryError(result.kind === 'error' ? result.message : '');
+      setPasswordRecovery(true);
+      setAuthLoading(false);
+    }
+
+    if (Capacitor.isNativePlatform()) {
+      void (async () => {
+        const listener = await CapacitorApp.addListener('appUrlOpen', ({ url }) => {
+          void handleRecoveryUrl(url);
+        });
+        if (disposed) {
+          void listener.remove();
+          return;
+        }
+        removeDeepLinkListener = () => { void listener.remove(); };
+        const launch = await CapacitorApp.getLaunchUrl();
+        if (launch?.url) await handleRecoveryUrl(launch.url);
+      })().catch(() => undefined);
+    } else {
+      const returnUrl = new URL(window.location.href);
+      if (returnUrl.searchParams.get('auth') === 'recovery') {
+        const callbackParams = new URLSearchParams(returnUrl.hash.replace(/^#/, ''));
+        const hasCallbackError = Boolean(
+          returnUrl.searchParams.get('error_description')
+          ?? returnUrl.searchParams.get('error_code')
+          ?? returnUrl.searchParams.get('error')
+          ?? callbackParams.get('error_description')
+          ?? callbackParams.get('error_code')
+          ?? callbackParams.get('error'),
+        );
+        void supabase.auth.getSession().then(({ data }) => {
+          if (disposed) return;
+          setRecoveryError(hasCallbackError || !data.session
+            ? 'رابط الاستعادة غير صالح أو انتهت صلاحيته. ارجع إلى تسجيل الدخول واطلب رابطًا جديدًا.'
+            : '');
+          setPasswordRecovery(true);
+          setAuthLoading(false);
+          clearWebRecoveryMarker();
+        }).catch(() => {
+          if (disposed) return;
+          setRecoveryError('تعذر التحقق من رابط الاستعادة. تحقق من اتصالك ثم اطلب رابطًا جديدًا.');
+          setPasswordRecovery(true);
+          setAuthLoading(false);
+        });
+      }
+    }
+
+    return () => {
+      disposed = true;
+      subscription.unsubscribe();
+      removeDeepLinkListener?.();
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -515,6 +599,19 @@ export default function App() {
     setLinkingAccount(false);
   }
 
+  if (passwordRecovery) {
+    return (
+      <PasswordResetGate
+        errorMessage={recoveryError || undefined}
+        onBack={() => { setPasswordRecovery(false); setRecoveryError(''); }}
+        onComplete={(recoveredAccount) => {
+          setPasswordRecovery(false);
+          setRecoveryError('');
+          void handleAuthenticated(recoveredAccount);
+        }}
+      />
+    );
+  }
   if (authLoading) return <div className="account-loading">جارٍ فتح حسابك...</div>;
   if (linkingAccount && account?.isGuest) return <AccountGate onAuthenticated={handleLinkedAccount} onPlayAsGuest={() => setLinkingAccount(false)} onCancel={() => setLinkingAccount(false)} />;
   if (!account) return <AccountGate onAuthenticated={handleAuthenticated} onPlayAsGuest={handlePlayAsGuest} />;

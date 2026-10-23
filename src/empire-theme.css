@@ -362,6 +362,11 @@
 .account-page .privacy-note { color: #a6bacb; }
 .account-visual, .setup-visual { border-color: rgba(246,196,83,.2); }
 .account-message--error, .setup-error { color: #ffb7b0; background: rgba(255,120,106,.1); border-color: rgba(255,120,106,.25); }
+.account-page .account-error, .account-page .account-message { margin: 0 0 12px; padding: 10px 12px; border: 1px solid var(--ui-line); border-radius: 10px; font-size: 12px; line-height: 1.65; }
+.account-page .account-error { color: #ffb7b0; background: rgba(255,120,106,.1); border-color: rgba(255,120,106,.25); }
+.account-page .account-message--success { color: #b8f3dc; background: rgba(22,199,154,.09); border-color: rgba(22,199,154,.28); }
+.account-page .account-recovery-link { margin-top: 9px; }
+.account-page .account-recovery-link + .account-switch { margin-top: 8px; }
 
 @media (max-width: 1080px) {
   .resource-bar { padding-inline: 18px; gap: 12px; }
