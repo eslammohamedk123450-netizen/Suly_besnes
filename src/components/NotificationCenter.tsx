@@ -3,7 +3,7 @@ import { Icon } from './Icon';
 
 interface NotificationCenterProps {
   notifications: GameNotification[];
-  onNavigate: (section: GameNotification['section']) => void;
+  onNavigate: (section: GameNotification['section'], target?: string) => void;
 }
 
 export function NotificationCenter({ notifications, onNavigate }: NotificationCenterProps) {
@@ -13,7 +13,7 @@ export function NotificationCenter({ notifications, onNavigate }: NotificationCe
         <div><span className="section-kicker">تنبيهات مجمعة</span><h2>مركز التنبيهات</h2></div>
         <span className="notification-count">{notifications.length} مجموعات</span>
       </div>
-      {notifications.length === 0 ? <p className="notification-empty">لا توجد تنبيهات معلقة. وضع الإمبراطورية مستقر حاليًا.</p> : <div className="notification-list">{notifications.map((notification) => <button className={`notification-row notification-row--${notification.tone}`} type="button" key={notification.id} onClick={() => onNavigate(notification.section)}><span className="notification-icon"><Icon name={notification.tone === 'danger' ? 'shield' : notification.tone === 'success' ? 'target' : notification.tone === 'warning' ? 'clock' : 'report'} size={16} /></span><span className="notification-copy"><strong>{notification.title}{notification.count ? <em>{notification.count}</em> : null}</strong><small>{notification.detail}</small></span><Icon name="chevron" size={14} /></button>)}</div>}
+      {notifications.length === 0 ? <p className="notification-empty">لا توجد تنبيهات معلقة. وضع الإمبراطورية مستقر حاليًا.</p> : <div className="notification-list">{notifications.map((notification) => <button className={`notification-row notification-row--${notification.tone}`} type="button" key={notification.id} onClick={() => onNavigate(notification.section, notification.target)}><span className="notification-icon"><Icon name={notification.tone === 'danger' ? 'shield' : notification.tone === 'success' ? 'target' : notification.tone === 'warning' ? 'clock' : 'report'} size={16} /></span><span className="notification-copy"><strong>{notification.title}{notification.count ? <em>{notification.count}</em> : null}</strong><small>{notification.detail}</small></span><Icon name="chevron" size={14} /></button>)}</div>}
     </section>
   );
 }

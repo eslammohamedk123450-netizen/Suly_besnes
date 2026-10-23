@@ -15,7 +15,7 @@ import { GlobalLeaderboardCard } from './GlobalLeaderboardCard';
 interface DashboardProps {
   profile: PlayerProfile;
   country: CountryDefinition;
-  onNavigate: (section: SectionId) => void;
+  onNavigate: (section: SectionId, target?: string) => void;
 }
 
 export function Dashboard({ profile, country, onNavigate }: DashboardProps) {

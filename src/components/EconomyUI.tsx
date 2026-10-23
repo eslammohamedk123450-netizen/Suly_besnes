@@ -24,6 +24,7 @@ export function EconomyPageShell({ dayLabel, balanceLabel, children }: EconomyPa
 }
 
 interface EconomyPanelProps {
+  id?: string;
   title: string;
   description?: string;
   aside?: ReactNode;
@@ -31,9 +32,9 @@ interface EconomyPanelProps {
   className?: string;
 }
 
-export function EconomyPanel({ title, description, aside, children, className = '' }: EconomyPanelProps) {
+export function EconomyPanel({ id, title, description, aside, children, className = '' }: EconomyPanelProps) {
   return (
-    <section className={`economy-panel${className ? ` ${className}` : ''}`}>
+    <section id={id} className={`economy-panel${className ? ` ${className}` : ''}`}>
       <div className="economy-panel-heading">
         <div><h2>{title}</h2>{description && <p>{description}</p>}</div>
         {aside}

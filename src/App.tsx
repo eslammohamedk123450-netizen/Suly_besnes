@@ -52,6 +52,7 @@ export default function App() {
   const [selectedCountryId, setSelectedCountryId] = useState<CountryId>(() => profile?.countryId ?? COUNTRIES[0].id);
   const [playerName, setPlayerName] = useState(() => profile?.name ?? 'أحمد المستثمر');
   const [activeSection, setActiveSection] = useState<SectionId>('home');
+  const [sectionFocus, setSectionFocus] = useState<string | undefined>();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [notificationTheme, setNotificationTheme] = useState(loadNotificationTheme);
   const [notice, setNotice] = useState('');
@@ -584,13 +585,14 @@ export default function App() {
     setNoticeTone(saved.ok ? 'success' : 'error');
   }
 
-  function navigate(section: SectionId) {
+  function navigate(section: SectionId, focus?: string) {
     if (!profile || !isSectionUnlocked(profile, section)) {
       setNotice(profile ? getSectionUnlockHint(profile, section) : 'ابدأ عالمك أولًا لفتح أنظمة اللعبة.');
       setNoticeTone('error');
       return;
     }
     setActiveSection(section);
+    setSectionFocus(focus);
     if (section !== 'home' && section !== 'profile' && !profile.onboarding.seenGuides.includes(section)) setPendingGuide(section);
     setMobileMenuOpen(false);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -679,7 +681,7 @@ export default function App() {
           ) : activeSection === 'profile' ? (
             <ProfilePage profile={profile} country={country} accountId={account.id} isGuest={Boolean(account.isGuest)} isSynced={!account.isGuest && syncState === 'synced' && pendingCommandCount === 0} onLinkAccount={() => setLinkingAccount(true)} />
           ) : (
-            <SectionPage section={active} profile={profile} country={country} notificationTheme={notificationTheme} isGuest={Boolean(account.isGuest)} onNotificationThemeChange={setNotificationTheme} onHome={() => navigate('home')} onAction={handleGameResult} onCommand={handleGameCommand} onRedeemed={handleRedeemed} onLinkAccount={() => setLinkingAccount(true)} onLogout={handleLogout} onShowGuide={() => setPendingGuide(activeSection)} />
+            <SectionPage section={active} profile={profile} country={country} focus={sectionFocus} notificationTheme={notificationTheme} isGuest={Boolean(account.isGuest)} onNotificationThemeChange={setNotificationTheme} onHome={() => navigate('home')} onAction={handleGameResult} onCommand={handleGameCommand} onRedeemed={handleRedeemed} onLinkAccount={() => setLinkingAccount(true)} onLogout={handleLogout} onShowGuide={() => setPendingGuide(activeSection)} />
           )}
         </main>
       </div>
