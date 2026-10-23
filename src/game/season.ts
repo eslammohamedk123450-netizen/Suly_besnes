@@ -41,6 +41,7 @@ export const SEASON_CHALLENGES: readonly SeasonChallenge[] = [
 export const LOGIN_REWARDS = [
   { id: 'cash', title: 'سيولة فورية', description: '25,000 جنيه محاكاة', points: 5 },
   { id: 'gold', title: 'ذهب للمحفظة', description: '0.5 غرام ذهب محاكاة', points: 5 },
+  { id: 'diamonds', title: 'ماس الإمبراطورية', description: '8 ماسات مجانية للبطاقات', points: 5 },
 ] as const;
 
 export function getSeasonLeaderboard(profile: PlayerProfile): Array<{ name: string; points: number; isPlayer?: boolean }> {
@@ -108,6 +109,10 @@ export function claimLoginReward(profile: PlayerProfile, rewardId: (typeof LOGIN
   if (rewardId === 'gold') {
     const nextProfile = withLedger(profile, 0, 'مكافأة دخول الموسم: 0.5 غرام ذهب', { season, goldGrams: Math.round((profile.goldGrams + 0.5) * 10) / 10, goldCostBasis: profile.goldCostBasis + 3_000 });
     return { ok: true, profile: nextProfile, message: 'تمت إضافة 0.5 غرام ذهب محاكاة إلى محفظتك.', data: { rewardId } };
+  }
+  if (rewardId === 'diamonds') {
+    const nextProfile = withLedger(profile, 0, 'مكافأة دخول الموسم: 8 ماسات', { season, diamonds: profile.diamonds + 8 });
+    return { ok: true, profile: nextProfile, message: 'تمت إضافة 8 ماسات مجانية إلى حسابك.', data: { rewardId } };
   }
   const nextProfile = withLedger(profile, 25_000, 'مكافأة دخول الموسم: سيولة فورية', { season });
   return { ok: true, profile: nextProfile, message: 'تمت إضافة 25,000 ج.م محاكاة إلى رصيدك.', data: { rewardId } };
