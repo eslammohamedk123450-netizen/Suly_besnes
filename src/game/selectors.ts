@@ -1,5 +1,6 @@
 import type { SectionId } from '../domain/navigation';
 import type { PlayerProfile } from '../domain/player';
+import { calculateTotalAssets } from '../domain/player';
 import { AUCTION_CATALOG, findIndustry, findMaterial, findInvestment, PRODUCT_CATALOG, RECIPE_CATALOG, TASK_CATALOG } from './catalog';
 import { getAuctionListings, isAuctionOpen } from './auctions';
 import { getOperatingCostProgression } from './economyBalance';
@@ -77,6 +78,16 @@ export interface EmpirePulse {
   badges: Array<{ id: string; label: string; earned: boolean }>;
 }
 
+export interface EmpirePoints {
+  total: number;
+  title: string;
+  wealth: number;
+  performance: number;
+  reputation: number;
+  stability: number;
+  expansion: number;
+}
+
 export function selectAvailableAuctions(profile: PlayerProfile): typeof AUCTION_CATALOG {
   return getAuctionListings(profile).filter((listing) => isAuctionOpen(profile, listing));
 }
@@ -104,6 +115,21 @@ export function selectEmpirePulse(profile: PlayerProfile): EmpirePulse {
     { id: 'trader', label: 'صائد السوق', earned: profile.sales.length >= 3 },
   ];
   return { score, rank: current.name, rankTone: current.tone, nextRank: next.name, nextRankScore: next.score, focusTitle, focusDescription, badges };
+}
+
+/** تقييم مشتق من 0 إلى 1000؛ لا يُحفظ كرقم قابل للتعديل داخل ملف اللاعب. */
+export function selectEmpirePoints(profile: PlayerProfile): EmpirePoints {
+  const totalAssets = calculateTotalAssets(profile);
+  const wealth = Math.min(300, Math.floor(Math.max(0, totalAssets) / 100_000) * 10);
+  const performance = Math.min(220, Math.floor(Math.max(0, profile.finances.netProfit) / 50_000) * 10 + Math.min(60, profile.sales.length * 4) + Math.min(60, (profile.contracts ?? []).filter((contract) => contract.status === 'completed').length * 12));
+  const reputation = Math.min(180, Math.round((profile.reputation ?? 50) * 1.8));
+  const overduePenalty = Math.min(130, Math.floor(Math.max(0, profile.payables) / 25_000) * 10);
+  const defaultPenalty = Math.min(50, profile.banking.loans.filter((loan) => loan.status === 'defaulted').length * 25);
+  const stability = Math.max(0, 150 - overduePenalty - defaultPenalty);
+  const expansion = Math.min(150, profile.companies.length * 25 + profile.lands.length * 10 + profile.staff.filter((member) => member.status === 'active').length * 5);
+  const total = Math.min(1000, wealth + performance + reputation + stability + expansion);
+  const title = total >= 850 ? 'إمبراطورية رائدة' : total >= 650 ? 'إمبراطورية متقدمة' : total >= 400 ? 'إمبراطورية صاعدة' : total >= 200 ? 'تاجر واعد' : 'بداية الإمبراطورية';
+  return { total, title, wealth, performance, reputation, stability, expansion };
 }
 
 export function selectOperationsSnapshot(profile: PlayerProfile, operatingCostMultiplier = 1): OperationsSnapshot {
