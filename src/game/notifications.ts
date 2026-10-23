@@ -1,5 +1,6 @@
 import type { PlayerProfile } from '../domain/player';
 import { selectAvailableAuctions } from './selectors';
+import { selectEmpirePulse } from './selectors';
 
 export type NotificationTone = 'warning' | 'success' | 'info' | 'danger';
 export interface GameNotification {
@@ -7,7 +8,7 @@ export interface GameNotification {
   title: string;
   detail: string;
   tone: NotificationTone;
-  section: 'home' | 'contracts' | 'staff' | 'bank' | 'auctions' | 'reports' | 'obligations' | 'companies';
+  section: 'home' | 'contracts' | 'staff' | 'bank' | 'auctions' | 'reports' | 'obligations' | 'companies' | 'inventory';
 }
 
 export function selectNotifications(profile: PlayerProfile): GameNotification[] {
@@ -34,5 +35,9 @@ export function selectNotifications(profile: PlayerProfile): GameNotification[] 
   if (selectAvailableAuctions(profile).length > 0) {
     notifications.push({ id: 'auctions-open', title: 'فرص مزادات متاحة', detail: 'توجد أصول أو شحنات يمكن المنافسة عليها الآن.', tone: 'info', section: 'auctions' });
   }
+  selectEmpirePulse(profile).badges.filter((badge) => badge.earned).slice(-3).forEach((badge) => {
+    notifications.push({ id: `badge-${badge.id}`, title: 'شارة إمبراطورية مكتسبة', detail: `أصبحت شارة «${badge.label}» ضمن إنجازاتك.`, tone: 'success', section: 'home' });
+  });
+  notifications.push({ id: 'global-market-open', title: 'السوق العالمي مفتوح', detail: 'تتوفر عروض روبوتية جديدة للمواد الخام، وبعضها يقبل التفاوض.', tone: 'info', section: 'inventory' });
   return notifications.slice(0, 12);
 }
