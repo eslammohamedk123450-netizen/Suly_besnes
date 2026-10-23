@@ -1,6 +1,6 @@
 import { findCountry, type IndustryId } from '../domain/countries';
 import type { PlayerAsset, PlayerCompany, PlayerLand, PlayerProfile } from '../domain/player';
-import type { AuctionBidRecord, BusinessContract, DepositRecord, FinanceLedgerEntry, GameEventRecord, InventoryLot, InvestmentRecord, LoanRecord, ProductionOrder, StaffContract, StaffRole, AchievementRecord } from '../domain/futureSystems';
+import type { AuctionBidRecord, BusinessContract, DepositRecord, FinanceLedgerEntry, GameEventRecord, InventoryLot, InvestmentRecord, LoanRecord, ProductSale, ProductionOrder, StaffContract, StaffRole, AchievementRecord } from '../domain/futureSystems';
 import {
   DIRECT_COMPANY_CATALOG,
   DIRECT_LAND_CATALOG,
@@ -394,6 +394,7 @@ export function foundCompany(profile: PlayerProfile, industryId: IndustryId, lan
     industryId,
     countryId: profile.countryId,
     foundedAt: timestampFor(profile),
+    foundedOnDay: profile.day,
     landId,
     licenseIds: [licenseId],
     energyUnits: industry.energyCapacity,
@@ -496,9 +497,10 @@ export function cancelProductionOrder(profile: PlayerProfile, orderId: string): 
   if (!order) return failure(profile, 'not-found', 'أمر الإنتاج غير موجود.');
   if (order.status !== 'active') return failure(profile, 'production-not-cancellable', 'لا يمكن إلغاء أمر مكتمل أو ملغى.');
   const refund = Math.round(order.materialCost * 0.7);
+  const unrecoveredMaterialCost = Math.max(0, order.materialCost - refund);
   const nextProfile = addLedger(
     { ...profile, productionOrders: profile.productionOrders.map((item) => item.id === orderId ? { ...item, status: 'cancelled' as const } : item) },
-    [ledgerEntry(profile, 'settlement', refund, `استرداد 70% من حجز أمر الإنتاج ${order.productName}`, 0)],
+    [ledgerEntry(profile, 'settlement', refund, `استرداد 70% من حجز أمر الإنتاج ${order.productName}`, 0), ...(unrecoveredMaterialCost > 0 ? [ledgerEntry(profile, 'expense', unrecoveredMaterialCost, `خسارة مواد غير مستردة لأمر ${order.productName}`, 1)] : [])],
     profile.bankBalance + refund,
   );
   return success(nextProfile, `تم إلغاء الأمر واسترداد ${refund.toLocaleString('ar-EG')} ج.م من الحجز.`, { orderId, refund });
@@ -522,7 +524,7 @@ export function sellProduct(profile: PlayerProfile, productId: string, quantity:
   const tax = Math.round(grossRevenue * taxRate);
   const costOfGoods = Math.round(lot.unitCost * quantity);
   const nextInventory = profile.inventory.map((item) => item.materialOrProductId === productId ? { ...item, quantity: item.quantity - quantity } : item).filter((item) => item.quantity > 0);
-  const sale = { id: nextId(profile, 'sale', profile.sales.length), productId, quantity, unitPrice: marketQuote.currentPrice, grossRevenue, tax, soldAt: timestampFor(profile) };
+  const sale: ProductSale = { id: nextId(profile, 'sale', profile.sales.length), productId, quantity, unitPrice: marketQuote.currentPrice, grossRevenue, tax, costOfGoods, soldOnDay: profile.day, soldAt: timestampFor(profile) };
   const nextProfile = addLedger(
     { ...profile, inventory: nextInventory, sales: [...profile.sales, sale] },
     [
@@ -771,7 +773,7 @@ export function advanceDay(profile: PlayerProfile): GameResult<DayOutcome> {
   let inventory = [...profile.inventory];
   const productionOrders = profile.productionOrders.map((order) => {
     if (order.status !== 'active' || order.completesOnDay > nextDay) return order;
-    const unitCost = order.materialCost / order.outputQuantity;
+  const unitCost = order.materialCost / order.outputQuantity;
     const existingLot = inventory.find((lot) => lot.materialOrProductId === order.productId);
     inventory = existingLot
       ? inventory.map((lot) => lot.materialOrProductId === order.productId
@@ -882,18 +884,33 @@ export function deliverContract(profile: PlayerProfile, contractId: string): Gam
   if (profile.day > contract.deadlineDay) return failure(profile, 'condition-not-met', 'انتهت مهلة العقد؛ انتظر ترحيل اليوم لتسجيل فشله.');
   const lot = profile.inventory.find((item) => item.materialOrProductId === contract.productId && item.quantity >= contract.quantity);
   if (!lot) return failure(profile, 'insufficient-materials', `تحتاج إلى ${contract.quantity} وحدة من ${contract.productName} قبل التسليم.`);
+  const minimumQuality = contract.minimumQuality ?? 0;
+  const actualQuality = lot.qualityScore ?? 90;
+  if (actualQuality < minimumQuality) return failure(profile, 'condition-not-met', `جودة المنتج ${Math.round(actualQuality)}%، بينما يشترط العميل ${minimumQuality}% على الأقل.`);
   const nextInventory = profile.inventory.flatMap((item) => item.id !== lot.id ? [item] : item.quantity === contract.quantity ? [] : [{ ...item, quantity: item.quantity - contract.quantity }]);
-  const revenue = contract.quantity * contract.unitPrice + contract.reward;
+  const grossRevenue = contract.quantity * contract.unitPrice;
+  const hasAccountant = profile.staff.some((member) => member.status === 'active' && member.role === 'accountant');
+  const taxRate = (findCountry(profile.countryId)?.economy.taxRate ?? 0) * (hasAccountant ? 0.9 : 1);
+  const tax = Math.round(grossRevenue * taxRate);
+  const costOfGoods = Math.round(lot.unitCost * contract.quantity);
+  const sale: ProductSale = { id: nextId(profile, 'sale', profile.sales.length), productId: contract.productId, quantity: contract.quantity, unitPrice: contract.unitPrice, grossRevenue, tax, costOfGoods, soldOnDay: profile.day, contractId: contract.id, soldAt: timestampFor(profile) };
+  const revenue = grossRevenue + contract.reward;
   const completed: BusinessContract = { ...contract, status: 'completed', completedOnDay: profile.day };
   const contracts = (profile.contracts ?? []).map((item) => item.id === contract.id ? completed : item);
-  const base = { ...profile, inventory: nextInventory, contracts, reputation: Math.min(100, (profile.reputation ?? 50) + contract.reputationReward) };
+  const base = { ...profile, inventory: nextInventory, sales: [...profile.sales, sale], contracts, reputation: Math.min(100, (profile.reputation ?? 50) + contract.reputationReward) };
   const achievements = awardAchievements(base);
   const nextProfile = addLedger(
     { ...base, achievements: achievements.achievements },
-    [ledgerEntry(profile, 'revenue', revenue, `تسليم عقد ${contract.clientName} · ${contract.productName}`, 0), ...(achievements.bonus > 0 ? [ledgerEntry(profile, 'revenue', achievements.bonus, 'مكافأة إنجازات العقود', 1)] : [])],
-    profile.bankBalance + revenue + achievements.bonus,
+    [
+      ledgerEntry(profile, 'revenue', grossRevenue, `بيع عقد ${contract.clientName} · ${contract.productName}`, 0),
+      ledgerEntry(profile, 'revenue', contract.reward, `علاوة عقد ${contract.clientName}`, 1),
+      ledgerEntry(profile, 'expense', tax, 'ضريبة مبيعات محاكاة على العقد', 2),
+      ledgerEntry(profile, 'expense', costOfGoods, `تكلفة البضاعة المباعة بعقد: ${contract.productName}`, 3),
+      ...(achievements.bonus > 0 ? [ledgerEntry(profile, 'revenue', achievements.bonus, 'مكافأة إنجازات العقود', 4)] : []),
+    ],
+    profile.bankBalance + revenue - tax + achievements.bonus,
   );
-  return success(nextProfile, `تم تسليم العقد بنجاح. حصلت على ${revenue.toLocaleString('ar-EG')} ج.م وارتفعت سمعتك.`, completed);
+  return success(syncTasks(nextProfile), `تم تسليم العقد بنجاح. الإيراد ${grossRevenue.toLocaleString('ar-EG')} ج.م والعلاوة ${contract.reward.toLocaleString('ar-EG')} ج.م بعد احتساب الضريبة والتكلفة.`, completed);
 }
 
 export function claimTask(profile: PlayerProfile, taskId: string): GameResult<TaskOutcome> {

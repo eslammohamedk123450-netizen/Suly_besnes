@@ -40,6 +40,7 @@ export interface PlayerCompany {
   industryId: IndustryId;
   countryId: CountryId;
   foundedAt: string;
+  foundedOnDay?: number;
   landId?: string;
   licenseIds?: string[];
   energyUnits?: number;

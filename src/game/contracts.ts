@@ -39,6 +39,7 @@ export function getContractOffers(profile: PlayerProfile): ContractOffer[] {
       unitPrice,
       reward: Math.round(unitPrice * quantity * 0.12),
       reputationReward: client.type === 'urgent' ? 8 : 5,
+      minimumQuality: client.type === 'quality' ? 92 : undefined,
       deadlineDay: deadline,
       description: client.description,
     };

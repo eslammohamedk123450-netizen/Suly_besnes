@@ -68,6 +68,9 @@ export interface ProductSale {
   unitPrice: number;
   grossRevenue: number;
   tax: number;
+  costOfGoods?: number;
+  soldOnDay?: number;
+  contractId?: string;
   soldAt: string;
 }
 
@@ -205,6 +208,7 @@ export interface BusinessContract {
   unitPrice: number;
   reward: number;
   reputationReward: number;
+  minimumQuality?: number;
   deadlineDay: number;
   acceptedOnDay: number;
   status: ContractStatus;
