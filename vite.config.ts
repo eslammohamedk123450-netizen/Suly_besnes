@@ -46,4 +46,4 @@ function adminCodeApi() {
   } };
 }
 
-export default defineConfig({ plugins: [react(), adminCodeApi()], server: { host: '0.0.0.0', port: 3000, strictPort: true, allowedHosts: ['3000-iketdicg64pocr7bvbsfa-c733e53e.sg2.manus.computer'] }, build: { target: 'es2022', sourcemap: false } });
+export default defineConfig({ plugins: [react(), adminCodeApi()], server: { host: '0.0.0.0', port: 3000, strictPort: true, allowedHosts: ['3000-iketdicg64pocr7bvbsfa-c733e53e.sg2.manus.computer'] }, preview: { host: '0.0.0.0', port: 3000, strictPort: true, allowedHosts: ['3000-i1vbpqovhbyqwcb61hj57-9d39feba.sg2.manus.computer'] }, build: { target: 'es2022', sourcemap: false } });
