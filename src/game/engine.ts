@@ -416,7 +416,12 @@ export function upgradeCompany(profile: PlayerProfile, companyId: string): GameR
   if (!company) return failure(profile, 'not-found', 'الشركة غير موجودة.');
   const level = company.upgradeLevel ?? 1;
   if (level >= 5) return failure(profile, 'condition-not-met', 'وصلت هذه الشركة إلى أعلى مستوى تطوير.');
-  const cost = 120_000 * level;
+  const completedBatches = profile.productionOrders
+    .filter((order) => order.companyId === companyId && order.status === 'completed')
+    .reduce((sum, order) => sum + order.batches, 0);
+  const requiredBatches = level * 2;
+  if (completedBatches < requiredBatches) return failure(profile, 'condition-not-met', `تحتاج إلى إكمال ${requiredBatches} دفعات إنتاج قبل الوصول إلى المستوى ${level + 1}. أكملت ${completedBatches}.`);
+  const cost = Math.round(120_000 * Math.pow(1.55, level - 1));
   if (profile.bankBalance < cost) return failure(profile, 'insufficient-funds', `تحتاج إلى ${cost.toLocaleString('ar-EG')} ج.م لتطوير الشركة.`);
   const capacityBonus = 20 * level;
   const companies = profile.companies.map((item) => item.id === companyId
@@ -617,6 +622,20 @@ export function hireStaff(profile: PlayerProfile, role: StaffRole, name: string,
   return success(nextProfile, `تم تعيين ${staff.name} بوظيفة ${option.label}؛ أول راتب دوري في اليوم التالي.`, staff);
 }
 
+export function payStaffSalary(profile: PlayerProfile, staffId: string): GameResult<{ staffId: string; amount: number }> {
+  const employee = profile.staff.find((member) => member.id === staffId && member.status === 'active');
+  if (!employee) return failure(profile, 'not-found', 'عقد الموظف غير موجود أو غير نشط.');
+  const amount = employee.unpaidSalary ?? 0;
+  if (amount <= 0) return failure(profile, 'condition-not-met', 'لا يوجد راتب مستحق لهذا الموظف حاليًا.');
+  if (profile.bankBalance < amount) return failure(profile, 'insufficient-funds', `تحتاج إلى ${amount.toLocaleString('ar-EG')} ج.م لدفع راتب ${employee.name}.`);
+  const nextProfile = addLedger(
+    { ...profile, staff: profile.staff.map((member) => member.id === staffId ? { ...member, unpaidSalary: 0, nextPayDay: profile.day + 1 } : member) },
+    [ledgerEntry(profile, 'expense', amount, `دفع راتب يدوي: ${employee.name}`, 0)],
+    profile.bankBalance - amount,
+  );
+  return success(nextProfile, `تم دفع ${amount.toLocaleString('ar-EG')} ج.م للموظف ${employee.name}.`, { staffId, amount });
+}
+
 export function terminateStaff(profile: PlayerProfile, staffId: string): GameResult<StaffContract> {
   const employee = profile.staff.find((member) => member.id === staffId && member.status === 'active');
   if (!employee) return failure(profile, 'not-found', 'عقد الموظف غير موجود أو تم إنهاؤه.');
@@ -745,15 +764,8 @@ export function advanceDay(profile: PlayerProfile): GameResult<DayOutcome> {
   });
   const staff = profile.staff.map((employee) => {
     if (employee.status !== 'active' || employee.nextPayDay > nextDay) return employee;
-    const paid = Math.min(balance, employee.dailySalary);
-    balance -= paid;
-    entries.push(ledgerEntry(profile, 'expense', employee.dailySalary, `راتب ${employee.role}: ${employee.name}`, entries.length));
-    if (paid < employee.dailySalary) {
-      const unpaid = employee.dailySalary - paid;
-      payables += unpaid;
-      entries.push(ledgerEntry(profile, 'liability', unpaid, `راتب غير مسدد: ${employee.name}`, entries.length));
-    }
-    return { ...employee, nextPayDay: nextDay + 1 };
+    const dueDays = Math.max(1, nextDay - employee.nextPayDay + 1);
+    return { ...employee, nextPayDay: nextDay + 1, unpaidSalary: (employee.unpaidSalary ?? 0) + employee.dailySalary * dueDays };
   });
   let inventory = [...profile.inventory];
   const productionOrders = profile.productionOrders.map((order) => {

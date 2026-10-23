@@ -126,6 +126,7 @@ export interface StaffContract {
   dailySalary: number;
   hiredOnDay: number;
   nextPayDay: number;
+  unpaidSalary?: number;
   status: 'active' | 'terminated';
 }
 
