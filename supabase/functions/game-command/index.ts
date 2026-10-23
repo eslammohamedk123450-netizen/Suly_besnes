@@ -8,7 +8,7 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 const allowedCommands = new Set([
-  'place_bid', 'buy_direct_land', 'buy_direct_company', 'sell_land', 'sell_company', 'sell_asset',
+  'place_bid', 'buy_direct_land', 'buy_direct_company', 'sell_land', 'upgrade_land', 'sell_company', 'sell_asset',
   'buy_material', 'buy_global_material', 'found_company', 'upgrade_company', 'run_production', 'service_company',
   'cancel_production', 'use_speed_card', 'buy_speed_card', 'sell_product', 'buy_gold', 'buy_gold_with_diamonds', 'sell_gold', 'hire_staff',
   'pay_staff_salary', 'terminate_staff', 'create_deposit', 'withdraw_deposit', 'take_loan', 'repay_loan',

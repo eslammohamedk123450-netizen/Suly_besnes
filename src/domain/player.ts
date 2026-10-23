@@ -35,6 +35,7 @@ export interface PlayerLand {
   /** Day on which the land entered the player's empire; optional for legacy saves. */
   acquiredOnDay?: number;
   landType?: 'industrial' | 'agricultural' | 'commercial';
+  upgradeLevel?: number;
 }
 
 export interface PlayerCompany {

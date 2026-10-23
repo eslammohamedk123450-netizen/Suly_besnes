@@ -339,6 +339,18 @@ export function sellLand(profile: PlayerProfile, landId: string): GameResult<{ l
   return success(nextProfile, `تم بيع ${land.label} واسترداد 50% من قيمتها.`, { landId, payout });
 }
 
+export function upgradeLand(profile: PlayerProfile, landId: string): GameResult<{ landId: string; level: number; cost: number }> {
+  const land = profile.lands.find((item) => item.id === landId);
+  if (!land) return failure(profile, 'not-found', 'الأرض غير موجودة.');
+  const level = land.upgradeLevel ?? 1;
+  if (level >= 5) return failure(profile, 'condition-not-met', 'وصلت الأرض إلى أعلى مستوى تطوير.');
+  const cost = Math.round(80_000 * Math.pow(1.55, level - 1));
+  if (profile.bankBalance < cost) return failure(profile, 'insufficient-funds', 'لا يكفي الرصيد لتطوير هذه الأرض.');
+  const upgraded = { ...land, upgradeLevel: level + 1, areaSquareMeters: Math.round(land.areaSquareMeters * 1.1), purchasePrice: land.purchasePrice + cost };
+  const nextProfile = addLedger({ ...profile, lands: profile.lands.map((item) => item.id === landId ? upgraded : item) }, [ledgerEntry(profile, 'expense', cost, `تطوير أرض ${land.label} إلى المستوى ${level + 1}`, 0)], profile.bankBalance - cost);
+  return success(nextProfile, `تم تطوير ${land.label} إلى المستوى ${level + 1}.`, { landId, level: level + 1, cost });
+}
+
 export function sellCompany(profile: PlayerProfile, companyId: string): GameResult<{ companyId: string; payout: number }> {
   const company = profile.companies.find((item) => item.id === companyId);
   if (!company) return failure(profile, 'not-found', 'الشركة غير موجودة.');
@@ -1075,6 +1087,7 @@ export type GameCommand =
   | { name: 'buy_direct_land'; args: { listingId: string } }
   | { name: 'buy_direct_company'; args: { listingId: string } }
   | { name: 'sell_land'; args: { landId: string } }
+  | { name: 'upgrade_land'; args: { landId: string } }
   | { name: 'sell_company'; args: { companyId: string } }
   | { name: 'sell_asset'; args: { assetId: string } }
   | { name: 'buy_material'; args: { materialId: string; quantity: number } }
@@ -1113,6 +1126,7 @@ export function executeGameCommand(profile: PlayerProfile, command: GameCommand)
     case 'buy_direct_land': return buyDirectLand(profile, command.args.listingId);
     case 'buy_direct_company': return buyDirectCompany(profile, command.args.listingId);
     case 'sell_land': return sellLand(profile, command.args.landId);
+    case 'upgrade_land': return upgradeLand(profile, command.args.landId);
     case 'sell_company': return sellCompany(profile, command.args.companyId);
     case 'sell_asset': return sellAsset(profile, command.args.assetId);
     case 'buy_material': return buyMaterial(profile, command.args.materialId, command.args.quantity);

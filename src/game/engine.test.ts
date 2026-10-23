@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { COUNTRIES } from '../domain/countries';
 import { createNewPlayer, type PlayerProfile } from '../domain/player';
 import { getContractOffers } from './contracts';
-import { advanceDay, acceptContract, buyGoldWithDiamonds, buySpeedCard, deliverContract, foundCompany, payStaffSalary, repayLoan, runProduction, sellGold, takeLoan } from './engine';
+import { advanceDay, acceptContract, buyGoldWithDiamonds, buySpeedCard, deliverContract, foundCompany, payStaffSalary, repayLoan, runProduction, sellGold, takeLoan, upgradeLand } from './engine';
 import { negotiateContract } from './engine';
 import { getSynergyBonuses } from './synergy';
 import { normalizeSavedProfile } from '../storage/saveRepository';
@@ -151,5 +151,16 @@ describe('Business Empire economy invariants', () => {
     const closed = repayLoan(partial.profile, opened.data.id, 'all');
     expect(closed.ok).toBe(true);
     if (closed.ok) expect(closed.data.status).toBe('paid');
+  });
+
+  it('upgrades land with a bounded level and increases its usable area', () => {
+    const base = profile({ bankBalance: 250_000, lands: [{ id: 'land-upgrade', label: 'أرض تطوير', landType: 'industrial', areaSquareMeters: 1_000, purchasePrice: 120_000, acquiredAt: '2026-01-01T00:00:00.000Z', acquiredOnDay: 1 }] });
+    const result = upgradeLand(base, 'land-upgrade');
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.data.level).toBe(2);
+      expect(result.profile.lands[0].areaSquareMeters).toBe(1_100);
+      expect(result.profile.bankBalance).toBe(170_000);
+    }
   });
 });

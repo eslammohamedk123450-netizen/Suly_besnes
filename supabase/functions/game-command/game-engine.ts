@@ -457,6 +457,17 @@ function sellLand(profile, landId) {
   const nextProfile = addLedger({ ...profile, lands: profile.lands.filter((item) => item.id !== landId) }, [ledgerEntry(profile, "revenue", payout, `\u0628\u064A\u0639 \u0623\u0631\u0636: ${land.label} \u0628\u0646\u0635\u0641 \u0627\u0644\u0642\u064A\u0645\u0629`, 0)], profile.bankBalance + payout);
   return success(nextProfile, `\u062A\u0645 \u0628\u064A\u0639 ${land.label} \u0648\u0627\u0633\u062A\u0631\u062F\u0627\u062F 50% \u0645\u0646 \u0642\u064A\u0645\u062A\u0647\u0627.`, { landId, payout });
 }
+function upgradeLand(profile, landId) {
+  const land = profile.lands.find((item) => item.id === landId);
+  if (!land) return failure(profile, "not-found", "الأرض غير موجودة.");
+  const level = land.upgradeLevel ?? 1;
+  if (level >= 5) return failure(profile, "condition-not-met", "وصلت الأرض إلى أعلى مستوى تطوير.");
+  const cost = Math.round(8e4 * Math.pow(1.55, level - 1));
+  if (profile.bankBalance < cost) return failure(profile, "insufficient-funds", "لا يكفي الرصيد لتطوير هذه الأرض.");
+  const upgraded = { ...land, upgradeLevel: level + 1, areaSquareMeters: Math.round(land.areaSquareMeters * 1.1), purchasePrice: land.purchasePrice + cost };
+  const nextProfile = addLedger({ ...profile, lands: profile.lands.map((item) => item.id === landId ? upgraded : item) }, [ledgerEntry(profile, "expense", cost, `تطوير أرض ${land.label} إلى المستوى ${level + 1}`, 0)], profile.bankBalance - cost);
+  return success(nextProfile, `تم تطوير ${land.label} إلى المستوى ${level + 1}.`, { landId, level: level + 1, cost });
+}
 function sellCompany(profile, companyId) {
   const company = profile.companies.find((item) => item.id === companyId);
   if (!company) return failure(profile, "not-found", "\u0627\u0644\u0634\u0631\u0643\u0629 \u063A\u064A\u0631 \u0645\u0648\u062C\u0648\u062F\u0629.");
@@ -1118,6 +1129,8 @@ function executeGameCommand(profile, command) {
       return buyDirectCompany(profile, command.args.listingId);
     case "sell_land":
       return sellLand(profile, command.args.landId);
+    case "upgrade_land":
+      return upgradeLand(profile, command.args.landId);
     case "sell_company":
       return sellCompany(profile, command.args.companyId);
     case "sell_asset":
