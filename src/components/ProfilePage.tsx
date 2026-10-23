@@ -4,6 +4,7 @@ import type { PlayerProfile } from '../domain/player';
 import { accountCodeFromSeed } from '../domain/accountFeatures';
 import { formatGold, formatMoney, formatNumber } from '../domain/formatters';
 import { getPlayerProgress } from '../game/onboarding';
+import { selectEmpirePulse } from '../game/selectors';
 
 interface ProfilePageProps {
   profile: PlayerProfile;
@@ -50,6 +51,7 @@ export function ProfilePage({ profile, country, accountId, isGuest, isSynced, on
   const progress = getPlayerProgress(profile);
   const accountCode = accountCodeFromSeed(accountId);
   const badges = (profile.badges ?? []).filter((badge) => badge.trim().length > 0);
+  const badgeCatalog = selectEmpirePulse(profile).badges;
   const progressPercent = Math.min(
     100,
     Math.max(0, (progress.experienceInLevel / progress.experienceForNextLevel) * 100),
@@ -181,10 +183,10 @@ export function ProfilePage({ profile, country, accountId, isGuest, isSynced, on
           </div>
           <span className="profile-badges-total">{formatNumber(badges.length)}</span>
         </div>
-        {badges.length > 0 ? (
+        {badgeCatalog.length > 0 ? (
           <ul className="profile-badge-list">
-            {badges.map((badge, index) => (
-              <li className="profile-badge" key={`${badge}-${index}`}>{badge}</li>
+            {badgeCatalog.map((badge) => (
+              <li className={`profile-badge${badge.earned ? ' profile-badge--earned' : ' profile-badge--locked'}`} key={badge.id}><span className="profile-badge-mark">{badge.earned ? '◆' : '◇'}</span><span><strong>{badge.label}</strong><small>{badge.earned ? 'مكتسبة ومفعلة' : 'لم تُكتسب بعد'}</small></span></li>
             ))}
           </ul>
         ) : (
