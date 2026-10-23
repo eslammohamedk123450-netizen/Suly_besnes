@@ -1,5 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { executeGameCommand } from 'https://raw.githubusercontent.com/eslammohamedk123450-netizen/Suly_besnes/main/supabase/functions/game-command/game-engine.ts';
+import { validatePlayerProfile } from './profile-validator.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -59,9 +60,13 @@ Deno.serve(async (request) => {
   const { data: row, error: readError } = await admin.from('game_profiles').select('save_data, updated_at').eq('user_id', user.id).maybeSingle();
   if (readError || !row?.save_data || typeof row.save_data !== 'object') return json({ error: 'profile_not_found' }, 404);
   const before = row.save_data as Record<string, unknown>;
+  const beforeValidation = validatePlayerProfile(before);
+  if (!beforeValidation.ok) return json({ error: 'stored_profile_invalid', details: beforeValidation.errors }, 409);
   const result = executeGameCommand(before as never, command as never) as { ok: boolean; profile: Record<string, unknown>; message: string; data?: unknown; reason?: string };
-  if (!result.ok) return json({ ok: true, result });
   const nextProfile = result.profile;
+  const afterValidation = validatePlayerProfile(nextProfile, before);
+  if (!afterValidation.ok) return json({ error: 'command_result_invalid', details: afterValidation.errors }, 409);
+  if (!result.ok) return json({ ok: true, result });
   const commitResult = { ok: true, profile: nextProfile, result };
   const { data: committed, error: commitError } = await admin.rpc('commit_game_command', {
     p_user_id: user.id,
