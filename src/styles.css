@@ -176,6 +176,23 @@ button:disabled { cursor: not-allowed; opacity: .55; }
 .stat-value { display: block; margin: 13px 0 5px; overflow: hidden; color: var(--navy); font-size: clamp(17px, 1.6vw, 22px); font-variant-numeric: tabular-nums; font-weight: 900; text-overflow: ellipsis; white-space: nowrap; }
 .stat-footnote { color: #929eaa; font-size: 9px; }
 .dashboard-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 13px; }
+.empire-points-card { padding: 18px 20px 16px; background: linear-gradient(135deg, #fffdf7, #fff); border: 1px solid #eadfbe; border-radius: 14px; box-shadow: 0 6px 18px rgba(9,27,45,.035); }
+.empire-points-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.empire-points-title { display: flex; align-items: center; gap: 11px; }
+.empire-points-title h2 { margin: 0; color: var(--navy); font-size: 16px; }
+.empire-points-icon { display: grid; place-items: center; width: 40px; height: 40px; color: #a17b25; background: #f5edd8; border-radius: 12px; }
+.empire-points-total { display: grid; gap: 2px; text-align: left; }
+.empire-points-total strong { color: var(--navy); font-size: 22px; font-variant-numeric: tabular-nums; }
+.empire-points-total strong small { color: #87939e; font-size: 12px; font-weight: 700; }
+.empire-points-total span { color: #a17f2b; font-size: 10px; font-weight: 800; }
+.empire-points-progress { height: 7px; margin-top: 16px; overflow: hidden; background: #f0eadb; border-radius: 99px; }
+.empire-points-progress span { display: block; height: 100%; background: linear-gradient(90deg, #c39a3d, #e3c978); border-radius: inherit; }
+.empire-points-breakdown { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 9px; margin-top: 14px; }
+.empire-points-breakdown div { display: grid; gap: 4px; padding: 9px 10px; background: rgba(250,247,237,.78); border: 1px solid #f0e7cf; border-radius: 9px; }
+.empire-points-breakdown span { color: #7c8994; font-size: 9px; }
+.empire-points-breakdown strong { color: #405568; font-size: 11px; font-variant-numeric: tabular-nums; }
+.empire-points-note { display: flex; align-items: center; gap: 6px; margin: 12px 0 0; color: #89949e; font-size: 9px; }
+.empire-points-note svg { flex: 0 0 auto; color: #419779; }
 .surface { min-width: 0; padding: 17px 18px; background: #fff; border: 1px solid #e5ebf0; border-radius: 14px; box-shadow: 0 6px 18px rgba(9,27,45,.03); }
 .panel-heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
 .panel-heading h2 { margin: 0; color: var(--navy); font-size: 15px; }
@@ -228,6 +245,8 @@ button:disabled { cursor: not-allowed; opacity: .55; }
 .settings-row { display: flex; justify-content: space-between; align-items: center; gap: 15px; min-height: 48px; border-bottom: 1px solid #edf0f3; }
 .settings-row > span:first-child { color: #748392; font-size: 11px; }
 .settings-row strong { color: #233a50; font-size: 11px; }
+.settings-row--highlight { margin-inline: -8px; padding-inline: 8px; background: #fffaf0; border-bottom-color: #eee2c2; border-radius: 7px; }
+.settings-row--highlight strong { color: #9a7626; }
 .saved-status { display: inline-flex; align-items: center; gap: 8px; color: #2d8668 !important; }
 .settings-note { display: flex; align-items: flex-start; gap: 9px; margin: 18px 0; padding: 12px; color: #597182; background: #f4f8f8; border-radius: 10px; }
 .settings-note svg { flex: 0 0 auto; color: #438b74; }
@@ -320,6 +339,20 @@ button:disabled { cursor: not-allowed; opacity: .55; }
   .stat-tag { display: none; }
   .stat-value { margin: 10px 0 3px; font-size: clamp(16px, 4vw, 19px); }
   .stat-footnote { font-size: 8px; }
+  .empire-points-card { padding: 14px; border-radius: 12px; }
+  .empire-points-heading { align-items: flex-start; gap: 10px; }
+  .empire-points-title { gap: 8px; }
+  .empire-points-title h2 { font-size: 13px; }
+  .empire-points-icon { width: 33px; height: 33px; border-radius: 9px; }
+  .empire-points-icon svg { width: 17px; height: 17px; }
+  .empire-points-total strong { font-size: 17px; }
+  .empire-points-total strong small { font-size: 10px; }
+  .empire-points-total span { font-size: 8px; }
+  .empire-points-breakdown { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; margin-top: 10px; }
+  .empire-points-breakdown div { padding: 7px 8px; }
+  .empire-points-breakdown span { font-size: 8px; }
+  .empire-points-breakdown strong { font-size: 10px; }
+  .empire-points-note { font-size: 8px; line-height: 1.6; }
   .dashboard-columns { grid-template-columns: 1fr; gap: 9px; }
   .surface { padding: 14px; border-radius: 12px; }
   .panel-heading h2 { font-size: 13px; }

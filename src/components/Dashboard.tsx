@@ -5,7 +5,7 @@ import { formatGold, formatMoney, formatNumber } from '../domain/formatters';
 import { GOLD_PRICE_PER_GRAM } from '../game/catalog';
 import { GAME_SECTIONS, type SectionId } from '../domain/navigation';
 import { Icon } from './Icon';
-import { selectEmpirePulse, selectOperationsSnapshot } from '../game/selectors';
+import { selectEmpirePoints, selectEmpirePulse, selectOperationsSnapshot } from '../game/selectors';
 import { getSectionUnlockHint, getUnlockedSectionIds } from '../game/onboarding';
 
 interface DashboardProps {
@@ -22,6 +22,7 @@ export function Dashboard({ profile, country, onNavigate }: DashboardProps) {
   const latestEntries = profile.ledger.slice(-5).reverse();
   const operations = selectOperationsSnapshot(profile, country.economy.operatingCostMultiplier ?? 1);
   const pulse = selectEmpirePulse(profile);
+  const empirePoints = selectEmpirePoints(profile);
   const ledgerDay = (occurredAt: string) => {
     const createdAt = Date.parse(profile.createdAt);
     const entryAt = Date.parse(occurredAt);
@@ -63,6 +64,22 @@ export function Dashboard({ profile, country, onNavigate }: DashboardProps) {
         <div className="operations-metric"><span><Icon name="briefcase" size={15} /> منتجات قابلة للبيع</span><strong>{formatNumber(operations.productUnits)}</strong></div>
         <div className="operations-metric"><span><Icon name="target" size={15} /> عقود نشطة</span><strong>{formatNumber(operations.activeContracts)}</strong></div>
         <div className="operations-metric"><span><Icon name="shield" size={15} /> السمعة التجارية</span><strong>{formatNumber(operations.reputation)} / 100</strong></div>
+      </section>
+
+      <section className="empire-points-card" aria-label="نقاط الإمبراطورية">
+        <div className="empire-points-heading">
+          <div className="empire-points-title"><span className="empire-points-icon"><Icon name="crown" size={20} /></span><div><span className="section-kicker">التقييم الموحد للحساب</span><h2>نقاط الإمبراطورية</h2></div></div>
+          <div className="empire-points-total"><strong>{formatNumber(empirePoints.total)} <small>/ 1000</small></strong><span>{empirePoints.title}</span></div>
+        </div>
+        <div className="empire-points-progress" aria-hidden="true"><span style={{ width: `${empirePoints.total / 10}%` }} /></div>
+        <div className="empire-points-breakdown">
+          <div><span>الثروة والأصول</span><strong>{formatNumber(empirePoints.wealth)} / 300</strong></div>
+          <div><span>الأداء المالي</span><strong>{formatNumber(empirePoints.performance)} / 220</strong></div>
+          <div><span>السمعة</span><strong>{formatNumber(empirePoints.reputation)} / 180</strong></div>
+          <div><span>الاستقرار</span><strong>{formatNumber(empirePoints.stability)} / 150</strong></div>
+          <div><span>التوسع</span><strong>{formatNumber(empirePoints.expansion)} / 150</strong></div>
+        </div>
+        <p className="empire-points-note"><Icon name="shield" size={14} /> تُعاد حساباتها مباشرة من بيانات الحساب عند العرض، ولا تُحفظ كرصيد قابل للتعديل.</p>
       </section>
 
       <section className={`empire-pulse empire-pulse--${pulse.rankTone}`}>

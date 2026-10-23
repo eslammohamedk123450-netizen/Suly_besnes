@@ -11,7 +11,7 @@ import { getMarketQuote } from '../game/market';
 import { formatAuctionCountdown, getAuctionCloseAt } from '../game/auctions';
 import { getInvestmentPayoutRate, getOperatingCostProgression } from '../game/economyBalance';
 import { getContractOffers, getCustomerSegmentLabel } from '../game/contracts';
-import { selectActiveInvestments, selectAdvancedStatistics, selectAvailableAuctions, selectFinancialReport, selectInventorySummary, selectObligations, selectSalesSummary, selectTaskBoard } from '../game/selectors';
+import { selectActiveInvestments, selectAdvancedStatistics, selectAvailableAuctions, selectEmpirePoints, selectFinancialReport, selectInventorySummary, selectObligations, selectSalesSummary, selectTaskBoard } from '../game/selectors';
 import { Icon } from './Icon';
 import { EconomyEmpty, EconomyPageShell, EconomyPanel, EconomyStat } from './EconomyUI';
 import { CodeRedemption } from './CodeRedemption';
@@ -94,6 +94,7 @@ export function SectionPage({ section, profile, country, notificationTheme, isGu
   }
 
   if (section.id === 'settings') {
+    const empirePoints = selectEmpirePoints(profile);
     return <div className="section-page">{heading}{pageShell(
       <EconomyPanel title="ملف اللاعب" description="إعدادات هذا العالم المحلي المحفوظ على الجهاز.">
         <div className="settings-card settings-card--inner">
@@ -102,6 +103,7 @@ export function SectionPage({ section, profile, country, notificationTheme, isGu
           <div className="settings-row"><span>الدولة الأساسية</span><strong>{country.flag} {country.name} · {country.currency.code}</strong></div>
           <div className="settings-row"><span>اليوم داخل العالم</span><strong>{formatNumber(profile.day)}</strong></div>
           <div className="settings-row"><span>المستوى</span><strong>{formatNumber(profile.level)}</strong></div>
+          <div className="settings-row settings-row--highlight"><span>نقاط الإمبراطورية</span><strong>{formatNumber(empirePoints.total)} / 1000 · {empirePoints.title}</strong></div>
           <div className="settings-row"><span>الماس</span><strong>{formatNumber(profile.diamonds)}</strong></div>
           <div className="settings-row"><span>بطاقات التسريع</span><strong>{formatNumber(profile.speedCards.reduce((sum, stack) => sum + stack.quantity, 0))}</strong></div>
           <div className="settings-row"><span>الشارات الخاصة</span><strong>{formatNumber(profile.badges.length)}</strong></div>
