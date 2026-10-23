@@ -26,15 +26,15 @@ select ok(
   'anon can execute leaderboard reads'
 );
 select ok(
-  not has_function_privilege('anon', 'public.record_season_event(uuid,text,text,text,jsonb)', 'execute'),
+  not has_function_privilege('anon', 'public.record_season_event(uuid,uuid,text,text,text,jsonb)', 'execute'),
   'anon cannot record season events'
 );
 select ok(
-  not has_function_privilege('authenticated', 'public.record_season_event(uuid,text,text,text,jsonb)', 'execute'),
+  not has_function_privilege('authenticated', 'public.record_season_event(uuid,uuid,text,text,text,jsonb)', 'execute'),
   'authenticated cannot submit unverified score events'
 );
 select ok(
-  has_function_privilege('service_role', 'public.record_season_event(uuid,text,text,text,jsonb)', 'execute'),
+  has_function_privilege('service_role', 'public.record_season_event(uuid,uuid,text,text,text,jsonb)', 'execute'),
   'service_role can submit server-validated score events'
 );
 select ok(

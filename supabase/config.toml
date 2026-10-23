@@ -1,0 +1,4 @@
+project_id = "kamxjsddjxowodatafqo"
+
+[functions.season-event]
+verify_jwt = true

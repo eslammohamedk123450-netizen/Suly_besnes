@@ -37,3 +37,11 @@ export async function getGlobalLeaderboard(seasonId: string, limit = 100, offset
   if (error) throw error;
   return (data ?? []) as LeaderboardRow[];
 }
+
+export async function claimDailySeasonLogin(seasonId: string): Promise<LeaderboardRow | null> {
+  const { data, error } = await supabase.functions.invoke('season-event', {
+    body: { seasonId, eventType: 'login_reward' },
+  });
+  if (error) throw error;
+  return (data?.seasonScore ?? null) as LeaderboardRow | null;
+}
