@@ -44,7 +44,7 @@ const gold = inputValues.gold ? Number(inputValues.gold) : 0;
 const expiresAt = inputValues.expires || new Date(Date.now() + 90 * 86_400_000).toISOString();
 
 if (!Number.isInteger(cash) || cash < 0 || cash > 1_000_000) throw new Error('قيمة cash يجب أن تكون رقمًا صحيحًا بين 0 و1,000,000.');
-if (!Number.isFinite(gold) || gold < 0 || gold > 100) throw new Error('قيمة gold يجب أن تكون بين 0 و100 غرام.');
+if (!Number.isFinite(gold) || gold < 0 || gold > 1_000_000) throw new Error('قيمة gold يجب أن تكون بين 0 و1,000,000 غرام.');
 if (!cash && !gold) throw new Error('أدخل مبلغًا أو ذهبًا على الأقل.');
 if (!Number.isFinite(Date.parse(expiresAt)) || Date.parse(expiresAt) <= Date.now()) throw new Error('تاريخ الانتهاء يجب أن يكون مستقبليًا بصيغة ISO.');
 

@@ -34,7 +34,7 @@ export async function redeemRewardCode(profile: PlayerProfile, rawCode: string):
     let gold = 0;
     for (const reward of payload.rewards) {
       if (reward.type === 'cash' && Number.isInteger(reward.amount) && reward.amount > 0 && reward.amount <= 1_000_000) cash += reward.amount;
-      else if (reward.type === 'gold' && Number.isFinite(reward.grams) && reward.grams > 0 && reward.grams <= 100) gold += reward.grams;
+      else if (reward.type === 'gold' && Number.isFinite(reward.grams) && reward.grams > 0 && reward.grams <= 1_000_000) gold += reward.grams;
       else return { ok: false, profile, message: 'يحتوي الكود على مكافأة غير مسموحة.' };
     }
     const ledger = cash > 0 ? [...profile.ledger, makeLedger(profile, cash, `مكافأة كود ${payload.codeId}`)] : profile.ledger;
