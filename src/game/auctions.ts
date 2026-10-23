@@ -1,8 +1,9 @@
 import type { AuctionListing } from '../domain/futureSystems';
 import type { PlayerProfile } from '../domain/player';
 import { AUCTION_CATALOG } from './catalog';
+import { GAME_DAY_MS } from './time';
 
-const DAY_MS = 86_400_000;
+const DAY_MS = GAME_DAY_MS;
 
 export function getAuctionCloseAt(profile: PlayerProfile, listing: AuctionListing): string {
   const base = Date.parse(profile.createdAt);
@@ -20,11 +21,8 @@ function wasWon(profile: PlayerProfile, listingId: string): boolean {
 }
 
 export function getAuctionListings(profile: PlayerProfile): AuctionListing[] {
-  return AUCTION_CATALOG.map((base) => {
-    if (!wasWon(profile, base.id)) return base;
-    const cycle = Math.max(1, profile.auctionHistory.filter((bid) => bid.listingId.startsWith(base.id) && bid.bidder === 'player').length);
-    return { ...base, id: `${base.id}-renewed-${cycle}`, label: `${base.label} · عرض جديد ${cycle}` };
-  });
+  // الفوز يستهلك المزاد نهائيًا؛ لا نعيد إدراج نفس السلعة تلقائيًا.
+  return AUCTION_CATALOG.filter((base) => !wasWon(profile, base.id));
 }
 
 export function resolveAuctionListing(profile: PlayerProfile, listingId: string): AuctionListing | undefined {

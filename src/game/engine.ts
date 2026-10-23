@@ -2,7 +2,6 @@ import { findCountry, type IndustryId } from '../domain/countries';
 import type { PlayerAsset, PlayerCompany, PlayerLand, PlayerProfile } from '../domain/player';
 import type { AuctionBidRecord, DepositRecord, FinanceLedgerEntry, GameEventRecord, InventoryLot, InvestmentRecord, LoanRecord, ProductionOrder, StaffContract, StaffRole } from '../domain/futureSystems';
 import {
-  AUCTION_CATALOG,
   DIRECT_COMPANY_CATALOG,
   DIRECT_LAND_CATALOG,
   GOLD_PRICE_PER_GRAM,
@@ -17,6 +16,7 @@ import {
 import { getMarketQuote } from './market';
 import { isAuctionOpen, resolveAuctionListing } from './auctions';
 import { getInvestmentPayoutRate, getOperatingCostProgression } from './economyBalance';
+import { GAME_DAY_MS } from './time';
 
 export type GameErrorCode =
   | 'invalid-input'
@@ -107,7 +107,7 @@ export type GameResult<T = undefined> =
   | { ok: true; profile: PlayerProfile; message: string; data: T }
   | { ok: false; profile: PlayerProfile; message: string; reason: GameErrorCode };
 
-const DAY_MS = 86_400_000;
+const DAY_MS = GAME_DAY_MS;
 
 function timestampFor(profile: PlayerProfile): string {
   const base = Date.parse(profile.createdAt);
@@ -202,8 +202,8 @@ export function placeBid(profile: PlayerProfile, listingId: string, amount: numb
     || profile.ledger.some((entry) => entry.note.includes(listing.label))) return failure(profile, 'already-owned', 'لقد فزت بهذا المزاد بالفعل.');
   if (amount < listing.minimumBid) return failure(profile, 'invalid-input', 'يجب أن يساوي العرض الحد الأدنى للمزاد أو يتجاوزه.');
 
-  const listingIndex = AUCTION_CATALOG.findIndex((entry) => listing.id.startsWith(entry.id));
-  const highestBotBid = listing.minimumBid + listing.bidIncrement * (2 + Math.max(0, listingIndex));
+  // يبدأ المنافس الآلي بعرض واحد؛ غرفة المزاد تعرض الزيادات الحية قبل اعتماد فوز اللاعب.
+  const highestBotBid = listing.minimumBid + listing.bidIncrement;
   const botBids = [
     { bidderId: `${listing.id}-bot-a`, amount: listing.minimumBid + listing.bidIncrement },
     { bidderId: `${listing.id}-bot-b`, amount: highestBotBid },

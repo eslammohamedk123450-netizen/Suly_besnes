@@ -37,7 +37,7 @@ export function Dashboard({ profile, country, onNavigate }: DashboardProps) {
           <h1>مرحبًا، {profile.name}</h1>
           <p>الثروة بداية الحكاية؛ قراراتك هي ما يبني الإمبراطورية.</p>
           <div className="hero-meta"><span className="country-chip">{country.flag} {country.name}</span><span className="hero-divider" /><span>المستوى {profile.level}</span><span className="hero-divider" /><span>{profile.companies.length} شركات</span></div>
-          <span className="dashboard-auto-note"><Icon name="clock" size={15} /> اليوم يتقدم تلقائيًا كل 24 ساعة حقيقية</span>
+          <span className="dashboard-auto-note"><Icon name="clock" size={15} /> اليوم يتقدم تلقائيًا كل 24 دقيقة حقيقية</span>
         </div>
         <div className="hero-emblem"><Icon name="crown" size={25} /><span>BE</span></div>
       </section>

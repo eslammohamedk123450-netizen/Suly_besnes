@@ -2,9 +2,10 @@ import { useEffect, useRef, useState } from 'react';
 import type { PlayerProfile } from '../domain/player';
 import { formatNumber } from '../domain/formatters';
 import { Icon } from './Icon';
+import { GAME_DAY_MS } from '../game/time';
 
-const DAY_MS = 24 * 60 * 60 * 1000;
-const CLOCK_KEY = 'business-empire-real-time-clock-v1';
+const DAY_MS = GAME_DAY_MS;
+const CLOCK_KEY = 'business-empire-real-time-clock-v2';
 const MAX_CATCH_UP_DAYS = 30;
 
 interface SavedClock {

@@ -16,7 +16,7 @@ export function EconomyPageShell({ dayLabel, balanceLabel, children }: EconomyPa
           <small>{balanceLabel} · تقدمك محفوظ محليًا</small>
         </div>
         <span className="economy-day"><Icon name="clock" size={15} />{dayLabel}</span>
-        <span className="economy-auto-note"><Icon name="clock" size={14} /> اليوم يتقدم تلقائيًا كل 24 ساعة</span>
+        <span className="economy-auto-note"><Icon name="clock" size={14} /> اليوم يتقدم تلقائيًا كل 24 دقيقة</span>
       </div>
       {children}
     </div>

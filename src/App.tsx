@@ -126,7 +126,7 @@ export default function App() {
     const saved = saveGame(current, account?.id);
     if (account) void saveRemoteGame(account.id, current);
     setProfile(current);
-    setNotice(saved.ok ? `تم ترحيل ${completedDays} ${completedDays === 1 ? 'يوم تلقائيًا' : 'أيام تلقائيًا'} بعد مرور 24 ساعة حقيقية.` : 'تم ترحيل الأيام، لكن تعذر تثبيت الحفظ على هذا الجهاز.');
+    setNotice(saved.ok ? `تم ترحيل ${completedDays} ${completedDays === 1 ? 'يوم تلقائيًا' : 'أيام تلقائيًا'} بعد مرور 24 دقيقة حقيقية.` : 'تم ترحيل الأيام، لكن تعذر تثبيت الحفظ على هذا الجهاز.');
     setNoticeTone(saved.ok ? 'success' : 'error');
   }
 
