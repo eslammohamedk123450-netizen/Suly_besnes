@@ -460,3 +460,62 @@ git diff --check
 إذا تغيّر رقم WhatsApp، عدّل الثابت داخل `src/components/DiamondStorePanel.tsx` فقط، ولا تضع أي Token أو Service Role Key في الواجهة.
 
 مفاتيح GitHub وSupabase لا تُنسخ في ملف التسليم. يجب تسجيل الدخول من الحساب التالي بالطريقة المصرح بها، وضبط `SUPABASE_SERVICE_ROLE_KEY` على الخادم فقط عند اختبار لوحة الإدارة.
+
+
+---
+
+## 10. تصحيح مهم بخصوص المتجر والأسعار
+
+بعد دمج آخر تغييرات الحساب الآخر، تبيّن أن المتجر الحقيقي موجود بالفعل في:
+
+```text
+src/components/DiamondStore.tsx
+src/components/DiamondStore.css
+src/game/diamondPackages.ts
+src/storage/diamondTopupRepository.ts
+admin-dashboard/supabase/migrations/20261024014939_manual_diamond_topups.sql
+```
+
+المتجر الحقيقي متصل بطلبات شحن Supabase، ويمنع الإضافة التلقائية قبل مراجعة التحويل. النسخة التجريبية المكررة `DiamondStorePanel.tsx` لم تعد موجودة، وتم الحفاظ على المتجر الحقيقي.
+
+الأسعار الجديدة التي طلبها المستخدم لتحديث الكتالوج هي:
+
+```text
+$1  = 100 ماس
+$5  = 500 ماس + 45 إضافي
+$10 = 1000 ماس + 110 إضافي
+$20 = 2100 ماس + 260 إضافي
+$35 = 3800 ماس + 500 إضافي
+$50 = 6200 ماس + 999 إضافي
+      + 15 بطاقة إكمال إنتاج
+      + 10 بطاقات تسريع اليوم ×2
+      + 50 جرام ذهب
+```
+
+### تنبيه قبل تعديل الأسعار
+
+الواجهة الحالية ومخطط الطلبات القديمان يستخدمان أسماء وحقولًا بالجنيه المصري:
+
+```text
+priceEgp
+amountEgp
+```
+
+كما أن دالة Supabase الحالية تحتوي باقات IDs قديمة:
+
+```text
+starter, builder, executive, empire
+```
+
+لذلك لا يكفي تعديل `diamondPackages.ts` فقط. يجب عند تنفيذ الأسعار الجديدة:
+
+1. إضافة ستة Package IDs أو إعادة تسمية IDs بطريقة ترحيل آمنة.
+2. تحديد هل `$` سعر عرض فقط أم يجب تحويله إلى مبلغ Vodafone Cash بالجنيه.
+3. عدم عرض سعر بالدولار ثم إنشاء طلب بقيمة جنيه مختلفة بلا توضيح.
+4. تحديث migration ودالة `create_diamond_topup_request`.
+5. تحديث لوحة الإدارة لتعرض العملة الصحيحة.
+6. إضافة مكافآت باقة `$50` إلى طلب الشحن والموافقة الذرية.
+7. تحديث اختبارات `diamondPackages.test.ts` و`diamondTopupRepository.test.ts`.
+8. تطبيق migration الجديدة على Supabase قبل اختبار الطلبات.
+
+لا توجد رموز سرية جديدة لهذه الخطوة. المطلوب فقط صلاحية Supabase لتطبيق migration، ولا يجوز وضع `SUPABASE_SERVICE_ROLE_KEY` أو GitHub PAT في ملف التسليم أو كود الواجهة.
