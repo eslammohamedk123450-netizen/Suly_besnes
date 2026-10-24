@@ -382,8 +382,13 @@ export function SectionPage({ section, profile, country, focus, notificationThem
     const estimatedUnitCost = recipe ? ((recipe.inputs.reduce((sum, input) => sum + input.quantity * (profile.inventory.find((lot) => lot.materialOrProductId === input.materialId)?.unitCost ?? 0), 0) + selectedBatches * recipe.energyCost + Math.round((selectedCompany?.operatingCostPerDay ?? 0) * 0.15 * getOperatingCostProgression(profile.day))) / Math.max(1, estimatedOutput)) : 0;
     const visibleProductionOrders = profile.productionOrders.filter((order) => showProductionHistory || order.status === 'active').slice().reverse();
     const hiddenProductionHistoryCount = profile.productionOrders.filter((order) => order.status !== 'active').length;
+    const activeProductionCount = profile.productionOrders.filter((order) => order.status === 'active').length;
+    const completedProductionCount = profile.productionOrders.filter((order) => order.status === 'completed').length;
+    const totalEnergy = profile.companies.reduce((sum, company) => sum + (company.energyUnits ?? 0), 0);
+    const totalEnergyCapacity = profile.companies.reduce((sum, company) => sum + (company.energyCapacity ?? 0), 0);
     return <div className="section-page">{heading}{pageShell(
       <>
+        <div className="economy-grid economy-grid--four-mobile production-overview"><EconomyStat label="المصانع" value={formatNumber(profile.companies.length)} /><EconomyStat label="أوامر نشطة" value={formatNumber(activeProductionCount)} /><EconomyStat label="أوامر مكتملة" value={formatNumber(completedProductionCount)} /><EconomyStat label="الطاقة المتاحة" value={`${formatNumber(totalEnergy)} / ${formatNumber(totalEnergyCapacity)}`} /></div>
         <EconomyPanel title="خطوط الإنتاج" description="ابدأ أمرًا يحجز المواد والطاقة، ثم يستلم المنتج عند اكتماله في يوم لاحق.">
           {profile.companies.length === 0 ? <EconomyEmpty title="لا توجد مصانع عاملة" message="أسس شركة أولًا؛ يتضمن ترخيصها خط إنتاج للقطاع الذي اخترته." /> : <div className="economy-layout">
             {companyTransferPending && <div className="economy-alert"><Icon name="clock" size={16} /> يجري إنهاء عقود نقل الملكية؛ يبدأ تشغيل هذه الشركة في اليوم {formatNumber(selectedCompany?.operationalFromDay ?? profile.day)}.</div>}<form className="economy-form" onSubmit={(event: FormEvent<HTMLFormElement>) => { event.preventDefault(); if (selectedCompany) runCommand({ name: 'run_production', args: { companyId: selectedCompany.id, batches: Number(productionBatches) } }, (current) => runProduction(current, selectedCompany.id, Number(productionBatches))); }}>
