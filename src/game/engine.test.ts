@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { COUNTRIES } from '../domain/countries';
 import { createNewPlayer, type PlayerProfile } from '../domain/player';
 import { getContractOffers } from './contracts';
-import { advanceDay, acceptContract, buyDirectLand, buyGoldWithDiamonds, buyMaterial, buySpeedCard, createDeposit, deliverContract, executeGameCommand, foundCompany, getDayBriefing, mergeDeposits, payStaffSalary, placeBid, repayLoan, runProduction, sellGold, takeLoan, updateNotificationState, upgradeLand, upgradeWarehouse, useDaySpeedCard, withdrawDeposit } from './engine';
+import { advanceDay, acceptContract, buyDirectLand, buyGoldWithDiamonds, buyMaterial, buySpeedCard, createDeposit, deliverContract, executeGameCommand, foundCompany, getDayBriefing, getStaffUpgradeCost, mergeDeposits, payStaffSalary, placeBid, repayLoan, runProduction, sellGold, takeLoan, updateNotificationState, upgradeLand, upgradeStaff, upgradeWarehouse, useDaySpeedCard, withdrawDeposit } from './engine';
 import { negotiateContract } from './engine';
 import { getSynergyBonuses } from './synergy';
 import { normalizeSavedProfile } from '../storage/saveRepository';
@@ -47,6 +47,20 @@ describe('Business Empire economy invariants', () => {
     expect(paid.profile.staff[0].unpaidSalary).toBe(0);
     expect(paid.profile.ledger.filter((entry) => entry.note.startsWith('سداد راتب مستحق'))).toHaveLength(1);
     expect(paid.profile.ledger.filter((entry) => entry.note === 'رواتب مستحقة عن اليوم')).toHaveLength(1);
+  });
+
+  it('upgrades staff and develops experience without breaking legacy contracts', () => {
+    const employee = { id: 'staff-1', role: 'accountant' as const, name: 'محاسب التطوير', dailySalary: 4_500, hiredOnDay: 1, nextPayDay: 2, status: 'active' as const };
+    const base = profile({ bankBalance: 500_000, staff: [employee] });
+    const upgraded = upgradeStaff(base, employee.id);
+    expect(upgraded.ok).toBe(true);
+    if (!upgraded.ok) return;
+    expect(upgraded.profile.staff[0].level).toBe(2);
+    expect(upgraded.profile.bankBalance).toBe(500_000 - getStaffUpgradeCost(employee));
+    const next = advanceDay(upgraded.profile);
+    expect(next.ok).toBe(true);
+    if (!next.ok) return;
+    expect(next.profile.staff[0].experience).toBe(10);
   });
 
   it('pauses and restores energy around unpaid obligations', () => {

@@ -994,8 +994,8 @@ function sellProduct(profile, productId, quantity) {
   if (quantity > marketQuote.demandUnits) return failure(profile, "market-limit", `\u0627\u0644\u0637\u0644\u0628 \u0627\u0644\u0645\u062A\u0627\u062D \u0627\u0644\u064A\u0648\u0645 ${marketQuote.demandUnits} \u0648\u062D\u062F\u0629 \u0641\u0642\u0637\u061B \u062E\u0641\u0651\u0636 \u0627\u0644\u0643\u0645\u064A\u0629 \u0623\u0648 \u0627\u0646\u062A\u0638\u0631 \u064A\u0648\u0645\u064B\u0627 \u0622\u062E\u0631.`);
   const qualityMultiplier = lot.qualityScore === void 0 ? 1 : 0.85 + lot.qualityScore / 100 * 0.15;
   const grossRevenue = Math.round(quantity * marketQuote.currentPrice * qualityMultiplier);
-  const hasAccountant = profile.staff.some((member) => member.status === "active" && member.role === "accountant");
-  const taxRate = (findCountry(profile.countryId)?.economy.taxRate ?? 0) * (hasAccountant ? 0.9 : 1);
+  const accountant = profile.staff.find((member) => member.status === "active" && member.role === "accountant");
+  const taxRate = (findCountry(profile.countryId)?.economy.taxRate ?? 0) * (accountant ? Math.max(0.82, 0.9 - (staffLevel(accountant) - 1) * 0.02) : 1);
   const tax = Math.round(grossRevenue * taxRate);
   const costOfGoods = Math.round(lot.unitCost * quantity);
   const nextInventory = profile.inventory.map((item) => item.materialOrProductId === productId ? { ...item, quantity: item.quantity - quantity } : item).filter((item) => item.quantity > 0);
@@ -1075,8 +1075,11 @@ function sellGold(profile, grams) {
 function getDayBriefing(profile) {
   const day = profile.day + 1;
   const multiplier = findCountry(profile.countryId)?.economy.operatingCostMultiplier ?? 1;
-  const managedCompanyIds = new Set(profile.staff.filter((member) => member.status === "active" && member.role === "manager" && member.companyId).map((member) => member.companyId));
-  const operatingCost = profile.companies.reduce((sum, company) => sum + (company.operatingCostPerDay ?? 0) * (managedCompanyIds.has(company.id) ? 0.92 : 1), 0) * multiplier * getOperatingCostProgression(profile.day) * getSynergyOperatingMultiplier(profile);
+  const operatingCost = profile.companies.reduce((sum, company) => {
+    const manager = profile.staff.find((member) => member.status === "active" && member.role === "manager" && member.companyId === company.id);
+    const managerDiscount = manager ? Math.min(0.18, 0.08 + (staffLevel(manager) - 1) * 0.025) : 0;
+    return sum + (company.operatingCostPerDay ?? 0) * (1 - managerDiscount);
+  }, 0) * multiplier * getOperatingCostProgression(profile.day) * getSynergyOperatingMultiplier(profile);
   const maturingInvestments = profile.investments.filter((investment) => investment.status === "active" && investment.maturityDay <= day).map((investment) => ({ id: investment.id, name: findInvestment(investment.investmentTypeId)?.name ?? investment.investmentTypeId }));
   const event = getEconomicEventTemplate(day);
   const availableEnergy = profile.companies.reduce((sum, company) => sum + (company.energyUnits ?? 0), 0);
@@ -1089,21 +1092,56 @@ var STAFF_ROLE_OPTIONS = {
   lawyer: { label: "\u0645\u062D\u0627\u0645\u064D", dailySalary: 4e3, companyRequired: false },
   hr: { label: "\u0645\u062F\u064A\u0631 \u0645\u0648\u0627\u0631\u062F \u0628\u0634\u0631\u064A\u0629", dailySalary: 3500, companyRequired: false }
 };
+const MAX_STAFF_LEVEL = 5;
+const STAFF_EXPERIENCE_PER_LEVEL = 100;
+function staffLevel(employee) {
+  return Math.max(1, Math.min(MAX_STAFF_LEVEL, Math.floor(employee?.level ?? 1)));
+}
+function staffExperience(employee) {
+  return Math.max(0, Math.min(STAFF_EXPERIENCE_PER_LEVEL - 1, Math.floor(employee?.experience ?? 0)));
+}
+function getStaffUpgradeCost(employee) {
+  return Math.round(employee.dailySalary * (2 + staffLevel(employee)));
+}
+function developStaff(employee) {
+  let level = staffLevel(employee);
+  let experience = staffExperience(employee) + (employee.role === "manager" ? 12 : 10);
+  while (level < MAX_STAFF_LEVEL && experience >= STAFF_EXPERIENCE_PER_LEVEL) {
+    experience -= STAFF_EXPERIENCE_PER_LEVEL;
+    level += 1;
+  }
+  return { ...employee, level, experience };
+}
 function hireStaff(profile, role, name, companyId) {
   const option = STAFF_ROLE_OPTIONS[role];
   if (!option || name.trim().length < 2) return failure(profile, "invalid-input", "\u0623\u062F\u062E\u0644 \u0627\u0633\u0645\u064B\u0627 \u0635\u062D\u064A\u062D\u064B\u0627 \u0648\u0627\u062E\u062A\u0631 \u062F\u0648\u0631\u064B\u0627 \u0645\u0639\u0631\u0648\u0641\u064B\u0627.");
   if (option.companyRequired && !profile.companies.some((company) => company.id === companyId)) return failure(profile, "not-found", "\u0627\u0644\u0645\u062F\u064A\u0631 \u064A\u062C\u0628 \u0623\u0646 \u064A\u0631\u062A\u0628\u0637 \u0628\u0634\u0631\u0643\u0629 \u0645\u0648\u062C\u0648\u062F\u0629.");
   if (role === "manager" && profile.staff.some((member) => member.status === "active" && member.role === "manager" && member.companyId === companyId)) return failure(profile, "invalid-input", "\u0647\u0630\u0647 \u0627\u0644\u0634\u0631\u0643\u0629 \u0644\u062F\u064A\u0647\u0627 \u0645\u062F\u064A\u0631 \u0646\u0634\u0637 \u0628\u0627\u0644\u0641\u0639\u0644.");
-  const hasHr = profile.staff.some((member) => member.status === "active" && member.role === "hr");
-  const contractCost = Math.round(option.dailySalary * (hasHr ? 0.8 : 1));
+  const hr = profile.staff.find((member) => member.status === "active" && member.role === "hr");
+  const contractCost = Math.round(option.dailySalary * (hr ? Math.max(0.68, 0.8 - (staffLevel(hr) - 1) * 0.03) : 1));
   if (profile.bankBalance < contractCost) return failure(profile, "insufficient-funds", "\u0644\u0627 \u064A\u0643\u0641\u064A \u0627\u0644\u0631\u0635\u064A\u062F \u0644\u062A\u0648\u0642\u064A\u0639 \u0639\u0642\u062F \u0627\u0644\u0645\u0648\u0638\u0641 \u0648\u062F\u0641\u0639 \u064A\u0648\u0645 \u0627\u0644\u062A\u0639\u0627\u0642\u062F.");
-  const staff = { id: nextId(profile, "staff", profile.staff.length), role, name: name.trim(), companyId, dailySalary: option.dailySalary, hiredOnDay: profile.day, nextPayDay: profile.day + 1, status: "active" };
+  const staff = { id: nextId(profile, "staff", profile.staff.length), role, name: name.trim(), companyId, dailySalary: option.dailySalary, level: 1, experience: 0, hiredOnDay: profile.day, nextPayDay: profile.day + 1, status: "active" };
   const nextProfile = addLedger(
     { ...profile, staff: [...profile.staff, staff] },
     [ledgerEntry(profile, "expense", contractCost, `\u062A\u0648\u0642\u064A\u0639 \u0639\u0642\u062F ${option.label}: ${staff.name}`, 0)],
     profile.bankBalance - contractCost
   );
   return success(nextProfile, `\u062A\u0645 \u062A\u0639\u064A\u064A\u0646 ${staff.name} \u0628\u0648\u0638\u064A\u0641\u0629 ${option.label}\u061B \u0623\u0648\u0644 \u0631\u0627\u062A\u0628 \u062F\u0648\u0631\u064A \u0641\u064A \u0627\u0644\u064A\u0648\u0645 \u0627\u0644\u062A\u0627\u0644\u064A.`, staff);
+}
+function upgradeStaff(profile, staffId) {
+  const employee = profile.staff.find((member) => member.id === staffId && member.status === "active");
+  if (!employee) return failure(profile, "not-found", "عقد الموظف غير موجود أو غير نشط.");
+  const level = staffLevel(employee);
+  if (level >= MAX_STAFF_LEVEL) return failure(profile, "condition-not-met", "وصل الموظف إلى أعلى مستوى متاح.");
+  const cost = getStaffUpgradeCost(employee);
+  if (profile.bankBalance < cost) return failure(profile, "insufficient-funds", `تحتاج إلى ${cost.toLocaleString("ar-EG")} ج.م لترقية ${employee.name}.`);
+  const updated = { ...employee, level: level + 1, experience: staffExperience(employee) };
+  const nextProfile = addLedger(
+    { ...profile, staff: profile.staff.map((member) => member.id === staffId ? updated : member) },
+    [ledgerEntry(profile, "expense", cost, `ترقية الموظف ${employee.name} إلى المستوى ${level + 1}`, 0)],
+    profile.bankBalance - cost
+  );
+  return success(nextProfile, `تمت ترقية ${employee.name} إلى المستوى ${level + 1}.`, updated);
 }
 function payStaffSalary(profile, staffId) {
   const employee = profile.staff.find((member) => member.id === staffId && member.status === "active");
@@ -1309,9 +1347,11 @@ function advanceDay(profile) {
     return { ...loan, remainingBalance, nextPaymentDay: nextDay + 1, status: remainingBalance === 0 ? "paid" : "active" };
   });
   const staff = profile.staff.map((employee) => {
-    if (employee.status !== "active" || employee.nextPayDay > nextDay) return employee;
+    if (employee.status !== "active") return employee;
+    const developed = developStaff(employee);
+    if (employee.nextPayDay > nextDay) return developed;
     const dueDays = Math.max(1, nextDay - employee.nextPayDay + 1);
-    return { ...employee, nextPayDay: nextDay + 1, unpaidSalary: (employee.unpaidSalary ?? 0) + employee.dailySalary * dueDays };
+    return { ...developed, nextPayDay: nextDay + 1, unpaidSalary: (employee.unpaidSalary ?? 0) + employee.dailySalary * dueDays };
   });
   const salaryAccrued = staff.reduce((sum, employee) => {
     const previous = profile.staff.find((item) => item.id === employee.id);
@@ -1361,8 +1401,8 @@ function advanceDay(profile) {
     balance += briefing.event.cashImpact;
     entries.push(ledgerEntry(profile, "revenue", briefing.event.cashImpact, briefing.event.title, entries.length));
   } else if (briefing.event.cashImpact < 0) {
-    const hasLawyer = profile.staff.some((member) => member.status === "active" && member.role === "lawyer");
-    const eventCost = Math.round(Math.abs(briefing.event.cashImpact) * (hasLawyer ? 0.85 : 1));
+    const lawyer = profile.staff.find((member) => member.status === "active" && member.role === "lawyer");
+    const eventCost = Math.round(Math.abs(briefing.event.cashImpact) * (lawyer ? Math.max(0.73, 0.85 - (staffLevel(lawyer) - 1) * 0.03) : 1));
     const paidEventCost = Math.min(balance, eventCost);
     balance -= paidEventCost;
     eventImpact = -paidEventCost;
@@ -1564,6 +1604,8 @@ function executeGameCommand(profile, command) {
       return sellGold(profile, command.args.grams);
     case "hire_staff":
       return hireStaff(profile, command.args.role, command.args.name, command.args.companyId);
+    case "upgrade_staff":
+      return upgradeStaff(profile, command.args.staffId);
     case "pay_staff_salary":
       return payStaffSalary(profile, command.args.staffId);
     case "terminate_staff":

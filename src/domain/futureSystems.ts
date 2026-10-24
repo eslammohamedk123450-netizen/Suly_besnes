@@ -139,6 +139,9 @@ export interface StaffContract {
   name: string;
   companyId?: string;
   dailySalary: number;
+  /** Legacy saves omit these fields and are treated as a level-one employee. */
+  level?: number;
+  experience?: number;
   hiredOnDay: number;
   nextPayDay: number;
   unpaidSalary?: number;

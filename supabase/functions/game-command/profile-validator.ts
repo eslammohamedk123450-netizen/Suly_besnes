@@ -386,7 +386,7 @@ export function validatePlayerProfile(profile: unknown, previousProfile?: unknow
     ['profile.banking.loans', banking.loans, ['id', 'collateralType', 'collateralId', 'principal', 'totalRepayment', 'annualRate', 'startedOnDay', 'termDays', 'nextPaymentDay', 'installmentAmount', 'remainingBalance', 'status']],
     ['profile.licenses', profile.licenses, ['id', 'countryId', 'industryId', 'feePaid', 'issuedAt', 'expiresAt']],
     ['profile.investments', profile.investments, ['id', 'investmentTypeId', 'principal', 'expectedReturnRate', 'startedOnDay', 'maturityDay', 'status', 'settledAmount']],
-    ['profile.staff', profile.staff, ['id', 'role', 'name', 'companyId', 'dailySalary', 'hiredOnDay', 'nextPayDay', 'unpaidSalary', 'status']],
+    ['profile.staff', profile.staff, ['id', 'role', 'name', 'companyId', 'dailySalary', 'level', 'experience', 'hiredOnDay', 'nextPayDay', 'unpaidSalary', 'status']],
     ['profile.auctionHistory', profile.auctionHistory, ['id', 'listingId', 'bidder', 'bidderId', 'amount', 'day', 'occurredAt']],
     ['profile.sales', profile.sales, ['id', 'productId', 'quantity', 'unitPrice', 'grossRevenue', 'tax', 'costOfGoods', 'soldOnDay', 'contractId', 'soldAt']],
     ['profile.ledger', profile.ledger, ['id', 'category', 'amount', 'countryId', 'occurredAt', 'note']],

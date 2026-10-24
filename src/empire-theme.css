@@ -551,3 +551,17 @@
   .app-frame .staff-mini-stats > div { padding: 10px; }
   .app-frame .staff-mini-stats strong { font-size: 17px; }
 }
+
+
+/* Staff progression */
+.app-frame .staff-level-row { display: flex; justify-content: space-between; gap: 8px; margin-top: 8px; color: #d8eaf1; font-size: 8px; font-weight: 800; }
+.app-frame .staff-level-row small { color: #86a5b9; font-size: 8px; }
+.app-frame .staff-level-track { height: 4px; overflow: hidden; margin-top: 4px; background: rgba(255,255,255,.1); border-radius: 99px; }
+.app-frame .staff-level-track span { display: block; height: 100%; background: linear-gradient(90deg, #f6c453, #16c79a); border-radius: inherit; transition: width .25s ease; }
+.app-frame .staff-upgrade-button { min-height: 29px; padding-inline: 8px; color: #ffe08b; background: rgba(246,196,83,.1); border: 1px solid rgba(246,196,83,.3); border-radius: 8px; font-size: 7px; font-weight: 800; white-space: nowrap; }
+.app-frame .staff-upgrade-button:hover:not(:disabled) { color: #10243a; background: var(--ui-gold); }
+.app-frame .staff-upgrade-button:disabled { opacity: .45; }
+@media (max-width: 760px) {
+  .app-frame .staff-level-row { margin-top: 6px; }
+  .app-frame .staff-upgrade-button { font-size: 6px; padding-inline: 6px; }
+}

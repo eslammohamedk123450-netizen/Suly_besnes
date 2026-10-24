@@ -589,10 +589,11 @@ export function runProduction(profile: PlayerProfile, companyId: string, batches
     return input ? { ...lot, quantity: lot.quantity - input.quantity * batches } : lot;
   }).filter((lot) => lot.quantity > 0);
   const companies = profile.companies.map((item) => item.id === companyId ? { ...item, energyUnits: energyAvailable - batches * recipe.energyUnits } : item);
-  const hasManager = profile.staff.some((member) => member.status === 'active' && member.role === 'manager' && member.companyId === companyId);
-  const durationDays = Math.min(3, Math.max(1, Math.ceil(batches / 3) - (hasManager ? 1 : 0)));
+  const manager = profile.staff.find((member) => member.status === 'active' && member.role === 'manager' && member.companyId === companyId);
+  const managerLevel = staffLevel(manager);
+  const durationDays = Math.min(3, Math.max(1, Math.ceil(batches / 3) - (manager ? 1 : 0)));
   const marketForecast = getMarketQuote(profile, recipe.productId, profile.day + durationDays);
-  const qualityScore = Math.max(70, Math.min(100, 86 + (hasManager ? 10 : 0) - (maintenanceCondition < 60 ? 10 : 0)));
+  const qualityScore = Math.max(70, Math.min(100, 86 + (manager ? 10 + (managerLevel - 1) * 3 : 0) - (maintenanceCondition < 60 ? 10 : 0)));
   const expectedUnitCost = (materialCost + energyCost + maintenanceCost) / outputQuantity;
   const nextMaintenanceCondition = Math.max(0, maintenanceCondition - Math.max(8, Math.ceil(batches / 2)));
   const order: ProductionOrder = { id: nextId(profile, 'production', profile.productionOrders.length), companyId, productId: recipe.productId, productName: recipe.productName, batches, outputQuantity, outputUnit: recipe.outputUnit, materialCost, energyCost, expectedUnitCost, demandForecast: marketForecast?.demandUnits ?? 0, qualityScore, maintenanceCost, startedOnDay: profile.day, completesOnDay: profile.day + durationDays, status: 'active' };
@@ -688,8 +689,8 @@ export function sellProduct(profile: PlayerProfile, productId: string, quantity:
   if (quantity > marketQuote.demandUnits) return failure(profile, 'market-limit', `الطلب المتاح اليوم ${marketQuote.demandUnits} وحدة فقط؛ خفّض الكمية أو انتظر يومًا آخر.`);
   const qualityMultiplier = lot.qualityScore === undefined ? 1 : 0.85 + lot.qualityScore / 100 * 0.15;
   const grossRevenue = Math.round(quantity * marketQuote.currentPrice * qualityMultiplier);
-  const hasAccountant = profile.staff.some((member) => member.status === 'active' && member.role === 'accountant');
-  const taxRate = (findCountry(profile.countryId)?.economy.taxRate ?? 0) * (hasAccountant ? 0.9 : 1);
+  const accountant = profile.staff.find((member) => member.status === 'active' && member.role === 'accountant');
+  const taxRate = (findCountry(profile.countryId)?.economy.taxRate ?? 0) * (accountant ? Math.max(0.82, 0.9 - (staffLevel(accountant) - 1) * 0.02) : 1);
   const tax = Math.round(grossRevenue * taxRate);
   const costOfGoods = Math.round(lot.unitCost * quantity);
   const nextInventory = profile.inventory.map((item) => item.materialOrProductId === productId ? { ...item, quantity: item.quantity - quantity } : item).filter((item) => item.quantity > 0);
@@ -777,8 +778,11 @@ export function sellGold(profile: PlayerProfile, grams: number): GameResult<Gold
 export function getDayBriefing(profile: PlayerProfile): DayBriefing {
   const day = profile.day + 1;
   const multiplier = findCountry(profile.countryId)?.economy.operatingCostMultiplier ?? 1;
-  const managedCompanyIds = new Set(profile.staff.filter((member) => member.status === 'active' && member.role === 'manager' && member.companyId).map((member) => member.companyId));
-  const operatingCost = profile.companies.reduce((sum, company) => sum + (company.operatingCostPerDay ?? 0) * (managedCompanyIds.has(company.id) ? 0.92 : 1), 0) * multiplier * getOperatingCostProgression(profile.day) * getSynergyOperatingMultiplier(profile);
+  const operatingCost = profile.companies.reduce((sum, company) => {
+    const manager = profile.staff.find((member) => member.status === 'active' && member.role === 'manager' && member.companyId === company.id);
+    const managerDiscount = manager ? Math.min(0.18, 0.08 + (staffLevel(manager) - 1) * 0.025) : 0;
+    return sum + (company.operatingCostPerDay ?? 0) * (1 - managerDiscount);
+  }, 0) * multiplier * getOperatingCostProgression(profile.day) * getSynergyOperatingMultiplier(profile);
   const maturingInvestments = profile.investments
     .filter((investment) => investment.status === 'active' && investment.maturityDay <= day)
     .map((investment) => ({ id: investment.id, name: findInvestment(investment.investmentTypeId)?.name ?? investment.investmentTypeId }));
@@ -795,21 +799,62 @@ const STAFF_ROLE_OPTIONS: Record<StaffRole, { label: string; dailySalary: number
   hr: { label: 'مدير موارد بشرية', dailySalary: 3_500, companyRequired: false },
 };
 
+const MAX_STAFF_LEVEL = 5;
+const STAFF_EXPERIENCE_PER_LEVEL = 100;
+
+export function staffLevel(employee: StaffContract | undefined): number {
+  return Math.max(1, Math.min(MAX_STAFF_LEVEL, Math.floor(employee?.level ?? 1)));
+}
+
+export function staffExperience(employee: StaffContract | undefined): number {
+  return Math.max(0, Math.min(STAFF_EXPERIENCE_PER_LEVEL - 1, Math.floor(employee?.experience ?? 0)));
+}
+
+export function getStaffUpgradeCost(employee: StaffContract): number {
+  return Math.round(employee.dailySalary * (2 + staffLevel(employee)));
+}
+
+function developStaff(employee: StaffContract): StaffContract {
+  let level = staffLevel(employee);
+  let experience = staffExperience(employee) + (employee.role === 'manager' ? 12 : 10);
+  while (level < MAX_STAFF_LEVEL && experience >= STAFF_EXPERIENCE_PER_LEVEL) {
+    experience -= STAFF_EXPERIENCE_PER_LEVEL;
+    level += 1;
+  }
+  return { ...employee, level, experience };
+}
+
 export function hireStaff(profile: PlayerProfile, role: StaffRole, name: string, companyId?: string): GameResult<StaffContract> {
   const option = STAFF_ROLE_OPTIONS[role];
   if (!option || name.trim().length < 2) return failure(profile, 'invalid-input', 'أدخل اسمًا صحيحًا واختر دورًا معروفًا.');
   if (option.companyRequired && !profile.companies.some((company) => company.id === companyId)) return failure(profile, 'not-found', 'المدير يجب أن يرتبط بشركة موجودة.');
   if (role === 'manager' && profile.staff.some((member) => member.status === 'active' && member.role === 'manager' && member.companyId === companyId)) return failure(profile, 'invalid-input', 'هذه الشركة لديها مدير نشط بالفعل.');
-  const hasHr = profile.staff.some((member) => member.status === 'active' && member.role === 'hr');
-  const contractCost = Math.round(option.dailySalary * (hasHr ? 0.8 : 1));
+  const hr = profile.staff.find((member) => member.status === 'active' && member.role === 'hr');
+  const contractCost = Math.round(option.dailySalary * (hr ? Math.max(0.68, 0.8 - (staffLevel(hr) - 1) * 0.03) : 1));
   if (profile.bankBalance < contractCost) return failure(profile, 'insufficient-funds', 'لا يكفي الرصيد لتوقيع عقد الموظف ودفع يوم التعاقد.');
-  const staff: StaffContract = { id: nextId(profile, 'staff', profile.staff.length), role, name: name.trim(), companyId, dailySalary: option.dailySalary, hiredOnDay: profile.day, nextPayDay: profile.day + 1, status: 'active' };
+  const staff: StaffContract = { id: nextId(profile, 'staff', profile.staff.length), role, name: name.trim(), companyId, dailySalary: option.dailySalary, level: 1, experience: 0, hiredOnDay: profile.day, nextPayDay: profile.day + 1, status: 'active' };
   const nextProfile = addLedger(
     { ...profile, staff: [...profile.staff, staff] },
     [ledgerEntry(profile, 'expense', contractCost, `توقيع عقد ${option.label}: ${staff.name}`, 0)],
     profile.bankBalance - contractCost,
   );
   return success(nextProfile, `تم تعيين ${staff.name} بوظيفة ${option.label}؛ أول راتب دوري في اليوم التالي.`, staff);
+}
+
+export function upgradeStaff(profile: PlayerProfile, staffId: string): GameResult<StaffContract> {
+  const employee = profile.staff.find((member) => member.id === staffId && member.status === 'active');
+  if (!employee) return failure(profile, 'not-found', 'عقد الموظف غير موجود أو غير نشط.');
+  const level = staffLevel(employee);
+  if (level >= MAX_STAFF_LEVEL) return failure(profile, 'condition-not-met', 'وصل الموظف إلى أعلى مستوى متاح.');
+  const cost = getStaffUpgradeCost(employee);
+  if (profile.bankBalance < cost) return failure(profile, 'insufficient-funds', `تحتاج إلى ${cost.toLocaleString('ar-EG')} ج.م لترقية ${employee.name}.`);
+  const updated = { ...employee, level: level + 1, experience: staffExperience(employee) };
+  const nextProfile = addLedger(
+    { ...profile, staff: profile.staff.map((member) => member.id === staffId ? updated : member) },
+    [ledgerEntry(profile, 'expense', cost, `ترقية الموظف ${employee.name} إلى المستوى ${level + 1}`, 0)],
+    profile.bankBalance - cost,
+  );
+  return success(nextProfile, `تمت ترقية ${employee.name} إلى المستوى ${level + 1}.`, updated);
 }
 
 export function payStaffSalary(profile: PlayerProfile, staffId: string): GameResult<{ staffId: string; amount: number }> {
@@ -1030,9 +1075,11 @@ export function advanceDay(profile: PlayerProfile): GameResult<DayOutcome> {
     return { ...loan, remainingBalance, nextPaymentDay: nextDay + 1, status: remainingBalance === 0 ? 'paid' as const : 'active' as const };
   });
   const staff = profile.staff.map((employee) => {
-    if (employee.status !== 'active' || employee.nextPayDay > nextDay) return employee;
+    if (employee.status !== 'active') return employee;
+    const developed = developStaff(employee);
+    if (employee.nextPayDay > nextDay) return developed;
     const dueDays = Math.max(1, nextDay - employee.nextPayDay + 1);
-    return { ...employee, nextPayDay: nextDay + 1, unpaidSalary: (employee.unpaidSalary ?? 0) + employee.dailySalary * dueDays };
+    return { ...developed, nextPayDay: nextDay + 1, unpaidSalary: (employee.unpaidSalary ?? 0) + employee.dailySalary * dueDays };
   });
   const salaryAccrued = staff.reduce((sum, employee) => {
     const previous = profile.staff.find((item) => item.id === employee.id);
@@ -1088,8 +1135,8 @@ export function advanceDay(profile: PlayerProfile): GameResult<DayOutcome> {
     balance += briefing.event.cashImpact;
     entries.push(ledgerEntry(profile, 'revenue', briefing.event.cashImpact, briefing.event.title, entries.length));
   } else if (briefing.event.cashImpact < 0) {
-    const hasLawyer = profile.staff.some((member) => member.status === 'active' && member.role === 'lawyer');
-    const eventCost = Math.round(Math.abs(briefing.event.cashImpact) * (hasLawyer ? 0.85 : 1));
+    const lawyer = profile.staff.find((member) => member.status === 'active' && member.role === 'lawyer');
+    const eventCost = Math.round(Math.abs(briefing.event.cashImpact) * (lawyer ? Math.max(0.73, 0.85 - (staffLevel(lawyer) - 1) * 0.03) : 1));
     const paidEventCost = Math.min(balance, eventCost);
     balance -= paidEventCost;
     eventImpact = -paidEventCost;
@@ -1182,7 +1229,8 @@ export function deliverContract(profile: PlayerProfile, contractId: string): Gam
   const nextInventory = profile.inventory.flatMap((item) => item.id !== lot.id ? [item] : item.quantity === contract.quantity ? [] : [{ ...item, quantity: item.quantity - contract.quantity }]);
   const grossRevenue = contract.quantity * contract.unitPrice;
   const hasAccountant = profile.staff.some((member) => member.status === 'active' && member.role === 'accountant');
-  const taxRate = (findCountry(profile.countryId)?.economy.taxRate ?? 0) * (hasAccountant ? 0.9 : 1);
+  const accountant = profile.staff.find((member) => member.status === 'active' && member.role === 'accountant');
+  const taxRate = (findCountry(profile.countryId)?.economy.taxRate ?? 0) * (accountant ? Math.max(0.82, 0.9 - (staffLevel(accountant) - 1) * 0.02) : 1);
   const tax = Math.round(grossRevenue * taxRate);
   const costOfGoods = Math.round(lot.unitCost * contract.quantity);
   const sale: ProductSale = { id: nextId(profile, 'sale', profile.sales.length), productId: contract.productId, quantity: contract.quantity, unitPrice: contract.unitPrice, grossRevenue, tax, costOfGoods, soldOnDay: profile.day, contractId: contract.id, soldAt: timestampFor(profile) };
@@ -1285,6 +1333,7 @@ export type GameCommand =
   | { name: 'buy_gold_with_diamonds'; args: { grams: number } }
   | { name: 'sell_gold'; args: { grams: number } }
   | { name: 'hire_staff'; args: { role: StaffRole; name: string; companyId?: string } }
+  | { name: 'upgrade_staff'; args: { staffId: string } }
   | { name: 'pay_staff_salary'; args: { staffId: string } }
   | { name: 'terminate_staff'; args: { staffId: string } }
   | { name: 'create_deposit'; args: { amount: number; durationDays: number } }
@@ -1331,6 +1380,7 @@ export function executeGameCommand(profile: PlayerProfile, command: GameCommand)
     case 'buy_gold_with_diamonds': return buyGoldWithDiamonds(profile, command.args.grams);
     case 'sell_gold': return sellGold(profile, command.args.grams);
     case 'hire_staff': return hireStaff(profile, command.args.role, command.args.name, command.args.companyId);
+    case 'upgrade_staff': return upgradeStaff(profile, command.args.staffId);
     case 'pay_staff_salary': return payStaffSalary(profile, command.args.staffId);
     case 'terminate_staff': return terminateStaff(profile, command.args.staffId);
     case 'create_deposit': return createDeposit(profile, command.args.amount, command.args.durationDays);
