@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { COUNTRIES } from '../domain/countries';
 import { createNewPlayer, type PlayerProfile } from '../domain/player';
 import { getContractOffers } from './contracts';
-import { advanceDay, acceptContract, buyGoldWithDiamonds, buySpeedCard, deliverContract, foundCompany, payStaffSalary, repayLoan, runProduction, sellGold, takeLoan, upgradeLand } from './engine';
+import { advanceDay, acceptContract, buyGoldWithDiamonds, buySpeedCard, deliverContract, foundCompany, getDayBriefing, payStaffSalary, repayLoan, runProduction, sellGold, takeLoan, upgradeLand } from './engine';
 import { negotiateContract } from './engine';
 import { getSynergyBonuses } from './synergy';
 import { normalizeSavedProfile } from '../storage/saveRepository';
@@ -162,5 +162,12 @@ describe('Business Empire economy invariants', () => {
       expect(result.profile.lands[0].areaSquareMeters).toBe(1_100);
       expect(result.profile.bankBalance).toBe(170_000);
     }
+  });
+
+  it('rotates through a broader deterministic economic event cycle', () => {
+    const base = profile();
+    const titles = Array.from({ length: 8 }, (_, index) => getDayBriefing({ ...base, day: index + 1 }).event.title);
+    expect(new Set(titles).size).toBe(8);
+    expect(titles).toContain('فرصة تصدير استثنائية');
   });
 });

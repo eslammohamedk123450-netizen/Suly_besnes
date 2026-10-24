@@ -695,6 +695,11 @@ export function getDayBriefing(profile: PlayerProfile): DayBriefing {
     { title: 'طلب محلي مرتفع', cashImpact: 18_000 },
     { title: 'ارتفاع لوجستي مؤقت', cashImpact: -14_000 },
     { title: 'يوم استقرار اقتصادي', cashImpact: 0 },
+    { title: 'منحة دعم للمصانع الصغيرة', cashImpact: 26_000 },
+    { title: 'نقص مؤقت في المواد الخام', cashImpact: -22_000 },
+    { title: 'فرصة تصدير استثنائية', cashImpact: 34_000 },
+    { title: 'فحص تنظيمي وتكاليف امتثال', cashImpact: -18_000 },
+    { title: 'موسم تجاري قوي', cashImpact: 42_000 },
   ];
   const event = eventTemplates[(day - 1) % eventTemplates.length];
   const availableEnergy = profile.companies.reduce((sum, company) => sum + (company.energyUnits ?? 0), 0);

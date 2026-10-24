@@ -731,7 +731,12 @@ function getDayBriefing(profile) {
   const eventTemplates = [
     { title: "\u0637\u0644\u0628 \u0645\u062D\u0644\u064A \u0645\u0631\u062A\u0641\u0639", cashImpact: 18e3 },
     { title: "\u0627\u0631\u062A\u0641\u0627\u0639 \u0644\u0648\u062C\u0633\u062A\u064A \u0645\u0624\u0642\u062A", cashImpact: -14e3 },
-    { title: "\u064A\u0648\u0645 \u0627\u0633\u062A\u0642\u0631\u0627\u0631 \u0627\u0642\u062A\u0635\u0627\u062F\u064A", cashImpact: 0 }
+    { title: "\u064A\u0648\u0645 \u0627\u0633\u062A\u0642\u0631\u0627\u0631 \u0627\u0642\u062A\u0635\u0627\u062F\u064A", cashImpact: 0 },
+    { title: "\u0645\u0646\u062D\u0629 \u062F\u0639\u0645 \u0644\u0644\u0645\u0635\u0627\u0646\u0639 \u0627\u0644\u0635\u063A\u064A\u0631\u0629", cashImpact: 26e3 },
+    { title: "\u0646\u0642\u0635 \u0645\u0624\u0642\u062A \u0641\u064A \u0627\u0644\u0645\u0648\u0627\u062F \u0627\u0644\u062E\u0627\u0645", cashImpact: -22e3 },
+    { title: "\u0641\u0631\u0635\u0629 \u062A\u0635\u062F\u064A\u0631 \u0627\u0633\u062A\u062B\u0646\u0627\u0626\u064A\u0629", cashImpact: 34e3 },
+    { title: "\u0641\u062D\u0635 \u062A\u0646\u0638\u064A\u0645\u064A \u0648\u062A\u0643\u0627\u0644\u064A\u0641 \u0627\u0645\u062A\u062B\u0627\u0644", cashImpact: -18e3 },
+    { title: "\u0645\u0648\u0633\u0645 \u062A\u062C\u0627\u0631\u064A \u0642\u0648\u064A", cashImpact: 42e3 }
   ];
   const event = eventTemplates[(day - 1) % eventTemplates.length];
   const availableEnergy = profile.companies.reduce((sum, company) => sum + (company.energyUnits ?? 0), 0);
