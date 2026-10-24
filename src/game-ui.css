@@ -471,3 +471,7 @@
 @media(max-width:460px){.dashboard-store-link{gap:6px;padding:8px 10px;font-size:12px}.dashboard-store-link span{font-size:9px}.store-category-grid{gap:8px}.store-category-card small{font-size:10px}}
 
 .production-history-toggle { width: 100%; margin-top: 10px; }
+
+.production-filters { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.production-filters button { padding: 6px 11px; color: #71818b; background: #f6f9fa; border: 1px solid #e2e8eb; border-radius: 999px; font-size: 9px; cursor: pointer; }
+.production-filters button.is-selected { color: #fff; background: #2e556d; border-color: #2e556d; }
