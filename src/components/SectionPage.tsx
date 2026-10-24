@@ -177,8 +177,8 @@ export function SectionPage({ section, profile, country, focus, notificationThem
   if (section.id === 'store') {
     return <div className="section-page store-page">{heading}{pageShell(
       <>
-        <div className="store-hero"><div><span className="section-kicker">متجر المشتريات</span><h2>اشترِ الماس فقط</h2><p>اختر باقتك، راجع السعر، ثم أرسل طلب الشحن للمراجعة.</p></div><Icon name="store" size={38} /></div>
-        <SectionPanel title="باقات الماس" description="كل بطاقة تعرض عدد الماسات وسعرها بوضوح. الماس هو المنتج المدفوع الأساسي في اللعبة.">
+        <div className="store-hero"><div><span className="section-kicker">المتجر الماسي</span><h2>اشترِ الماس والمكافآت</h2><p>اختر باقتك، راجع السعر والمكافآت، ثم أرسل طلب الشحن للمراجعة.</p></div><Icon name="store" size={38} /></div>
+        <SectionPanel title="باقات الماس" description="الأسعار بالدولار، وكل بطاقة تعرض إجمالي الماس والمكافآت الإضافية بوضوح.">
           <DiamondStore profile={profile} isGuest={isGuest} onLinkAccount={onLinkAccount} onRefreshProfile={onRefreshProfile} />
         </SectionPanel>
       </>,

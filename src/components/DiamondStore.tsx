@@ -51,7 +51,7 @@ export function DiamondStore({ profile, isGuest, onLinkAccount, onRefreshProfile
     ? createdOrder
     : existingPendingOrder;
   const whatsappText = selected && activeOrder
-    ? `مرحبًا، أرسلت تحويل Vodafone Cash لطلب شحن الماس رقم ${activeOrder.orderNumber}. الباقة: ${selected.label}، ${selected.diamonds} ماسة بقيمة ${selected.priceEgp} ج.م. سأرفق إيصال التحويل.`
+    ? `مرحبًا، أرسلت قيمة طلب شحن الماس رقم ${activeOrder.orderNumber}. الباقة: ${selected.label}، ${selected.diamonds} ماسة بقيمة $${selected.priceUsd}. سأرفق إيصال التحويل.`
     : 'مرحبًا، أريد الاستفسار عن شحن الماس للعبة إمبراطورية الأعمال.';
 
   async function refreshOrders() {
@@ -108,11 +108,11 @@ export function DiamondStore({ profile, isGuest, onLinkAccount, onRefreshProfile
     <section className="diamond-store" aria-labelledby="diamond-store-title">
       <div className="diamond-store-heading">
         <div>
-          <span className="section-kicker">متجر الإمبراطورية</span>
-          <h3 id="diamond-store-title">شراء الماس</h3>
-          <p>السعر الأساسي 100 ماسة = 1$. كلما اخترت باقة أعلى زادت الماسات الإضافية ونسبة المكافأة.</p>
+          <span className="section-kicker">المتجر الماسي</span>
+          <h3 id="diamond-store-title">باقات الماس</h3>
+          <p>اختر الباقة المناسبة واحصل على الماس الإضافي والمكافآت الموضحة.</p>
         </div>
-        <span className="diamond-store-rate">100 ماسة = 1$</span>
+        <span className="diamond-store-rate">$1 = 100 ماسة</span>
       </div>
       <div className="diamond-package-grid">
         {DIAMOND_PACKAGES.map((item) => {
@@ -127,23 +127,24 @@ export function DiamondStore({ profile, isGuest, onLinkAccount, onRefreshProfile
             <span className="diamond-package-gem" aria-hidden="true">◆</span>
             <strong>{item.label}</strong>
             <b>◆ {item.diamonds.toLocaleString('ar-EG')}</b>
-            <span>{item.priceEgp.toLocaleString('ar-EG')} ج.م</span>
-            {bonus.diamonds > 0 && <em className="diamond-package-bonus">مكافأة +{formatNumber(bonus.diamonds)} ماسة · قيمة أعلى {bonusPercent}٪</em>}
+            <span>${item.priceUsd.toLocaleString('en-US')}</span>
+            {bonus.diamonds > 0 && <em className="diamond-package-bonus">+{formatNumber(bonus.diamonds)} ماسة إضافية · {bonusPercent}٪ مكافأة</em>}
             {bonus.diamonds === 0 && <em className="diamond-package-bonus diamond-package-bonus--base">الباقة الأساسية</em>}
+            {item.bonusRewards?.map((reward) => <em className="diamond-package-reward" key={reward}>{reward}</em>)}
             <small>{item.note}</small>
           </button>;
         })}
       </div>
       {selected && (
         <div className="diamond-transfer-panel" aria-label="تعليمات تحويل قيمة الماس">
-          <div className="diamond-transfer-title"><strong>تحويل قيمة {selected.diamonds.toLocaleString('ar-EG')} ماسة</strong><span>{selected.priceEgp.toLocaleString('ar-EG')} ج.م</span></div>
+          <div className="diamond-transfer-title"><strong>قيمة {selected.diamonds.toLocaleString('ar-EG')} ماسة</strong><span>${selected.priceUsd.toLocaleString('en-US')}</span></div>
           {isGuest ? (
             <div className="diamond-order-guest"><p>اربط حسابك أولًا حتى يُسجّل الطلب على حسابك الصحيح. لا تحوّل المبلغ قبل ربط الحساب.</p><button className="button button-primary" type="button" onClick={onLinkAccount}>ربط الحساب للمتابعة</button></div>
           ) : (
             <>
               <ol>
-                <li>افتح Vodafone Cash واختر تحويل أموال.</li>
-                <li>حوّل مبلغ <strong>{selected.priceEgp.toLocaleString('ar-EG')} ج.م</strong> إلى الرقم التالي:</li>
+                <li>تواصل مع مسؤول الشحن عبر WhatsApp لمعرفة وسيلة التحويل المتاحة.</li>
+                <li>أرسل قيمة الباقة <strong>${selected.priceUsd.toLocaleString('en-US')}</strong> إلى وسيلة الدفع المعتمدة:</li>
               </ol>
               <button className="diamond-cash-number" type="button" onClick={() => void copyNumber()} aria-label="نسخ رقم Vodafone Cash">
                 <span>رقم Vodafone Cash</span><strong dir="ltr">{VODAFONE_CASH_NUMBER}</strong><small>{copied ? 'تم نسخ الرقم' : 'اضغط لنسخ الرقم'}</small>
@@ -169,7 +170,7 @@ export function DiamondStore({ profile, isGuest, onLinkAccount, onRefreshProfile
         <div className="diamond-orders-heading"><strong>طلباتي</strong><button className="text-link" type="button" onClick={() => void refreshOrders()} disabled={ordersLoading}>{ordersLoading ? 'جارٍ التحديث…' : 'تحديث الحالة'}</button></div>
         {ordersError && <p className="diamond-order-error" role="alert">{ordersError}</p>}
         {ordersLoading && orders.length === 0 ? <p className="diamond-orders-empty">جارٍ تحميل الطلبات…</p> : orders.length === 0 ? <p className="diamond-orders-empty">لا توجد طلبات شحن مسجلة.</p> : <div className="diamond-orders-list">{orders.map((order) => <article className={`diamond-order-row diamond-order-row--${order.status}`} key={order.orderId}>
-          <div className="diamond-order-row-main"><strong dir="ltr">{order.orderNumber}</strong><small>{order.packageName} · {formatNumber(order.diamonds)} ماسة · {formatNumber(order.amountEgp)} ج.م</small></div>
+          <div className="diamond-order-row-main"><strong dir="ltr">{order.orderNumber}</strong><small>{order.packageName} · {formatNumber(order.diamonds)} ماسة · ${formatNumber(order.amountUsd ?? order.amountEgp ?? 0)}</small></div>
           <span className={`diamond-order-status diamond-order-status--${order.status}`}>{STATUS_LABELS[order.status]}</span>
           {order.status === 'rejected' && order.reviewReason && <small className="diamond-order-reason">{order.reviewReason}</small>}
         </article>)}</div>}
