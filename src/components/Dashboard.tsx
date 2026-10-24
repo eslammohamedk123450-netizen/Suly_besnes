@@ -18,6 +18,14 @@ interface DashboardProps {
   onNavigate: (section: SectionId, target?: string) => void;
 }
 
+function getAccountBadgeVariant(label: string): 'vip' | 'verified' | 'partner' | 'default' {
+  const normalized = label.normalize('NFKC').toLocaleLowerCase('ar-EG').replace(/[\u064b-\u065f\u0670]/g, '');
+  if (normalized.includes('vip') || normalized.includes('مميز')) return 'vip';
+  if (normalized.includes('موثق') || normalized.includes('رسمي') || normalized.includes('verified')) return 'verified';
+  if (normalized.includes('شريك') || normalized.includes('معتمد') || normalized.includes('partner')) return 'partner';
+  return 'default';
+}
+
 export function Dashboard({ profile, country, onNavigate }: DashboardProps) {
   const totalAssets = calculateTotalAssets(profile);
   const goldMarketValue = Math.round(profile.goldGrams * GOLD_PRICE_PER_GRAM);
@@ -52,6 +60,23 @@ export function Dashboard({ profile, country, onNavigate }: DashboardProps) {
           <span className="dashboard-auto-note"><Icon name="clock" size={15} /> اليوم يتقدم تلقائيًا كل 24 دقيقة حقيقية</span>
         </div>
         <div className="hero-emblem"><Icon name="crown" size={25} /><span>BE</span></div>
+      </section>
+
+      <section className="account-badges-panel" aria-label="شارات الحساب">
+        <div className="account-badges-heading"><span className="section-kicker">الامتيازات الحالية</span><h2>شارات الحساب</h2></div>
+        {profile.badges.length > 0 ? (
+          <ul className="account-badges-list" aria-label="الشارات الممنوحة لهذا الحساب">
+            {profile.badges.map((badge, index) => {
+              const variant = getAccountBadgeVariant(badge);
+              return <li className={`account-badge account-badge--${variant}`} key={`${badge}-${index}`}>
+                <span className="account-badge-label">{badge}</span>
+                <span className="account-badge-mark" aria-hidden="true">
+                  {variant === 'vip' ? <Icon name="crown" size={15} /> : variant === 'verified' || variant === 'default' ? <Icon name="shield" size={15} /> : <span className="account-badge-check">✓</span>}
+                </span>
+              </li>;
+            })}
+          </ul>
+        ) : <p className="account-badges-empty">لم تُضف شارات لهذا الحساب بعد.</p>}
       </section>
 
       {totalOutstanding > 0 && <div className="operating-warning" role="status">لديك التزامات ورواتب غير مسددة بقيمة {formatMoney(totalOutstanding, country)}؛ أُوقفت الطاقة مؤقتًا، وتُخصم الالتزامات من السيولة الجديدة.</div>}
