@@ -7,6 +7,7 @@ import BadgeManagement from "@/components/BadgeManagement";
 import PlayerLookup from "@/components/PlayerLookup";
 import ResourceAdjustmentDialog from "@/components/ResourceAdjustmentDialog";
 import RewardCodePanel from "@/components/RewardCodePanel";
+import TopupRequests from "@/components/TopupRequests";
 import { adjustResources, getAuditHistory, getSession, getSetupStatus, logout, searchPlayer, type AdminTab, type AuditEntry, type PlayerRecord } from "@/lib/adminApi";
 
 type Mode = "checking" | "setup" | "login" | "app" | "error";
@@ -151,6 +152,7 @@ export default function Home() {
       {tab === "players" && lookup}
       {tab === "badges" && <>{lookup}{player && <BadgeManagement player={player} onChanged={async () => { await reloadPlayer(); void loadAudit(); showNotice("تم تحديث شارات الحساب."); }} />}</>}
       {tab === "codes" && <RewardCodePanel />}
+      {tab === "topups" && <TopupRequests onReviewed={async () => { void loadAudit(); showNotice("تم تسجيل قرار طلب الشحن وتحديث سجل التدقيق."); }} />}
       {tab === "audit" && <AuditHistory entries={auditEntries} loading={auditLoading} error={auditError} onRefresh={loadAudit} />}
     </AdminShell>
 

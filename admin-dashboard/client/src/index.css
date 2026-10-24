@@ -394,7 +394,7 @@ textarea.text-input { resize: vertical; line-height: 1.8; }
   .admin-topbar { min-height: 112px; padding: 21px 21px 18px; }
   .admin-content { padding: 18px 19px 24px; }
   .admin-footer { padding-inline: 20px; }
-  .mobile-nav { position: fixed; z-index: 50; inset-inline: 0; bottom: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 2px; min-height: 66px; padding: 6px 8px calc(6px + env(safe-area-inset-bottom)); background: rgba(255,255,255,.96); border-top: 1px solid #dfe7e8; box-shadow: 0 -8px 22px rgba(12,34,53,.07); backdrop-filter: blur(12px); }
+  .mobile-nav { position: fixed; z-index: 50; inset-inline: 0; bottom: 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 2px; min-height: 66px; padding: 6px 8px calc(6px + env(safe-area-inset-bottom)); background: rgba(255,255,255,.96); border-top: 1px solid #dfe7e8; box-shadow: 0 -8px 22px rgba(12,34,53,.07); backdrop-filter: blur(12px); }
   .mobile-nav button { display: grid; justify-items: center; align-content: center; gap: 3px; min-width: 0; padding: 3px 2px; color: #7f8f98; background: transparent; border: 0; border-radius: 9px; font-size: 8px; cursor: pointer; }
   .mobile-nav button.mobile-nav-active { color: #18775d; background: #edf7f1; }
   .mobile-nav button span { overflow: hidden; max-width: 100%; text-overflow: ellipsis; white-space: nowrap; }
@@ -518,4 +518,81 @@ textarea.text-input { resize: vertical; line-height: 1.8; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+}
+
+/* Manual diamond top-up review */
+.topups-page { display: grid; gap: 14px; min-width: 0; }
+.topups-manual-note { display: flex; align-items: flex-start; gap: 10px; padding: 13px 14px; color: #725c2e; background: #fff9eb; border: 1px solid #f0e4c3; border-radius: 12px; }
+.topups-note-icon { display: grid; flex: 0 0 auto; place-items: center; width: 32px; height: 32px; color: #98782e; background: #f8edce; border-radius: 9px; }
+.topups-manual-note strong { display: block; color: #71592a; font-size: 10px; }
+.topups-manual-note p { margin: 3px 0 0; color: #89764e; font-size: 9px; line-height: 1.8; }
+.topups-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.topups-heading { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.topups-heading-icon { display: grid; flex: 0 0 auto; place-items: center; width: 37px; height: 37px; color: #806728; background: #f8f2df; border: 1px solid #eee4c8; border-radius: 11px; }
+.topups-heading h2 { margin: 0; color: var(--navy); font-size: 14px; }
+.topups-heading p { margin: 3px 0 0; color: var(--muted); font-size: 9px; }
+.topups-refresh { min-height: 35px; padding-inline: 10px; font-size: 9px; }
+.topups-filters { display: flex; flex-wrap: wrap; gap: 6px; padding: 4px; background: #eaf0ef; border: 1px solid #e2e9e8; border-radius: 11px; }
+.topups-filter { min-height: 33px; padding: 0 12px; color: #6d808b; background: transparent; border: 1px solid transparent; border-radius: 8px; font-size: 9px; font-weight: 700; cursor: pointer; transition: .16s ease; }
+.topups-filter:hover { color: #315c4c; background: rgba(255,255,255,.6); }
+.topups-filter-active { color: #23664f; background: #fff; border-color: #dfe9e3; box-shadow: 0 2px 6px rgba(17,43,61,.06); }
+.topups-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 11px; }
+.topup-card { display: grid; gap: 11px; min-width: 0; padding: 14px; background: #fff; border: 1px solid var(--line); border-radius: 13px; box-shadow: 0 4px 14px rgba(17,43,61,.025); }
+.topup-card-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.topup-order-number { display: grid; gap: 2px; min-width: 0; }
+.topup-order-number span, .topup-detail > span { color: #87969e; font-size: 8px; }
+.topup-order-number strong { overflow: hidden; color: #345064; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.topup-status { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 5px; padding: 5px 8px; border-radius: 999px; font-size: 8px; font-weight: 800; }
+.topup-status i { width: 5px; height: 5px; background: currentColor; border-radius: 50%; }
+.topup-status-pending { color: #886c2d; background: #fbf5e3; }
+.topup-status-approved { color: #287455; background: #eaf5ee; }
+.topup-status-rejected { color: #a24d50; background: #fbefee; }
+.topup-player-line { display: flex; align-items: center; gap: 9px; min-width: 0; padding: 9px; background: #f8faf9; border: 1px solid #edf1ef; border-radius: 10px; }
+.topup-player-avatar { display: grid; flex: 0 0 auto; place-items: center; width: 34px; height: 34px; color: #34765c; background: #e7f3eb; border: 1px solid #d9ecdf; border-radius: 10px; font-size: 12px; font-weight: 800; }
+.topup-player-line > div { display: grid; gap: 3px; min-width: 0; }
+.topup-player-line strong { overflow: hidden; color: #304c5e; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.topup-player-line > div > span { color: #83929b; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 8px; text-align: right; }
+.topup-details-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 9px; }
+.topup-detail { display: grid; gap: 4px; min-width: 0; }
+.topup-detail strong { overflow-wrap: anywhere; color: #405969; font-size: 9px; }
+.topup-detail strong small { color: #82919a; font-size: 8px; font-weight: 600; }
+.topup-diamonds, .topup-date { display: inline-flex; align-items: center; gap: 5px; }
+.topup-diamonds { color: #96762a !important; }
+.topup-date { color: #607684 !important; font-size: 8px !important; }
+.topup-actions { display: grid; grid-template-columns: 1fr 1.25fr; gap: 7px; padding-top: 2px; border-top: 1px solid #edf1f1; }
+.topup-actions .primary-button, .topup-actions .danger-button { min-height: 37px; padding-inline: 8px; font-size: 9px; }
+.topup-review-meta { padding-top: 8px; border-top: 1px solid #edf1f1; color: #7d8d96; font-size: 8px; line-height: 1.7; }
+.topup-review-meta p { margin: 3px 0 0; color: #526b78; }
+.topups-empty { min-height: 190px; }
+.topups-error-retry { min-height: 30px; margin-inline-start: 8px; padding-inline: 9px; font-size: 9px; }
+.topup-review-modal { width: min(100%, 480px); }
+.topup-review-form { display: grid; gap: 10px; padding: 15px 22px 17px; }
+.topup-review-form .field-label { margin: 0 0 -5px; }
+.topup-review-form .reason-input { margin: 0; }
+.topup-reject-note { display: flex; align-items: center; gap: 8px; padding: 9px 10px; color: #934b4e; background: #fff4f2; border: 1px solid #efd9d7; border-radius: 9px; font-size: 9px; line-height: 1.6; }
+.topup-review-summary { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 9px 10px; color: #788a93; background: #f8faf9; border: 1px solid #edf1ef; border-radius: 9px; font-size: 9px; }
+.topup-review-summary strong { color: #35596a; font-size: 11px; }
+.topup-modal-foot { display: flex; align-items: center; gap: 6px; padding: 0 22px 16px; color: #7c9285; font-size: 8px; }
+.topup-modal-foot svg { color: #4b8a69; }
+
+@media (max-width: 820px) {
+  .topups-list { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 580px) {
+  .topups-page { gap: 10px; }
+  .topups-manual-note { gap: 8px; padding: 10px; }
+  .topups-note-icon { width: 29px; height: 29px; }
+  .topups-manual-note strong { font-size: 9px; }
+  .topups-manual-note p { font-size: 8px; }
+  .topups-heading-icon { width: 32px; height: 32px; }
+  .topups-heading h2 { font-size: 12px; }
+  .topups-heading p { max-width: 230px; font-size: 8px; line-height: 1.6; }
+  .topups-refresh { min-height: 31px; padding-inline: 7px; font-size: 8px; }
+  .topups-filters { gap: 3px; }
+  .topups-filter { min-height: 31px; padding-inline: 8px; font-size: 8px; }
+  .topup-card { gap: 9px; padding: 11px; }
+  .topup-actions .primary-button, .topup-actions .danger-button { min-height: 35px; padding-inline: 5px; font-size: 8px; }
+  .topup-review-form { gap: 9px; padding: 12px 15px 14px; }
+  .topup-modal-foot { padding: 0 15px 13px; }
 }

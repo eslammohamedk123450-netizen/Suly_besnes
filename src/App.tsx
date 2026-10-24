@@ -370,6 +370,22 @@ export default function App() {
     }
   }
 
+  async function refreshAuthoritativeProfile() {
+    if (!account || account.isGuest) return;
+    if (getPendingSyncCount(account.id) > 0) {
+      const synchronized = await synchronizePendingCommands(false);
+      if (!synchronized || getPendingSyncCount(account.id) > 0) return;
+    }
+    if (syncLock.current) return;
+    const latest = await loadRemoteGame(account.id);
+    if (!latest || getPendingSyncCount(account.id) > 0) return;
+    const normalized = normalizeAccountFeatures(latest, account.id);
+    const saved = saveGame(normalized, account.id);
+    if (!saved.ok) return;
+    setProfile(normalized);
+    setSyncState('synced');
+  }
+
   function handlePlayAsGuest() {
     const guest = createGuestAccount();
     setAccount(guest);
@@ -681,7 +697,7 @@ export default function App() {
           ) : activeSection === 'profile' ? (
             <ProfilePage profile={profile} country={country} accountId={account.id} isGuest={Boolean(account.isGuest)} isSynced={!account.isGuest && syncState === 'synced' && pendingCommandCount === 0} onLinkAccount={() => setLinkingAccount(true)} />
           ) : (
-            <SectionPage section={active} profile={profile} country={country} focus={sectionFocus} notificationTheme={notificationTheme} isGuest={Boolean(account.isGuest)} onNotificationThemeChange={setNotificationTheme} onHome={() => navigate('home')} onAction={handleGameResult} onCommand={handleGameCommand} onRedeemed={handleRedeemed} onLinkAccount={() => setLinkingAccount(true)} onLogout={handleLogout} onShowGuide={() => setPendingGuide(activeSection)} />
+            <SectionPage section={active} profile={profile} country={country} focus={sectionFocus} notificationTheme={notificationTheme} isGuest={Boolean(account.isGuest)} onNotificationThemeChange={setNotificationTheme} onHome={() => navigate('home')} onAction={handleGameResult} onCommand={handleGameCommand} onRedeemed={handleRedeemed} onRefreshProfile={refreshAuthoritativeProfile} onLinkAccount={() => setLinkingAccount(true)} onLogout={handleLogout} onShowGuide={() => setPendingGuide(activeSection)} />
           )}
         </main>
       </div>

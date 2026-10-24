@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Award, CircleHelp, Coins, LayoutDashboard, LogOut, ScrollText, TicketPercent, UsersRound } from "lucide-react";
+import { Award, CircleHelp, Coins, Diamond, LayoutDashboard, LogOut, ScrollText, TicketPercent, UsersRound } from "lucide-react";
 import type { AdminTab } from "@/lib/adminApi";
 
 const navItems: { id: AdminTab; label: string; hint: string; icon: typeof LayoutDashboard }[] = [
@@ -7,6 +7,7 @@ const navItems: { id: AdminTab; label: string; hint: string; icon: typeof Layout
   { id: "players", label: "إدارة اللاعبين", hint: "بحث وتعديل الموارد", icon: UsersRound },
   { id: "badges", label: "الشارات", hint: "منح وإلغاء", icon: Award },
   { id: "codes", label: "أكواد المكافآت", hint: "إصدار الأكواد", icon: TicketPercent },
+  { id: "topups", label: "طلبات شحن الماس", hint: "مراجعة يدوية للطلبات", icon: Diamond },
   { id: "audit", label: "سجل التدقيق", hint: "كل الإجراءات", icon: ScrollText },
 ];
 
@@ -15,6 +16,7 @@ const headings: Record<AdminTab, { title: string; subtitle: string }> = {
   players: { title: "إدارة اللاعبين", subtitle: "ابحث بمعرّف BE واعرض البيانات الضرورية فقط." },
   badges: { title: "إدارة الشارات", subtitle: "كل شارة موثقة بسببها ومدتها وسجلها." },
   codes: { title: "أكواد المكافآت", subtitle: "الحفاظ على توافق الأكواد الحالية قبل تفعيل الإصدار." },
+  topups: { title: "طلبات شحن الماس", subtitle: "تحقق يدويًا من إيصال Vodafone Cash خارج النظام قبل الاعتماد." },
   audit: { title: "سجل التدقيق", subtitle: "سجل زمني غير قابل للتعديل من لوحة الإدارة." },
 };
 
@@ -86,8 +88,9 @@ export default function AdminShell({ tab, email, onTabChange, onLogout, children
       <nav className="mobile-nav" aria-label="التنقل الرئيسي للهاتف">
         {navItems.filter((item) => item.id !== "overview").map((item) => {
           const Icon = item.icon;
-          return <button key={item.id} type="button" className={tab === item.id ? "mobile-nav-active" : ""} onClick={() => onTabChange(item.id)} aria-label={item.label}>
-            <Icon size={19} /><span>{item.id === "players" ? "اللاعبون" : item.id === "badges" ? "الشارات" : item.id === "codes" ? "الأكواد" : "السجل"}</span>
+          const mobileLabel = item.id === "players" ? "اللاعبون" : item.id === "badges" ? "الشارات" : item.id === "codes" ? "الأكواد" : item.id === "topups" ? "شحن الماس" : "السجل";
+          return <button key={item.id} type="button" className={tab === item.id ? "mobile-nav-active" : ""} onClick={() => onTabChange(item.id)} aria-label={item.label} aria-current={tab === item.id ? "page" : undefined}>
+            <Icon size={19} /><span>{mobileLabel}</span>
           </button>;
         })}
       </nav>

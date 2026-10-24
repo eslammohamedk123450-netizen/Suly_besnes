@@ -169,6 +169,12 @@ function knownError(error: unknown): { status: number; message: string } {
   if (value.includes("badge_already_active")) return { status: 409, message: "هذه الشارة نشطة بالفعل لهذا اللاعب." };
   if (value.includes("badge_not_active")) return { status: 409, message: "لا توجد شارة نشطة من هذا النوع لإلغائها." };
   if (value.includes("idempotency_key_conflict")) return { status: 409, message: "تعذر مطابقة الطلب السابق؛ حدّث الصفحة قبل إعادة المحاولة." };
+  if (value.includes("invalid_topup_status")) return { status: 400, message: "حالة الطلب المطلوبة غير صالحة." };
+  if (value.includes("invalid_topup_review")) return { status: 400, message: "أدخل سببًا صالحًا للمراجعة لا يقل عن خمسة أحرف." };
+  if (value.includes("topup_order_not_found")) return { status: 404, message: "لم يتم العثور على طلب الشحن." };
+  if (value.includes("topup_order_not_pending")) return { status: 409, message: "تمت مراجعة هذا الطلب بالفعل." };
+  if (value.includes("player_profile_not_found")) return { status: 404, message: "تعذر العثور على ملف اللاعب المرتبط بالطلب." };
+  if (value.includes("invalid_topup_package")) return { status: 400, message: "باقة الشحن غير صالحة." };
   if (value.includes("invalid_badge")) return { status: 400, message: "بيانات الشارة غير صالحة." };
   if (value.includes("invalid_admin_setup")) return { status: 400, message: "بيانات الحساب غير صالحة." };
   if (value.includes("invalid_setup_code")) return { status: 403, message: "رمز الإعداد غير صحيح أو تم استخدامه." };
@@ -343,6 +349,37 @@ Deno.serve(async (request: Request) => {
         p_offset: Math.min(Math.max(Number(body.offset) || 0, 0), 10_000),
       });
       return json(200, { ok: true, entries: result });
+    }
+
+    if (action === "list_diamond_topups") {
+      const status = body.status;
+      if (status !== "pending" && status !== "approved" && status !== "rejected" && status !== "all") {
+        return json(400, { ok: false, error: "اختر حالة طلب صالحة." });
+      }
+      const orders = await rpc<unknown>("admin_list_diamond_topup_orders", {
+        p_status: status,
+        p_limit: Math.min(Math.max(Number(body.limit) || 50, 1), 100),
+        p_offset: Math.min(Math.max(Number(body.offset) || 0, 0), 10_000),
+      });
+      return json(200, { ok: true, orders });
+    }
+
+    if (action === "approve_diamond_topup" || action === "reject_diamond_topup") {
+      const orderId = body.orderId;
+      const reason = getText(body.reason, 500);
+      if (!validRequestId(orderId) || !validRequestId(body.requestId) || !reason || reason.length < 5) {
+        return json(400, { ok: false, error: "تحقق من رقم الطلب وسبب المراجعة." });
+      }
+      const rpcName = action === "approve_diamond_topup"
+        ? "admin_approve_diamond_topup_order"
+        : "admin_reject_diamond_topup_order";
+      const result = await rpc<unknown>(rpcName, {
+        p_order_id: orderId,
+        p_request_id: body.requestId,
+        p_admin_email: adminEmail,
+        p_reason: reason,
+      });
+      return json(200, { ok: true, result });
     }
 
     return json(404, { ok: false, error: "unknown_action" });

@@ -36,6 +36,7 @@ interface SectionPageProps {
   onAction: (result: GameResult<unknown>) => void;
   onCommand: (command: GameCommand, fallback: (current: PlayerProfile) => GameResult<unknown>) => void;
   onRedeemed: (profile: PlayerProfile, message: string, codeId: string, rawCode: string) => Promise<boolean>;
+  onRefreshProfile: () => Promise<void>;
   onLinkAccount: () => void;
   onLogout: () => void;
   onShowGuide: () => void;
@@ -56,7 +57,7 @@ function economicEventDetails(event: PlayerProfile['events'][number], currentDay
   return details;
 }
 
-export function SectionPage({ section, profile, country, focus, notificationTheme, isGuest, onNotificationThemeChange, onHome, onAction, onCommand, onRedeemed, onLinkAccount, onLogout, onShowGuide }: SectionPageProps) {
+export function SectionPage({ section, profile, country, focus, notificationTheme, isGuest, onNotificationThemeChange, onHome, onAction, onCommand, onRedeemed, onRefreshProfile, onLinkAccount, onLogout, onShowGuide }: SectionPageProps) {
   const playerProgress = getPlayerProgress(profile);
   const [bidAmounts, setBidAmounts] = useState<Record<string, string>>({});
   const [companyName, setCompanyName] = useState('شركة جديدة');
@@ -147,7 +148,7 @@ export function SectionPage({ section, profile, country, focus, notificationThem
           <div className="settings-note"><Icon name="shield" size={17} /><p>{isGuest ? 'عالم الضيف محفوظ على هذا الجهاز. اربط حسابًا لاستعادة العالم على أجهزة أخرى.' : 'يُحفظ العالم على جهازك ويتزامن عند الاتصال؛ اللعب الأساسي متاح دون اتصال.'}</p></div>
           {isGuest && <button className="button button-primary account-link-button" type="button" onClick={onLinkAccount}>ربط الحساب ونسخ العالم واستعادته</button>}
           <CodeRedemption profile={profile} onRedeemed={onRedeemed} />
-          <DiamondStore profile={profile} onBuyGoldWithDiamonds={(grams) => runCommand({ name: 'buy_gold_with_diamonds', args: { grams } }, (current) => buyGoldWithDiamonds(current, grams))} onSellGold={(grams) => runCommand({ name: 'sell_gold', args: { grams } }, (current) => sellGold(current, grams))} />
+          <DiamondStore profile={profile} isGuest={isGuest} onLinkAccount={onLinkAccount} onRefreshProfile={onRefreshProfile} onBuyGoldWithDiamonds={(grams) => runCommand({ name: 'buy_gold_with_diamonds', args: { grams } }, (current) => buyGoldWithDiamonds(current, grams))} onSellGold={(grams) => runCommand({ name: 'sell_gold', args: { grams } }, (current) => sellGold(current, grams))} />
           <div className="diamond-shop"><div className="diamond-shop-heading"><div><strong>متجر بطاقات السرعة</strong><small>100 ماسة = 1 دولار مرجعيًا · لا يوجد شراء خارجي حاليًا</small></div><span className="economy-pill economy-pill--gold">◆ {formatNumber(profile.diamonds)} ماسة</span></div><div className="diamond-shop-grid">{(Object.keys(SPEED_CARD_DIAMOND_COSTS) as SpeedCardKind[]).map((kind) => { const quantity = speedCardQuantities[kind] ?? '1'; const cost = SPEED_CARD_DIAMOND_COSTS[kind]; const available = profile.speedCards.find((card) => card.kind === kind)?.quantity ?? 0; return <article className="diamond-shop-card" key={kind}><strong>{SPEED_CARD_LABELS[kind]}</strong><small>الرصيد الحالي: {formatNumber(available)} · {formatNumber(cost)} ماسة للبطاقة</small><div className="diamond-shop-buy"><input aria-label={`كمية ${SPEED_CARD_LABELS[kind]}`} type="number" min="1" step="1" value={quantity} onChange={(event) => setSpeedCardQuantities((previous) => ({ ...previous, [kind]: event.target.value }))} /><button className="button button-secondary" type="button" disabled={profile.diamonds < cost * Number(quantity || 0) || Number(quantity) < 1} onClick={() => runCommand({ name: 'buy_speed_card', args: { kind, quantity: Number(quantity) } }, (current) => buySpeedCard(current, kind, Number(quantity)))}>شراء بالماس</button></div></article>; })}</div></div>
           <PurchaseSupport />
           <div className="settings-notice-theme">

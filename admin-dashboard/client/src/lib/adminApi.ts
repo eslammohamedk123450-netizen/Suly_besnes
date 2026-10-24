@@ -1,5 +1,23 @@
 export type BadgeKey = "vip" | "official_verified" | "partner_verified";
-export type AdminTab = "overview" | "players" | "badges" | "codes" | "audit";
+export type AdminTab = "overview" | "players" | "badges" | "codes" | "topups" | "audit";
+export type TopupStatus = "pending" | "approved" | "rejected";
+export type TopupFilter = TopupStatus | "all";
+
+export interface TopupOrder {
+  orderId: string;
+  orderNumber: string;
+  accountCode: string;
+  playerName: string;
+  packageId: string;
+  packageName: string;
+  diamonds: number;
+  amountEgp: number;
+  status: TopupStatus;
+  createdAt: string;
+  reviewedAt: string | null;
+  reviewedBy: string | null;
+  reviewReason: string | null;
+}
 
 export interface ActiveBadge {
   type: BadgeKey;
@@ -35,7 +53,7 @@ export interface AuditEntry {
   id: string;
   adminEmail: string;
   accountCode: string | null;
-  action: "resource_adjustment" | "badge_grant" | "badge_revoke" | "badge_expire";
+  action: "resource_adjustment" | "badge_grant" | "badge_revoke" | "badge_expire" | "reward_signing_key_initialized" | "diamond_topup_approved" | "diamond_topup_rejected";
   reason: string;
   before: Record<string, unknown>;
   after: Record<string, unknown>;
@@ -135,4 +153,17 @@ export async function getBadgeHistory(accountCode: string): Promise<BadgeHistory
 export async function getAuditHistory(): Promise<AuditEntry[]> {
   const response = await post<{ ok: true; entries: AuditEntry[] }>("/api/admin/audit");
   return response.entries ?? [];
+}
+
+export async function getDiamondTopups(status: TopupFilter): Promise<TopupOrder[]> {
+  const response = await post<{ ok: true; orders: TopupOrder[] }>("/api/admin/diamond-topups", { status });
+  return response.orders ?? [];
+}
+
+export async function approveDiamondTopup(input: { orderId: string; requestId: string; reason: string }): Promise<void> {
+  await post("/api/admin/diamond-topups/approve", input);
+}
+
+export async function rejectDiamondTopup(input: { orderId: string; requestId: string; reason: string }): Promise<void> {
+  await post("/api/admin/diamond-topups/reject", input);
 }

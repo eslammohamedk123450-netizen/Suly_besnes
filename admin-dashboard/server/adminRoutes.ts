@@ -208,4 +208,28 @@ export function registerAdminRoutes(app: Express) {
       offset: request.body?.offset,
     });
   });
+
+  app.post("/api/admin/diamond-topups", (request, response) => {
+    void handle(request, response, "list_diamond_topups", {
+      status: request.body?.status,
+      limit: request.body?.limit,
+      offset: request.body?.offset,
+    });
+  });
+
+  app.post("/api/admin/diamond-topups/approve", (request, response) => {
+    void handle(request, response, "approve_diamond_topup", {
+      orderId: request.body?.orderId,
+      requestId: request.body?.requestId,
+      reason: request.body?.reason,
+    });
+  });
+
+  app.post("/api/admin/diamond-topups/reject", (request, response) => {
+    void handle(request, response, "reject_diamond_topup", {
+      orderId: request.body?.orderId,
+      requestId: request.body?.requestId,
+      reason: request.body?.reason,
+    });
+  });
 }
