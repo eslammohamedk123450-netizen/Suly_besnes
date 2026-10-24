@@ -1049,8 +1049,10 @@ function advanceDay(profile) {
     entries.push(ledgerEntry(profile, "liability", salaryAccrued, "\u0627\u0644\u062A\u0632\u0627\u0645 \u0631\u0648\u0627\u062A\u0628 \u063A\u064A\u0631 \u0645\u0633\u062F\u062F", entries.length));
   }
   let inventory = [...profile.inventory];
+  const newlyCompletedProductionIds = [];
   const productionOrders = profile.productionOrders.map((order) => {
     if (order.status !== "active" || order.completesOnDay > nextDay) return order;
+    newlyCompletedProductionIds.push(order.id);
     const unitCost = order.materialCost / order.outputQuantity;
     const existingLot = inventory.find((lot) => lot.materialOrProductId === order.productId);
     inventory = existingLot ? inventory.map((lot) => lot.materialOrProductId === order.productId ? { ...lot, quantity: lot.quantity + order.outputQuantity, unitCost: (lot.quantity * lot.unitCost + order.outputQuantity * unitCost) / (lot.quantity + order.outputQuantity), qualityScore: ((lot.qualityScore ?? 90) * lot.quantity + order.qualityScore * order.outputQuantity) / (lot.quantity + order.outputQuantity) } : lot) : [...inventory, { id: nextId(profile, "inventory", inventory.length), materialOrProductId: order.productId, quantity: order.outputQuantity, unit: order.outputUnit, unitCost, qualityScore: order.qualityScore }];
@@ -1118,7 +1120,7 @@ function advanceDay(profile) {
   if (expiredContracts.length > 0) entries.push(ledgerEntry(profile, "expense", expiredContracts.length * 2e3, "\u063A\u0631\u0627\u0645\u0627\u062A \u0639\u0642\u0648\u062F \u0645\u062A\u0623\u062E\u0631\u0629", entries.length));
   const event = { id: `event-${nextDay}`, day: nextDay, title: expiredContracts.length > 0 ? `${briefing.event.title} \xB7 \u062A\u0623\u062E\u0631 \u0639\u0642\u062F` : briefing.event.title, cashImpact: eventImpact, occurredAt: now };
   const nextProfile = addLedger(
-    { ...profile, day: nextDay, companies, investments, banking: { ...profile.banking, loans }, staff, productionOrders, inventory, events: [...profile.events, event], payables, contracts, reputation },
+    { ...profile, day: nextDay, companies, investments, banking: { ...profile.banking, loans }, staff, productionOrders, inventory, unreadProductionOrderIds: [.../* @__PURE__ */ new Set([...profile.unreadProductionOrderIds ?? [], ...newlyCompletedProductionIds])].slice(-500), events: [...profile.events, event], payables, contracts, reputation },
     entries,
     balance
   );
@@ -1211,6 +1213,23 @@ var produce = runProduction;
 var sell = sellProduct;
 var invest = createInvestment;
 var passDay = advanceDay;
+function updateNotificationState(profile, action, notificationIds) {
+  if (action !== "read" && action !== "dismiss") return failure(profile, "invalid-input", "\u0625\u062C\u0631\u0627\u0621 \u0627\u0644\u062A\u0646\u0628\u064A\u0647 \u063A\u064A\u0631 \u0635\u0627\u0644\u062D.");
+  if (!Array.isArray(notificationIds) || notificationIds.length === 0 || notificationIds.length > 20) return failure(profile, "invalid-input", "\u0627\u062E\u062A\u0631 \u062A\u0646\u0628\u064A\u0647\u064B\u0627 \u0648\u0627\u062D\u062F\u064B\u0627 \u0639\u0644\u0649 \u0627\u0644\u0623\u0642\u0644.");
+  const ids = [...new Set(notificationIds.filter((id) => typeof id === "string" && id.trim().length > 0 && id.length <= 512))];
+  if (ids.length === 0 || ids.length !== notificationIds.length) return failure(profile, "invalid-input", "\u0642\u0627\u0626\u0645\u0629 \u0627\u0644\u062A\u0646\u0628\u064A\u0647\u0627\u062A \u063A\u064A\u0631 \u0635\u0627\u0644\u062D\u0629.");
+  const readIds = new Set(profile.readNotificationIds ?? []);
+  const dismissedIds = new Set(profile.dismissedNotificationIds ?? []);
+  for (const id of ids) (action === "read" ? readIds : dismissedIds).add(id);
+  const productionIds = new Set(ids.flatMap((id) => id.startsWith("production-completed:") ? id.slice("production-completed:".length).split(",").filter(Boolean) : []));
+  const nextProfile = {
+    ...profile,
+    readNotificationIds: [...readIds].slice(-500),
+    dismissedNotificationIds: [...dismissedIds].slice(-500),
+    unreadProductionOrderIds: (profile.unreadProductionOrderIds ?? []).filter((id) => !productionIds.has(id))
+  };
+  return success(nextProfile, action === "read" ? "\u062A\u0645 \u062A\u0639\u0644\u064A\u0645 \u0627\u0644\u062A\u0646\u0628\u064A\u0647 \u0643\u0645\u0642\u0631\u0648\u0621." : "\u062A\u0645 \u0625\u062E\u0641\u0627\u0621 \u0627\u0644\u062A\u0646\u0628\u064A\u0647.", { action, notificationIds: ids });
+}
 function executeGameCommand(profile, command) {
   switch (command.name) {
     case "place_bid":
@@ -1281,6 +1300,8 @@ function executeGameCommand(profile, command) {
       return negotiateContract(profile, command.args.contractId, command.args.mode);
     case "claim_task":
       return claimTask(profile, command.args.taskId);
+    case "update_notification_state":
+      return updateNotificationState(profile, command.args.action, command.args.notificationIds);
   }
 }
 export {
@@ -1326,6 +1347,7 @@ export {
   serviceCompany,
   takeLoan,
   terminateStaff,
+  updateNotificationState,
   upgradeCompany,
   upgradeLand,
   useProductionSpeedCard,

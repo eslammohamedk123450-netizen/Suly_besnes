@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { COUNTRIES } from '../domain/countries';
 import { createNewPlayer, type PlayerProfile } from '../domain/player';
 import { getContractOffers } from './contracts';
-import { advanceDay, acceptContract, buyGoldWithDiamonds, buyMaterial, buySpeedCard, createDeposit, deliverContract, foundCompany, getDayBriefing, mergeDeposits, payStaffSalary, repayLoan, runProduction, sellGold, takeLoan, upgradeLand, withdrawDeposit } from './engine';
+import { advanceDay, acceptContract, buyGoldWithDiamonds, buyMaterial, buySpeedCard, createDeposit, deliverContract, foundCompany, getDayBriefing, mergeDeposits, payStaffSalary, repayLoan, runProduction, sellGold, takeLoan, updateNotificationState, upgradeLand, withdrawDeposit } from './engine';
 import { negotiateContract } from './engine';
 import { getSynergyBonuses } from './synergy';
 import { normalizeSavedProfile } from '../storage/saveRepository';
@@ -230,5 +230,19 @@ describe('Business Empire economy invariants', () => {
     const titles = Array.from({ length: 8 }, (_, index) => getDayBriefing({ ...base, day: index + 1 }).event.title);
     expect(new Set(titles).size).toBe(8);
     expect(titles).toContain('فرصة تصدير استثنائية');
+  });
+
+  it('records newly completed production for one persistent notification and safely updates notification state', () => {
+    const productionOrder = { id: 'production-notice-1', companyId: 'company-1', productId: 'food-pack', productName: 'غذاء', batches: 1, outputQuantity: 20, outputUnit: 'عبوة', materialCost: 500, energyCost: 20, expectedUnitCost: 25, demandForecast: 100, qualityScore: 90, maintenanceCost: 0, startedOnDay: 1, completesOnDay: 2, status: 'active' as const };
+    const result = advanceDay(profile({ bankBalance: 1_000_000, productionOrders: [productionOrder] }));
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.profile.unreadProductionOrderIds).toEqual(['production-notice-1']);
+    const marked = updateNotificationState(result.profile, 'read', ['production-completed:production-notice-1']);
+    expect(marked.ok).toBe(true);
+    if (marked.ok) {
+      expect(marked.profile.readNotificationIds).toContain('production-completed:production-notice-1');
+      expect(marked.profile.unreadProductionOrderIds).toEqual([]);
+    }
   });
 });

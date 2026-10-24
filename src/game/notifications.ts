@@ -25,10 +25,11 @@ export function selectNotifications(profile: PlayerProfile): GameNotification[] 
   if (profile.payables > 0) {
     notifications.push({ id: 'payables', title: 'التزامات غير مسددة', detail: `إجمالي الالتزامات ${money(profile.payables)} وتؤثر على الطاقة.`, tone: 'danger', section: 'obligations', target: 'obligations-list' });
   }
-  const completedProduction = profile.productionOrders.filter((item) => item.status === 'completed');
-  if (completedProduction.length > 0) {
-    const output = completedProduction.reduce((sum, item) => sum + item.outputQuantity, 0);
-    notifications.push({ id: 'production-completed', title: 'إنتاج مكتمل', detail: `اكتملت ${completedProduction.length} أوامر إنتاج · إجمالي ${output.toLocaleString('ar-EG')} وحدة جاهزة في المخزن.`, tone: 'success', section: 'production', count: completedProduction.length, target: 'production-queue' });
+  const newlyCompleted = (profile.unreadProductionOrderIds ?? []).slice(0, 5).map((id) => profile.productionOrders.find((item) => item.id === id && item.status === 'completed')).filter((item): item is PlayerProfile['productionOrders'][number] => Boolean(item));
+  if (newlyCompleted.length > 0) {
+    const output = newlyCompleted.reduce((sum, item) => sum + item.outputQuantity, 0);
+    const ids = newlyCompleted.map((item) => item.id);
+    notifications.push({ id: `production-completed:${ids.join(',')}`, title: 'إنتاج مكتمل', detail: `اكتملت ${newlyCompleted.length} أوامر إنتاج جديدة · إجمالي ${output.toLocaleString('ar-EG')} وحدة جاهزة في المخزن.`, tone: 'success', section: 'production', count: newlyCompleted.length, target: 'production-queue' });
   }
   const dueLoans = profile.banking.loans.filter((loan) => loan.status === 'active' && loan.nextPaymentDay - profile.day <= 2);
   if (dueLoans.length > 0) {
@@ -52,5 +53,6 @@ export function selectNotifications(profile: PlayerProfile): GameNotification[] 
   const earnedBadges = selectEmpirePulse(profile).badges.filter((badge) => badge.earned);
   if (earnedBadges.length > 0) notifications.push({ id: 'badges-earned', title: 'شارات الإمبراطورية', detail: `لديك ${earnedBadges.length} شارات مكتسبة: ${earnedBadges.slice(-3).map((badge) => badge.label).join('، ')}.`, tone: 'success', section: 'home', count: earnedBadges.length });
   notifications.push({ id: 'global-market-open', title: 'السوق العالمي مفتوح', detail: 'عروض تجار المواد الخام متاحة، وبعضها يقبل التفاوض.', tone: 'info', section: 'inventory' });
-  return notifications.slice(0, 10);
+  const dismissed = new Set(profile.dismissedNotificationIds ?? []);
+  return notifications.filter((notification) => !dismissed.has(notification.id)).slice(0, 10);
 }

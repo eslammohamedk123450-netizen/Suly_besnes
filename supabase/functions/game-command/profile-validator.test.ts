@@ -8,6 +8,7 @@ const validProfile = () => ({
   finances: { netProfit: 0, totalRevenue: 0, totalExpenses: 0 }, day: 1, inventory: [], licenses: [],
   investments: [], banking: { deposits: [], loans: [] }, staff: [], productionOrders: [], auctionHistory: [],
   redeemedCodeIds: [], sales: [], ledger: [], events: [], tasks: [], completedTaskIds: [],
+  readNotificationIds: [], dismissedNotificationIds: [], unreadProductionOrderIds: [],
   season: { seasonId: 'season-1', startedOnDay: 1, endsOnDay: 30, points: 0, claimedChallengeKeys: [] },
   reputation: 50, contracts: [], achievements: [], onboarding: { introCompleted: false, chapter: 0, seenGuides: [] },
 });
@@ -20,6 +21,24 @@ const hasError = (profile: unknown, fragment: string, previous?: unknown) => {
 describe('validatePlayerProfile', () => {
   it('accepts a valid new player profile', () => {
     expect(validatePlayerProfile(validProfile())).toEqual({ ok: true });
+  });
+
+  it('accepts persisted notification state and rejects duplicate notification IDs', () => {
+    const profile = validProfile();
+    profile.readNotificationIds = ['salary-overdue'];
+    profile.dismissedNotificationIds = ['global-market-open'];
+    profile.unreadProductionOrderIds = ['order-1'];
+    expect(validatePlayerProfile(profile)).toEqual({ ok: true });
+    profile.readNotificationIds = ['salary-overdue', 'salary-overdue'];
+    expect(hasError(profile, 'profile.readNotificationIds:duplicate_value')).toBe(true);
+  });
+
+  it('accepts a legacy profile without persisted notification arrays', () => {
+    const legacy = { ...validProfile() } as Record<string, unknown>;
+    delete legacy.readNotificationIds;
+    delete legacy.dismissedNotificationIds;
+    delete legacy.unreadProductionOrderIds;
+    expect(validatePlayerProfile(legacy)).toEqual({ ok: true });
   });
 
   it('rejects negative balances and gold', () => {

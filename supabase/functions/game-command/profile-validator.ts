@@ -13,10 +13,10 @@ const PROFILE_KEYS = new Set([
   'goldGrams', 'goldCostBasis', 'diamonds', 'speedCards', 'badges', 'assets', 'lands', 'companies',
   'finances', 'day', 'inventory', 'licenses', 'investments', 'banking', 'staff', 'productionOrders',
   'auctionHistory', 'redeemedCodeIds', 'sales', 'ledger', 'events', 'tasks', 'completedTaskIds',
-  'season', 'reputation', 'contracts', 'achievements', 'onboarding',
+  'season', 'reputation', 'contracts', 'achievements', 'onboarding', 'readNotificationIds', 'dismissedNotificationIds', 'unreadProductionOrderIds',
 ]);
 
-const REQUIRED_PROFILE_KEYS = [...PROFILE_KEYS].filter((key) => key !== 'season');
+const REQUIRED_PROFILE_KEYS = [...PROFILE_KEYS].filter((key) => !['season', 'readNotificationIds', 'dismissedNotificationIds', 'unreadProductionOrderIds'].includes(key));
 
 const MATERIAL_CAPACITY: Record<string, number> = {
   'crude-oil': 500, 'natural-gas': 500, water: 2_000, chemicals: 800, grain: 1_000,
@@ -327,6 +327,9 @@ export function validatePlayerProfile(profile: unknown, previousProfile?: unknow
     ['profile.badges', profile.badges],
     ['profile.redeemedCodeIds', profile.redeemedCodeIds],
     ['profile.completedTaskIds', profile.completedTaskIds],
+    ['profile.readNotificationIds', profile.readNotificationIds ?? []],
+    ['profile.dismissedNotificationIds', profile.dismissedNotificationIds ?? []],
+    ['profile.unreadProductionOrderIds', profile.unreadProductionOrderIds ?? []],
   ];
   for (const [path, value] of simpleIdArrays) uniqueStrings(requireArray(value, path, errors), path, errors);
 

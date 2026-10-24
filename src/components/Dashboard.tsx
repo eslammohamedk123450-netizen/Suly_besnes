@@ -8,6 +8,7 @@ import { Icon } from './Icon';
 import { selectEmpirePoints, selectEmpirePulse, selectOperationsSnapshot } from '../game/selectors';
 import { getPlayerProgress, getSectionUnlockHint, getUnlockedSectionIds } from '../game/onboarding';
 import { selectNotifications } from '../game/notifications';
+import { updateNotificationState, type GameCommand, type GameResult } from '../game/engine';
 import { NotificationCenter } from './NotificationCenter';
 import { getSynergyBonuses } from '../game/synergy';
 import { GlobalLeaderboardCard } from './GlobalLeaderboardCard';
@@ -16,6 +17,7 @@ interface DashboardProps {
   profile: PlayerProfile;
   country: CountryDefinition;
   onNavigate: (section: SectionId, target?: string) => void;
+  onCommand: (command: GameCommand, fallback: (current: PlayerProfile) => GameResult<unknown>) => void;
 }
 
 function getAccountBadgeVariant(label: string): 'vip' | 'verified' | 'partner' | 'default' {
@@ -26,7 +28,7 @@ function getAccountBadgeVariant(label: string): 'vip' | 'verified' | 'partner' |
   return 'default';
 }
 
-export function Dashboard({ profile, country, onNavigate }: DashboardProps) {
+export function Dashboard({ profile, country, onNavigate, onCommand }: DashboardProps) {
   const totalAssets = calculateTotalAssets(profile);
   const goldMarketValue = Math.round(profile.goldGrams * GOLD_PRICE_PER_GRAM);
   const quickSections = GAME_SECTIONS.filter((section) => section.id !== 'home');
@@ -40,6 +42,10 @@ export function Dashboard({ profile, country, onNavigate }: DashboardProps) {
   const totalOutstanding = profile.payables + unpaidSalary;
   const notifications = selectNotifications(profile);
   const synergies = getSynergyBonuses(profile);
+  const updateNotifications = (action: 'read' | 'dismiss', notificationIds: string[]) => onCommand(
+    { name: 'update_notification_state', args: { action, notificationIds } },
+    (current) => updateNotificationState(current, action, notificationIds),
+  );
   const ledgerDay = (occurredAt: string) => {
     const createdAt = Date.parse(profile.createdAt);
     const entryAt = Date.parse(occurredAt);
@@ -81,7 +87,7 @@ export function Dashboard({ profile, country, onNavigate }: DashboardProps) {
 
       {totalOutstanding > 0 && <div className="operating-warning" role="status">لديك التزامات ورواتب غير مسددة بقيمة {formatMoney(totalOutstanding, country)}؛ أُوقفت الطاقة مؤقتًا، وتُخصم الالتزامات من السيولة الجديدة.</div>}
 
-      <NotificationCenter notifications={notifications} onNavigate={onNavigate} />
+      <NotificationCenter notifications={notifications} readNotificationIds={profile.readNotificationIds ?? []} onNavigate={onNavigate} onMarkRead={(id) => updateNotifications('read', [id])} onMarkAllRead={(ids) => updateNotifications('read', ids)} onDismissAll={(ids) => updateNotifications('dismiss', ids)} />
 
       {synergies.length > 0 && <section className="surface synergy-panel"><div className="panel-heading"><div><span className="section-kicker">ميزة تشغيلية</span><h2>التآزر بين الشركات</h2></div><span className="notification-count">{synergies.length} نشط</span></div><div className="economy-list">{synergies.map((synergy) => <article className="economy-card economy-card--soft" key={synergy.id}><div className="economy-card-head"><div className="economy-card-title"><span className="economy-card-icon"><Icon name="company" size={17} /></span><span><strong>{synergy.title}</strong><small>{synergy.description}</small></span></div><span className="economy-pill economy-pill--green">تكلفة −{Math.round((1 - synergy.costMultiplier) * 100)}%</span></div></article>)}</div></section>}
 

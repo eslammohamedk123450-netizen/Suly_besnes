@@ -941,9 +941,11 @@ export function advanceDay(profile: PlayerProfile): GameResult<DayOutcome> {
     entries.push(ledgerEntry(profile, 'liability', salaryAccrued, 'التزام رواتب غير مسدد', entries.length));
   }
   let inventory = [...profile.inventory];
+  const newlyCompletedProductionIds: string[] = [];
   const productionOrders = profile.productionOrders.map((order) => {
     if (order.status !== 'active' || order.completesOnDay > nextDay) return order;
-  const unitCost = order.materialCost / order.outputQuantity;
+    newlyCompletedProductionIds.push(order.id);
+    const unitCost = order.materialCost / order.outputQuantity;
     const existingLot = inventory.find((lot) => lot.materialOrProductId === order.productId);
     inventory = existingLot
       ? inventory.map((lot) => lot.materialOrProductId === order.productId
@@ -1018,7 +1020,7 @@ export function advanceDay(profile: PlayerProfile): GameResult<DayOutcome> {
   if (expiredContracts.length > 0) entries.push(ledgerEntry(profile, 'expense', expiredContracts.length * 2_000, 'غرامات عقود متأخرة', entries.length));
   const event: GameEventRecord = { id: `event-${nextDay}`, day: nextDay, title: expiredContracts.length > 0 ? `${briefing.event.title} · تأخر عقد` : briefing.event.title, cashImpact: eventImpact, occurredAt: now };
   const nextProfile = addLedger(
-    { ...profile, day: nextDay, companies, investments, banking: { ...profile.banking, loans }, staff, productionOrders, inventory, events: [...profile.events, event], payables, contracts, reputation },
+    { ...profile, day: nextDay, companies, investments, banking: { ...profile.banking, loans }, staff, productionOrders, inventory, unreadProductionOrderIds: [...new Set([...(profile.unreadProductionOrderIds ?? []), ...newlyCompletedProductionIds])].slice(-500), events: [...profile.events, event], payables, contracts, reputation },
     entries,
     balance,
   );
@@ -1125,6 +1127,24 @@ export const sell = sellProduct;
 export const invest = createInvestment;
 export const passDay = advanceDay;
 
+export function updateNotificationState(profile: PlayerProfile, action: unknown, notificationIds: unknown): GameResult<{ action: 'read' | 'dismiss'; notificationIds: string[] }> {
+  if (action !== 'read' && action !== 'dismiss') return failure(profile, 'invalid-input', 'إجراء التنبيه غير صالح.');
+  if (!Array.isArray(notificationIds) || notificationIds.length === 0 || notificationIds.length > 20) return failure(profile, 'invalid-input', 'اختر تنبيهًا واحدًا على الأقل.');
+  const ids = [...new Set(notificationIds.filter((id): id is string => typeof id === 'string' && id.trim().length > 0 && id.length <= 512))];
+  if (ids.length === 0 || ids.length !== notificationIds.length) return failure(profile, 'invalid-input', 'قائمة التنبيهات غير صالحة.');
+  const readIds = new Set(profile.readNotificationIds ?? []);
+  const dismissedIds = new Set(profile.dismissedNotificationIds ?? []);
+  for (const id of ids) (action === 'read' ? readIds : dismissedIds).add(id);
+  const productionIds = new Set(ids.flatMap((id) => id.startsWith('production-completed:') ? id.slice('production-completed:'.length).split(',').filter(Boolean) : []));
+  const nextProfile: PlayerProfile = {
+    ...profile,
+    readNotificationIds: [...readIds].slice(-500),
+    dismissedNotificationIds: [...dismissedIds].slice(-500),
+    unreadProductionOrderIds: (profile.unreadProductionOrderIds ?? []).filter((id) => !productionIds.has(id)),
+  };
+  return success(nextProfile, action === 'read' ? 'تم تعليم التنبيه كمقروء.' : 'تم إخفاء التنبيه.', { action, notificationIds: ids });
+}
+
 /** Serializable intent sent by authenticated clients; it deliberately contains no profile/save data. */
 export type GameCommand =
   | { name: 'place_bid'; args: { listingId: string; amount: number; targetCompanyId?: string } }
@@ -1160,7 +1180,8 @@ export type GameCommand =
   | { name: 'accept_contract'; args: { offerId: string } }
   | { name: 'deliver_contract'; args: { contractId: string } }
   | { name: 'negotiate_contract'; args: { contractId: string; mode: 'price' | 'deadline' | 'quality' } }
-  | { name: 'claim_task'; args: { taskId: string } };
+  | { name: 'claim_task'; args: { taskId: string } }
+  | { name: 'update_notification_state'; args: { action: 'read' | 'dismiss'; notificationIds: string[] } };
 
 export type GameCommandHandler = (command: GameCommand, fallback: (profile: PlayerProfile) => GameResult<unknown>) => void | Promise<void>;
 
@@ -1201,5 +1222,6 @@ export function executeGameCommand(profile: PlayerProfile, command: GameCommand)
     case 'deliver_contract': return deliverContract(profile, command.args.contractId);
     case 'negotiate_contract': return negotiateContract(profile, command.args.contractId, command.args.mode);
     case 'claim_task': return claimTask(profile, command.args.taskId);
+    case 'update_notification_state': return updateNotificationState(profile, command.args.action, command.args.notificationIds);
   }
 }

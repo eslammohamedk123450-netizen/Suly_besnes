@@ -677,7 +677,7 @@ export default function App() {
 
         <main className="main-content">
           {activeSection === 'home' ? (
-            <Dashboard profile={profile} country={country} onNavigate={navigate} />
+            <Dashboard profile={profile} country={country} onNavigate={navigate} onCommand={handleGameCommand} />
           ) : activeSection === 'profile' ? (
             <ProfilePage profile={profile} country={country} accountId={account.id} isGuest={Boolean(account.isGuest)} isSynced={!account.isGuest && syncState === 'synced' && pendingCommandCount === 0} onLinkAccount={() => setLinkingAccount(true)} />
           ) : (

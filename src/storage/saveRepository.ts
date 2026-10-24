@@ -5,7 +5,7 @@ import { findIndustry, GOLD_PRICE_PER_GRAM } from '../game/catalog';
 import { normalizeAccountFeatures } from '../domain/accountFeatures';
 
 const SAVE_KEY = 'business-empire.save.v1';
-const SAVE_VERSION = 4;
+const SAVE_VERSION = 5;
 
 function saveKey(accountId?: string): string {
   return accountId ? `${SAVE_KEY}.${accountId}` : SAVE_KEY;
@@ -306,6 +306,9 @@ function migrateProfile(value: unknown): PlayerProfile | null {
     events: Array.isArray(value.events) ? value.events as PlayerProfile['events'] : [],
     tasks: Array.isArray(value.tasks) && value.tasks.every(isTaskProgress) ? value.tasks : [],
     completedTaskIds: Array.isArray(value.completedTaskIds) && value.completedTaskIds.every(isNonEmptyString) ? value.completedTaskIds : [],
+    readNotificationIds: Array.isArray(value.readNotificationIds) ? value.readNotificationIds.filter(isNonEmptyString).slice(-500) : [],
+    dismissedNotificationIds: Array.isArray(value.dismissedNotificationIds) ? value.dismissedNotificationIds.filter(isNonEmptyString).slice(-500) : [],
+    unreadProductionOrderIds: Array.isArray(value.unreadProductionOrderIds) ? value.unreadProductionOrderIds.filter(isNonEmptyString).slice(-500) : [],
     reputation: isFiniteNonNegative(value.reputation) ? Math.min(100, value.reputation as number) : 50,
     contracts: Array.isArray(value.contracts) && value.contracts.every(isBusinessContract) ? value.contracts : [],
     achievements: Array.isArray(value.achievements) && value.achievements.every(isAchievement) ? value.achievements : [],
@@ -325,7 +328,7 @@ export function loadSavedGame(accountId?: string): PlayerProfile | null {
     const raw = globalThis.localStorage?.getItem(saveKey(accountId)) ?? (accountId ? globalThis.localStorage?.getItem(SAVE_KEY) : null);
     if (!raw) return null;
     const value: unknown = JSON.parse(raw);
-    if (!isRecord(value) || ![1, 2, 3, SAVE_VERSION].includes(value.version as number) || !isDateString(value.savedAt)) return null;
+    if (!isRecord(value) || ![1, 2, 3, 4, SAVE_VERSION].includes(value.version as number) || !isDateString(value.savedAt)) return null;
     const profile = normalizeSavedProfile(value.profile);
     if (!profile) return null;
     if (value.version !== SAVE_VERSION || JSON.stringify(value.profile) !== JSON.stringify(profile)) saveGame(profile, accountId);

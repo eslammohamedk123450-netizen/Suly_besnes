@@ -95,6 +95,9 @@ export interface PlayerProfile {
   events: GameEventRecord[];
   tasks: TaskProgress[];
   completedTaskIds: string[];
+  readNotificationIds: string[];
+  dismissedNotificationIds: string[];
+  unreadProductionOrderIds: string[];
   season?: SeasonProgress;
   reputation: number;
   contracts: BusinessContract[];
@@ -144,6 +147,9 @@ export function createNewPlayer(
     events: [],
     tasks: [],
     completedTaskIds: [],
+    readNotificationIds: [],
+    dismissedNotificationIds: [],
+    unreadProductionOrderIds: [],
     reputation: 50,
     contracts: [],
     achievements: [],

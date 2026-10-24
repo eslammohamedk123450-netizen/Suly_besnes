@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import type { GameCommand } from '../game/engine';
 import { acknowledgeGameCommand, blockGameCommand, enqueueGameCommand, loadQueuedGameCommands } from './commandOutbox';
 
 class MemoryStorage {
@@ -31,6 +32,12 @@ describe('local game command outbox', () => {
 
     expect(loadQueuedGameCommands('account-1').map((item) => item.command.name)).toEqual(['advance_day', 'buy_gold']);
     expect(loadQueuedGameCommands('account-2')).toEqual([]);
+  });
+
+  it('queues notification read state as a validated game intent', () => {
+    vi.stubGlobal('localStorage', new MemoryStorage());
+    const command: GameCommand = { name: 'update_notification_state', args: { action: 'read', notificationIds: ['salary-overdue'] } };
+    expect(enqueueGameCommand('account-1', command, 'stable-command-key-0003')?.command).toEqual(command);
   });
 
   it('blocks a conflicting command until explicit recovery and acknowledges successful commands', () => {
