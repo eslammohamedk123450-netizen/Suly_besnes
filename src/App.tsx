@@ -30,7 +30,7 @@ import { chapterFor, getPlayerProgress, getSectionUnlockHint, getUnlockedSection
 import { normalizeAccountFeatures } from './domain/accountFeatures';
 import { claimDailySeasonLogin, getVisibleSeasons, recordVerifiedGameTransaction } from './storage/leaderboardRepository';
 import { ResourceBar, type ResourceSyncState } from './components/ResourceBar';
-import { acknowledgeGameCommand, blockGameCommand, createGameCommandKey, enqueueGameCommand, loadQueuedGameCommands, retryTransientBlockedCommands } from './storage/commandOutbox';
+import { acknowledgeGameCommand, blockGameCommand, createGameCommandKey, enqueueGameCommand, loadQueuedGameCommands } from './storage/commandOutbox';
 import { clearPendingInitialProfile, loadPendingInitialProfile, queueInitialProfile } from './storage/pendingInitialProfile';
 import { playSound } from './game/soundEffects';
 
@@ -208,24 +208,16 @@ export default function App() {
       else if (pendingCount) setSyncState('syncing');
       else setSyncState('synced');
     };
-    const handleOnline = () => { void synchronizePendingCommands(true); };
+    // Sync silently when connectivity returns. Never interrupt gameplay with a toast.
+    const handleOnline = () => { void synchronizePendingCommands(false); };
     const handleOffline = () => refreshStatus();
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
     refreshStatus();
     if (typeof navigator === 'undefined' || navigator.onLine) void synchronizePendingCommands(false);
-    const syncTimer = window.setInterval(() => {
-      if (typeof navigator !== 'undefined' && !navigator.onLine) {
-        refreshStatus();
-        return;
-      }
-      retryTransientBlockedCommands(account.id);
-      void synchronizePendingCommands(false);
-    }, 3_000);
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
-      window.clearInterval(syncTimer);
     };
   }, [account?.id, account?.isGuest]);
 
@@ -320,8 +312,6 @@ export default function App() {
         const savedInitial = saveGame(authoritative, account.id);
         if (!savedInitial.ok) {
           setSyncState('blocked');
-          setNotice('أنشأ الخادم عالمك بأمان، لكن تعذر حفظ نسخته على هذا الجهاز. لم نحذف بيانات المزامنة؛ تحقق من مساحة التخزين.');
-          setNoticeTone('error');
           return false;
         }
         clearPendingInitialProfile(account.id);
@@ -357,16 +347,12 @@ export default function App() {
           blockGameCommand(account.id, next.commandKey, `http_${attempt.status}`);
           setPendingCommandCount(getPendingSyncCount(account.id));
           setSyncState('blocked');
-          setNotice(attempt.message);
-          setNoticeTone('error');
           return false;
         }
         if (!attempt.result.ok) {
           blockGameCommand(account.id, next.commandKey, attempt.result.reason);
           setPendingCommandCount(getPendingSyncCount(account.id));
           setSyncState('blocked');
-          setNotice(`تعذر اعتماد خطوة محفوظة: ${attempt.result.message} لم نحذفها أو نستبدل عالمك.`);
-          setNoticeTone('error');
           return false;
         }
         const saved = saveGame(attempt.result.profile, account.id);
@@ -374,8 +360,6 @@ export default function App() {
           blockGameCommand(account.id, next.commandKey, 'local_save_failed');
           setPendingCommandCount(getPendingSyncCount(account.id));
           setSyncState('blocked');
-          setNotice('اعتمد الخادم الخطوة، لكن تعذر تحديث النسخة المحلية؛ أبقينا إيصال المزامنة للمراجعة.');
-          setNoticeTone('error');
           return false;
         }
         setProfile(normalizeAccountFeatures(attempt.result.profile, account.id));
@@ -588,6 +572,8 @@ export default function App() {
     const previousProfile = profile;
     const execution = await executeCommandForProfile(profile, command, fallback);
     if (execution.source === 'remote' && execution.result.ok) void recordVerifiedTransactions(previousProfile, execution.result.profile);
+    // Sync failures are kept in the local outbox and must never interrupt gameplay.
+    if (execution.source === 'blocked' && !execution.result.ok) return;
     handleGameResult(execution.result, { syncRemote: false });
   }
 
