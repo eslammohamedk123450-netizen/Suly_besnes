@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { GameCommand } from '../game/engine';
-import { acknowledgeGameCommand, blockGameCommand, enqueueGameCommand, loadQueuedGameCommands } from './commandOutbox';
+import { acknowledgeGameCommand, blockGameCommand, enqueueGameCommand, loadQueuedGameCommands, retryTransientBlockedCommands } from './commandOutbox';
 
 class MemoryStorage {
   private values = new Map<string, string>();
@@ -58,5 +58,16 @@ describe('local game command outbox', () => {
 
     acknowledgeGameCommand('account-1', 'stable-command-key-0001');
     expect(loadQueuedGameCommands('account-1')).toEqual([]);
+  });
+
+  it('reopens only optimistic concurrency conflicts for automatic retry', () => {
+    vi.stubGlobal('localStorage', new MemoryStorage());
+    enqueueGameCommand('account-1', { name: 'advance_day', args: {} }, 'stable-command-key-0001');
+    enqueueGameCommand('account-1', { name: 'buy_gold', args: { grams: 1 } }, 'stable-command-key-0002');
+    blockGameCommand('account-1', 'stable-command-key-0001', 'http_409');
+    blockGameCommand('account-1', 'stable-command-key-0002', 'condition-not-met');
+
+    expect(retryTransientBlockedCommands('account-1')).toBe(1);
+    expect(loadQueuedGameCommands('account-1').map((entry) => entry.status)).toEqual(['pending', 'blocked']);
   });
 });

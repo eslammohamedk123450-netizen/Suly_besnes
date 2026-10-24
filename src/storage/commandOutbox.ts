@@ -80,3 +80,16 @@ export function blockGameCommand(accountId: string, commandKey: string, reason: 
     : entry);
   writeQueue(accountId, entries);
 }
+
+/** Reopens only optimistic-concurrency conflicts; invalid gameplay commands stay blocked. */
+export function retryTransientBlockedCommands(accountId: string): number {
+  const entries = loadQueuedGameCommands(accountId);
+  let retried = 0;
+  const reopened = entries.map((entry) => {
+    if (entry.status !== 'blocked' || entry.blockedReason !== 'http_409') return entry;
+    retried += 1;
+    return { commandKey: entry.commandKey, command: entry.command, createdAt: entry.createdAt, status: 'pending' as const };
+  });
+  if (retried > 0) writeQueue(accountId, reopened);
+  return retried;
+}

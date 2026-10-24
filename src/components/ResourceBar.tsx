@@ -21,7 +21,7 @@ export function ResourceBar({ profile, country, onNavigate, syncState, pendingCo
   const progressPercent = Math.min(100, (progress.experienceInLevel / progress.experienceForNextLevel) * 100);
   const syncCopy: Record<ResourceSyncState, { title: string; detail: string }> = {
     local: { title: 'لعب محلي', detail: 'محفوظ على الجهاز' },
-    synced: { title: 'المزامنة جاهزة', detail: 'تقدمك محفوظ' },
+    synced: { title: 'المزامنة جاهزة', detail: 'حفظ تلقائي مباشر' },
     syncing: { title: 'جارٍ المزامنة', detail: pendingCommandCount ? `${formatNumber(pendingCommandCount)} أوامر` : 'تحديث العالم' },
     offline: { title: 'تلعب دون اتصال', detail: pendingCommandCount ? `${formatNumber(pendingCommandCount)} تنتظر الشبكة` : 'الحفظ محلي' },
     blocked: { title: 'المزامنة متوقفة', detail: `${formatNumber(pendingCommandCount)} تحتاج مراجعة` },

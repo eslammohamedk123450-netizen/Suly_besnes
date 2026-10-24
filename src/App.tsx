@@ -30,7 +30,7 @@ import { chapterFor, getPlayerProgress, getSectionUnlockHint, getUnlockedSection
 import { normalizeAccountFeatures } from './domain/accountFeatures';
 import { claimDailySeasonLogin, getVisibleSeasons, recordVerifiedGameTransaction } from './storage/leaderboardRepository';
 import { ResourceBar, type ResourceSyncState } from './components/ResourceBar';
-import { acknowledgeGameCommand, blockGameCommand, createGameCommandKey, enqueueGameCommand, loadQueuedGameCommands } from './storage/commandOutbox';
+import { acknowledgeGameCommand, blockGameCommand, createGameCommandKey, enqueueGameCommand, loadQueuedGameCommands, retryTransientBlockedCommands } from './storage/commandOutbox';
 import { clearPendingInitialProfile, loadPendingInitialProfile, queueInitialProfile } from './storage/pendingInitialProfile';
 import { playSound } from './game/soundEffects';
 
@@ -213,9 +213,18 @@ export default function App() {
     window.addEventListener('offline', handleOffline);
     refreshStatus();
     if (typeof navigator === 'undefined' || navigator.onLine) void synchronizePendingCommands(false);
+    const syncTimer = window.setInterval(() => {
+      if (typeof navigator !== 'undefined' && !navigator.onLine) {
+        refreshStatus();
+        return;
+      }
+      retryTransientBlockedCommands(account.id);
+      void synchronizePendingCommands(false);
+    }, 3_000);
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
+      window.clearInterval(syncTimer);
     };
   }, [account?.id, account?.isGuest]);
 
