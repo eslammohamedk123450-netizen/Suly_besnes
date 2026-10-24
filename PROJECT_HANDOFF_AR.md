@@ -28,11 +28,25 @@
 
 ## الحالة الأخيرة المؤكدة
 
-آخر Commit على GitHub:
+آخر Commit الوظيفي قبل ملف التسليم:
 
 ```text
 73c2597 fix: match profile badges with dashboard style
 ```
+
+بعد إنشاء هذا الملف وصل إلى GitHub Commit خارجي خاص ببناء Android:
+
+```text
+b191a93 build(android): release debug APK v1.6
+```
+
+ثم تم رفع ملف التسليم في:
+
+```text
+0db2dce docs: add complete Arabic project handoff
+```
+
+لم يتم إنشاء APK ضمن دفعة التسليم الحالية، ولا ينبغي إعادة بنائه إلا بطلب صريح من المستخدم.
 
 والفرع نظيف ومتزامن مع GitHub عند إنشاء هذا الملف:
 
