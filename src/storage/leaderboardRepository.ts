@@ -18,6 +18,17 @@ export interface LeaderboardRow {
   updated_at: string;
 }
 
+export type LeaderboardCategory = 'points' | 'production' | 'contracts' | 'badges';
+
+export interface RankedLeaderboardRow extends LeaderboardRow {
+  category_value: number;
+  player_level: number;
+  company_count: number;
+  land_count: number;
+  badge_count: number;
+  is_current_player: boolean;
+}
+
 export async function getVisibleSeasons(): Promise<PublicSeason[]> {
   const { data, error } = await supabase
     .from('visible_game_seasons')
@@ -36,6 +47,20 @@ export async function getGlobalLeaderboard(seasonId: string, limit = 100, offset
   });
   if (error) throw error;
   return (data ?? []) as LeaderboardRow[];
+}
+
+export async function getRankedGlobalLeaderboard(
+  seasonId: string,
+  category: LeaderboardCategory = 'points',
+  limit = 10,
+): Promise<RankedLeaderboardRow[]> {
+  const { data, error } = await supabase.rpc('get_ranked_global_leaderboard', {
+    p_season_id: seasonId,
+    p_category: category,
+    p_limit: Math.min(Math.max(limit, 1), 10),
+  });
+  if (error) throw error;
+  return (data ?? []) as RankedLeaderboardRow[];
 }
 
 export async function claimDailySeasonLogin(seasonId: string): Promise<LeaderboardRow | null> {

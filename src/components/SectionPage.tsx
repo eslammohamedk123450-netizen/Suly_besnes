@@ -19,7 +19,7 @@ import { CodeRedemption } from './CodeRedemption';
 import { PurchaseSupport } from './PurchaseSupport';
 import { DiamondStore } from './DiamondStore';
 import { AuctionRoom } from './AuctionRoom';
-import { claimLoginReward, claimSeasonChallenge, chooseSeasonEvent, getSeasonEventSnapshot, getSeasonLeaderboard, getSeasonSnapshot, LOGIN_REWARDS } from '../game/season';
+import { claimLoginReward, claimSeasonChallenge, chooseSeasonEvent, getSeasonEventSnapshot, getSeasonSnapshot, LOGIN_REWARDS } from '../game/season';
 import { getSynergyProductionMultiplier } from '../game/synergy';
 import { getGlobalMarketOffers, negotiateGlobalMarketOffer } from '../game/globalMarket';
 import { SPEED_CARD_DIAMOND_COSTS, SPEED_CARD_LABELS, type SpeedCardKind } from '../domain/accountFeatures';
@@ -495,7 +495,6 @@ export function SectionPage({ section, profile, country, focus, notificationThem
     const tasks = selectTaskBoard(profile);
     const completed = tasks.filter((task) => task.claimed).length;
     const season = getSeasonSnapshot(profile);
-    const leaderboard = getSeasonLeaderboard(profile);
     const seasonEvent = getSeasonEventSnapshot(profile);
     return <div className="section-page">{heading}{pageShell(
       <>
@@ -509,8 +508,8 @@ export function SectionPage({ section, profile, country, focus, notificationThem
           <div className="economy-button-row season-rewards">{LOGIN_REWARDS.map((reward) => <button className="button button-secondary" type="button" key={reward.id} disabled={season.loginRewardClaimed} onClick={() => run((current) => claimLoginReward(current, reward.id))}><strong>{reward.title}</strong><span>{reward.description}</span></button>)}</div>
           {season.loginRewardClaimed && <div className="economy-notice economy-notice--success">تم استلام مكافأة الدخول لهذا اليوم. عد غدًا لاختيار مكافأة جديدة.</div>}
         </EconomyPanel>
-        <EconomyPanel title="ترتيب موسم التوسع" description="ترتيب محلي محاكى الآن؛ ستصبح المنافسة العالمية متاحة عند إضافة نظام اللاعبين المتصلين.">
-          <div className="season-leaderboard">{leaderboard.map((row, index) => <div className={`season-rank-row${row.isPlayer ? ' season-rank-row--player' : ''}`} key={row.name}><strong>#{index + 1}</strong><span>{row.name}</span><b>{formatNumber(row.points)} نقطة</b></div>)}</div>
+        <EconomyPanel title="المتصدرون العالميون" description="الترتيب العام يعرض نتائج مستخدمين حقيقيين فقط، دون منافسين وهميين أو بيانات مالية خاصة.">
+          <div className="economy-button-row"><span>اختر تصنيف النقاط أو الإنتاج أو العقود أو الشارات من بطاقة المتصدرين.</span><button className="button button-secondary" type="button" onClick={onHome}>عرض المتصدرين في الرئيسية</button></div>
         </EconomyPanel>
         <EconomyPanel title={`حدث اليوم · ${seasonEvent.event.title}`} description={seasonEvent.claimed ? 'تم تنفيذ قرار اليوم. سيظهر حدث جديد عند انتقال اليوم.' : seasonEvent.event.description}>
           {seasonEvent.claimed ? <div className="economy-notice economy-notice--success">تم اتخاذ القرار اليومي. استمر في إدارة إمبراطوريتك حتى يبدأ الحدث التالي.</div> : <div className="season-event-choices">{seasonEvent.event.choices.map((choice) => <button className="button button-secondary" type="button" key={choice.id} onClick={() => run((current) => chooseSeasonEvent(current, choice.id))}><strong>{choice.label}</strong><span>{choice.description}</span></button>)}</div>}
