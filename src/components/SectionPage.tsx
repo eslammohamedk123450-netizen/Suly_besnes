@@ -417,25 +417,6 @@ export function SectionPage({ section, profile, country, focus, notificationThem
     )}</div>;
   }
 
-  if (section.id === 'store') {
-    const inventorySummary = selectInventorySummary(profile);
-    const materialStock = new Map(inventorySummary.rows.filter((row) => row.kind === 'material').map((row) => [row.itemId, row]));
-    return <div className="section-page">{heading}{pageShell(
-      <>
-        <div className="economy-grid economy-grid--three-mobile"><EconomyStat label="الرصيد المتاح" value={formatMoney(profile.bankBalance, country)} /><EconomyStat label="قيمة المخزون" value={formatMoney(inventorySummary.totalValue, country)} /><EconomyStat label="عدد المواد" value={formatNumber(MATERIAL_CATALOG.length)} /></div>
-        <EconomyPanel title="متجر الإمبراطورية" description="اشترِ المواد الخام يدويًا لتجهيز مصانعك. الأسعار والكميات جزء من محاكاة اللعبة وتتغير حسب قراراتك.">
-          <div className="store-banner"><Icon name="briefcase" size={20} /><div><strong>جهّز خطوط الإنتاج</strong><span>اشترِ الكمية المناسبة فقط وحافظ على سيولتك للتشغيل والتطوير.</span></div></div>
-          <div className="economy-list">{MATERIAL_CATALOG.map((material) => {
-            const stock = materialStock.get(material.id);
-            const quantity = materialQuantities[material.id] ?? '1';
-            const remainingCapacity = Math.max(0, material.storageLimit - (stock?.quantity ?? 0));
-            return <article className="economy-card" key={material.id}><div className="economy-card-head"><div className="economy-card-title"><span className="economy-card-icon"><Icon name="warehouse" size={18} /></span><span><strong>{material.name}</strong><small>{formatMoney(material.pricePerUnit, country)} لكل {material.unit}</small></span></div><span className="economy-pill">في المخزن {formatNumber(stock?.quantity ?? 0)}</span></div><div className="economy-card-body"><form className="economy-form" onSubmit={(event: FormEvent<HTMLFormElement>) => { event.preventDefault(); run((current) => buyMaterial(current, material.id, Number(quantity))); }}><div className="economy-form-row"><div className="economy-field"><label htmlFor={`store-${material.id}`}>الكمية ({material.unit})</label><input id={`store-${material.id}`} type="number" min="1" max={remainingCapacity} step="1" value={quantity} onChange={(event) => setMaterialQuantities((previous) => ({ ...previous, [material.id]: event.target.value }))} /></div><div className="economy-field"><label>الإجمالي</label><input value={formatMoney(Number(quantity || 0) * material.pricePerUnit, country)} readOnly /></div></div><button className="button button-primary" type="submit" disabled={remainingCapacity < 1 || Number(quantity) < 1 || Number(quantity) > remainingCapacity || profile.bankBalance < Number(quantity) * material.pricePerUnit}><Icon name="plus" size={15} /> شراء من المتجر</button></form></div></article>;
-          })}</div>
-        </EconomyPanel>
-      </>,
-    )}</div>;
-  }
-
   if (section.id === 'inventory') {
     const inventorySummary = selectInventorySummary(profile);
     const productRows = inventorySummary.rows.filter((row) => row.kind === 'product');
