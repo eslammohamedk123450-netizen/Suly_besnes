@@ -4,6 +4,7 @@ import type { SectionId } from '../domain/navigation';
 import { formatGold, formatMoney, formatNumber } from '../domain/formatters';
 import { getPlayerProgress, getStarterMissions } from '../game/onboarding';
 import { Icon } from './Icon';
+import { useDaySpeedCard, type GameCommand, type GameResult } from '../game/engine';
 
 export type ResourceSyncState = 'synced' | 'syncing' | 'offline' | 'blocked' | 'local';
 
@@ -13,12 +14,15 @@ interface ResourceBarProps {
   onNavigate: (section: SectionId) => void;
   syncState: ResourceSyncState;
   pendingCommandCount: number;
+  onCommand: (command: GameCommand, fallback: (current: PlayerProfile) => GameResult<unknown>) => void;
 }
 
-export function ResourceBar({ profile, country, onNavigate, syncState, pendingCommandCount }: ResourceBarProps) {
+export function ResourceBar({ profile, country, onNavigate, syncState, pendingCommandCount, onCommand }: ResourceBarProps) {
   const progress = getPlayerProgress(profile);
   const missionsLeft = getStarterMissions(profile).filter((mission) => !mission.completed).length;
   const progressPercent = Math.min(100, (progress.experienceInLevel / progress.experienceForNextLevel) * 100);
+  const daySpeedCards = profile.speedCards.find((card) => card.kind === 'day-speed-2x')?.quantity ?? 0;
+  const daySpeedActive = (profile.activeDaySpeedMultiplier ?? 1) > 1;
   const syncCopy: Record<ResourceSyncState, { title: string; detail: string }> = {
     local: { title: 'لعب محلي', detail: 'محفوظ على الجهاز' },
     synced: { title: 'المزامنة جاهزة', detail: 'حفظ تلقائي مباشر' },
@@ -50,6 +54,13 @@ export function ResourceBar({ profile, country, onNavigate, syncState, pendingCo
           <span className="resource-pill-icon"><Icon name="tasks" size={16} /></span><span><small>المهام</small><strong>{missionsLeft ? `${formatNumber(missionsLeft)} متبقية` : 'عرض الكل'}</strong></span><Icon className="resource-pill-chevron" name="chevron" size={13} />
         </button>
       </div>
+      <button className={`resource-speed-action${daySpeedActive ? ' is-active' : ''}`} type="button" disabled={!daySpeedCards || daySpeedActive} onClick={() => onCommand(
+        { name: 'use_day_speed_card', args: { kind: 'day-speed-2x' } },
+        (current) => useDaySpeedCard(current, 'day-speed-2x'),
+      )}>
+        <span className="resource-speed-action-icon">×2</span>
+        <span><small>{daySpeedActive ? 'السرعة مفعلة' : 'بطاقة اليوم'}</small><strong>{daySpeedActive ? 'نشطة' : `${formatNumber(daySpeedCards)} متاحة`}</strong></span>
+      </button>
     </section>
   );
 }

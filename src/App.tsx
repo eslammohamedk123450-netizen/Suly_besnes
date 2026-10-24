@@ -692,7 +692,7 @@ export default function App() {
           <button className="header-settings" type="button" onClick={() => navigate('settings')} aria-label="الإعدادات"><Icon name="settings" size={19} /></button>
         </div>
       </header>
-      <ResourceBar profile={profile} country={country} onNavigate={navigate} syncState={!account || account.isGuest ? 'local' : syncState} pendingCommandCount={pendingCommandCount} />
+      <ResourceBar profile={profile} country={country} onNavigate={navigate} syncState={!account || account.isGuest ? 'local' : syncState} pendingCommandCount={pendingCommandCount} onCommand={handleGameCommand} />
 
       <div className="app-layout">
         <aside className="side-nav" aria-label="أقسام اللعبة">

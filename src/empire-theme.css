@@ -59,6 +59,15 @@
 .resource-pill--missions:hover { transform: translateY(-1px); border-color: rgba(22,199,154,.55); background: #173b56; }
 .resource-pill--missions .resource-pill-icon { color: var(--ui-green); }
 .resource-pill-chevron { color: #6e8ca6; transform: rotate(180deg); }
+.resource-speed-action { display: inline-flex; align-items: center; gap: 7px; min-width: 108px; min-height: 46px; padding: 7px 10px; color: var(--ui-text); text-align: right; background: linear-gradient(145deg, rgba(74,58,25,.96), rgba(49,37,18,.96)); border: 1px solid rgba(246,196,83,.45); border-radius: 13px; cursor: pointer; transition: transform .16s, border-color .16s, background .16s; }
+.resource-speed-action:hover:not(:disabled) { transform: translateY(-1px); border-color: rgba(246,196,83,.8); background: #5b451e; }
+.resource-speed-action:disabled { cursor: not-allowed; opacity: .58; }
+.resource-speed-action.is-active { color: #d8ffe9; border-color: rgba(22,199,154,.55); background: linear-gradient(145deg, rgba(20,82,66,.96), rgba(15,53,49,.96)); }
+.resource-speed-action > span:last-child { display: grid; gap: 2px; min-width: 0; }
+.resource-speed-action small { color: #e3c875; font-size: 8px; font-weight: 700; }
+.resource-speed-action strong { overflow: hidden; color: #fff3be; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.resource-speed-action.is-active small, .resource-speed-action.is-active strong { color: #b8f1d7; }
+.resource-speed-action-icon { display: grid; flex: 0 0 auto; place-items: center; width: 27px; height: 27px; color: #fff0a9; background: rgba(246,196,83,.16); border-radius: 9px; font-size: 11px; font-weight: 900; }
 .resource-sync { display: flex; flex: 0 0 auto; align-items: center; gap: 8px; min-width: 132px; padding: 7px 10px; color: #dce8f1; background: rgba(22,199,154,.07); border: 1px solid rgba(22,199,154,.16); border-radius: 12px; }
 .resource-sync > span:last-child { display: grid; gap: 2px; min-width: 0; }
 .resource-sync small { color: #9eb4c7; font-size: 8px; font-weight: 700; }
@@ -398,6 +407,10 @@
   .resource-pill-chevron { display: none; }
   .resource-pill small { font-size: 7px; }
   .resource-pill strong { font-size: 8px; }
+  .resource-speed-action { justify-content: center; width: 100%; min-height: 38px; padding: 5px 8px; border-radius: 10px; }
+  .resource-speed-action-icon { width: 22px; height: 22px; border-radius: 7px; }
+  .resource-speed-action small { font-size: 7px; }
+  .resource-speed-action strong { font-size: 8px; }
   .app-frame .app-layout { padding: 11px 11px 0; }
   .app-frame .side-nav { display: none; }
   .app-frame .dashboard-page { gap: 10px; }
