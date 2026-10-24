@@ -47,7 +47,7 @@ export function DiamondStore({ profile, onBuyGoldWithDiamonds, onSellGold }: Dia
         <div>
           <span className="section-kicker">متجر الإمبراطورية</span>
           <h3 id="diamond-store-title">شراء الماس</h3>
-          <p>اختر الباقة، ثم حوّل قيمتها يدويًا عبر Vodafone Cash. لا يتم خصم أي مبلغ تلقائيًا من داخل اللعبة.</p>
+          <p>اختر الباقة، ثم حوّل قيمتها يدويًا عبر Vodafone Cash. الدفع يتم خارج اللعبة ولا تخصم اللعبة أي مبلغ.</p>
         </div>
         <span className="diamond-store-rate">100 ماسة = 50 ج.م</span>
       </div>

@@ -47,7 +47,7 @@ export async function executeRemoteGameCommand(command: GameCommand, commandKey:
     if (status === null || status === 404 || status === 408 || status === 429 || status >= 500) return { kind: 'unavailable' };
     return { kind: 'rejected', status, message: status === 409
       ? 'تعارضت هذه الخطوة مع نسخة أحدث من عالمك؛ أوقفنا مزامنتها لحماية تقدمك.'
-      : 'رفض الخادم هذه الخطوة؛ لم يتغير العالم السحابي.' };
+      : 'رفض الخادم هذه الخطوة؛ لم يتغير الحفظ.' };
   }
   if (data?.ok === true && data.result && typeof data.result === 'object' && typeof data.result.ok === 'boolean' && data.result.profile) {
     const result = data.result as GameResult<unknown>;

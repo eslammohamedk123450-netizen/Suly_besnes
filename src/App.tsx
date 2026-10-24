@@ -391,7 +391,7 @@ export default function App() {
     const existingCloudProfile = await loadRemoteGame(nextAccount.id);
     if (existingCloudProfile) {
       setProfile(existingCloudProfile ? normalizeAccountFeatures(existingCloudProfile, nextAccount.id) : null);
-      setNotice('تم فتح عالم الحساب السحابي الموجود. حفظ الضيف لم يُحذف من هذا الجهاز.');
+      setNotice('تم فتح عالم الحساب الموجود. حفظ الضيف لم يُحذف من هذا الجهاز.');
     } else if (guestProfile) {
       const guestCountry = findCountry(guestProfile.countryId) ?? COUNTRIES[0];
       const freshCloudProfile = normalizeAccountFeatures(createNewPlayer(guestCountry, guestProfile.name), nextAccount.id);
@@ -404,7 +404,7 @@ export default function App() {
         linkTone = 'error';
       }
       setNotice(queued
-        ? 'تم ربط الحساب وبدأ عالم سحابي جديد لحماية الأرصدة. حفظ الضيف السابق ما زال محليًا على هذا الجهاز ولم يُرفع.'
+        ? 'تم ربط الحساب وبدأ عالم جديد لحماية الأرصدة. حفظ الضيف السابق ما زال على هذا الجهاز ولم يُنقل.'
         : 'تم ربط الحساب، لكن تعذر تجهيز مزامنة العالم الجديد. لم يُرفع حفظ الضيف؛ تحقق من مساحة التخزين ثم أعد المحاولة.');
     } else {
       setProfile(null);
@@ -543,7 +543,7 @@ export default function App() {
 
   async function handleRedeemed(_nextProfile: PlayerProfile, message: string, _codeId: string, rawCode: string): Promise<boolean> {
     if (!account || account.isGuest) {
-      setNotice('استرداد الأكواد يحتاج حسابًا سحابيًا؛ يمكنك ربط حساب من الإعدادات.');
+      setNotice('استرداد الأكواد يحتاج حسابًا؛ يمكنك ربط حساب من الإعدادات.');
       setNoticeTone('error');
       return false;
     }
@@ -579,7 +579,7 @@ export default function App() {
     if (completedDays === 0) return;
     const saved = saveGame(current, account?.id);
     setProfile(current);
-    const elapsedLabel = `${completedDays} ${completedDays === 1 ? 'يوم تلقائيًا' : 'أيام تلقائيًا'}`;
+    const elapsedLabel = `${completedDays} ${completedDays === 1 ? 'يوم' : 'أيام'}`;
     const summary = completedDays > 1 ? `تم ترحيل ${elapsedLabel}. آخر ملخص: ${latestDayMessage}` : latestDayMessage;
     setNotice(saved.ok ? summary : `${summary} تعذر تثبيت الحفظ على هذا الجهاز.`);
     setNoticeTone(saved.ok ? 'success' : 'error');
@@ -672,7 +672,7 @@ export default function App() {
               })}
             </div>
           ))}
-          <div className="side-nav-note"><Icon name="shield" size={16} /><span>{!account || account.isGuest ? <>حفظ محلي<br />على هذا الجهاز</> : syncState === 'offline' ? <>اللعب مستمر<br />بانتظار الاتصال</> : syncState === 'blocked' ? <>حماية التقدم<br />مراجعة المزامنة</> : syncState === 'syncing' ? <>جارٍ حفظ<br />خطواتك السحابية</> : <>حفظ محلي<br />ومزامنة آمنة</>}</span></div>
+          <div className="side-nav-note"><Icon name="shield" size={16} /><span>{!account || account.isGuest ? <>حفظ<br />على هذا الجهاز</> : syncState === 'offline' ? <>اللعب مستمر<br />بانتظار الاتصال</> : syncState === 'blocked' ? <>حماية التقدم<br />مراجعة الحفظ</> : syncState === 'syncing' ? <>جارٍ حفظ<br />خطواتك</> : <>حفظ آمن<br />ومحدّث</>}</span></div>
         </aside>
 
         <main className="main-content">

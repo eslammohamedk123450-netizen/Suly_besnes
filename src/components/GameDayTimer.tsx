@@ -73,7 +73,7 @@ export function GameDayTimer({ profile, onDaysElapsed }: GameDayTimerProps) {
   return (
     <div className="game-day-timer" aria-live="off" aria-label={`اليوم ${profile.day}. الوقت المتبقي لليوم التالي ${countdown(remaining)}`}>
       <span className="game-day-timer-icon"><Icon name="clock" size={15} /></span>
-      <span className="game-day-timer-copy"><small>اليوم {formatNumber(profile.day)} · الترحيل تلقائي</small><strong>{countdown(remaining)}</strong></span>
+      <span className="game-day-timer-copy"><small>اليوم {formatNumber(profile.day)} · الوقت المتبقي لليوم التالي</small><strong>{countdown(remaining)}</strong></span>
     </div>
   );
 }

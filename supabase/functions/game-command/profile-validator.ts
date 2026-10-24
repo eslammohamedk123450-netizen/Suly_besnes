@@ -358,7 +358,7 @@ export function validatePlayerProfile(profile: unknown, previousProfile?: unknow
   const banking = requireRecord(profile.banking, 'profile.banking', errors);
   checkAllowedKeys(banking, ['deposits', 'loans'], 'profile.banking', errors);
   const nestedIdCollections: Array<[string, unknown, readonly string[]]> = [
-    ['profile.banking.deposits', banking.deposits, ['id', 'principal', 'annualRate', 'startedOnDay', 'maturityDay', 'status', 'settledAmount']],
+    ['profile.banking.deposits', banking.deposits, ['id', 'principal', 'annualRate', 'startedOnDay', 'maturityDay', 'status', 'settledAmount', 'mergedIntoId', 'tranches']],
     ['profile.banking.loans', banking.loans, ['id', 'collateralType', 'collateralId', 'principal', 'totalRepayment', 'annualRate', 'startedOnDay', 'termDays', 'nextPaymentDay', 'installmentAmount', 'remainingBalance', 'status']],
     ['profile.licenses', profile.licenses, ['id', 'countryId', 'industryId', 'feePaid', 'issuedAt', 'expiresAt']],
     ['profile.investments', profile.investments, ['id', 'investmentTypeId', 'principal', 'expectedReturnRate', 'startedOnDay', 'maturityDay', 'status', 'settledAmount']],
@@ -374,6 +374,31 @@ export function validatePlayerProfile(profile: unknown, previousProfile?: unknow
   for (const [path, value, allowed] of nestedIdCollections) {
     collectionIds.set(path, validateEntityIds(requireArray(value, path, errors), path, errors, allowed));
   }
+  const deposits = requireArray(banking.deposits, 'profile.banking.deposits', errors);
+  deposits.forEach((value, index) => {
+    if (!isRecord(value)) return;
+    if (!['active', 'paid', 'withdrawn', 'merged'].includes(String(value.status))) addError(errors, `profile.banking.deposits[${index}].status:invalid_value`);
+    if (value.mergedIntoId !== undefined) requireString(value.mergedIntoId, `profile.banking.deposits[${index}].mergedIntoId`, errors, 128);
+    if (value.status === 'merged' && typeof value.mergedIntoId !== 'string') addError(errors, `profile.banking.deposits[${index}].mergedIntoId:required`);
+    if (value.tranches === undefined) return;
+    if (!Array.isArray(value.tranches) || value.tranches.length === 0 || value.tranches.length > 250) {
+      addError(errors, `profile.banking.deposits[${index}].tranches:invalid_length`);
+      return;
+    }
+    value.tranches.forEach((entry, trancheIndex) => {
+      const path = `profile.banking.deposits[${index}].tranches[${trancheIndex}]`;
+      const tranche = requireRecord(entry, path, errors);
+      checkAllowedKeys(tranche, ['id', 'principal', 'annualRate', 'startedOnDay', 'maturityDay', 'status', 'settledAmount'], path, errors);
+      requireString(tranche.id, `${path}.id`, errors, 128);
+      requireNumber(tranche.principal, `${path}.principal`, errors, { min: 0, max: MAX_MONEY });
+      requireNumber(tranche.annualRate, `${path}.annualRate`, errors, { min: 0, max: 10 });
+      requireNumber(tranche.startedOnDay, `${path}.startedOnDay`, errors, { min: 1, max: MAX_GAME_DAY, integer: true });
+      requireNumber(tranche.maturityDay, `${path}.maturityDay`, errors, { min: 1, max: MAX_GAME_DAY, integer: true });
+      if (typeof tranche.startedOnDay === 'number' && typeof tranche.maturityDay === 'number' && tranche.maturityDay < tranche.startedOnDay) addError(errors, `${path}.maturityDay:before_start`);
+      if (!['active', 'paid', 'withdrawn'].includes(String(tranche.status))) addError(errors, `${path}.status:invalid_value`);
+      if (tranche.settledAmount !== undefined) requireNumber(tranche.settledAmount, `${path}.settledAmount`, errors, { min: 0, max: MAX_MONEY });
+    });
+  });
   const allIdGroups: Array<[string, unknown[]]> = [
     ['assets', assets], ['lands', lands], ['companies', companies], ['inventory', inventory],
     ['productionOrders', productionOrders],

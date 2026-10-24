@@ -43,7 +43,7 @@ export default function PlayerLookup({ player, searching, searchError, onSearch,
     <div className="player-workspace" dir="rtl">
       <section className="search-panel">
         <div className="search-panel-mark"><Search size={20} /></div>
-        <div className="search-panel-copy"><span className="eyebrow">بحث آمن</span><h2>ابحث عن لاعب</h2><p>أدخل معرّف BE للعثور على الحساب. لا نعرض بريد اللاعب أو بياناته غير الضرورية. عند البحث، تُعالج الشارات الإدارية المنتهية تلقائيًا ويُسجّل ذلك.</p></div>
+        <div className="search-panel-copy"><span className="eyebrow">بحث آمن</span><h2>ابحث عن لاعب</h2><p>أدخل معرّف BE للعثور على الحساب. لا نعرض بريد اللاعب أو بياناته غير الضرورية. عند البحث، تُعالج الشارات الإدارية المنتهية ويُسجّل ذلك.</p></div>
         <form className="player-search-form" onSubmit={(event) => void submit(event)}>
           <label className="field-label" htmlFor="account-code">معرّف الحساب</label>
           <div className="search-input-row"><span className="search-input-symbol">BE</span><input id="account-code" className="text-input code-input" value={accountCode} onChange={(event) => { setAccountCode(event.target.value.toUpperCase()); setLocalError(""); }} placeholder="BE-XXXXXXX-XXXXX" autoCapitalize="characters" autoComplete="off" spellCheck={false} maxLength={32} dir="ltr" required /><button className="primary-button" type="submit" disabled={searching}>{searching ? <LoaderCircle size={17} className="spin" /> : <Search size={17} />}<span>{searching ? "جارٍ البحث…" : "بحث"}</span></button></div>

@@ -157,7 +157,7 @@ export default function AdminAuth({ setupRequired, onAuthenticated }: Props) {
 
             <div className="auth-card-foot">
               <ShieldCheck size={15} />
-              <span>الجلسة محمية، وتُغلق تلقائيًا بعد 12 ساعة.</span>
+              <span>الجلسة محمية، وتُغلق بعد 12 ساعة.</span>
             </div>
           </div>
           <p className="auth-copyright">إمبراطورية الأعمال <span>·</span> لوحة إدارة خاصة</p>

@@ -90,12 +90,23 @@ function isInvestment(value: unknown): value is InvestmentRecord {
     && (value.status === 'active' || value.status === 'paid' || value.status === 'loss');
 }
 
-function isDeposit(value: unknown): value is DepositRecord {
+function isDepositTranche(value: unknown): boolean {
   return isRecord(value) && isNonEmptyString(value.id) && isFiniteNonNegative(value.principal)
     && isFiniteNonNegative(value.annualRate) && Number.isInteger(value.startedOnDay) && (value.startedOnDay as number) >= 1
     && Number.isInteger(value.maturityDay) && (value.maturityDay as number) >= (value.startedOnDay as number)
     && (value.status === 'active' || value.status === 'paid' || value.status === 'withdrawn')
     && (value.settledAmount === undefined || isFiniteNonNegative(value.settledAmount));
+}
+
+function isDeposit(value: unknown): value is DepositRecord {
+  return isRecord(value) && isNonEmptyString(value.id) && isFiniteNonNegative(value.principal)
+    && isFiniteNonNegative(value.annualRate) && Number.isInteger(value.startedOnDay) && (value.startedOnDay as number) >= 1
+    && Number.isInteger(value.maturityDay) && (value.maturityDay as number) >= (value.startedOnDay as number)
+    && (value.status === 'active' || value.status === 'paid' || value.status === 'withdrawn' || value.status === 'merged')
+    && (value.settledAmount === undefined || isFiniteNonNegative(value.settledAmount))
+    && (value.mergedIntoId === undefined || isNonEmptyString(value.mergedIntoId))
+    && (value.status !== 'merged' || isNonEmptyString(value.mergedIntoId))
+    && (value.tranches === undefined || (Array.isArray(value.tranches) && value.tranches.length > 0 && value.tranches.length <= 250 && value.tranches.every(isDepositTranche)));
 }
 
 function isLoan(value: unknown): value is LoanRecord {

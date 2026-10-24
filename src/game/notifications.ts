@@ -51,6 +51,6 @@ export function selectNotifications(profile: PlayerProfile): GameNotification[] 
   if (auctions.length > 0) notifications.push({ id: 'auctions-open', title: 'فرص مزادات متاحة', detail: `يوجد ${auctions.length} ${plural(auctions.length, 'مزاد مفتوح', 'مزادان مفتوحان', 'مزادات مفتوحة')} للمنافسة الآن.`, tone: 'info', section: 'auctions', count: auctions.length, target: 'auctions-list' });
   const earnedBadges = selectEmpirePulse(profile).badges.filter((badge) => badge.earned);
   if (earnedBadges.length > 0) notifications.push({ id: 'badges-earned', title: 'شارات الإمبراطورية', detail: `لديك ${earnedBadges.length} شارات مكتسبة: ${earnedBadges.slice(-3).map((badge) => badge.label).join('، ')}.`, tone: 'success', section: 'home', count: earnedBadges.length });
-  notifications.push({ id: 'global-market-open', title: 'السوق العالمي مفتوح', detail: 'عروض روبوتية متاحة للمواد الخام، وبعضها يقبل التفاوض.', tone: 'info', section: 'inventory' });
+  notifications.push({ id: 'global-market-open', title: 'السوق العالمي مفتوح', detail: 'عروض تجار المواد الخام متاحة، وبعضها يقبل التفاوض.', tone: 'info', section: 'inventory' });
   return notifications.slice(0, 10);
 }

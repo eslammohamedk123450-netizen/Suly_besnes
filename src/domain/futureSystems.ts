@@ -94,7 +94,7 @@ export interface InvestmentRecord {
   settledAmount?: number;
 }
 
-export interface DepositRecord {
+export interface DepositTranche {
   id: string;
   principal: number;
   annualRate: number;
@@ -102,6 +102,18 @@ export interface DepositRecord {
   maturityDay: number;
   status: 'active' | 'paid' | 'withdrawn';
   settledAmount?: number;
+}
+
+export interface DepositRecord {
+  id: string;
+  principal: number;
+  annualRate: number;
+  startedOnDay: number;
+  maturityDay: number;
+  status: 'active' | 'paid' | 'withdrawn' | 'merged';
+  settledAmount?: number;
+  mergedIntoId?: string;
+  tranches?: DepositTranche[];
 }
 
 export interface LoanRecord {

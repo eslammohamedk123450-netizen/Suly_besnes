@@ -100,18 +100,18 @@ export function ProfilePage({ profile, country, accountId, isGuest, isSynced, on
         <section className="profile-sync-notice profile-sync-notice--guest" role="status">
           <div>
             <strong>هذا معرف ضيف محلي — لا يظهر في لوحة الإدارة</strong>
-            <p>عالم الضيف محفوظ على هذا الجهاز. أنشئ حسابًا سحابيًا للحصول على معرف قابل للبحث؛ سيبدأ الحساب السحابي بعالم جديد وتبقى نسخة الضيف محلية هنا.</p>
+            <p>عالم الضيف محفوظ على هذا الجهاز. أنشئ حسابًا للحصول على معرف قابل للبحث؛ سيبدأ الحساب الجديد بعالم جديد وتبقى نسخة الضيف هنا.</p>
           </div>
-          <button className="profile-sync-link" type="button" onClick={onLinkAccount}>إنشاء حساب سحابي</button>
+          <button className="profile-sync-link" type="button" onClick={onLinkAccount}>إنشاء حساب</button>
         </section>
       ) : !isSynced ? (
         <section className="profile-sync-notice profile-sync-notice--pending" role="status">
-          <strong>لم يكتمل حفظ العالم في السحابة بعد</strong>
-          <p>سيصبح هذا المعرف قابلًا للبحث في لوحة الإدارة بعد اكتمال المزامنة. تحقق من الاتصال وحالة الحفظ أعلى الشاشة.</p>
+          <strong>لم يكتمل حفظ العالم بعد</strong>
+          <p>سيصبح هذا المعرف قابلًا للبحث في لوحة الإدارة بعد اكتمال الحفظ. تحقق من الاتصال وحالة الحفظ أعلى الشاشة.</p>
         </section>
       ) : (
         <section className="profile-sync-notice profile-sync-notice--ready" role="status">
-          <strong>الحساب السحابي متصل</strong>
+          <strong>الحساب متصل</strong>
           <p>هذا هو معرف الحساب الحالي الذي تستخدمه لوحة الإدارة للبحث عن اللاعب.</p>
         </section>
       )}

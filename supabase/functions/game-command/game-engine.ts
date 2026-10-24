@@ -172,19 +172,25 @@ function getMarketQuote(profile, productId, day = profile.day) {
 var GAME_DAY_MS = 24 * 60 * 1e3;
 
 // src/game/auctions.ts
-var REGULAR_AUCTION_LIFETIME_DAYS = 7;
+var AUCTION_CYCLE_DAYS = 1;
 function getAuctionCloseAt(profile, listing) {
   const parsedStart = Date.parse(profile.createdAt);
   const worldStart = Number.isFinite(parsedStart) ? parsedStart : Date.now();
-  const dailyListing = listing.id.match(/^season-rare-(\d+)$/);
-  const closeAt = dailyListing ? worldStart + Number(dailyListing[1]) * GAME_DAY_MS : worldStart + REGULAR_AUCTION_LIFETIME_DAYS * GAME_DAY_MS;
-  return new Date(closeAt).toISOString();
+  return listing.closesAt || new Date(worldStart + AUCTION_CYCLE_DAYS * GAME_DAY_MS).toISOString();
 }
 function wasWon(profile, listingId) {
   return profile.lands.some((land) => land.id === listingId || land.id.startsWith(`${listingId}-renewed-`)) || profile.assets.some((asset) => asset.id === listingId || asset.id.startsWith(`${listingId}-renewed-`)) || profile.auctionHistory.some((bid) => bid.listingId.startsWith(listingId) && bid.bidder === "player");
 }
 function getAuctionListings(profile) {
-  const regular = AUCTION_CATALOG.filter((base) => !wasWon(profile, base.id));
+  const worldStart = Number.isFinite(Date.parse(profile.createdAt)) ? Date.parse(profile.createdAt) : Date.now();
+  const closesAt = new Date(worldStart + (profile.day + AUCTION_CYCLE_DAYS) * GAME_DAY_MS).toISOString();
+  const regular = AUCTION_CATALOG.map((base) => ({
+    ...base,
+    id: `${base.id}-day-${profile.day}`,
+    label: `${base.label} \xB7 \u062F\u0648\u0631\u0629 \u0627\u0644\u064A\u0648\u0645 ${profile.day}`,
+    closesAt,
+    status: "open"
+  })).filter((listing) => !wasWon(profile, listing.id));
   const rareId = `season-rare-${profile.day}`;
   const rare = {
     id: rareId,
@@ -195,7 +201,7 @@ function getAuctionListings(profile) {
     areaSquareMeters: 0,
     minimumBid: 45e4 + profile.day % 3 * 25e3,
     bidIncrement: 25e3,
-    closesAt: new Date(Date.parse(profile.createdAt) + profile.day * GAME_DAY_MS).toISOString(),
+    closesAt,
     status: "open",
     energyCapacityBonus: 90
   };
@@ -266,6 +272,37 @@ function getSynergyProductionMultiplier(profile) {
   return getSynergyBonuses(profile).reduce((multiplier, bonus) => multiplier * bonus.productionMultiplier, 1);
 }
 
+// src/game/globalMarket.ts
+var SELLERS = ["\u0645\u0648\u0627\u0646\u0626 \u0627\u0644\u0645\u062A\u0648\u0633\u0637", "\u0634\u0628\u0643\u0629 \u0627\u0644\u0646\u064A\u0644 \u0644\u0644\u062A\u0648\u0631\u064A\u062F", "\u062A\u062C\u0627\u0631\u0629 \u0627\u0644\u0634\u0631\u0642", "\u062A\u062D\u0627\u0644\u0641 \u0627\u0644\u0645\u0635\u0627\u0646\u0639"];
+var PRICE_FACTORS = [0.92, 1, 1.12];
+function getGlobalMarketOffers(profile) {
+  return MATERIAL_CATALOG.flatMap((material, materialIndex) => [0, 1, 2].map((offerIndex) => {
+    const factor = PRICE_FACTORS[(offerIndex + profile.day + materialIndex) % PRICE_FACTORS.length];
+    const unitPrice = Math.max(1, Math.round(material.pricePerUnit * factor));
+    const negotiable = (offerIndex + profile.day + materialIndex) % 3 !== 1;
+    return {
+      id: `global-${material.id}-day-${profile.day}-offer-${offerIndex}`,
+      materialId: material.id,
+      sellerName: SELLERS[(materialIndex + offerIndex + profile.day) % SELLERS.length],
+      unitPrice,
+      floorPrice: negotiable ? Math.max(1, Math.round(unitPrice * 0.9)) : unitPrice,
+      negotiable,
+      confidence: offerIndex === 1 ? "high" : offerIndex === 0 ? "medium" : "low"
+    };
+  }));
+}
+function resolveGlobalMarketOffer(profile, offerId) {
+  return getGlobalMarketOffers(profile).find((offer) => offer.id === offerId);
+}
+
+// src/domain/accountFeatures.ts
+var SPEED_CARD_DIAMOND_COSTS = {
+  "production-25": 12,
+  "production-50": 24,
+  "production-instant": 60,
+  "capacity-boost": 36
+};
+
 // src/game/engine.ts
 var DAY_MS = GAME_DAY_MS;
 function timestampFor(profile) {
@@ -309,11 +346,17 @@ function ledgerEntry(profile, category, amount, note, index) {
 }
 function syncTasks(profile) {
   const existing = new Map((profile.tasks ?? []).map((task) => [task.taskId, task]));
-  const automaticBadges = [profile.companies.length > 0 ? "شارة المؤسس" : null, profile.productionOrders.length > 0 ? "مشغّل مصنع" : null, profile.sales.length >= 3 ? "صائد السوق" : null, profile.staff.filter((member) => member.status === "active").length >= 2 ? "قائد فريق" : null, profile.investments.length > 0 || profile.banking.deposits.length > 0 ? "عين على المستقبل" : null].filter(Boolean);
+  const automaticBadges = [
+    profile.companies.length > 0 ? "\u0634\u0627\u0631\u0629 \u0627\u0644\u0645\u0624\u0633\u0633" : null,
+    profile.productionOrders.length > 0 ? "\u0645\u0634\u063A\u0651\u0644 \u0645\u0635\u0646\u0639" : null,
+    profile.sales.length >= 3 ? "\u0635\u0627\u0626\u062F \u0627\u0644\u0633\u0648\u0642" : null,
+    profile.staff.filter((member) => member.status === "active").length >= 2 ? "\u0642\u0627\u0626\u062F \u0641\u0631\u064A\u0642" : null,
+    profile.investments.length > 0 || profile.banking.deposits.length > 0 ? "\u0639\u064A\u0646 \u0639\u0644\u0649 \u0627\u0644\u0645\u0633\u062A\u0642\u0628\u0644" : null
+  ].filter((badge) => Boolean(badge));
   return {
     ...profile,
     tasks: TASK_CATALOG.map((task) => existing.get(task.id) ?? { taskId: task.id, claimed: false }),
-    badges: [...new Set([...(profile.badges ?? []), ...automaticBadges])]
+    badges: [.../* @__PURE__ */ new Set([...profile.badges ?? [], ...automaticBadges])]
   };
 }
 function conditionMet(profile, condition) {
@@ -352,7 +395,7 @@ function placeBid(profile, listingId, amount, targetCompanyId) {
     { bidderId: `${listing.id}-bot-b`, amount: highestBotBid }
   ];
   if (amount <= highestBotBid) {
-    return failure(profile, "auction-lost", `\u062E\u0633\u0631 \u0639\u0631\u0636\u0643 \u0627\u0644\u0645\u0632\u0627\u062F\u061B \u0623\u0639\u0644\u0649 \u0639\u0631\u0636 \u0622\u0644\u064A \u0643\u0627\u0646 ${highestBotBid.toLocaleString("ar-EG")} \u062C.\u0645.`);
+    return failure(profile, "auction-lost", `\u062E\u0633\u0631 \u0639\u0631\u0636\u0643 \u0627\u0644\u0645\u0632\u0627\u062F\u061B \u0623\u0639\u0644\u0649 \u0639\u0631\u0636 \u0645\u0646\u0627\u0641\u0633 \u0643\u0627\u0646 ${highestBotBid.toLocaleString("ar-EG")} \u062C.\u0645.`);
   }
   if (profile.bankBalance < amount) return failure(profile, "insufficient-funds", "\u0644\u0627 \u064A\u0643\u0641\u064A \u0631\u0635\u064A\u062F\u0643 \u0644\u062A\u0633\u062F\u064A\u062F \u0627\u0644\u0639\u0631\u0636 \u0627\u0644\u0641\u0627\u0626\u0632.");
   const auctionHistory = [
@@ -459,14 +502,14 @@ function sellLand(profile, landId) {
 }
 function upgradeLand(profile, landId) {
   const land = profile.lands.find((item) => item.id === landId);
-  if (!land) return failure(profile, "not-found", "الأرض غير موجودة.");
+  if (!land) return failure(profile, "not-found", "\u0627\u0644\u0623\u0631\u0636 \u063A\u064A\u0631 \u0645\u0648\u062C\u0648\u062F\u0629.");
   const level = land.upgradeLevel ?? 1;
-  if (level >= 5) return failure(profile, "condition-not-met", "وصلت الأرض إلى أعلى مستوى تطوير.");
+  if (level >= 5) return failure(profile, "condition-not-met", "\u0648\u0635\u0644\u062A \u0627\u0644\u0623\u0631\u0636 \u0625\u0644\u0649 \u0623\u0639\u0644\u0649 \u0645\u0633\u062A\u0648\u0649 \u062A\u0637\u0648\u064A\u0631.");
   const cost = Math.round(8e4 * Math.pow(1.55, level - 1));
-  if (profile.bankBalance < cost) return failure(profile, "insufficient-funds", "لا يكفي الرصيد لتطوير هذه الأرض.");
+  if (profile.bankBalance < cost) return failure(profile, "insufficient-funds", "\u0644\u0627 \u064A\u0643\u0641\u064A \u0627\u0644\u0631\u0635\u064A\u062F \u0644\u062A\u0637\u0648\u064A\u0631 \u0647\u0630\u0647 \u0627\u0644\u0623\u0631\u0636.");
   const upgraded = { ...land, upgradeLevel: level + 1, areaSquareMeters: Math.round(land.areaSquareMeters * 1.1), purchasePrice: land.purchasePrice + cost };
-  const nextProfile = addLedger({ ...profile, lands: profile.lands.map((item) => item.id === landId ? upgraded : item) }, [ledgerEntry(profile, "expense", cost, `تطوير أرض ${land.label} إلى المستوى ${level + 1}`, 0)], profile.bankBalance - cost);
-  return success(nextProfile, `تم تطوير ${land.label} إلى المستوى ${level + 1}.`, { landId, level: level + 1, cost });
+  const nextProfile = addLedger({ ...profile, lands: profile.lands.map((item) => item.id === landId ? upgraded : item) }, [ledgerEntry(profile, "expense", cost, `\u062A\u0637\u0648\u064A\u0631 \u0623\u0631\u0636 ${land.label} \u0625\u0644\u0649 \u0627\u0644\u0645\u0633\u062A\u0648\u0649 ${level + 1}`, 0)], profile.bankBalance - cost);
+  return success(nextProfile, `\u062A\u0645 \u062A\u0637\u0648\u064A\u0631 ${land.label} \u0625\u0644\u0649 \u0627\u0644\u0645\u0633\u062A\u0648\u0649 ${level + 1}.`, { landId, level: level + 1, cost });
 }
 function sellCompany(profile, companyId) {
   const company = profile.companies.find((item) => item.id === companyId);
@@ -487,24 +530,30 @@ function sellAsset(profile, assetId) {
   const nextProfile = addLedger({ ...profile, assets: profile.assets.filter((item) => item.id !== assetId) }, [ledgerEntry(profile, "revenue", payout, `\u0628\u064A\u0639 \u0623\u0635\u0644: ${asset.label} \u0628\u0646\u0635\u0641 \u0627\u0644\u0642\u064A\u0645\u0629`, 0)], profile.bankBalance + payout);
   return success(nextProfile, `\u062A\u0645 \u0628\u064A\u0639 ${asset.label} \u0648\u0627\u0633\u062A\u0631\u062F\u0627\u062F 50% \u0645\u0646 \u0642\u064A\u0645\u062A\u0647.`, { assetId, payout });
 }
-function buyMaterial(profile, materialId, quantity) {
+function buyMaterial(profile, _materialId, _quantity) {
+  return failure(profile, "condition-not-met", "\u0627\u0644\u0634\u0631\u0627\u0621 \u0627\u0644\u0645\u0628\u0627\u0634\u0631 \u0644\u0644\u0645\u0648\u0627\u062F \u0627\u0644\u062E\u0627\u0645 \u063A\u064A\u0631 \u0645\u062A\u0627\u062D. \u0627\u0633\u062A\u062E\u062F\u0645 \u0639\u0631\u0648\u0636 \u0627\u0644\u0633\u0648\u0642 \u0623\u0648 \u0627\u0644\u0645\u0632\u0627\u062F.");
+}
+function buyGlobalMaterial(profile, offerId, quantity, negotiatedUnitPrice) {
   const countryError = ensureEgypt(profile);
   if (countryError) return countryError;
-  const material = findMaterial(materialId);
-  if (!material) return failure(profile, "not-found", "\u0627\u0644\u0645\u0627\u062F\u0629 \u0627\u0644\u062E\u0627\u0645 \u063A\u064A\u0631 \u0645\u0648\u062C\u0648\u062F\u0629 \u0641\u064A \u0627\u0644\u0643\u062A\u0627\u0644\u0648\u062C.");
   if (!isPositiveInteger(quantity)) return failure(profile, "invalid-input", "\u0627\u0644\u0643\u0645\u064A\u0629 \u064A\u062C\u0628 \u0623\u0646 \u062A\u0643\u0648\u0646 \u0639\u062F\u062F\u064B\u0627 \u0635\u062D\u064A\u062D\u064B\u0627 \u0645\u0648\u062C\u0628\u064B\u0627.");
-  const existing = profile.inventory.find((lot) => lot.materialOrProductId === materialId);
-  const currentQuantity = existing?.quantity ?? 0;
-  if (currentQuantity + quantity > material.storageLimit) return failure(profile, "storage-limit", "\u062A\u062A\u062C\u0627\u0648\u0632 \u0627\u0644\u0643\u0645\u064A\u0629 \u0633\u0639\u0629 \u0627\u0644\u062A\u062E\u0632\u064A\u0646 \u0644\u0647\u0630\u0647 \u0627\u0644\u0645\u0627\u062F\u0629.");
-  const totalCost = quantity * material.pricePerUnit;
-  if (profile.bankBalance < totalCost) return failure(profile, "insufficient-funds", "\u0644\u0627 \u064A\u0643\u0641\u064A \u0631\u0635\u064A\u062F\u0643 \u0644\u0634\u0631\u0627\u0621 \u0647\u0630\u0647 \u0627\u0644\u0643\u0645\u064A\u0629.");
-  const inventory = existing ? profile.inventory.map((lot) => lot.materialOrProductId === materialId ? { ...lot, quantity: lot.quantity + quantity, unitCost: (lot.quantity * lot.unitCost + totalCost) / (lot.quantity + quantity) } : lot) : [...profile.inventory, { id: nextId(profile, "inventory", profile.inventory.length), materialOrProductId: materialId, quantity, unit: material.unit, unitCost: material.pricePerUnit }];
+  const offer = resolveGlobalMarketOffer(profile, offerId);
+  const material = offer ? findMaterial(offer.materialId) : void 0;
+  if (!offer || !material) return failure(profile, "not-found", "\u0639\u0631\u0636 \u0627\u0644\u0633\u0648\u0642 \u0627\u0644\u0639\u0627\u0644\u0645\u064A \u0644\u0645 \u064A\u0639\u062F \u0645\u062A\u0627\u062D\u064B\u0627.");
+  const unitPrice = negotiatedUnitPrice ?? offer.unitPrice;
+  if (!Number.isInteger(unitPrice) || unitPrice < offer.floorPrice || unitPrice > offer.unitPrice || !offer.negotiable && unitPrice !== offer.unitPrice) {
+    return failure(profile, "invalid-input", "\u0627\u0644\u0633\u0639\u0631 \u0644\u0627 \u064A\u0637\u0627\u0628\u0642 \u0634\u0631\u0648\u0637 \u0627\u0644\u0639\u0631\u0636 \u0623\u0648 \u0627\u0644\u062A\u0641\u0627\u0648\u0636.");
+  }
+  const totalCost = quantity * unitPrice;
+  if (profile.bankBalance < totalCost) return failure(profile, "insufficient-funds", "\u0644\u0627 \u064A\u0643\u0641\u064A \u0631\u0635\u064A\u062F\u0643 \u0644\u0642\u0628\u0648\u0644 \u0647\u0630\u0647 \u0627\u0644\u0635\u0641\u0642\u0629.");
+  const existing = profile.inventory.find((lot) => lot.materialOrProductId === material.id);
+  const inventory = existing ? profile.inventory.map((lot) => lot.materialOrProductId === material.id ? { ...lot, quantity: lot.quantity + quantity, unitCost: (lot.quantity * lot.unitCost + totalCost) / (lot.quantity + quantity) } : lot) : [...profile.inventory, { id: nextId(profile, "inventory", profile.inventory.length), materialOrProductId: material.id, quantity, unit: material.unit, unitCost: unitPrice }];
   const nextProfile = addLedger(
     { ...profile, inventory },
-    [ledgerEntry(profile, "asset", totalCost, `\u0634\u0631\u0627\u0621 ${quantity} ${material.unit} \u0645\u0646 ${material.name}`, 0)],
+    [ledgerEntry(profile, "asset", totalCost, `\u0634\u0631\u0627\u0621 \u0639\u0627\u0644\u0645\u064A ${quantity} ${material.unit} \u0645\u0646 ${offer.sellerName}`, 0)],
     profile.bankBalance - totalCost
   );
-  return success(syncTasks(nextProfile), `\u062A\u0645 \u0634\u0631\u0627\u0621 ${quantity} ${material.name} \u0648\u062A\u062E\u0632\u064A\u0646\u0647\u0627.`, { materialId, quantity, totalCost });
+  return success(syncTasks(nextProfile), `\u062A\u0645 \u0642\u0628\u0648\u0644 \u0639\u0631\u0636 ${offer.sellerName} \u0648\u0634\u0631\u0627\u0621 ${quantity} ${material.name} \u0628\u0644\u0627 \u062D\u062F \u062A\u062E\u0632\u064A\u0646.`, { materialId: material.id, quantity, totalCost, unitPrice });
 }
 function foundCompany(profile, industryId, landId, name) {
   const countryError = ensureEgypt(profile);
@@ -652,6 +701,16 @@ function useProductionSpeedCard(profile, orderId, kind) {
   const productionOrders = profile.productionOrders.map((item) => item.id === orderId ? { ...item, completesOnDay } : item);
   return success({ ...profile, speedCards, productionOrders }, `\u062A\u0645 \u0627\u0633\u062A\u062E\u062F\u0627\u0645 \u0628\u0637\u0627\u0642\u0629 \u0627\u0644\u062A\u0633\u0631\u064A\u0639\u061B \u064A\u0643\u062A\u0645\u0644 \u0627\u0644\u0623\u0645\u0631 \u0641\u064A \u0627\u0644\u064A\u0648\u0645 ${completesOnDay}.`, { orderId, kind, completesOnDay });
 }
+function buySpeedCard(profile, kind, quantity) {
+  if (!isPositiveInteger(quantity)) return failure(profile, "invalid-input", "\u0639\u062F\u062F \u0627\u0644\u0628\u0637\u0627\u0642\u0627\u062A \u064A\u062C\u0628 \u0623\u0646 \u064A\u0643\u0648\u0646 \u0639\u062F\u062F\u064B\u0627 \u0635\u062D\u064A\u062D\u064B\u0627 \u0645\u0648\u062C\u0628\u064B\u0627.");
+  const cost = SPEED_CARD_DIAMOND_COSTS[kind];
+  if (!cost) return failure(profile, "not-found", "\u0646\u0648\u0639 \u0628\u0637\u0627\u0642\u0629 \u0627\u0644\u0633\u0631\u0639\u0629 \u063A\u064A\u0631 \u0645\u0639\u0631\u0648\u0641.");
+  const diamondsSpent = cost * quantity;
+  if (profile.diamonds < diamondsSpent) return failure(profile, "insufficient-funds", "\u0644\u0627 \u064A\u0643\u0641\u064A \u0631\u0635\u064A\u062F \u0627\u0644\u0645\u0627\u0633 \u0644\u0634\u0631\u0627\u0621 \u0647\u0630\u0647 \u0627\u0644\u0628\u0637\u0627\u0642\u0627\u062A.");
+  const existing = profile.speedCards.find((card) => card.kind === kind);
+  const speedCards = existing ? profile.speedCards.map((card) => card.kind === kind ? { ...card, quantity: card.quantity + quantity } : card) : [...profile.speedCards, { kind, quantity }];
+  return success({ ...profile, diamonds: profile.diamonds - diamondsSpent, speedCards }, `\u062A\u0645 \u0634\u0631\u0627\u0621 ${quantity} \u0628\u0637\u0627\u0642\u0629 \u0628\u0627\u0633\u062A\u062E\u062F\u0627\u0645 ${diamondsSpent} \u0645\u0627\u0633\u0629.`, { kind, quantity, diamondsSpent });
+}
 function sellProduct(profile, productId, quantity) {
   const countryError = ensureEgypt(profile);
   if (countryError) return countryError;
@@ -699,6 +758,14 @@ function buyGold(profile, grams) {
     { goldGrams: Math.round((profile.goldGrams + grams) * 10) / 10, goldCostBasis: profile.goldCostBasis + amount }
   );
   return success(nextProfile, `\u0627\u0634\u062A\u0631\u064A\u062A ${grams.toFixed(1)} \u063A\u0631\u0627\u0645 \u0630\u0647\u0628 \u0628\u0633\u0639\u0631 \u0645\u062D\u0627\u0643\u0627\u0629 ${GOLD_PRICE_PER_GRAM} \u062C.\u0645 \u0644\u0644\u063A\u0631\u0627\u0645.`, { grams, cashAmount: amount, pricePerGram: GOLD_PRICE_PER_GRAM });
+}
+var DIAMONDS_PER_GOLD_GRAM = 60;
+function buyGoldWithDiamonds(profile, grams) {
+  if (!isPositiveTenth(grams)) return failure(profile, "invalid-input", "\u0623\u062F\u062E\u0644 \u0643\u0645\u064A\u0629 \u0630\u0647\u0628 \u0645\u0648\u062C\u0628\u0629 \u0628\u062E\u0637\u0648\u0629 0.1 \u063A\u0631\u0627\u0645.");
+  const diamonds = Math.round(grams * DIAMONDS_PER_GOLD_GRAM);
+  if (profile.diamonds < diamonds) return failure(profile, "insufficient-funds", "\u0644\u0627 \u064A\u0643\u0641\u064A \u0631\u0635\u064A\u062F \u0627\u0644\u0645\u0627\u0633 \u0644\u0634\u0631\u0627\u0621 \u0647\u0630\u0647 \u0627\u0644\u0643\u0645\u064A\u0629 \u0645\u0646 \u0627\u0644\u0630\u0647\u0628.");
+  const nextProfile = { ...profile, diamonds: profile.diamonds - diamonds, goldGrams: Math.round((profile.goldGrams + grams) * 10) / 10, goldCostBasis: profile.goldCostBasis };
+  return success(nextProfile, `\u062A\u0645 \u0634\u0631\u0627\u0621 ${grams.toFixed(1)} \u063A\u0631\u0627\u0645 \u0630\u0647\u0628 \u0645\u0642\u0627\u0628\u0644 ${diamonds} \u0645\u0627\u0633\u0629.`, { grams, cashAmount: diamonds, pricePerGram: DIAMONDS_PER_GOLD_GRAM });
 }
 function sellGold(profile, grams) {
   const countryError = ensureEgypt(profile);
@@ -792,6 +859,7 @@ var DEPOSIT_OPTIONS = [
 function createDeposit(profile, amount, durationDays) {
   const option = DEPOSIT_OPTIONS.find((item) => item.durationDays === durationDays);
   if (!option) return failure(profile, "invalid-input", "\u0645\u062F\u0629 \u0627\u0644\u0648\u062F\u064A\u0639\u0629 \u063A\u064A\u0631 \u0645\u062A\u0627\u062D\u0629. \u0627\u062E\u062A\u0631 3 \u0623\u0648 7 \u0623\u0648 14 \u064A\u0648\u0645\u064B\u0627.");
+  if (profile.banking.deposits.filter((deposit2) => deposit2.status === "active").length >= 5) return failure(profile, "condition-not-met", "\u0648\u0635\u0644\u062A \u0625\u0644\u0649 \u0627\u0644\u062D\u062F \u0627\u0644\u0623\u0642\u0635\u0649: 5 \u0648\u062F\u0627\u0626\u0639 \u0646\u0634\u0637\u0629. \u0627\u062F\u0645\u062C \u0627\u0644\u0648\u062F\u0627\u0626\u0639 \u0623\u0648 \u0627\u0633\u062A\u0631\u062F \u0648\u062F\u064A\u0639\u0629 \u0645\u0633\u062A\u062D\u0642\u0629 \u0623\u0648\u0644\u064B\u0627.");
   if (!Number.isInteger(amount) || amount < 5e4) return failure(profile, "invalid-input", "\u0627\u0644\u062D\u062F \u0627\u0644\u0623\u062F\u0646\u0649 \u0644\u0644\u0648\u062F\u064A\u0639\u0629 50,000 \u062C\u0646\u064A\u0647 \u0645\u062D\u0627\u0643\u0627\u0629.");
   if (amount > profile.bankBalance) return failure(profile, "insufficient-funds", "\u0644\u0627 \u064A\u0643\u0641\u064A \u0627\u0644\u0631\u0635\u064A\u062F \u0644\u0625\u0646\u0634\u0627\u0621 \u0647\u0630\u0647 \u0627\u0644\u0648\u062F\u064A\u0639\u0629.");
   const deposit = { id: nextId(profile, "deposit", profile.banking.deposits.length), principal: amount, annualRate: option.annualRate, startedOnDay: profile.day, maturityDay: profile.day + durationDays, status: "active" };
@@ -802,20 +870,73 @@ function createDeposit(profile, amount, durationDays) {
   );
   return success(nextProfile, `\u062A\u0645 \u0625\u0646\u0634\u0627\u0621 \u0648\u062F\u064A\u0639\u0629 \u0645\u062D\u0627\u0643\u0627\u0629 \u062A\u0633\u062A\u062D\u0642 \u0641\u064A \u0627\u0644\u064A\u0648\u0645 ${deposit.maturityDay}.`, deposit);
 }
+function activeDepositTranches(deposit) {
+  if (deposit.tranches) return deposit.tranches.filter((tranche) => tranche.status === "active");
+  return deposit.status === "active" ? [{ id: deposit.id, principal: deposit.principal, annualRate: deposit.annualRate, startedOnDay: deposit.startedOnDay, maturityDay: deposit.maturityDay, status: "active" }] : [];
+}
+function getDepositExpectedInterest(deposit) {
+  return activeDepositTranches(deposit).reduce((sum, tranche) => sum + Math.round(tranche.principal * tranche.annualRate * (tranche.maturityDay - tranche.startedOnDay) / 30), 0);
+}
+function hasMaturedDepositTranche(deposit, day) {
+  return activeDepositTranches(deposit).some((tranche) => day >= tranche.maturityDay);
+}
+function getDepositMaturityRange(deposit) {
+  const tranches = activeDepositTranches(deposit);
+  if (tranches.length === 0) return { firstDay: deposit.maturityDay, lastDay: deposit.maturityDay };
+  return { firstDay: Math.min(...tranches.map((tranche) => tranche.maturityDay)), lastDay: Math.max(...tranches.map((tranche) => tranche.maturityDay)) };
+}
+function mergeDeposits(profile, depositIds) {
+  if (!Array.isArray(depositIds) || depositIds.some((id) => typeof id !== "string")) return failure(profile, "invalid-input", "\u0642\u0627\u0626\u0645\u0629 \u0627\u0644\u0648\u062F\u0627\u0626\u0639 \u0627\u0644\u0645\u062E\u062A\u0627\u0631\u0629 \u063A\u064A\u0631 \u0635\u0627\u0644\u062D\u0629.");
+  const ids = [...new Set(depositIds)];
+  if (ids.length < 2) return failure(profile, "invalid-input", "\u0627\u062E\u062A\u0631 \u0648\u062F\u064A\u0639\u062A\u064A\u0646 \u0646\u0634\u0637\u062A\u064A\u0646 \u0639\u0644\u0649 \u0627\u0644\u0623\u0642\u0644 \u0644\u062F\u0645\u062C\u0647\u0645\u0627.");
+  const deposits = ids.map((id) => profile.banking.deposits.find((deposit2) => deposit2.id === id));
+  if (deposits.some((deposit2) => !deposit2 || deposit2.status !== "active")) return failure(profile, "not-found", "\u062A\u0623\u0643\u062F \u0645\u0646 \u0627\u062E\u062A\u064A\u0627\u0631 \u0648\u062F\u0627\u0626\u0639 \u0646\u0634\u0637\u0629 \u0645\u0648\u062C\u0648\u062F\u0629.");
+  const selected = deposits;
+  const tranches = selected.flatMap(activeDepositTranches);
+  if (tranches.length < 2) return failure(profile, "invalid-input", "\u0644\u0627 \u062A\u0648\u062C\u062F \u0623\u062C\u0632\u0627\u0621 \u0646\u0634\u0637\u0629 \u0643\u0627\u0641\u064A\u0629 \u0644\u062F\u0645\u062C\u0647\u0627.");
+  const principal = tranches.reduce((sum, tranche) => sum + tranche.principal, 0);
+  const annualRate = principal > 0 ? tranches.reduce((sum, tranche) => sum + tranche.principal * tranche.annualRate, 0) / principal : 0;
+  const deposit = {
+    id: nextId(profile, "deposit", profile.banking.deposits.length),
+    principal,
+    annualRate,
+    startedOnDay: Math.min(...tranches.map((tranche) => tranche.startedOnDay)),
+    maturityDay: Math.max(...tranches.map((tranche) => tranche.maturityDay)),
+    status: "active",
+    tranches
+  };
+  const mergedIds = new Set(ids);
+  const history = profile.banking.deposits.map((item) => mergedIds.has(item.id) ? { ...item, status: "merged", mergedIntoId: deposit.id } : item);
+  const nextProfile = { ...profile, banking: { ...profile.banking, deposits: [...history, deposit] } };
+  return success(nextProfile, `\u062A\u0645 \u062F\u0645\u062C ${ids.length} \u0648\u062F\u0627\u0626\u0639 \u0641\u064A \u0648\u062F\u064A\u0639\u0629 \u0648\u0627\u062D\u062F\u0629 \u0645\u0639 \u0627\u0644\u062D\u0641\u0627\u0638 \u0639\u0644\u0649 \u0639\u0627\u0626\u062F \u0648\u0645\u0648\u0639\u062F \u0627\u0633\u062A\u062D\u0642\u0627\u0642 \u0643\u0644 \u062C\u0632\u0621.`, deposit);
+}
 function withdrawDeposit(profile, depositId) {
   const deposit = profile.banking.deposits.find((item) => item.id === depositId);
   if (!deposit) return failure(profile, "not-found", "\u0627\u0644\u0648\u062F\u064A\u0639\u0629 \u063A\u064A\u0631 \u0645\u0648\u062C\u0648\u062F\u0629.");
   if (deposit.status !== "active") return failure(profile, "invalid-input", "\u0647\u0630\u0647 \u0627\u0644\u0648\u062F\u064A\u0639\u0629 \u062A\u0645\u062A \u062A\u0633\u0648\u064A\u062A\u0647\u0627 \u0645\u0646 \u0642\u0628\u0644.");
-  if (profile.day < deposit.maturityDay) return failure(profile, "deposit-not-mature", `\u062A\u0633\u062A\u062D\u0642 \u0627\u0644\u0648\u062F\u064A\u0639\u0629 \u0641\u064A \u0627\u0644\u064A\u0648\u0645 ${deposit.maturityDay}.`);
-  const interest = Math.round(deposit.principal * deposit.annualRate * (deposit.maturityDay - deposit.startedOnDay) / 30);
-  const amount = deposit.principal + interest;
-  const updatedDeposit = { ...deposit, status: "paid", settledAmount: amount };
+  const activeTranches = activeDepositTranches(deposit);
+  const maturedTranches = activeTranches.filter((tranche) => profile.day >= tranche.maturityDay);
+  if (maturedTranches.length === 0) return failure(profile, "deposit-not-mature", `\u062A\u0633\u062A\u062D\u0642 \u0627\u0644\u0648\u062F\u064A\u0639\u0629 \u0641\u064A \u0627\u0644\u064A\u0648\u0645 ${Math.min(...activeTranches.map((tranche) => tranche.maturityDay))}.`);
+  const principal = maturedTranches.reduce((sum, tranche) => sum + tranche.principal, 0);
+  const interest = maturedTranches.reduce((sum, tranche) => sum + Math.round(tranche.principal * tranche.annualRate * (tranche.maturityDay - tranche.startedOnDay) / 30), 0);
+  const amount = principal + interest;
+  let updatedDeposit;
+  if (deposit.tranches) {
+    const maturedIds = new Set(maturedTranches.map((tranche) => tranche.id));
+    const tranches = deposit.tranches.map((tranche) => maturedIds.has(tranche.id) ? { ...tranche, status: "paid", settledAmount: tranche.principal + Math.round(tranche.principal * tranche.annualRate * (tranche.maturityDay - tranche.startedOnDay) / 30) } : tranche);
+    const remaining = tranches.filter((tranche) => tranche.status === "active");
+    const remainingPrincipal = remaining.reduce((sum, tranche) => sum + tranche.principal, 0);
+    const remainingRate = remainingPrincipal > 0 ? remaining.reduce((sum, tranche) => sum + tranche.principal * tranche.annualRate, 0) / remainingPrincipal : deposit.annualRate;
+    updatedDeposit = { ...deposit, principal: remainingPrincipal, annualRate: remainingRate, startedOnDay: remaining.length ? Math.min(...remaining.map((tranche) => tranche.startedOnDay)) : deposit.startedOnDay, maturityDay: remaining.length ? Math.max(...remaining.map((tranche) => tranche.maturityDay)) : deposit.maturityDay, status: remaining.length ? "active" : "paid", settledAmount: (deposit.settledAmount ?? 0) + amount, tranches };
+  } else {
+    updatedDeposit = { ...deposit, status: "paid", settledAmount: amount };
+  }
   const nextProfile = addLedger(
     { ...profile, banking: { ...profile.banking, deposits: profile.banking.deposits.map((item) => item.id === depositId ? updatedDeposit : item) } },
-    [ledgerEntry(profile, "revenue", interest, `\u0641\u0627\u0626\u062F\u0629 \u0648\u062F\u064A\u0639\u0629 \u0645\u062D\u0627\u0643\u0627\u0629 ${deposit.id}`, 0), ledgerEntry(profile, "settlement", deposit.principal, `\u0627\u0633\u062A\u0631\u062F\u0627\u062F \u0623\u0635\u0644 \u0627\u0644\u0648\u062F\u064A\u0639\u0629 ${deposit.id}`, 1)],
+    [ledgerEntry(profile, "revenue", interest, `\u0641\u0627\u0626\u062F\u0629 \u0648\u062F\u064A\u0639\u0629 \u0645\u062D\u0627\u0643\u0627\u0629 ${deposit.id}`, 0), ledgerEntry(profile, "settlement", principal, `\u0627\u0633\u062A\u0631\u062F\u0627\u062F \u0623\u0635\u0644 \u0627\u0644\u0648\u062F\u064A\u0639\u0629 ${deposit.id}`, 1)],
     profile.bankBalance + amount
   );
-  return success(nextProfile, `\u062A\u0645 \u0627\u0633\u062A\u0631\u062F\u0627\u062F \u0627\u0644\u0648\u062F\u064A\u0639\u0629 \u0645\u0639 \u0641\u0627\u0626\u062F\u0629 \u0645\u062D\u0627\u0643\u0627\u0629 ${interest.toLocaleString("ar-EG")} \u062C.\u0645.`, { depositId, amount, interest });
+  return success(nextProfile, `\u062A\u0645 \u0627\u0633\u062A\u0631\u062F\u0627\u062F \u0627\u0644\u0645\u0633\u062A\u062D\u0642 \u0645\u0646 \u0627\u0644\u0648\u062F\u064A\u0639\u0629 \u0645\u0639 \u0641\u0627\u0626\u062F\u0629 ${interest.toLocaleString("ar-EG")} \u062C.\u0645.`, { depositId, amount, interest });
 }
 function collateralValue(profile, collateralType, collateralId) {
   if (collateralType === "land") return profile.lands.find((land) => land.id === collateralId)?.purchasePrice ?? 0;
@@ -825,6 +946,7 @@ function collateralValue(profile, collateralType, collateralId) {
   return company && industry ? industry.setupFee + (country?.economy.licenseFeesByIndustry[company.industryId] ?? industry.licenseFee) + 1e5 : 0;
 }
 function takeLoan(profile, collateralType, collateralId, amount, termDays) {
+  if (profile.banking.loans.filter((loan2) => loan2.status === "active").length >= 3) return failure(profile, "condition-not-met", "\u0648\u0635\u0644\u062A \u0625\u0644\u0649 \u0627\u0644\u062D\u062F \u0627\u0644\u0623\u0642\u0635\u0649: 3 \u0642\u0631\u0648\u0636 \u0646\u0634\u0637\u0629. \u0633\u062F\u0651\u062F \u0642\u0631\u0636\u064B\u0627 \u0642\u0627\u0626\u0645\u064B\u0627 \u0623\u0648\u0644\u064B\u0627.");
   const collateralAmount = collateralValue(profile, collateralType, collateralId);
   if (collateralAmount <= 0) return failure(profile, "not-found", "\u0627\u0644\u0636\u0645\u0627\u0646 \u063A\u064A\u0631 \u0645\u0648\u062C\u0648\u062F \u0623\u0648 \u063A\u064A\u0631 \u0645\u0624\u0647\u0644 \u0644\u0644\u062A\u0645\u0648\u064A\u0644.");
   if (profile.banking.loans.some((loan2) => loan2.status === "active" && loan2.collateralType === collateralType && loan2.collateralId === collateralId)) return failure(profile, "collateral-in-use", "\u0647\u0630\u0627 \u0627\u0644\u0636\u0645\u0627\u0646 \u0645\u0631\u062A\u0628\u0637 \u0628\u0642\u0631\u0636 \u0642\u0627\u0626\u0645 \u0628\u0627\u0644\u0641\u0639\u0644.");
@@ -843,15 +965,19 @@ function takeLoan(profile, collateralType, collateralId, amount, termDays) {
 }
 function repayLoan(profile, loanId, installments) {
   const loan = profile.banking.loans.find((item) => item.id === loanId && item.status === "active");
-  if (!loan) return failure(profile, "not-found", "القرض غير موجود أو تمت تسويته بالفعل.");
+  if (!loan) return failure(profile, "not-found", "\u0627\u0644\u0642\u0631\u0636 \u063A\u064A\u0631 \u0645\u0648\u062C\u0648\u062F \u0623\u0648 \u062A\u0645\u062A \u062A\u0633\u0648\u064A\u062A\u0647 \u0628\u0627\u0644\u0641\u0639\u0644.");
   const count = installments === "all" ? Math.ceil(loan.remainingBalance / loan.installmentAmount) : installments;
-  if (!Number.isInteger(count) || count < 1) return failure(profile, "invalid-input", "اختر قسطًا واحدًا على الأقل.");
+  if (!Number.isInteger(count) || count < 1) return failure(profile, "invalid-input", "\u0627\u062E\u062A\u0631 \u0642\u0633\u0637\u064B\u0627 \u0648\u0627\u062D\u062F\u064B\u0627 \u0639\u0644\u0649 \u0627\u0644\u0623\u0642\u0644.");
   const amount = installments === "all" ? loan.remainingBalance : Math.min(loan.remainingBalance, loan.installmentAmount * count);
-  if (profile.bankBalance < amount) return failure(profile, "insufficient-funds", "لا يكفي الرصيد لتسديد هذه الدفعة.");
+  if (profile.bankBalance < amount) return failure(profile, "insufficient-funds", "\u0644\u0627 \u064A\u0643\u0641\u064A \u0627\u0644\u0631\u0635\u064A\u062F \u0644\u062A\u0633\u062F\u064A\u062F \u0647\u0630\u0647 \u0627\u0644\u062F\u0641\u0639\u0629.");
   const remainingBalance = Math.max(0, loan.remainingBalance - amount);
   const updatedLoan = { ...loan, remainingBalance, nextPaymentDay: loan.nextPaymentDay + count, status: remainingBalance === 0 ? "paid" : loan.status };
-  const nextProfile = addLedger({ ...profile, banking: { ...profile.banking, loans: profile.banking.loans.map((item) => item.id === loanId ? updatedLoan : item) } }, [ledgerEntry(profile, "settlement", amount, `سداد ${installments === "all" ? "كامل" : `${count} أقساط`} من القرض ${loanId}`, 0)], profile.bankBalance - amount);
-  return success(nextProfile, remainingBalance === 0 ? "تم سداد القرض بالكامل وإغلاقه." : `تم سداد ${count} أقساط دفعة واحدة. المتبقي ${remainingBalance.toLocaleString("ar-EG")} ج.م.`, updatedLoan);
+  const nextProfile = addLedger(
+    { ...profile, banking: { ...profile.banking, loans: profile.banking.loans.map((item) => item.id === loanId ? updatedLoan : item) } },
+    [ledgerEntry(profile, "settlement", amount, `\u0633\u062F\u0627\u062F ${installments === "all" ? "\u0643\u0627\u0645\u0644" : `${count} \u0623\u0642\u0633\u0627\u0637`} \u0645\u0646 \u0627\u0644\u0642\u0631\u0636 ${loanId}`, 0)],
+    profile.bankBalance - amount
+  );
+  return success(nextProfile, remainingBalance === 0 ? "\u062A\u0645 \u0633\u062F\u0627\u062F \u0627\u0644\u0642\u0631\u0636 \u0628\u0627\u0644\u0643\u0627\u0645\u0644 \u0648\u0625\u063A\u0644\u0627\u0642\u0647." : `\u062A\u0645 \u0633\u062F\u0627\u062F ${count} \u0623\u0642\u0633\u0627\u0637 \u062F\u0641\u0639\u0629 \u0648\u0627\u062D\u062F\u0629. \u0627\u0644\u0645\u062A\u0628\u0642\u064A ${remainingBalance.toLocaleString("ar-EG")} \u062C.\u0645.`, updatedLoan);
 }
 function createInvestment(profile, investmentId, amount) {
   const countryError = ensureEgypt(profile);
@@ -1085,45 +1211,6 @@ var produce = runProduction;
 var sell = sellProduct;
 var invest = createInvestment;
 var passDay = advanceDay;
-function buyGoldWithDiamonds(profile, grams) {
-  if (!Number.isFinite(grams) || grams <= 0 || Math.abs(grams * 10 - Math.round(grams * 10)) > 1e-8) return failure(profile, "invalid-input", "أدخل كمية ذهب موجبة بخطوة 0.1 غرام.");
-  const diamonds = Math.round(grams * 60);
-  if (profile.diamonds < diamonds) return failure(profile, "insufficient-funds", "لا يكفي رصيد الماس لشراء هذه الكمية من الذهب.");
-  const nextProfile = { ...profile, diamonds: profile.diamonds - diamonds, goldGrams: Math.round((profile.goldGrams + grams) * 10) / 10, goldCostBasis: profile.goldCostBasis };
-  return success(nextProfile, `تم شراء ${grams.toFixed(1)} غرام ذهب مقابل ${diamonds} ماسة.`, { grams, cashAmount: diamonds, pricePerGram: 60 });
-}
-function buyGlobalMaterial(profile, offerId, quantity, negotiatedUnitPrice) {
-  if (profile.countryId !== "egypt") return failure(profile, "wrong-country", "هذه الجولة متاحة لمصر فقط.");
-  if (!isPositiveInteger(quantity)) return failure(profile, "invalid-input", "الكمية يجب أن تكون عددًا صحيحًا موجبًا.");
-  const match = /^global-(.+)-day-(\d+)-offer-(\d+)$/.exec(offerId);
-  if (!match || Number(match[2]) !== profile.day) return failure(profile, "not-found", "عرض السوق العالمي لم يعد متاحًا.");
-  const material = findMaterial(match[1]);
-  if (!material) return failure(profile, "not-found", "المادة الخام غير موجودة في الكتالوج.");
-  const offerIndex = Number(match[3]);
-  const factors = [0.92, 1, 1.12];
-  const unitPrice = Math.max(1, Math.round(material.pricePerUnit * factors[(offerIndex + profile.day + MATERIAL_CATALOG.findIndex((item) => item.id === material.id)) % factors.length]));
-  const negotiable = (offerIndex + profile.day + MATERIAL_CATALOG.findIndex((item) => item.id === material.id)) % 3 !== 1;
-  const floorPrice = negotiable ? Math.max(1, Math.round(unitPrice * 0.9)) : unitPrice;
-  const agreedPrice = negotiatedUnitPrice ?? unitPrice;
-  if (!Number.isInteger(agreedPrice) || agreedPrice < floorPrice || agreedPrice > unitPrice || (!negotiable && agreedPrice !== unitPrice)) return failure(profile, "invalid-input", "السعر لا يطابق شروط العرض أو التفاوض.");
-  const totalCost = quantity * agreedPrice;
-  if (profile.bankBalance < totalCost) return failure(profile, "insufficient-funds", "لا يكفي رصيدك لقبول هذه الصفقة.");
-  const existing = (profile.inventory ?? []).find((lot) => lot.materialOrProductId === material.id);
-  const inventory = existing ? profile.inventory.map((lot) => lot.materialOrProductId === material.id ? { ...lot, quantity: lot.quantity + quantity, unitCost: (lot.quantity * lot.unitCost + totalCost) / (lot.quantity + quantity) } : lot) : [...profile.inventory, { id: nextId(profile, "inventory", profile.inventory.length), materialOrProductId: material.id, quantity, unit: material.unit, unitCost: agreedPrice }];
-  const nextProfile = addLedger({ ...profile, inventory }, [ledgerEntry(profile, "asset", totalCost, `شراء عالمي ${quantity} ${material.unit} من السوق العالمي`, 0)], profile.bankBalance - totalCost);
-  return success(syncTasks(nextProfile), `تم شراء ${quantity} ${material.name} من السوق العالمي بلا حد تخزين.`, { materialId: material.id, quantity, totalCost, unitPrice: agreedPrice });
-}
-function buySpeedCard(profile, kind, quantity) {
-  const costs = { "production-25": 12, "production-50": 24, "production-instant": 60, "capacity-boost": 36 };
-  if (!isPositiveInteger(quantity)) return failure(profile, "invalid-input", "عدد البطاقات يجب أن يكون عددًا صحيحًا موجبًا.");
-  const cost = costs[kind];
-  if (!cost) return failure(profile, "not-found", "نوع بطاقة السرعة غير معروف.");
-  const diamondsSpent = cost * quantity;
-  if (profile.diamonds < diamondsSpent) return failure(profile, "insufficient-funds", "لا يكفي رصيد الماس لشراء هذه البطاقات.");
-  const existing = profile.speedCards.find((card) => card.kind === kind);
-  const speedCards = existing ? profile.speedCards.map((card) => card.kind === kind ? { ...card, quantity: card.quantity + quantity } : card) : [...profile.speedCards, { kind, quantity }];
-  return success({ ...profile, diamonds: profile.diamonds - diamondsSpent, speedCards }, `تم شراء ${quantity} بطاقة باستخدام ${diamondsSpent} ماسة.`, { kind, quantity, diamondsSpent });
-}
 function executeGameCommand(profile, command) {
   switch (command.name) {
     case "place_bid":
@@ -1174,6 +1261,8 @@ function executeGameCommand(profile, command) {
       return terminateStaff(profile, command.args.staffId);
     case "create_deposit":
       return createDeposit(profile, command.args.amount, command.args.durationDays);
+    case "merge_deposits":
+      return mergeDeposits(profile, command.args.depositIds);
     case "withdraw_deposit":
       return withdrawDeposit(profile, command.args.depositId);
     case "take_loan":
@@ -1200,8 +1289,11 @@ export {
   bidOnLand,
   buyDirectCompany,
   buyDirectLand,
+  buyGlobalMaterial,
   buyGold,
+  buyGoldWithDiamonds,
   buyMaterial,
+  buySpeedCard,
   cancelProductionOrder,
   claimTask,
   createDeposit,
@@ -1211,14 +1303,19 @@ export {
   foundBusiness,
   foundCompany,
   getDayBriefing,
+  getDepositExpectedInterest,
+  getDepositMaturityRange,
+  hasMaturedDepositTranche,
   hireStaff,
   invest,
+  mergeDeposits,
   negotiateContract,
   passDay,
   payStaffSalary,
   placeBid,
   produce,
   purchaseMaterial,
+  repayLoan,
   runProduction,
   sell,
   sellAsset,
@@ -1230,6 +1327,7 @@ export {
   takeLoan,
   terminateStaff,
   upgradeCompany,
+  upgradeLand,
   useProductionSpeedCard,
   withdrawDeposit
 };

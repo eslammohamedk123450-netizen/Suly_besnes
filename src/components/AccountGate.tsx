@@ -60,7 +60,7 @@ export function AccountGate({ onAuthenticated, onPlayAsGuest, onCancel }: Accoun
         <div className="account-visual-copy">
           <span className="eyebrow">ابدأ الآن، واحفظ بالطريقة التي تناسبك</span>
           <h1>إمبراطوريتك تبدأ من قرار.</h1>
-          <p>العب كضيف على هذا الجهاز، أو أنشئ حسابًا لمزامنة عالمك سحابيًا.</p>
+          <p>العب كضيف على هذا الجهاز، أو أنشئ حسابًا لاستعادة عالمك على أجهزتك الأخرى.</p>
         </div>
       </div>
       <section className="account-panel">
@@ -86,7 +86,7 @@ export function AccountGate({ onAuthenticated, onPlayAsGuest, onCancel }: Accoun
           )}
           {notice && <div className={`account-error account-message--${noticeTone}`} role={noticeTone === 'error' ? 'alert' : 'status'}>{notice}</div>}
           <button className="button button-primary button-start" type="submit" disabled={busy}>
-            {busy ? 'جارٍ المعالجة...' : isForgotMode ? 'إرسال رابط الاستعادة' : mode === 'login' ? 'تسجيل الدخول' : 'إنشاء الحساب السحابي'}
+            {busy ? 'جارٍ المعالجة...' : isForgotMode ? 'إرسال رابط الاستعادة' : mode === 'login' ? 'تسجيل الدخول' : 'إنشاء حساب اللاعب'}
           </button>
         </form>
         {isForgotMode ? (
@@ -104,7 +104,7 @@ export function AccountGate({ onAuthenticated, onPlayAsGuest, onCancel }: Accoun
           {onCancel ? 'العودة إلى عالم الضيف' : 'اللعب كضيف · حفظ على هذا الجهاز'}
         </button>
         {onCancel && <button className="account-cancel" type="button" onClick={onCancel}>إلغاء ربط الحساب والعودة</button>}
-        <p className="privacy-note">حفظ الضيف محلي على هذا الجهاز. الحساب السحابي يتيح استعادة العالم على أجهزة أخرى.</p>
+        <p className="privacy-note">حفظ الضيف على هذا الجهاز. يتيح الحساب استعادة العالم على أجهزتك الأخرى.</p>
       </section>
     </main>
   );

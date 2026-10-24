@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { COUNTRIES } from '../domain/countries';
 import { createNewPlayer, type PlayerProfile } from '../domain/player';
 import { getContractOffers } from './contracts';
-import { advanceDay, acceptContract, buyGoldWithDiamonds, buySpeedCard, deliverContract, foundCompany, getDayBriefing, payStaffSalary, repayLoan, runProduction, sellGold, takeLoan, upgradeLand } from './engine';
+import { advanceDay, acceptContract, buyGoldWithDiamonds, buyMaterial, buySpeedCard, createDeposit, deliverContract, foundCompany, getDayBriefing, mergeDeposits, payStaffSalary, repayLoan, runProduction, sellGold, takeLoan, upgradeLand, withdrawDeposit } from './engine';
 import { negotiateContract } from './engine';
 import { getSynergyBonuses } from './synergy';
 import { normalizeSavedProfile } from '../storage/saveRepository';
@@ -151,6 +151,67 @@ describe('Business Empire economy invariants', () => {
     const closed = repayLoan(partial.profile, opened.data.id, 'all');
     expect(closed.ok).toBe(true);
     if (closed.ok) expect(closed.data.status).toBe('paid');
+  });
+
+  it('blocks direct raw-material purchases and caps active deposits and loans', () => {
+    const base = profile({ bankBalance: 1_000_000 });
+    expect(buyMaterial(base, 'grain', 1).ok).toBe(false);
+
+    let funded = base;
+    for (let index = 0; index < 5; index += 1) {
+      const opened = createDeposit(funded, 50_000, 3);
+      expect(opened.ok).toBe(true);
+      if (!opened.ok) return;
+      funded = opened.profile;
+    }
+    expect(createDeposit(funded, 50_000, 3).ok).toBe(false);
+    const merged = mergeDeposits(funded, funded.banking.deposits.filter((deposit) => deposit.status === 'active').map((deposit) => deposit.id));
+    expect(merged.ok).toBe(true);
+    if (merged.ok) {
+      expect(merged.data.tranches).toHaveLength(5);
+      expect(merged.data.principal).toBe(250_000);
+      expect(merged.profile.banking.deposits.filter((deposit) => deposit.status === 'active')).toHaveLength(1);
+    }
+
+    const lands = Array.from({ length: 4 }, (_, index) => ({ id: `land-${index + 1}`, label: `ضمان ${index + 1}`, landType: 'industrial' as const, areaSquareMeters: 1_000, purchasePrice: 100_000, acquiredAt: '2026-01-01T00:00:00.000Z', acquiredOnDay: 1 }));
+    let loansProfile = profile({ bankBalance: 0, lands });
+    for (let index = 0; index < 3; index += 1) {
+      const loan = takeLoan(loansProfile, 'land', lands[index].id, 25_000, 7);
+      expect(loan.ok).toBe(true);
+      if (!loan.ok) return;
+      loansProfile = loan.profile;
+    }
+    expect(takeLoan(loansProfile, 'land', lands[3].id, 25_000, 7).ok).toBe(false);
+  });
+
+  it('merges deposits while preserving each tranche maturity and settles them separately', () => {
+    const base = profile({ bankBalance: 1_000_000 });
+    const shortDeposit = createDeposit(base, 50_000, 3);
+    expect(shortDeposit.ok).toBe(true);
+    if (!shortDeposit.ok) return;
+    const longDeposit = createDeposit(shortDeposit.profile, 50_000, 7);
+    expect(longDeposit.ok).toBe(true);
+    if (!longDeposit.ok) return;
+    const merged = mergeDeposits(longDeposit.profile, [shortDeposit.data.id, longDeposit.data.id]);
+    expect(merged.ok).toBe(true);
+    if (!merged.ok) return;
+    expect(normalizeSavedProfile(merged.profile)?.banking.deposits.find((deposit) => deposit.id === merged.data.id)?.tranches).toHaveLength(2);
+
+    const firstSettlement = withdrawDeposit({ ...merged.profile, day: shortDeposit.data.maturityDay }, merged.data.id);
+    expect(firstSettlement.ok).toBe(true);
+    if (!firstSettlement.ok) return;
+    expect(firstSettlement.data.amount).toBe(50_250);
+    const remaining = firstSettlement.profile.banking.deposits.find((deposit) => deposit.id === merged.data.id)!;
+    expect(remaining.status).toBe('active');
+    expect(remaining.principal).toBe(50_000);
+
+    const finalSettlement = withdrawDeposit({ ...firstSettlement.profile, day: longDeposit.data.maturityDay }, merged.data.id);
+    expect(finalSettlement.ok).toBe(true);
+    if (finalSettlement.ok) {
+      expect(finalSettlement.data.amount).toBe(50_933);
+      expect(finalSettlement.profile.banking.deposits.find((deposit) => deposit.id === merged.data.id)?.status).toBe('paid');
+      expect(finalSettlement.profile.bankBalance).toBe(1_001_183);
+    }
   });
 
   it('upgrades land with a bounded level and increases its usable area', () => {

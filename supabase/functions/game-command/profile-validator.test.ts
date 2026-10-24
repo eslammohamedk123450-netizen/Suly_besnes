@@ -36,6 +36,21 @@ describe('validatePlayerProfile', () => {
     expect(hasError(profile, 'duplicate_id')).toBe(true);
   });
 
+  it('accepts merged deposits with preserved tranches and rejects invalid tranche status', () => {
+    const profile = validProfile();
+    profile.banking.deposits = [
+      { id: 'deposit-1', principal: 50_000, annualRate: 0.05, startedOnDay: 1, maturityDay: 4, status: 'merged', mergedIntoId: 'deposit-3' },
+      { id: 'deposit-2', principal: 50_000, annualRate: 0.08, startedOnDay: 1, maturityDay: 8, status: 'merged', mergedIntoId: 'deposit-3' },
+      { id: 'deposit-3', principal: 100_000, annualRate: 0.065, startedOnDay: 1, maturityDay: 8, status: 'active', tranches: [
+        { id: 'tranche-1', principal: 50_000, annualRate: 0.05, startedOnDay: 1, maturityDay: 4, status: 'active' },
+        { id: 'tranche-2', principal: 50_000, annualRate: 0.08, startedOnDay: 1, maturityDay: 8, status: 'active' },
+      ] },
+    ];
+    expect(validatePlayerProfile(profile)).toEqual({ ok: true });
+    profile.banking.deposits[2].tranches[0].status = 'unknown';
+    expect(hasError(profile, 'tranches[0].status:invalid_value')).toBe(true);
+  });
+
   it('requires each company to reference an owned land parcel', () => {
     const profile = validProfile();
     profile.companies = [{

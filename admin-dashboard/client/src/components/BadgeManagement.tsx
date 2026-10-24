@@ -145,7 +145,7 @@ export default function BadgeManagement({ player, onChanged }: Props) {
         })}
       </div>
 
-      <div className="leaderboard-note"><span className="leaderboard-note-icon"><Trophy size={16} /></span><p><strong>شارة متصدر الأسبوع</strong><span>تُدار تلقائيًا عند تفعيل الموسم. تصميم قائمة المتصدرين مؤجل حتى تزويدنا بالصورة التوضيحية التي طلبناها.</span></p></div>
+      <div className="leaderboard-note"><span className="leaderboard-note-icon"><Trophy size={16} /></span><p><strong>شارة متصدر الأسبوع</strong><span>تُحدّث عند تفعيل الموسم. تصميم قائمة المتصدرين مؤجل حتى تزويدنا بالصورة التوضيحية التي طلبناها.</span></p></div>
 
       <div className="history-section">
         <button className="history-toggle" type="button" onClick={() => void toggleHistory()}><span><Clock3 size={17} /> سجل تغييرات الشارات</span><span>{historyOpen ? "إخفاء" : "عرض السجل"}</span></button>

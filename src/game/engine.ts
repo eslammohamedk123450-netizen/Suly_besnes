@@ -1,6 +1,6 @@
 import { findCountry, type IndustryId } from '../domain/countries';
 import type { PlayerAsset, PlayerCompany, PlayerLand, PlayerProfile } from '../domain/player';
-import type { AuctionBidRecord, BusinessContract, DepositRecord, FinanceLedgerEntry, GameEventRecord, InventoryLot, InvestmentRecord, LoanRecord, ProductSale, ProductionOrder, StaffContract, StaffRole, AchievementRecord } from '../domain/futureSystems';
+import type { AuctionBidRecord, BusinessContract, DepositRecord, DepositTranche, FinanceLedgerEntry, GameEventRecord, InventoryLot, InvestmentRecord, LoanRecord, ProductSale, ProductionOrder, StaffContract, StaffRole, AchievementRecord } from '../domain/futureSystems';
 import {
   DIRECT_COMPANY_CATALOG,
   DIRECT_LAND_CATALOG,
@@ -225,7 +225,7 @@ export function placeBid(profile: PlayerProfile, listingId: string, amount: numb
     { bidderId: `${listing.id}-bot-b`, amount: highestBotBid },
   ];
   if (amount <= highestBotBid) {
-    return failure(profile, 'auction-lost', `خسر عرضك المزاد؛ أعلى عرض آلي كان ${highestBotBid.toLocaleString('ar-EG')} ج.م.`);
+    return failure(profile, 'auction-lost', `خسر عرضك المزاد؛ أعلى عرض منافس كان ${highestBotBid.toLocaleString('ar-EG')} ج.م.`);
   }
   if (profile.bankBalance < amount) return failure(profile, 'insufficient-funds', 'لا يكفي رصيدك لتسديد العرض الفائز.');
   const auctionHistory: AuctionBidRecord[] = [
@@ -372,29 +372,8 @@ export function sellAsset(profile: PlayerProfile, assetId: string): GameResult<{
   return success(nextProfile, `تم بيع ${asset.label} واسترداد 50% من قيمته.`, { assetId, payout });
 }
 
-export function buyMaterial(profile: PlayerProfile, materialId: string, quantity: number): GameResult<{ materialId: string; quantity: number; totalCost: number }> {
-  const countryError = ensureEgypt(profile);
-  if (countryError) return countryError;
-  const material = findMaterial(materialId);
-  if (!material) return failure(profile, 'not-found', 'المادة الخام غير موجودة في الكتالوج.');
-  if (!isPositiveInteger(quantity)) return failure(profile, 'invalid-input', 'الكمية يجب أن تكون عددًا صحيحًا موجبًا.');
-  const existing = profile.inventory.find((lot) => lot.materialOrProductId === materialId);
-  const currentQuantity = existing?.quantity ?? 0;
-  if (currentQuantity + quantity > material.storageLimit) return failure(profile, 'storage-limit', 'تتجاوز الكمية سعة التخزين لهذه المادة.');
-  const totalCost = quantity * material.pricePerUnit;
-  if (profile.bankBalance < totalCost) return failure(profile, 'insufficient-funds', 'لا يكفي رصيدك لشراء هذه الكمية.');
-
-  const inventory = existing
-    ? profile.inventory.map((lot) => lot.materialOrProductId === materialId
-      ? { ...lot, quantity: lot.quantity + quantity, unitCost: (lot.quantity * lot.unitCost + totalCost) / (lot.quantity + quantity) }
-      : lot)
-    : [...profile.inventory, { id: nextId(profile, 'inventory', profile.inventory.length), materialOrProductId: materialId, quantity, unit: material.unit, unitCost: material.pricePerUnit }];
-  const nextProfile = addLedger(
-    { ...profile, inventory },
-    [ledgerEntry(profile, 'asset', totalCost, `شراء ${quantity} ${material.unit} من ${material.name}`, 0)],
-    profile.bankBalance - totalCost,
-  );
-  return success(syncTasks(nextProfile), `تم شراء ${quantity} ${material.name} وتخزينها.`, { materialId, quantity, totalCost });
+export function buyMaterial(profile: PlayerProfile, _materialId: string, _quantity: number): GameResult<{ materialId: string; quantity: number; totalCost: number }> {
+  return failure(profile, 'condition-not-met', 'الشراء المباشر للمواد الخام غير متاح. استخدم عروض السوق أو المزاد.');
 }
 
 export function buyGlobalMaterial(profile: PlayerProfile, offerId: string, quantity: number, negotiatedUnitPrice?: number): GameResult<{ materialId: string; quantity: number; totalCost: number; unitPrice: number }> {
@@ -761,6 +740,7 @@ const DEPOSIT_OPTIONS = [
 export function createDeposit(profile: PlayerProfile, amount: number, durationDays: number): GameResult<DepositRecord> {
   const option = DEPOSIT_OPTIONS.find((item) => item.durationDays === durationDays);
   if (!option) return failure(profile, 'invalid-input', 'مدة الوديعة غير متاحة. اختر 3 أو 7 أو 14 يومًا.');
+  if (profile.banking.deposits.filter((deposit) => deposit.status === 'active').length >= 5) return failure(profile, 'condition-not-met', 'وصلت إلى الحد الأقصى: 5 ودائع نشطة. ادمج الودائع أو استرد وديعة مستحقة أولًا.');
   if (!Number.isInteger(amount) || amount < 50_000) return failure(profile, 'invalid-input', 'الحد الأدنى للوديعة 50,000 جنيه محاكاة.');
   if (amount > profile.bankBalance) return failure(profile, 'insufficient-funds', 'لا يكفي الرصيد لإنشاء هذه الوديعة.');
   const deposit: DepositRecord = { id: nextId(profile, 'deposit', profile.banking.deposits.length), principal: amount, annualRate: option.annualRate, startedOnDay: profile.day, maturityDay: profile.day + durationDays, status: 'active' };
@@ -772,20 +752,78 @@ export function createDeposit(profile: PlayerProfile, amount: number, durationDa
   return success(nextProfile, `تم إنشاء وديعة محاكاة تستحق في اليوم ${deposit.maturityDay}.`, deposit);
 }
 
+function activeDepositTranches(deposit: DepositRecord): DepositTranche[] {
+  if (deposit.tranches) return deposit.tranches.filter((tranche) => tranche.status === 'active');
+  return deposit.status === 'active' ? [{ id: deposit.id, principal: deposit.principal, annualRate: deposit.annualRate, startedOnDay: deposit.startedOnDay, maturityDay: deposit.maturityDay, status: 'active' }] : [];
+}
+
+export function getDepositExpectedInterest(deposit: DepositRecord): number {
+  return activeDepositTranches(deposit).reduce((sum, tranche) => sum + Math.round(tranche.principal * tranche.annualRate * (tranche.maturityDay - tranche.startedOnDay) / 30), 0);
+}
+
+export function hasMaturedDepositTranche(deposit: DepositRecord, day: number): boolean {
+  return activeDepositTranches(deposit).some((tranche) => day >= tranche.maturityDay);
+}
+
+export function getDepositMaturityRange(deposit: DepositRecord): { firstDay: number; lastDay: number } {
+  const tranches = activeDepositTranches(deposit);
+  if (tranches.length === 0) return { firstDay: deposit.maturityDay, lastDay: deposit.maturityDay };
+  return { firstDay: Math.min(...tranches.map((tranche) => tranche.maturityDay)), lastDay: Math.max(...tranches.map((tranche) => tranche.maturityDay)) };
+}
+
+export function mergeDeposits(profile: PlayerProfile, depositIds: string[]): GameResult<DepositRecord> {
+  if (!Array.isArray(depositIds) || depositIds.some((id) => typeof id !== 'string')) return failure(profile, 'invalid-input', 'قائمة الودائع المختارة غير صالحة.');
+  const ids = [...new Set(depositIds)];
+  if (ids.length < 2) return failure(profile, 'invalid-input', 'اختر وديعتين نشطتين على الأقل لدمجهما.');
+  const deposits = ids.map((id) => profile.banking.deposits.find((deposit) => deposit.id === id));
+  if (deposits.some((deposit) => !deposit || deposit.status !== 'active')) return failure(profile, 'not-found', 'تأكد من اختيار ودائع نشطة موجودة.');
+  const selected = deposits as DepositRecord[];
+  const tranches = selected.flatMap(activeDepositTranches);
+  if (tranches.length < 2) return failure(profile, 'invalid-input', 'لا توجد أجزاء نشطة كافية لدمجها.');
+  const principal = tranches.reduce((sum, tranche) => sum + tranche.principal, 0);
+  const annualRate = principal > 0 ? tranches.reduce((sum, tranche) => sum + tranche.principal * tranche.annualRate, 0) / principal : 0;
+  const deposit: DepositRecord = {
+    id: nextId(profile, 'deposit', profile.banking.deposits.length),
+    principal,
+    annualRate,
+    startedOnDay: Math.min(...tranches.map((tranche) => tranche.startedOnDay)),
+    maturityDay: Math.max(...tranches.map((tranche) => tranche.maturityDay)),
+    status: 'active',
+    tranches,
+  };
+  const mergedIds = new Set(ids);
+  const history = profile.banking.deposits.map((item) => mergedIds.has(item.id) ? { ...item, status: 'merged' as const, mergedIntoId: deposit.id } : item);
+  const nextProfile = { ...profile, banking: { ...profile.banking, deposits: [...history, deposit] } };
+  return success(nextProfile, `تم دمج ${ids.length} ودائع في وديعة واحدة مع الحفاظ على عائد وموعد استحقاق كل جزء.`, deposit);
+}
+
 export function withdrawDeposit(profile: PlayerProfile, depositId: string): GameResult<{ depositId: string; amount: number; interest: number }> {
   const deposit = profile.banking.deposits.find((item) => item.id === depositId);
   if (!deposit) return failure(profile, 'not-found', 'الوديعة غير موجودة.');
   if (deposit.status !== 'active') return failure(profile, 'invalid-input', 'هذه الوديعة تمت تسويتها من قبل.');
-  if (profile.day < deposit.maturityDay) return failure(profile, 'deposit-not-mature', `تستحق الوديعة في اليوم ${deposit.maturityDay}.`);
-  const interest = Math.round(deposit.principal * deposit.annualRate * (deposit.maturityDay - deposit.startedOnDay) / 30);
-  const amount = deposit.principal + interest;
-  const updatedDeposit = { ...deposit, status: 'paid' as const, settledAmount: amount };
+  const activeTranches = activeDepositTranches(deposit);
+  const maturedTranches = activeTranches.filter((tranche) => profile.day >= tranche.maturityDay);
+  if (maturedTranches.length === 0) return failure(profile, 'deposit-not-mature', `تستحق الوديعة في اليوم ${Math.min(...activeTranches.map((tranche) => tranche.maturityDay))}.`);
+  const principal = maturedTranches.reduce((sum, tranche) => sum + tranche.principal, 0);
+  const interest = maturedTranches.reduce((sum, tranche) => sum + Math.round(tranche.principal * tranche.annualRate * (tranche.maturityDay - tranche.startedOnDay) / 30), 0);
+  const amount = principal + interest;
+  let updatedDeposit: DepositRecord;
+  if (deposit.tranches) {
+    const maturedIds = new Set(maturedTranches.map((tranche) => tranche.id));
+    const tranches = deposit.tranches.map((tranche) => maturedIds.has(tranche.id) ? { ...tranche, status: 'paid' as const, settledAmount: tranche.principal + Math.round(tranche.principal * tranche.annualRate * (tranche.maturityDay - tranche.startedOnDay) / 30) } : tranche);
+    const remaining = tranches.filter((tranche) => tranche.status === 'active');
+    const remainingPrincipal = remaining.reduce((sum, tranche) => sum + tranche.principal, 0);
+    const remainingRate = remainingPrincipal > 0 ? remaining.reduce((sum, tranche) => sum + tranche.principal * tranche.annualRate, 0) / remainingPrincipal : deposit.annualRate;
+    updatedDeposit = { ...deposit, principal: remainingPrincipal, annualRate: remainingRate, startedOnDay: remaining.length ? Math.min(...remaining.map((tranche) => tranche.startedOnDay)) : deposit.startedOnDay, maturityDay: remaining.length ? Math.max(...remaining.map((tranche) => tranche.maturityDay)) : deposit.maturityDay, status: remaining.length ? 'active' : 'paid', settledAmount: (deposit.settledAmount ?? 0) + amount, tranches };
+  } else {
+    updatedDeposit = { ...deposit, status: 'paid', settledAmount: amount };
+  }
   const nextProfile = addLedger(
     { ...profile, banking: { ...profile.banking, deposits: profile.banking.deposits.map((item) => item.id === depositId ? updatedDeposit : item) } },
-    [ledgerEntry(profile, 'revenue', interest, `فائدة وديعة محاكاة ${deposit.id}`, 0), ledgerEntry(profile, 'settlement', deposit.principal, `استرداد أصل الوديعة ${deposit.id}`, 1)],
+    [ledgerEntry(profile, 'revenue', interest, `فائدة وديعة محاكاة ${deposit.id}`, 0), ledgerEntry(profile, 'settlement', principal, `استرداد أصل الوديعة ${deposit.id}`, 1)],
     profile.bankBalance + amount,
   );
-  return success(nextProfile, `تم استرداد الوديعة مع فائدة محاكاة ${interest.toLocaleString('ar-EG')} ج.م.`, { depositId, amount, interest });
+  return success(nextProfile, `تم استرداد المستحق من الوديعة مع فائدة ${interest.toLocaleString('ar-EG')} ج.م.`, { depositId, amount, interest });
 }
 
 function collateralValue(profile: PlayerProfile, collateralType: LoanRecord['collateralType'], collateralId: string): number {
@@ -797,6 +835,7 @@ function collateralValue(profile: PlayerProfile, collateralType: LoanRecord['col
 }
 
 export function takeLoan(profile: PlayerProfile, collateralType: LoanRecord['collateralType'], collateralId: string, amount: number, termDays: number): GameResult<LoanRecord> {
+  if (profile.banking.loans.filter((loan) => loan.status === 'active').length >= 3) return failure(profile, 'condition-not-met', 'وصلت إلى الحد الأقصى: 3 قروض نشطة. سدّد قرضًا قائمًا أولًا.');
   const collateralAmount = collateralValue(profile, collateralType, collateralId);
   if (collateralAmount <= 0) return failure(profile, 'not-found', 'الضمان غير موجود أو غير مؤهل للتمويل.');
   if (profile.banking.loans.some((loan) => loan.status === 'active' && loan.collateralType === collateralType && loan.collateralId === collateralId)) return failure(profile, 'collateral-in-use', 'هذا الضمان مرتبط بقرض قائم بالفعل.');
@@ -1112,6 +1151,7 @@ export type GameCommand =
   | { name: 'pay_staff_salary'; args: { staffId: string } }
   | { name: 'terminate_staff'; args: { staffId: string } }
   | { name: 'create_deposit'; args: { amount: number; durationDays: number } }
+  | { name: 'merge_deposits'; args: { depositIds: string[] } }
   | { name: 'withdraw_deposit'; args: { depositId: string } }
   | { name: 'take_loan'; args: { collateralType: LoanRecord['collateralType']; collateralId: string; amount: number; termDays: number } }
   | { name: 'repay_loan'; args: { loanId: string; installments: number | 'all' } }
@@ -1151,6 +1191,7 @@ export function executeGameCommand(profile: PlayerProfile, command: GameCommand)
     case 'pay_staff_salary': return payStaffSalary(profile, command.args.staffId);
     case 'terminate_staff': return terminateStaff(profile, command.args.staffId);
     case 'create_deposit': return createDeposit(profile, command.args.amount, command.args.durationDays);
+    case 'merge_deposits': return mergeDeposits(profile, command.args.depositIds);
     case 'withdraw_deposit': return withdrawDeposit(profile, command.args.depositId);
     case 'take_loan': return takeLoan(profile, command.args.collateralType, command.args.collateralId, command.args.amount, command.args.termDays);
     case 'repay_loan': return repayLoan(profile, command.args.loanId, command.args.installments);

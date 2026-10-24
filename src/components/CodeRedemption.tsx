@@ -17,7 +17,7 @@ export function CodeRedemption({ profile, onRedeemed }: CodeRedemptionProps) {
     if (result.ok && result.codeId) {
       const committed = await onRedeemed(result.profile, result.message, result.codeId, code.trim());
       setSuccess(committed);
-      setNotice(committed ? result.message.replace('جارٍ تسجيل المكافأة عالميًا؛ ', '') : 'تعذر تسجيل الكود سحابيًا. لم تُمنح المكافأة؛ حاول مرة أخرى مع اتصال بالإنترنت.');
+      setNotice(committed ? result.message.replace('جارٍ تسجيل المكافأة عالميًا؛ ', '') : 'تعذر تسجيل الكود. لم تُمنح المكافأة؛ حاول مرة أخرى مع اتصال بالإنترنت.');
       if (committed) setCode('');
     }
   }
