@@ -43,7 +43,10 @@ export function selectNotifications(profile: PlayerProfile): GameNotification[] 
     notifications.push({ id: 'contracts-due', title: 'عقود تقترب من الموعد', detail: `يوجد ${dueContracts.length} عقود قريبة · قيمة التسليم ${money(contractValue)} · أقرب موعد اليوم ${nearestDay}.`, tone: 'warning', section: 'contracts', count: dueContracts.length, target: 'contracts-active' });
   }
   const recentEvents = profile.events.slice(-3).reverse();
-  recentEvents.forEach((event) => notifications.push({ id: event.id, title: 'تغير اقتصادي', detail: `${event.title} · ${event.cashImpact >= 0 ? '+' : '−'}${money(Math.abs(event.cashImpact))}`, tone: event.cashImpact >= 0 ? 'success' : 'warning', section: 'reports' }));
+  if (recentEvents.length > 0) {
+    const eventImpact = recentEvents.reduce((sum, event) => sum + event.cashImpact, 0);
+    notifications.push({ id: `economic-events-${recentEvents[0].id}`, title: 'ملخص الأحداث الاقتصادية', detail: `${recentEvents.length} أحداث حديثة · ${recentEvents.map((event) => event.title).join('، ')} · الأثر الصافي ${eventImpact >= 0 ? '+' : '−'}${money(Math.abs(eventImpact))}`, tone: eventImpact >= 0 ? 'success' : 'warning', section: 'reports', count: recentEvents.length, target: 'economic-events' });
+  }
   const auctions = selectAvailableAuctions(profile);
   if (auctions.length > 0) notifications.push({ id: 'auctions-open', title: 'فرص مزادات متاحة', detail: `يوجد ${auctions.length} ${plural(auctions.length, 'مزاد مفتوح', 'مزادان مفتوحان', 'مزادات مفتوحة')} للمنافسة الآن.`, tone: 'info', section: 'auctions', count: auctions.length, target: 'auctions-list' });
   const earnedBadges = selectEmpirePulse(profile).badges.filter((badge) => badge.earned);
