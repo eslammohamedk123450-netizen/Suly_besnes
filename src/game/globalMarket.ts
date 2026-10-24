@@ -17,7 +17,10 @@ const PRICE_FACTORS = [0.92, 1, 1.12];
 export function getGlobalMarketOffers(profile: PlayerProfile): GlobalMarketOffer[] {
   return MATERIAL_CATALOG.flatMap((material, materialIndex) => [0, 1, 2].map((offerIndex) => {
     const factor = PRICE_FACTORS[(offerIndex + profile.day + materialIndex) % PRICE_FACTORS.length];
-    const unitPrice = Math.max(1, Math.round(material.pricePerUnit * factor));
+    const eventPriceMultiplier = profile.events
+      .filter((event) => event.materialId === material.id && event.day <= profile.day && (event.effectExpiresOnDay ?? event.day) >= profile.day && typeof event.materialPriceMultiplier === 'number')
+      .reduce((multiplier, event) => multiplier * (event.materialPriceMultiplier ?? 1), 1);
+    const unitPrice = Math.max(1, Math.round(material.pricePerUnit * factor * eventPriceMultiplier));
     const negotiable = (offerIndex + profile.day + materialIndex) % 3 !== 1;
     return {
       id: `global-${material.id}-day-${profile.day}-offer-${offerIndex}`,

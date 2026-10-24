@@ -44,6 +44,18 @@ interface SectionPageProps {
 const landTypeNames = { industrial: 'صناعية', agricultural: 'زراعية', commercial: 'تجارية' } as const;
 const ledgerLabels = { revenue: 'إيراد', expense: 'مصروف', asset: 'أصل', liability: 'التزام', settlement: 'سداد التزام' } as const;
 
+function economicEventDetails(event: PlayerProfile['events'][number], currentDay: number): string[] {
+  const details: string[] = [];
+  const industry = INDUSTRY_CATALOG.find((item) => item.id === event.industryId);
+  const material = MATERIAL_CATALOG.find((item) => item.id === event.materialId);
+  const product = PRODUCT_CATALOG.find((item) => item.id === event.productId);
+  if (industry) details.push(`القطاع: ${industry.name}`);
+  if (material && event.materialPriceMultiplier !== undefined) details.push(`${material.name}: السعر +${formatNumber(Math.round((event.materialPriceMultiplier - 1) * 100))}٪`);
+  if (product && event.demandMultiplier !== undefined) details.push(`${product.name}: الطلب +${formatNumber(Math.round((event.demandMultiplier - 1) * 100))}٪`);
+  if (event.effectExpiresOnDay !== undefined) details.push(event.effectExpiresOnDay >= currentDay ? `ساري حتى اليوم ${formatNumber(event.effectExpiresOnDay)}` : `انتهى تأثيره في اليوم ${formatNumber(event.effectExpiresOnDay)}`);
+  return details;
+}
+
 export function SectionPage({ section, profile, country, focus, notificationTheme, isGuest, onNotificationThemeChange, onHome, onAction, onCommand, onRedeemed, onLinkAccount, onLogout, onShowGuide }: SectionPageProps) {
   const playerProgress = getPlayerProgress(profile);
   const [bidAmounts, setBidAmounts] = useState<Record<string, string>>({});
@@ -455,7 +467,7 @@ export function SectionPage({ section, profile, country, focus, notificationThem
         <EconomyPanel title="دفتر الحساب" description="كل الأرقام مستخرجة من معاملات اللاعب المسجلة.">
           {report.recentEntries.length === 0 ? <EconomyEmpty title="لا توجد حركات مالية بعد" message="تظهر هنا العمليات بعد أول مزاد أو شراء أو إنتاج أو بيع." /> : <div className="economy-table-wrap"><table className="economy-table"><thead><tr><th>الحركة</th><th>النوع</th><th>القيمة</th><th>التاريخ</th></tr></thead><tbody>{report.recentEntries.map((entry) => <tr key={entry.id}><td><strong>{entry.note}</strong></td><td>{ledgerLabels[entry.category]}</td><td className={categoryClass(entry.category)}>{entry.category === 'expense' ? '−' : entry.category === 'revenue' ? '+' : ''}{formatMoney(entry.amount, country)}</td><td>{new Date(entry.occurredAt).toLocaleDateString('ar-EG')}</td></tr>)}</tbody></table></div>}
         </EconomyPanel>
-        {profile.events.length > 0 && <EconomyPanel id="economic-events" title="الأحداث الاقتصادية الأخيرة" description="أحداث محاكاة تؤثر في الرصيد عند تقدم اليوم."><div className="economy-list">{profile.events.slice().reverse().slice(0, 5).map((event) => <article className="economy-card economy-card--soft" key={event.id}><div className="economy-card-head"><div className="economy-card-title"><span className="economy-card-icon"><Icon name="globe" size={18} /></span><span><strong>{event.title}</strong><small>اليوم {formatNumber(event.day)}</small></span></div><span className={`economy-pill ${event.cashImpact >= 0 ? 'economy-pill--green' : 'economy-pill--red'}`}>{event.cashImpact >= 0 ? '+' : '−'}{formatMoney(Math.abs(event.cashImpact), country)}</span></div></article>)}</div></EconomyPanel>}
+        {profile.events.length > 0 && <EconomyPanel id="economic-events" title="الأحداث الاقتصادية الأخيرة" description="يعرض التقرير الأثر المالي والقطاع أو الخام المستهدف ومدة تأثير السعر والطلب."><div className="economy-list">{profile.events.slice().reverse().slice(0, 5).map((event) => <article className="economy-card economy-card--soft" key={event.id}><div className="economy-card-head"><div className="economy-card-title"><span className="economy-card-icon"><Icon name="globe" size={18} /></span><span><strong>{event.title}</strong><small>اليوم {formatNumber(event.day)}</small></span></div><span className={`economy-pill ${event.cashImpact >= 0 ? 'economy-pill--green' : 'economy-pill--red'}`}>{event.cashImpact >= 0 ? '+' : '−'}{formatMoney(Math.abs(event.cashImpact), country)}</span></div><div className="economy-card-body"><p>{event.description ?? 'لا يوجد وصف إضافي لهذا الحدث.'}</p>{economicEventDetails(event, profile.day).length > 0 && <div className="economy-meta">{economicEventDetails(event, profile.day).map((detail) => <span key={detail}>{detail}</span>)}</div>}</div></article>)}</div></EconomyPanel>}
       </>,
     )}</div>;
   }

@@ -156,11 +156,12 @@ function getMarketQuote(profile, productId, day = profile.day) {
   const priceShift = seed % 31 - 15;
   const demandShift = Math.floor(seed / 31) % 11 - 5;
   const baseDemand = 16 + productIndex * 5 % 13;
+  const eventDemandMultiplier = profile.events.filter((event) => event.productId === productId && event.day <= day && (event.effectExpiresOnDay ?? event.day) >= day && typeof event.demandMultiplier === "number").reduce((multiplier, event) => multiplier * (event.demandMultiplier ?? 1), 1);
   const currentPrice = Math.max(1, Math.round(product.baseSellPrice * getMarketPriceProgression(day) * (1 + priceShift / 100)));
   const trend = priceShift >= 6 ? "up" : priceShift <= -6 ? "down" : "steady";
   return {
     productId,
-    demandUnits: Math.max(4, baseDemand + demandShift),
+    demandUnits: Math.max(4, Math.round((baseDemand + demandShift) * eventDemandMultiplier)),
     currentPrice,
     basePrice: product.baseSellPrice,
     trend,
@@ -278,7 +279,8 @@ var PRICE_FACTORS = [0.92, 1, 1.12];
 function getGlobalMarketOffers(profile) {
   return MATERIAL_CATALOG.flatMap((material, materialIndex) => [0, 1, 2].map((offerIndex) => {
     const factor = PRICE_FACTORS[(offerIndex + profile.day + materialIndex) % PRICE_FACTORS.length];
-    const unitPrice = Math.max(1, Math.round(material.pricePerUnit * factor));
+    const eventPriceMultiplier = profile.events.filter((event) => event.materialId === material.id && event.day <= profile.day && (event.effectExpiresOnDay ?? event.day) >= profile.day && typeof event.materialPriceMultiplier === "number").reduce((multiplier, event) => multiplier * (event.materialPriceMultiplier ?? 1), 1);
+    const unitPrice = Math.max(1, Math.round(material.pricePerUnit * factor * eventPriceMultiplier));
     const negotiable = (offerIndex + profile.day + materialIndex) % 3 !== 1;
     return {
       id: `global-${material.id}-day-${profile.day}-offer-${offerIndex}`,
@@ -293,6 +295,22 @@ function getGlobalMarketOffers(profile) {
 }
 function resolveGlobalMarketOffer(profile, offerId) {
   return getGlobalMarketOffers(profile).find((offer) => offer.id === offerId);
+}
+
+// src/game/economicEvents.ts
+var ECONOMIC_EVENT_TEMPLATES = [
+  { title: "\u0637\u0644\u0628 \u0645\u062D\u0644\u064A \u0645\u0631\u062A\u0641\u0639", description: "\u064A\u0632\u062F\u0627\u062F \u0627\u0644\u0637\u0644\u0628 \u0627\u0644\u064A\u0648\u0645\u064A \u0639\u0644\u0649 \u0639\u0628\u0648\u0627\u062A \u0627\u0644\u0623\u063A\u0630\u064A\u0629 \u0628\u0646\u0633\u0628\u0629 \u0662\u0660\u066A \u0644\u0645\u062F\u0629 \u0663 \u0623\u064A\u0627\u0645.", cashImpact: 18e3, industryId: "food", productId: "food-pack", demandMultiplier: 1.2, durationDays: 3 },
+  { title: "\u0627\u0631\u062A\u0641\u0627\u0639 \u0644\u0648\u062C\u0633\u062A\u064A \u0645\u0624\u0642\u062A", description: "\u064A\u0631\u062A\u0641\u0639 \u0633\u0639\u0631 \u0648\u0642\u0648\u062F \u0627\u0644\u062A\u0634\u063A\u064A\u0644 \u0628\u0646\u0633\u0628\u0629 \u0661\u0660\u066A \u0644\u0645\u062F\u0629 \u064A\u0648\u0645\u064A\u0646 \u0628\u0633\u0628\u0628 \u0636\u063A\u0637 \u0627\u0644\u0646\u0642\u0644.", cashImpact: -14e3, industryId: "transport", materialId: "fuel", materialPriceMultiplier: 1.1, durationDays: 2 },
+  { title: "\u064A\u0648\u0645 \u0627\u0633\u062A\u0642\u0631\u0627\u0631 \u0627\u0642\u062A\u0635\u0627\u062F\u064A", description: "\u0627\u0644\u0623\u0633\u0639\u0627\u0631 \u0648\u0627\u0644\u0637\u0644\u0628 \u0645\u0633\u062A\u0642\u0631\u0627\u0646 \u0627\u0644\u064A\u0648\u0645\u060C \u0648\u0644\u0627 \u064A\u0648\u062C\u062F \u0623\u062B\u0631 \u0633\u0648\u0642\u064A \u0625\u0636\u0627\u0641\u064A.", cashImpact: 0 },
+  { title: "\u0645\u0646\u062D\u0629 \u062F\u0639\u0645 \u0644\u0644\u0645\u0635\u0627\u0646\u0639 \u0627\u0644\u0635\u063A\u064A\u0631\u0629", description: "\u062F\u0639\u0645 \u0645\u0627\u0644\u064A \u0645\u062E\u0635\u0635 \u0644\u0634\u0631\u0643\u0627\u062A \u0627\u0644\u0623\u063A\u0630\u064A\u0629 \u0627\u0644\u0635\u063A\u064A\u0631\u0629.", cashImpact: 26e3, industryId: "food" },
+  { title: "\u0646\u0642\u0635 \u0645\u0624\u0642\u062A \u0641\u064A \u0627\u0644\u0645\u0648\u0627\u062F \u0627\u0644\u062E\u0627\u0645", description: "\u064A\u0642\u0644 \u0627\u0644\u0645\u0639\u0631\u0648\u0636 \u0645\u0646 \u0627\u0644\u0641\u0648\u0644\u0627\u0630\u060C \u0641\u064A\u0631\u062A\u0641\u0639 \u0633\u0639\u0631\u0647 \u0628\u0646\u0633\u0628\u0629 \u0662\u0665\u066A \u0644\u0645\u062F\u0629 \u0664 \u0623\u064A\u0627\u0645.", cashImpact: -22e3, industryId: "construction", materialId: "steel", materialPriceMultiplier: 1.25, durationDays: 4 },
+  { title: "\u0641\u0631\u0635\u0629 \u062A\u0635\u062F\u064A\u0631 \u0627\u0633\u062A\u062B\u0646\u0627\u0626\u064A\u0629", description: "\u064A\u0631\u062A\u0641\u0639 \u0627\u0644\u0637\u0644\u0628 \u0639\u0644\u0649 \u0627\u0644\u0623\u062C\u0647\u0632\u0629 \u0627\u0644\u0625\u0644\u0643\u062A\u0631\u0648\u0646\u064A\u0629 \u0628\u0646\u0633\u0628\u0629 \u0662\u0660\u066A \u0644\u0645\u062F\u0629 \u0663 \u0623\u064A\u0627\u0645.", cashImpact: 34e3, industryId: "electronics", productId: "electronics", demandMultiplier: 1.2, durationDays: 3 },
+  { title: "\u0641\u062D\u0635 \u062A\u0646\u0638\u064A\u0645\u064A \u0648\u062A\u0643\u0627\u0644\u064A\u0641 \u0627\u0645\u062A\u062B\u0627\u0644", description: "\u062A\u0643\u0627\u0644\u064A\u0641 \u0627\u0645\u062A\u062B\u0627\u0644 \u0625\u0636\u0627\u0641\u064A\u0629 \u0639\u0644\u0649 \u0642\u0637\u0627\u0639 \u0627\u0644\u0628\u062A\u0631\u0648\u0644.", cashImpact: -18e3, industryId: "petroleum" },
+  { title: "\u0645\u0648\u0633\u0645 \u062A\u062C\u0627\u0631\u064A \u0642\u0648\u064A", description: "\u0645\u0648\u0633\u0645 \u0628\u064A\u0639 \u0642\u0648\u064A \u064A\u0631\u0641\u0639 \u0627\u0644\u0637\u0644\u0628 \u0639\u0644\u0649 \u0639\u0628\u0648\u0627\u062A \u0627\u0644\u0623\u063A\u0630\u064A\u0629 \u0628\u0646\u0633\u0628\u0629 \u0662\u0665\u066A \u0644\u0645\u062F\u0629 \u0665 \u0623\u064A\u0627\u0645.", cashImpact: 42e3, industryId: "food", productId: "food-pack", demandMultiplier: 1.25, durationDays: 5 }
+];
+function getEconomicEventTemplate(day) {
+  const index = Math.max(0, Math.floor(day) - 1) % ECONOMIC_EVENT_TEMPLATES.length;
+  return ECONOMIC_EVENT_TEMPLATES[index];
 }
 
 // src/domain/accountFeatures.ts
@@ -795,17 +813,7 @@ function getDayBriefing(profile) {
   const managedCompanyIds = new Set(profile.staff.filter((member) => member.status === "active" && member.role === "manager" && member.companyId).map((member) => member.companyId));
   const operatingCost = profile.companies.reduce((sum, company) => sum + (company.operatingCostPerDay ?? 0) * (managedCompanyIds.has(company.id) ? 0.92 : 1), 0) * multiplier * getOperatingCostProgression(profile.day) * getSynergyOperatingMultiplier(profile);
   const maturingInvestments = profile.investments.filter((investment) => investment.status === "active" && investment.maturityDay <= day).map((investment) => ({ id: investment.id, name: findInvestment(investment.investmentTypeId)?.name ?? investment.investmentTypeId }));
-  const eventTemplates = [
-    { title: "\u0637\u0644\u0628 \u0645\u062D\u0644\u064A \u0645\u0631\u062A\u0641\u0639", cashImpact: 18e3 },
-    { title: "\u0627\u0631\u062A\u0641\u0627\u0639 \u0644\u0648\u062C\u0633\u062A\u064A \u0645\u0624\u0642\u062A", cashImpact: -14e3 },
-    { title: "\u064A\u0648\u0645 \u0627\u0633\u062A\u0642\u0631\u0627\u0631 \u0627\u0642\u062A\u0635\u0627\u062F\u064A", cashImpact: 0 },
-    { title: "\u0645\u0646\u062D\u0629 \u062F\u0639\u0645 \u0644\u0644\u0645\u0635\u0627\u0646\u0639 \u0627\u0644\u0635\u063A\u064A\u0631\u0629", cashImpact: 26e3 },
-    { title: "\u0646\u0642\u0635 \u0645\u0624\u0642\u062A \u0641\u064A \u0627\u0644\u0645\u0648\u0627\u062F \u0627\u0644\u062E\u0627\u0645", cashImpact: -22e3 },
-    { title: "\u0641\u0631\u0635\u0629 \u062A\u0635\u062F\u064A\u0631 \u0627\u0633\u062A\u062B\u0646\u0627\u0626\u064A\u0629", cashImpact: 34e3 },
-    { title: "\u0641\u062D\u0635 \u062A\u0646\u0638\u064A\u0645\u064A \u0648\u062A\u0643\u0627\u0644\u064A\u0641 \u0627\u0645\u062A\u062B\u0627\u0644", cashImpact: -18e3 },
-    { title: "\u0645\u0648\u0633\u0645 \u062A\u062C\u0627\u0631\u064A \u0642\u0648\u064A", cashImpact: 42e3 }
-  ];
-  const event = eventTemplates[(day - 1) % eventTemplates.length];
+  const event = getEconomicEventTemplate(day);
   const availableEnergy = profile.companies.reduce((sum, company) => sum + (company.energyUnits ?? 0), 0);
   const outstandingSalary = unpaidSalaryTotal(profile);
   return { day, operatingCost, existingPayables: profile.payables + outstandingSalary, maturingInvestments, event, availableEnergy, energyPaused: profile.payables > 0 || outstandingSalary > 0 };
@@ -1118,7 +1126,20 @@ function advanceDay(profile) {
   const contracts = (profile.contracts ?? []).map((contract) => contract.status === "active" && contract.deadlineDay < nextDay ? { ...contract, status: "failed", failedOnDay: nextDay } : contract);
   const reputation = Math.max(0, Math.min(100, (profile.reputation ?? 50) - expiredContracts.length * 6));
   if (expiredContracts.length > 0) entries.push(ledgerEntry(profile, "expense", expiredContracts.length * 2e3, "\u063A\u0631\u0627\u0645\u0627\u062A \u0639\u0642\u0648\u062F \u0645\u062A\u0623\u062E\u0631\u0629", entries.length));
-  const event = { id: `event-${nextDay}`, day: nextDay, title: expiredContracts.length > 0 ? `${briefing.event.title} \xB7 \u062A\u0623\u062E\u0631 \u0639\u0642\u062F` : briefing.event.title, cashImpact: eventImpact, occurredAt: now };
+  const event = {
+    id: `event-${nextDay}`,
+    day: nextDay,
+    title: expiredContracts.length > 0 ? `${briefing.event.title} \xB7 \u062A\u0623\u062E\u0631 \u0639\u0642\u062F` : briefing.event.title,
+    description: briefing.event.description,
+    cashImpact: eventImpact,
+    ...briefing.event.industryId ? { industryId: briefing.event.industryId } : {},
+    ...briefing.event.materialId ? { materialId: briefing.event.materialId } : {},
+    ...briefing.event.productId ? { productId: briefing.event.productId } : {},
+    ...briefing.event.materialPriceMultiplier !== void 0 ? { materialPriceMultiplier: briefing.event.materialPriceMultiplier } : {},
+    ...briefing.event.demandMultiplier !== void 0 ? { demandMultiplier: briefing.event.demandMultiplier } : {},
+    ...briefing.event.durationDays ? { effectExpiresOnDay: nextDay + briefing.event.durationDays - 1 } : {},
+    occurredAt: now
+  };
   const nextProfile = addLedger(
     { ...profile, day: nextDay, companies, investments, banking: { ...profile.banking, loans }, staff, productionOrders, inventory, unreadProductionOrderIds: [.../* @__PURE__ */ new Set([...profile.unreadProductionOrderIds ?? [], ...newlyCompletedProductionIds])].slice(-500), events: [...profile.events, event], payables, contracts, reputation },
     entries,

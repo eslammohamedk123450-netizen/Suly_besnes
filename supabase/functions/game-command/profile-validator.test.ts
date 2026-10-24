@@ -41,6 +41,14 @@ describe('validatePlayerProfile', () => {
     expect(validatePlayerProfile(legacy)).toEqual({ ok: true });
   });
 
+  it('validates scoped and time-bounded economic event effects', () => {
+    const profile = validProfile();
+    profile.events = [{ id: 'event-1', day: 1, title: 'نقص فولاذ', description: 'يرتفع السعر مؤقتًا.', cashImpact: -10, occurredAt: profile.createdAt, industryId: 'construction', materialId: 'steel', materialPriceMultiplier: 1.25, effectExpiresOnDay: 4 }];
+    expect(validatePlayerProfile(profile)).toEqual({ ok: true });
+    profile.events[0].materialPriceMultiplier = 4;
+    expect(hasError(profile, 'profile.events[0].materialPriceMultiplier:invalid_number')).toBe(true);
+  });
+
   it('rejects negative balances and gold', () => {
     expect(hasError({ ...validProfile(), bankBalance: -1 }, 'bankBalance')).toBe(true);
     expect(hasError({ ...validProfile(), goldGrams: -0.1 }, 'goldGrams')).toBe(true);

@@ -20,6 +20,7 @@ import { GAME_DAY_MS } from './time';
 import { getContractOffers } from './contracts';
 import { getSynergyOperatingMultiplier, getSynergyProductionMultiplier } from './synergy';
 import { resolveGlobalMarketOffer } from './globalMarket';
+import { getEconomicEventTemplate, type EconomicEventTemplate } from './economicEvents';
 import { SPEED_CARD_DIAMOND_COSTS, type SpeedCardKind } from '../domain/accountFeatures';
 
 export type GameErrorCode =
@@ -85,7 +86,7 @@ export interface DayBriefing {
   operatingCost: number;
   existingPayables: number;
   maturingInvestments: readonly { id: string; name: string }[];
-  event: { title: string; cashImpact: number };
+  event: EconomicEventTemplate;
   availableEnergy: number;
   energyPaused: boolean;
 }
@@ -670,17 +671,7 @@ export function getDayBriefing(profile: PlayerProfile): DayBriefing {
   const maturingInvestments = profile.investments
     .filter((investment) => investment.status === 'active' && investment.maturityDay <= day)
     .map((investment) => ({ id: investment.id, name: findInvestment(investment.investmentTypeId)?.name ?? investment.investmentTypeId }));
-  const eventTemplates = [
-    { title: 'طلب محلي مرتفع', cashImpact: 18_000 },
-    { title: 'ارتفاع لوجستي مؤقت', cashImpact: -14_000 },
-    { title: 'يوم استقرار اقتصادي', cashImpact: 0 },
-    { title: 'منحة دعم للمصانع الصغيرة', cashImpact: 26_000 },
-    { title: 'نقص مؤقت في المواد الخام', cashImpact: -22_000 },
-    { title: 'فرصة تصدير استثنائية', cashImpact: 34_000 },
-    { title: 'فحص تنظيمي وتكاليف امتثال', cashImpact: -18_000 },
-    { title: 'موسم تجاري قوي', cashImpact: 42_000 },
-  ];
-  const event = eventTemplates[(day - 1) % eventTemplates.length];
+  const event = getEconomicEventTemplate(day);
   const availableEnergy = profile.companies.reduce((sum, company) => sum + (company.energyUnits ?? 0), 0);
   const outstandingSalary = unpaidSalaryTotal(profile);
   return { day, operatingCost, existingPayables: profile.payables + outstandingSalary, maturingInvestments, event, availableEnergy, energyPaused: profile.payables > 0 || outstandingSalary > 0 };
@@ -1018,7 +1009,20 @@ export function advanceDay(profile: PlayerProfile): GameResult<DayOutcome> {
     : contract);
   const reputation = Math.max(0, Math.min(100, (profile.reputation ?? 50) - expiredContracts.length * 6));
   if (expiredContracts.length > 0) entries.push(ledgerEntry(profile, 'expense', expiredContracts.length * 2_000, 'غرامات عقود متأخرة', entries.length));
-  const event: GameEventRecord = { id: `event-${nextDay}`, day: nextDay, title: expiredContracts.length > 0 ? `${briefing.event.title} · تأخر عقد` : briefing.event.title, cashImpact: eventImpact, occurredAt: now };
+  const event: GameEventRecord = {
+    id: `event-${nextDay}`,
+    day: nextDay,
+    title: expiredContracts.length > 0 ? `${briefing.event.title} · تأخر عقد` : briefing.event.title,
+    description: briefing.event.description,
+    cashImpact: eventImpact,
+    ...(briefing.event.industryId ? { industryId: briefing.event.industryId } : {}),
+    ...(briefing.event.materialId ? { materialId: briefing.event.materialId } : {}),
+    ...(briefing.event.productId ? { productId: briefing.event.productId } : {}),
+    ...(briefing.event.materialPriceMultiplier !== undefined ? { materialPriceMultiplier: briefing.event.materialPriceMultiplier } : {}),
+    ...(briefing.event.demandMultiplier !== undefined ? { demandMultiplier: briefing.event.demandMultiplier } : {}),
+    ...(briefing.event.durationDays ? { effectExpiresOnDay: nextDay + briefing.event.durationDays - 1 } : {}),
+    occurredAt: now,
+  };
   const nextProfile = addLedger(
     { ...profile, day: nextDay, companies, investments, banking: { ...profile.banking, loans }, staff, productionOrders, inventory, unreadProductionOrderIds: [...new Set([...(profile.unreadProductionOrderIds ?? []), ...newlyCompletedProductionIds])].slice(-500), events: [...profile.events, event], payables, contracts, reputation },
     entries,

@@ -245,7 +245,7 @@ export function validatePlayerProfile(profile: unknown, previousProfile?: unknow
     if (company.energyCapacity !== undefined) requireNumber(company.energyCapacity, `profile.companies[${index}].energyCapacity`, errors, { min: 1, max: MAX_ENERGY });
     if (company.energyUnits !== undefined) {
       const energyIsValid = requireNumber(company.energyUnits, `profile.companies[${index}].energyUnits`, errors, { min: 0, max: MAX_ENERGY });
-      if (energyIsValid && typeof company.energyCapacity === 'number' && company.energyUnits > company.energyCapacity) addError(errors, `profile.companies[${index}].energyUnits:exceeds_capacity`);
+      if (energyIsValid && typeof company.energyUnits === 'number' && typeof company.energyCapacity === 'number' && company.energyUnits > company.energyCapacity) addError(errors, `profile.companies[${index}].energyUnits:exceeds_capacity`);
     }
     if (company.operatingCostPerDay !== undefined) requireNumber(company.operatingCostPerDay, `profile.companies[${index}].operatingCostPerDay`, errors);
     if (company.maintenanceCondition !== undefined) requireNumber(company.maintenanceCondition, `profile.companies[${index}].maintenanceCondition`, errors, { min: 0, max: 100 });
@@ -263,7 +263,7 @@ export function validatePlayerProfile(profile: unknown, previousProfile?: unknow
     const limit = MATERIAL_CAPACITY[itemId] ?? PRODUCT_CAPACITY[itemId];
     if (limit === undefined) {
       addError(errors, `profile.inventory[${index}].materialOrProductId:unknown_catalog_item`);
-    } else if (quantityValid && lot.quantity > limit) {
+    } else if (quantityValid && typeof lot.quantity === 'number' && lot.quantity > limit) {
       addError(errors, `profile.inventory[${index}].quantity:exceeds_storage_capacity`);
     }
     if (itemId in PRODUCT_CAPACITY && ![...completedOutputByProduct.keys()].includes(itemId)) {
@@ -300,9 +300,9 @@ export function validatePlayerProfile(profile: unknown, previousProfile?: unknow
     requireNumber(order.completesOnDay, `profile.productionOrders[${index}].completesOnDay`, errors, { min: 1, max: MAX_GAME_DAY, integer: true });
     if (typeof order.startedOnDay === 'number' && typeof order.completesOnDay === 'number' && order.completesOnDay < order.startedOnDay) addError(errors, `profile.productionOrders[${index}].completesOnDay:before_start`);
     if (!['active', 'completed', 'cancelled'].includes(String(order.status))) addError(errors, `profile.productionOrders[${index}].status:invalid_value`);
-    if (outputValid && typeof order.status === 'string' && typeof order.productId === 'string') {
-      if (order.status === 'completed') completedOutputByProduct.set(order.productId, (completedOutputByProduct.get(order.productId) ?? 0) + order.outputQuantity as number);
-      if (order.status === 'active') activeOutputByProduct.set(order.productId, (activeOutputByProduct.get(order.productId) ?? 0) + order.outputQuantity as number);
+    if (outputValid && typeof order.outputQuantity === 'number' && typeof order.status === 'string' && typeof order.productId === 'string') {
+      if (order.status === 'completed') completedOutputByProduct.set(order.productId, (completedOutputByProduct.get(order.productId) ?? 0) + order.outputQuantity);
+      if (order.status === 'active') activeOutputByProduct.set(order.productId, (activeOutputByProduct.get(order.productId) ?? 0) + order.outputQuantity);
     }
   }
 
@@ -369,7 +369,7 @@ export function validatePlayerProfile(profile: unknown, previousProfile?: unknow
     ['profile.auctionHistory', profile.auctionHistory, ['id', 'listingId', 'bidder', 'bidderId', 'amount', 'day', 'occurredAt']],
     ['profile.sales', profile.sales, ['id', 'productId', 'quantity', 'unitPrice', 'grossRevenue', 'tax', 'costOfGoods', 'soldOnDay', 'contractId', 'soldAt']],
     ['profile.ledger', profile.ledger, ['id', 'category', 'amount', 'countryId', 'occurredAt', 'note']],
-    ['profile.events', profile.events, ['id', 'day', 'title', 'cashImpact', 'occurredAt']],
+    ['profile.events', profile.events, ['id', 'day', 'title', 'description', 'cashImpact', 'occurredAt', 'industryId', 'materialId', 'productId', 'materialPriceMultiplier', 'demandMultiplier', 'effectExpiresOnDay']],
     ['profile.contracts', profile.contracts, ['id', 'clientName', 'clientType', 'productId', 'productName', 'quantity', 'unitPrice', 'reward', 'reputationReward', 'minimumQuality', 'deadlineDay', 'acceptedOnDay', 'status', 'completedOnDay', 'failedOnDay', 'negotiated', 'negotiationNote']],
     ['profile.achievements', profile.achievements, ['id', 'earnedAtDay', 'title']],
   ];
@@ -377,6 +377,19 @@ export function validatePlayerProfile(profile: unknown, previousProfile?: unknow
   for (const [path, value, allowed] of nestedIdCollections) {
     collectionIds.set(path, validateEntityIds(requireArray(value, path, errors), path, errors, allowed));
   }
+  const eventRecords = requireArray(profile.events, 'profile.events', errors);
+  eventRecords.forEach((value, index) => {
+    if (!isRecord(value)) return;
+    const path = `profile.events[${index}]`;
+    if (value.description !== undefined) requireString(value.description, `${path}.description`, errors, 600);
+    if (value.industryId !== undefined && (typeof value.industryId !== 'string' || !Object.hasOwn(INDUSTRY_PRODUCT, value.industryId))) addError(errors, `${path}.industryId:invalid_value`);
+    if (value.materialId !== undefined && (typeof value.materialId !== 'string' || !Object.hasOwn(MATERIAL_CAPACITY, value.materialId))) addError(errors, `${path}.materialId:invalid_value`);
+    if (value.productId !== undefined && (typeof value.productId !== 'string' || !Object.hasOwn(PRODUCT_CAPACITY, value.productId))) addError(errors, `${path}.productId:invalid_value`);
+    if (value.materialPriceMultiplier !== undefined) requireNumber(value.materialPriceMultiplier, `${path}.materialPriceMultiplier`, errors, { min: 1, max: 3 });
+    if (value.demandMultiplier !== undefined) requireNumber(value.demandMultiplier, `${path}.demandMultiplier`, errors, { min: 1, max: 3 });
+    if (value.effectExpiresOnDay !== undefined) requireNumber(value.effectExpiresOnDay, `${path}.effectExpiresOnDay`, errors, { min: 1, max: MAX_GAME_DAY, integer: true });
+    if ((value.materialPriceMultiplier !== undefined || value.demandMultiplier !== undefined) && value.effectExpiresOnDay === undefined) addError(errors, `${path}.effectExpiresOnDay:required_for_market_effect`);
+  });
   const deposits = requireArray(banking.deposits, 'profile.banking.deposits', errors);
   deposits.forEach((value, index) => {
     if (!isRecord(value)) return;

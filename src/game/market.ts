@@ -34,11 +34,14 @@ export function getMarketQuote(profile: PlayerProfile, productId: string, day = 
   const priceShift = (seed % 31) - 15;
   const demandShift = (Math.floor(seed / 31) % 11) - 5;
   const baseDemand = 16 + ((productIndex * 5) % 13);
+  const eventDemandMultiplier = profile.events
+    .filter((event) => event.productId === productId && event.day <= day && (event.effectExpiresOnDay ?? event.day) >= day && typeof event.demandMultiplier === 'number')
+    .reduce((multiplier, event) => multiplier * (event.demandMultiplier ?? 1), 1);
   const currentPrice = Math.max(1, Math.round(product.baseSellPrice * getMarketPriceProgression(day) * (1 + priceShift / 100)));
   const trend: MarketTrend = priceShift >= 6 ? 'up' : priceShift <= -6 ? 'down' : 'steady';
   return {
     productId,
-    demandUnits: Math.max(4, baseDemand + demandShift),
+    demandUnits: Math.max(4, Math.round((baseDemand + demandShift) * eventDemandMultiplier)),
     currentPrice,
     basePrice: product.baseSellPrice,
     trend,

@@ -195,8 +195,15 @@ export interface GameEventRecord {
   id: string;
   day: number;
   title: string;
+  description?: string;
   cashImpact: number;
   occurredAt: string;
+  industryId?: IndustryId;
+  materialId?: string;
+  productId?: string;
+  materialPriceMultiplier?: number;
+  demandMultiplier?: number;
+  effectExpiresOnDay?: number;
 }
 
 export interface SeasonProgress {
