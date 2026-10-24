@@ -1,18 +1,10 @@
-.diamond-package-bonus {
-  display: block;
-  align-self: stretch;
-  padding: 5px 7px;
-  color: #28634e;
-  background: #eaf6ef;
-  border: 1px solid #cce8d7;
-  border-radius: 7px;
-  font-size: 10px;
-  font-style: normal;
-  font-weight: 800;
-  line-height: 1.5;
-}
-.diamond-package-bonus--base {
-  color: #7b6942;
-  background: #faf5e7;
-  border-color: #eee2c1;
-}
+
+.diamond-package-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.diamond-package { aspect-ratio: 1 / 1; justify-items: center; align-content: center; gap: 7px; padding: 14px 10px; text-align: center; }
+.diamond-package-gem { display: grid; place-items: center; width: 54px; height: 54px; color: #fff6c9; background: linear-gradient(145deg, #9fe9ff, #4b8edb 48%, #344e9b); border: 2px solid #d9f8ff; border-radius: 16px; box-shadow: 0 8px 16px rgba(43, 105, 173, .28), inset 0 0 0 4px rgba(255,255,255,.18); font-size: 28px; transform: rotate(45deg); }
+.diamond-package-gem::first-letter { transform: rotate(-45deg); }
+.diamond-package > strong { margin-top: 4px; }
+.diamond-package > b { color: #f4d77f; font-size: 15px; }
+.diamond-package > span:not(.diamond-package-gem) { color: #fff; font-size: 13px; font-weight: 900; }
+.diamond-package .diamond-package-bonus, .diamond-package > small { max-width: 100%; font-size: 8px; }
+@media (max-width: 720px) { .diamond-package-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .diamond-package { aspect-ratio: 1 / .92; } }

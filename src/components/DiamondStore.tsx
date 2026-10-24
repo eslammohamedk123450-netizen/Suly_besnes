@@ -10,8 +10,6 @@ interface DiamondStoreProps {
   isGuest: boolean;
   onLinkAccount: () => void;
   onRefreshProfile: () => Promise<void>;
-  onBuyGoldWithDiamonds: (grams: number) => void;
-  onSellGold: (grams: number) => void;
 }
 
 const VODAFONE_CASH_NUMBER = '01093629700';
@@ -36,10 +34,9 @@ function newRequestId() {
   return crypto.randomUUID();
 }
 
-export function DiamondStore({ profile, isGuest, onLinkAccount, onRefreshProfile, onBuyGoldWithDiamonds, onSellGold }: DiamondStoreProps) {
+export function DiamondStore({ profile, isGuest, onLinkAccount, onRefreshProfile }: DiamondStoreProps) {
   const [selectedId, setSelectedId] = useState<DiamondPackageId | null>(null);
   const [copied, setCopied] = useState(false);
-  const [goldGrams, setGoldGrams] = useState('2.0');
   const [orders, setOrders] = useState<DiamondTopupOrder[]>([]);
   const [ordersLoading, setOrdersLoading] = useState(false);
   const [ordersError, setOrdersError] = useState('');
@@ -127,6 +124,7 @@ export function DiamondStore({ profile, isGuest, onLinkAccount, onRefreshProfile
             setRequestId(null);
             setCreateError('');
           }} aria-pressed={selectedId === item.id}>
+            <span className="diamond-package-gem" aria-hidden="true">◆</span>
             <strong>{item.label}</strong>
             <b>◆ {item.diamonds.toLocaleString('ar-EG')}</b>
             <span>{item.priceEgp.toLocaleString('ar-EG')} ج.م</span>
@@ -177,10 +175,6 @@ export function DiamondStore({ profile, isGuest, onLinkAccount, onRefreshProfile
         </article>)}</div>}
       </section>}
 
-      <div className="diamond-exchange-grid">
-        <article className="diamond-exchange-card"><strong>شراء الذهب بالماس</strong><small>100 غرام = 50 ماسة · أي 1 غرام = 6,000 ج.م أو 0.5 ماسة · رصيدك {formatNumber(profile.diamonds)} ماسة</small><div className="diamond-exchange-row"><input type="number" min="2" step="2" value={goldGrams} onChange={(event) => setGoldGrams(event.target.value)} /><button className="button button-secondary" type="button" disabled={profile.diamonds < Number(goldGrams || 0) * 0.5 || !Number.isInteger(Number(goldGrams || 0) * 0.5)} onClick={() => onBuyGoldWithDiamonds(Number(goldGrams))}>شراء ذهب</button></div></article>
-        <article className="diamond-exchange-card"><strong>تحويل الذهب إلى نقود</strong><small>سعر البيع الحالي: 5,820 ج.م تقريبًا لكل 1 غرام · رصيدك {formatNumber(profile.goldGrams)} غرام</small><div className="diamond-exchange-row"><input type="number" min="0.1" max={profile.goldGrams} step="0.1" value={goldGrams} onChange={(event) => setGoldGrams(event.target.value)} /><button className="button button-secondary" type="button" disabled={Number(goldGrams) <= 0 || Number(goldGrams) > profile.goldGrams} onClick={() => onSellGold(Number(goldGrams))}>تحويل إلى نقود</button></div></article>
-      </div>
       <small className="diamond-store-note">الشحن يدوي بعد مراجعة الإيصال. لا ترسل كلمة المرور أو رمز الدخول لأي شخص.</small>
     </section>
   );

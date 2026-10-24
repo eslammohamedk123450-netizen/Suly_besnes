@@ -15,18 +15,15 @@ import { getContractOffers, getCustomerSegmentLabel } from '../game/contracts';
 import { selectActiveInvestments, selectAdvancedStatistics, selectAvailableAuctions, selectCompanyPerformance, selectEmpirePoints, selectFinancialReport, selectInventorySummary, selectObligations, selectSalesSummary, selectTaskBoard } from '../game/selectors';
 import { Icon } from './Icon';
 import { EconomyEmpty, EconomyPageShell, EconomyPanel, EconomyStat } from './EconomyUI';
-import { CodeRedemption } from './CodeRedemption';
-import { PurchaseSupport } from './PurchaseSupport';
 import { DiamondStore } from './DiamondStore';
 import { PurchaseOptions } from './PurchaseOptions';
 import { AuctionRoom } from './AuctionRoom';
 import { claimLoginReward, claimSeasonChallenge, chooseSeasonEvent, getSeasonEventSnapshot, getSeasonSnapshot, LOGIN_REWARDS } from '../game/season';
 import { getSynergyProductionMultiplier } from '../game/synergy';
 import { getGlobalMarketOffers, negotiateGlobalMarketOffer } from '../game/globalMarket';
-import { SPEED_CARD_DIAMOND_COSTS, SPEED_CARD_LABELS, type SpeedCardKind } from '../domain/accountFeatures';
 import { getWarehouseCapacity, getWarehouseItemCapacity, getWarehouseUsage, normalizeWarehouseLevel, WAREHOUSE_UPGRADE_REQUIREMENTS } from '../game/warehouse';
 import { getGameDayDurationMinutes } from '../game/time';
-import { getCashPriceForDiamondPrice, getDiscountedDiamondPrice, type PurchasePaymentMethod } from '../game/purchasePricing';
+import { getDiscountedDiamondPrice, type PurchasePaymentMethod } from '../game/purchasePricing';
 
 interface SectionPageProps {
   section: SectionItem;
@@ -143,33 +140,12 @@ export function SectionPage({ section, profile, country, focus, notificationThem
   }
 
   if (section.id === 'store') {
-    const daySpeedCards = ['day-speed-2x', 'day-speed-3x'] as const;
     return <div className="section-page store-page">{heading}{pageShell(
       <>
-        <div className="store-hero"><div><span className="section-kicker">كل مشترياتك في مكان واحد</span><h2>متجر الإمبراطورية</h2><p>رصيد البنك {formatMoney(profile.bankBalance, country)} · الماس {formatNumber(profile.diamonds)} ◆</p></div><Icon name="store" size={38} /></div>
-        <div className="store-category-grid">
-          <button type="button" className="store-category-card" onClick={() => onNavigate('inventory')}><Icon name="warehouse" size={21} /><strong>مواد خام</strong><small>عروض التجار والمزاد</small></button>
-          <button type="button" className="store-category-card" onClick={() => onNavigate('auctions')}><Icon name="gavel" size={21} /><strong>المزادات</strong><small>أصول وفرص متاحة</small></button>
-          <button type="button" className="store-category-card" onClick={() => onNavigate('lands')}><Icon name="land" size={21} /><strong>الأراضي</strong><small>مواقع للتوسع</small></button>
-          <button type="button" className="store-category-card" onClick={() => onNavigate('companies')}><Icon name="company" size={21} /><strong>الشركات</strong><small>فرص تأسيس وشراء</small></button>
-        </div>
-        <EconomyPanel title="بطاقات التسريع" description="اختر الدفع نقدًا أو بالماس (بخصم ١٪)، وفعّل بطاقات اليوم من هنا أو استخدم بطاقات الإنتاج عند أمر الإنتاج.">
-          <div className="diamond-shop-grid">{(Object.keys(SPEED_CARD_DIAMOND_COSTS) as SpeedCardKind[]).filter((kind) => kind !== 'capacity-boost').map((kind) => {
-            const quantity = speedCardQuantities[kind] ?? '1';
-            const cost = SPEED_CARD_DIAMOND_COSTS[kind];
-            const available = profile.speedCards.find((card) => card.kind === kind)?.quantity ?? 0;
-            const isDayCard = daySpeedCards.includes(kind as (typeof daySpeedCards)[number]);
-            const diamondPrice = cost * Number(quantity || 0);
-            const cashPrice = getCashPriceForDiamondPrice(diamondPrice);
-            const invalidQuantity = !Number.isInteger(Number(quantity)) || Number(quantity) < 1;
-            return <article className="diamond-shop-card" key={kind}><strong>{SPEED_CARD_LABELS[kind]}</strong><small>المتوفر {formatNumber(available)} · {formatNumber(cost)} ماسة للبطاقة</small><div className="diamond-shop-buy"><input aria-label={`كمية ${SPEED_CARD_LABELS[kind]}`} type="number" min="1" step="1" value={quantity} onChange={(event) => setSpeedCardQuantities((previous) => ({ ...previous, [kind]: event.target.value }))} /></div><PurchaseOptions country={country} cashPrice={cashPrice} diamondPrice={diamondPrice} bankBalance={profile.bankBalance} diamondsBalance={profile.diamonds} disabled={invalidQuantity} onPurchase={(paymentMethod) => runCommand({ name: 'buy_speed_card', args: { kind, quantity: Number(quantity), paymentMethod } }, (current) => buySpeedCard(current, kind, Number(quantity), paymentMethod))} />{isDayCard && <button className="button button-primary store-use-card" type="button" disabled={available < 1 || profile.activeDaySpeedMultiplier > 1} onClick={() => runCommand({ name: 'use_day_speed_card', args: { kind } }, (current) => useDaySpeedCard(current, kind))}>{profile.activeDaySpeedMultiplier > 1 ? `اليوم يعمل ×${profile.activeDaySpeedMultiplier}` : 'تفعيل لليوم الحالي'}</button>}</article>;
-          })}</div>
+        <div className="store-hero"><div><span className="section-kicker">متجر المشتريات</span><h2>اشترِ الماس فقط</h2><p>اختر باقتك، راجع السعر، ثم أرسل طلب الشحن للمراجعة.</p></div><Icon name="store" size={38} /></div>
+        <EconomyPanel title="باقات الماس" description="كل بطاقة تعرض عدد الماسات وسعرها بوضوح. الماس هو المنتج المدفوع الأساسي في اللعبة.">
+          <DiamondStore profile={profile} isGuest={isGuest} onLinkAccount={onLinkAccount} onRefreshProfile={onRefreshProfile} />
         </EconomyPanel>
-        <EconomyPanel title="شراء الماس" description="طلبات الشحن يدويّة؛ أرسل الإيصال بعد تسجيل الطلب وانتظر المراجعة.">
-          <DiamondStore profile={profile} isGuest={isGuest} onLinkAccount={onLinkAccount} onRefreshProfile={onRefreshProfile} onBuyGoldWithDiamonds={(grams) => runCommand({ name: 'buy_gold_with_diamonds', args: { grams } }, (current) => buyGoldWithDiamonds(current, grams))} onSellGold={(grams) => runCommand({ name: 'sell_gold', args: { grams } }, (current) => sellGold(current, grams))} />
-        </EconomyPanel>
-        <CodeRedemption profile={profile} onRedeemed={onRedeemed} />
-        <PurchaseSupport />
       </>,
     )}</div>;
   }

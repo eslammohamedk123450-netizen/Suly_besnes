@@ -67,7 +67,7 @@ export function Dashboard({ profile, country, onNavigate, onCommand }: Dashboard
           <p>الثروة بداية الحكاية؛ قراراتك هي ما يبني الإمبراطورية.</p>
           <div className="hero-meta"><span className="country-chip">{country.flag} {country.name}</span><span className="hero-divider" /><span>المستوى {playerProgress.level}</span><span className="hero-divider" /><span>{profile.companies.length} شركات</span></div>
           <span className="dashboard-auto-note"><Icon name="clock" size={15} /> مدة اليوم {profile.activeDaySpeedMultiplier > 1 ? `×${formatNumber(profile.activeDaySpeedMultiplier)} · ` : ''}{formatNumber(dayDurationMinutes)} دقيقة حقيقية</span>
-          <button className="dashboard-store-link" type="button" onClick={() => onNavigate('store')}><Icon name="store" size={17} /> متجر المشتريات <span>الماس · البطاقات · العروض</span></button>
+          <button className="dashboard-store-link" type="button" onClick={() => onNavigate('store')}><Icon name="store" size={17} /> متجر المشتريات <span>باقات الماس فقط</span></button>
         </div>
         <div className="hero-emblem"><Icon name="crown" size={25} /><span>BE</span></div>
       </section>
