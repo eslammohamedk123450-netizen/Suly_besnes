@@ -27,6 +27,18 @@ export interface FinancialReport {
   recentEntries: PlayerProfile['ledger'];
 }
 
+export interface CompanyPerformanceReport {
+  companyId: string;
+  completedOrders: number;
+  activeOrders: number;
+  outputUnits: number;
+  productionCost: number;
+  payroll: number;
+  dailyOperatingCost: number;
+  estimatedDailyNet: number;
+  quality: number;
+}
+
 export interface AdvancedStatistics {
   production: { totalOrders: number; completedOrders: number; activeOrders: number; cancelledOrders: number; totalBatches: number; totalOutput: number; totalProductionCost: number; averageQuality: number; companies: Array<{ id: string; name: string; level: number; batches: number; completedOrders: number; output: number; cost: number; quality: number; utilization: number }> };
   sales: { totalUnits: number; totalRevenue: number; totalTax: number; netRevenue: number; averageUnitPrice: number; products: Array<{ id: string; name: string; units: number; revenue: number; tax: number; averagePrice: number }> };
@@ -237,6 +249,18 @@ export function selectAdvancedStatistics(profile: PlayerProfile): AdvancedStatis
   const grossMargin = totalRevenue - totalTax - totalProductionCost;
   const totalUnits = sales.reduce((sum, sale) => sum + sale.quantity, 0);
   return { production: { totalOrders: orders.length, completedOrders: completedOrders.length, activeOrders: activeOrders.length, cancelledOrders: cancelledOrders.length, totalBatches, totalOutput, totalProductionCost, averageQuality, companies }, sales: { totalUnits, totalRevenue, totalTax, netRevenue: totalRevenue - totalTax, averageUnitPrice: totalUnits > 0 ? totalRevenue / totalUnits : 0, products }, profit: { grossMargin, operatingExpenses, investmentIncome, payroll, productionExpenses, otherExpenses, marginPercent: totalRevenue > 0 ? (grossMargin / totalRevenue) * 100 : 0 } };
+}
+
+
+export function selectCompanyPerformance(profile: PlayerProfile, companyId: string): CompanyPerformanceReport {
+  const company = profile.companies.find((item) => item.id === companyId);
+  const orders = profile.productionOrders.filter((order) => order.companyId === companyId);
+  const completed = orders.filter((order) => order.status === 'completed');
+  const payroll = profile.staff.filter((member) => member.companyId === companyId && member.status === 'active').reduce((sum, member) => sum + member.dailySalary, 0);
+  const productionCost = orders.reduce((sum, order) => sum + order.materialCost + order.energyCost + order.maintenanceCost, 0);
+  const quality = completed.length > 0 ? completed.reduce((sum, order) => sum + order.qualityScore, 0) / completed.length : 0;
+  const dailyOperatingCost = company?.operatingCostPerDay ?? 0;
+  return { companyId, completedOrders: completed.length, activeOrders: orders.filter((order) => order.status === 'active').length, outputUnits: completed.reduce((sum, order) => sum + order.outputQuantity, 0), productionCost, payroll, dailyOperatingCost, estimatedDailyNet: -(dailyOperatingCost + payroll), quality };
 }
 
 export function selectFinancialReport(profile: PlayerProfile): FinancialReport {
