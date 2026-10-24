@@ -55,7 +55,12 @@ export function loadQueuedGameCommands(accountId: string): QueuedGameCommand[] {
     if (!raw) return [];
     const envelope: unknown = JSON.parse(raw);
     if (!isRecord(envelope) || envelope.version !== 1 || !Array.isArray(envelope.entries)) return [];
-    return envelope.entries.filter(isQueuedCommand);
+    const seenKeys = new Set<string>();
+    return envelope.entries.filter(isQueuedCommand).filter((entry) => {
+      if (seenKeys.has(entry.commandKey)) return false;
+      seenKeys.add(entry.commandKey);
+      return true;
+    });
   } catch {
     return [];
   }

@@ -70,4 +70,18 @@ describe('local game command outbox', () => {
     expect(retryTransientBlockedCommands('account-1')).toBe(1);
     expect(loadQueuedGameCommands('account-1').map((entry) => entry.status)).toEqual(['pending', 'blocked']);
   });
+
+  it('deduplicates legacy queue entries that share one command key', () => {
+    const storage = new MemoryStorage();
+    vi.stubGlobal('localStorage', storage);
+    storage.setItem('business-empire:command-outbox:v1:account-1', JSON.stringify({
+      version: 1,
+      entries: [
+        { commandKey: 'stable-command-key-0001', command: { name: 'advance_day', args: {} }, createdAt: '2026-01-01T00:00:00.000Z', status: 'pending' },
+        { commandKey: 'stable-command-key-0001', command: { name: 'advance_day', args: {} }, createdAt: '2026-01-01T00:00:01.000Z', status: 'pending' },
+      ],
+    }));
+
+    expect(loadQueuedGameCommands('account-1')).toHaveLength(1);
+  });
 });

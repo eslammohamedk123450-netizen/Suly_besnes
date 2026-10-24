@@ -65,6 +65,7 @@ export default function App() {
   const [passwordRecovery, setPasswordRecovery] = useState(false);
   const [recoveryError, setRecoveryError] = useState('');
   const syncLock = useRef(false);
+  const remoteCommandAttempts = useRef(new Map<string, Promise<RemoteGameCommandAttempt>>());
 
   async function claimDailyLogin(nextAccount: LocalAccount) {
     if (nextAccount.isGuest) return;
@@ -273,7 +274,9 @@ export default function App() {
   }
 
   function executeRemoteWithTimeout(command: GameCommand, commandKey: string): Promise<RemoteGameCommandAttempt> {
-    return new Promise((resolve) => {
+    const existing = remoteCommandAttempts.current.get(commandKey);
+    if (existing) return existing;
+    const attempt = new Promise<RemoteGameCommandAttempt>((resolve) => {
       const timer = window.setTimeout(() => resolve({ kind: 'unavailable' }), 3_500);
       void executeRemoteGameCommand(command, commandKey).then((attempt) => {
         window.clearTimeout(timer);
@@ -283,6 +286,13 @@ export default function App() {
         resolve({ kind: 'unavailable' });
       });
     });
+    remoteCommandAttempts.current.set(commandKey, attempt);
+    void attempt.then(() => {
+      if (remoteCommandAttempts.current.get(commandKey) === attempt) remoteCommandAttempts.current.delete(commandKey);
+    }, () => {
+      if (remoteCommandAttempts.current.get(commandKey) === attempt) remoteCommandAttempts.current.delete(commandKey);
+    });
+    return attempt;
   }
 
   async function synchronizePendingCommands(showNotice = false): Promise<boolean> {
