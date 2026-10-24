@@ -247,7 +247,7 @@ export function placeBid(profile: PlayerProfile, listingId: string, amount: numb
   if (amount < listing.minimumBid) return failure(profile, 'invalid-input', 'يجب أن يساوي العرض الحد الأدنى للمزاد أو يتجاوزه.');
 
   // يبدأ المنافس الآلي بعرض واحد؛ غرفة المزاد تعرض الزيادات الحية قبل اعتماد فوز اللاعب.
-  const highestBotBid = listing.minimumBid + listing.bidIncrement;
+  const highestBotBid = listing.minimumBid + listing.bidIncrement * 2;
   const botBids = [
     { bidderId: `${listing.id}-bot-a`, amount: listing.minimumBid + listing.bidIncrement },
     { bidderId: `${listing.id}-bot-b`, amount: highestBotBid },

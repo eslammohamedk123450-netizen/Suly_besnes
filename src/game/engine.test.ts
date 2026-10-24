@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { COUNTRIES } from '../domain/countries';
 import { createNewPlayer, type PlayerProfile } from '../domain/player';
 import { getContractOffers } from './contracts';
-import { advanceDay, acceptContract, buyDirectLand, buyGoldWithDiamonds, buyMaterial, buySpeedCard, createDeposit, deliverContract, executeGameCommand, foundCompany, getDayBriefing, mergeDeposits, payStaffSalary, repayLoan, runProduction, sellGold, takeLoan, updateNotificationState, upgradeLand, upgradeWarehouse, useDaySpeedCard, withdrawDeposit } from './engine';
+import { advanceDay, acceptContract, buyDirectLand, buyGoldWithDiamonds, buyMaterial, buySpeedCard, createDeposit, deliverContract, executeGameCommand, foundCompany, getDayBriefing, mergeDeposits, payStaffSalary, placeBid, repayLoan, runProduction, sellGold, takeLoan, updateNotificationState, upgradeLand, upgradeWarehouse, useDaySpeedCard, withdrawDeposit } from './engine';
 import { negotiateContract } from './engine';
 import { getSynergyBonuses } from './synergy';
 import { normalizeSavedProfile } from '../storage/saveRepository';
@@ -294,6 +294,15 @@ describe('Business Empire economy invariants', () => {
     if (!premature.ok) expect(premature.reason).toBe('condition-not-met');
     const ready = foundCompany({ ...purchased.profile, day: 2 }, 'food', purchased.data.landId, 'شركة جاهزة');
     expect(ready.ok).toBe(true);
+  });
+
+  it('requires a bid above both automated competitors and accepts the safe recommendation', () => {
+    const base = profile({ countryId: 'egypt', bankBalance: 1_000_000, createdAt: new Date().toISOString() });
+    const tied = placeBid(base, 'land-cairo-industrial-day-1', 180_000);
+    expect(tied.ok).toBe(false);
+    if (!tied.ok) expect(tied.reason).toBe('auction-lost');
+    const safe = placeBid(base, 'land-cairo-industrial-day-1', 190_000);
+    expect(safe.ok).toBe(true);
   });
 
   it('charges the discounted whole-diamond price for land and rejects invalid payment methods', () => {

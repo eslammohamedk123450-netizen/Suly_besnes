@@ -475,3 +475,5 @@
 .production-filters { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
 .production-filters button { padding: 6px 11px; color: #71818b; background: #f6f9fa; border: 1px solid #e2e8eb; border-radius: 999px; font-size: 9px; cursor: pointer; }
 .production-filters button.is-selected { color: #fff; background: #2e556d; border-color: #2e556d; }
+.land-view-tabs{display:flex;gap:7px;padding:6px;background:#f7f9fa;border:1px solid #e5ebf0;border-radius:13px}.land-view-tabs button{display:inline-flex;flex:1;justify-content:center;align-items:center;gap:7px;min-height:38px;padding:0 12px;color:#708293;background:transparent;border:1px solid transparent;border-radius:9px;font-size:10px;font-weight:800;cursor:pointer}.land-view-tabs button:hover{background:#fff}.land-view-tabs button.is-active{color:#263e53;background:#fff;border-color:#ead9a6;box-shadow:0 4px 12px rgba(9,27,45,.05)}
+@media(max-width:520px){.land-view-tabs button{font-size:9px;padding-inline:7px}}
