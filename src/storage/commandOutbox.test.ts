@@ -40,6 +40,16 @@ describe('local game command outbox', () => {
     expect(enqueueGameCommand('account-1', command, 'stable-command-key-0003')?.command).toEqual(command);
   });
 
+  it('queues season progress and rewards so they are not lost before cloud sync', () => {
+    vi.stubGlobal('localStorage', new MemoryStorage());
+    enqueueGameCommand('account-1', { name: 'claim_season_challenge', args: { challengeId: 'daily-empire' } }, 'season-command-key-0001');
+    enqueueGameCommand('account-1', { name: 'claim_login_reward', args: { rewardId: 'diamonds' } }, 'season-command-key-0002');
+    enqueueGameCommand('account-1', { name: 'choose_season_event', args: { choiceId: 'safe' } }, 'season-command-key-0003');
+    expect(loadQueuedGameCommands('account-1').map((entry) => entry.command.name)).toEqual([
+      'claim_season_challenge', 'claim_login_reward', 'choose_season_event',
+    ]);
+  });
+
   it('blocks a conflicting command until explicit recovery and acknowledges successful commands', () => {
     vi.stubGlobal('localStorage', new MemoryStorage());
     enqueueGameCommand('account-1', { name: 'advance_day', args: {} }, 'stable-command-key-0001');

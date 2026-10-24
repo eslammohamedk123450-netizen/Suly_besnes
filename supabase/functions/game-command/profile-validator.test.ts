@@ -41,6 +41,24 @@ describe('validatePlayerProfile', () => {
     expect(validatePlayerProfile(legacy)).toEqual({ ok: true });
   });
 
+  it('accepts day-speed cards, warehouse upgrades, and transfer availability fields', () => {
+    const profile = {
+      ...validProfile(),
+      warehouseLevel: 2,
+      activeDaySpeedMultiplier: 3,
+      speedCards: [{ kind: 'day-speed-2x', quantity: 1 }],
+      lands: [{ id: 'land-1', label: 'أرض', areaSquareMeters: 100, purchasePrice: 100, acquiredAt: validProfile().createdAt, acquiredOnDay: 1, availableForCompanyOnDay: 2 }],
+      companies: [{ id: 'company-1', name: 'شركة', industryId: 'food', countryId: 'egypt', foundedAt: validProfile().createdAt, foundedOnDay: 1, operationalFromDay: 2, landId: 'land-1', licenseIds: [], energyUnits: 10, energyCapacity: 20, operatingCostPerDay: 0 }],
+    };
+    expect(validatePlayerProfile(profile)).toEqual({ ok: true });
+  });
+
+  it('rejects total warehouse material stock above its level capacity', () => {
+    const limits = [['crude-oil', 500], ['natural-gas', 500], ['water', 2_000], ['chemicals', 800], ['grain', 1_000], ['steel', 400], ['cement', 800], ['silicon', 250], ['fuel', 500], ['components', 300], ['packaging', 1_000]] as const;
+    const inventory = limits.flatMap(([materialOrProductId, quantity], index) => [0, 1].map((copy) => ({ id: `lot-${index}-${copy}`, materialOrProductId, quantity, unit: 'وحدة', unitCost: 1 })));
+    expect(hasError({ ...validProfile(), inventory }, 'warehouse_material_capacity_exceeded')).toBe(true);
+  });
+
   it('validates scoped and time-bounded economic event effects', () => {
     const profile = validProfile();
     profile.events = [{ id: 'event-1', day: 1, title: 'نقص فولاذ', description: 'يرتفع السعر مؤقتًا.', cashImpact: -10, occurredAt: profile.createdAt, industryId: 'construction', materialId: 'steel', materialPriceMultiplier: 1.25, effectExpiresOnDay: 4 }];

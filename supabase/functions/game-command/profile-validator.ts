@@ -11,12 +11,12 @@ const MAX_ENERGY = 100_000;
 const PROFILE_KEYS = new Set([
   'id', 'accountCode', 'name', 'level', 'countryId', 'createdAt', 'bankBalance', 'payables',
   'goldGrams', 'goldCostBasis', 'diamonds', 'speedCards', 'badges', 'assets', 'lands', 'companies',
-  'finances', 'day', 'inventory', 'licenses', 'investments', 'banking', 'staff', 'productionOrders',
+  'finances', 'day', 'warehouseLevel', 'activeDaySpeedMultiplier', 'inventory', 'licenses', 'investments', 'banking', 'staff', 'productionOrders',
   'auctionHistory', 'redeemedCodeIds', 'sales', 'ledger', 'events', 'tasks', 'completedTaskIds',
   'season', 'reputation', 'contracts', 'achievements', 'onboarding', 'readNotificationIds', 'dismissedNotificationIds', 'unreadProductionOrderIds',
 ]);
 
-const REQUIRED_PROFILE_KEYS = [...PROFILE_KEYS].filter((key) => !['season', 'readNotificationIds', 'dismissedNotificationIds', 'unreadProductionOrderIds'].includes(key));
+const REQUIRED_PROFILE_KEYS = [...PROFILE_KEYS].filter((key) => !['season', 'warehouseLevel', 'activeDaySpeedMultiplier', 'readNotificationIds', 'dismissedNotificationIds', 'unreadProductionOrderIds'].includes(key));
 
 const MATERIAL_CAPACITY: Record<string, number> = {
   'crude-oil': 500, 'natural-gas': 500, water: 2_000, chemicals: 800, grain: 1_000,
@@ -26,6 +26,14 @@ const PRODUCT_CAPACITY: Record<string, number> = {
   'refined-fuel': 500, 'power-units': 1_000, 'bottled-gas': 500, 'clean-water': 2_000,
   detergent: 800, 'food-pack': 1_000, 'building-blocks': 500, electronics: 250, 'freight-service': 300,
 };
+const WAREHOUSE_CAPACITY = [
+  { materials: 0, products: 0 },
+  { materials: 8_050, products: 6_850 },
+  { materials: 10_000, products: 9_000 },
+  { materials: 13_500, products: 12_000 },
+  { materials: 18_000, products: 16_000 },
+  { materials: 24_000, products: 22_000 },
+];
 const INDUSTRY_PRODUCT: Record<string, string> = {
   petroleum: 'refined-fuel', electricity: 'power-units', gas: 'bottled-gas', water: 'clean-water',
   detergents: 'detergent', food: 'food-pack', construction: 'building-blocks',
@@ -184,6 +192,11 @@ export function validatePlayerProfile(profile: unknown, previousProfile?: unknow
   validateTimestamp(profile.createdAt, 'profile.createdAt', errors);
   requireNumber(profile.level, 'profile.level', errors, { min: 1, max: MAX_LEVEL, integer: true });
   requireNumber(profile.day, 'profile.day', errors, { min: 1, max: MAX_GAME_DAY, integer: true });
+  if (profile.warehouseLevel !== undefined) requireNumber(profile.warehouseLevel, 'profile.warehouseLevel', errors, { min: 1, max: 5, integer: true });
+  if (profile.activeDaySpeedMultiplier !== undefined && ![1, 2, 3].includes(Number(profile.activeDaySpeedMultiplier))) addError(errors, 'profile.activeDaySpeedMultiplier:invalid_value');
+  const warehouseLevel = typeof profile.warehouseLevel === 'number' && Number.isInteger(profile.warehouseLevel) && profile.warehouseLevel >= 1 && profile.warehouseLevel <= 5 ? profile.warehouseLevel : 1;
+  const warehouseCapacity = WAREHOUSE_CAPACITY[warehouseLevel];
+  const itemCapacityMultiplier = 1 + (warehouseLevel - 1) * 0.5;
   requireNumber(profile.bankBalance, 'profile.bankBalance', errors);
   requireNumber(profile.payables, 'profile.payables', errors);
   requireNumber(profile.goldGrams, 'profile.goldGrams', errors);
@@ -203,8 +216,8 @@ export function validatePlayerProfile(profile: unknown, previousProfile?: unknow
   const inventory = requireArray(profile.inventory, 'profile.inventory', errors);
   const productionOrders = requireArray(profile.productionOrders, 'profile.productionOrders', errors);
   const assetsIds = validateEntityIds(assets, 'profile.assets', errors, ['id', 'label', 'value', 'acquiredAt']);
-  const landIds = validateEntityIds(lands, 'profile.lands', errors, ['id', 'label', 'areaSquareMeters', 'purchasePrice', 'acquiredAt', 'acquiredOnDay', 'landType']);
-  const companyIds = validateEntityIds(companies, 'profile.companies', errors, ['id', 'name', 'industryId', 'countryId', 'foundedAt', 'foundedOnDay', 'landId', 'licenseIds', 'energyUnits', 'energyCapacity', 'operatingCostPerDay', 'maintenanceCondition', 'upgradeLevel']);
+  const landIds = validateEntityIds(lands, 'profile.lands', errors, ['id', 'label', 'areaSquareMeters', 'purchasePrice', 'acquiredAt', 'acquiredOnDay', 'availableForCompanyOnDay', 'landType', 'upgradeLevel']);
+  const companyIds = validateEntityIds(companies, 'profile.companies', errors, ['id', 'name', 'industryId', 'countryId', 'foundedAt', 'foundedOnDay', 'operationalFromDay', 'landId', 'licenseIds', 'energyUnits', 'energyCapacity', 'operatingCostPerDay', 'maintenanceCondition', 'upgradeLevel']);
   const inventoryIds = validateEntityIds(inventory, 'profile.inventory', errors, ['id', 'materialOrProductId', 'quantity', 'unit', 'unitCost', 'qualityScore']);
   const orderIds = validateEntityIds(productionOrders, 'profile.productionOrders', errors, ['id', 'companyId', 'productId', 'productName', 'batches', 'outputQuantity', 'outputUnit', 'materialCost', 'energyCost', 'expectedUnitCost', 'demandForecast', 'qualityScore', 'maintenanceCost', 'startedOnDay', 'completesOnDay', 'status']);
   void assetsIds;
@@ -219,6 +232,7 @@ export function validatePlayerProfile(profile: unknown, previousProfile?: unknow
     requireNumber(land.purchasePrice, `profile.lands[${index}].purchasePrice`, errors);
     validateTimestamp(land.acquiredAt, `profile.lands[${index}].acquiredAt`, errors);
     if (land.acquiredOnDay !== undefined) requireNumber(land.acquiredOnDay, `profile.lands[${index}].acquiredOnDay`, errors, { min: 1, max: MAX_GAME_DAY, integer: true });
+    if (land.availableForCompanyOnDay !== undefined) requireNumber(land.availableForCompanyOnDay, `profile.lands[${index}].availableForCompanyOnDay`, errors, { min: 1, max: MAX_GAME_DAY, integer: true });
     if (land.landType !== undefined && !['industrial', 'agricultural', 'commercial'].includes(String(land.landType))) addError(errors, `profile.lands[${index}].landType:invalid_value`);
   }
 
@@ -242,6 +256,7 @@ export function validatePlayerProfile(profile: unknown, previousProfile?: unknow
     requireString(company.countryId, `profile.companies[${index}].countryId`, errors, 32);
     validateTimestamp(company.foundedAt, `profile.companies[${index}].foundedAt`, errors);
     if (company.foundedOnDay !== undefined) requireNumber(company.foundedOnDay, `profile.companies[${index}].foundedOnDay`, errors, { min: 1, max: MAX_GAME_DAY, integer: true });
+    if (company.operationalFromDay !== undefined) requireNumber(company.operationalFromDay, `profile.companies[${index}].operationalFromDay`, errors, { min: 1, max: MAX_GAME_DAY, integer: true });
     if (company.energyCapacity !== undefined) requireNumber(company.energyCapacity, `profile.companies[${index}].energyCapacity`, errors, { min: 1, max: MAX_ENERGY });
     if (company.energyUnits !== undefined) {
       const energyIsValid = requireNumber(company.energyUnits, `profile.companies[${index}].energyUnits`, errors, { min: 0, max: MAX_ENERGY });
@@ -260,10 +275,10 @@ export function validatePlayerProfile(profile: unknown, previousProfile?: unknow
     requireString(lot.unit, `profile.inventory[${index}].unit`, errors, 64);
     requireNumber(lot.unitCost, `profile.inventory[${index}].unitCost`, errors);
     if (lot.qualityScore !== undefined) requireNumber(lot.qualityScore, `profile.inventory[${index}].qualityScore`, errors, { min: 0, max: 100 });
-    const limit = MATERIAL_CAPACITY[itemId] ?? PRODUCT_CAPACITY[itemId];
-    if (limit === undefined) {
+    const baseLimit = MATERIAL_CAPACITY[itemId] ?? PRODUCT_CAPACITY[itemId];
+    if (baseLimit === undefined) {
       addError(errors, `profile.inventory[${index}].materialOrProductId:unknown_catalog_item`);
-    } else if (quantityValid && typeof lot.quantity === 'number' && lot.quantity > limit) {
+    } else if (quantityValid && typeof lot.quantity === 'number' && lot.quantity > Math.floor(baseLimit * itemCapacityMultiplier)) {
       addError(errors, `profile.inventory[${index}].quantity:exceeds_storage_capacity`);
     }
     if (itemId in PRODUCT_CAPACITY && ![...completedOutputByProduct.keys()].includes(itemId)) {
@@ -306,14 +321,20 @@ export function validatePlayerProfile(profile: unknown, previousProfile?: unknow
     }
   }
 
-  for (const [productId, quantity] of inventoryByItem) {
+  for (const productId of new Set([...inventoryByItem.keys(), ...activeOutputByProduct.keys()])) {
     if (productId in PRODUCT_CAPACITY) {
+      const quantity = inventoryByItem.get(productId) ?? 0;
       const produced = completedOutputByProduct.get(productId) ?? 0;
       if (quantity > 0 && produced <= 0) addError(errors, `profile.inventory.${productId}:product_without_completed_production`);
       const reserved = activeOutputByProduct.get(productId) ?? 0;
-      if (quantity + reserved > PRODUCT_CAPACITY[productId]) addError(errors, `profile.inventory.${productId}:planned_stock_exceeds_capacity`);
+      if (quantity + reserved > Math.floor(PRODUCT_CAPACITY[productId] * itemCapacityMultiplier)) addError(errors, `profile.inventory.${productId}:planned_stock_exceeds_capacity`);
     }
   }
+  const totalMaterialUsage = [...inventoryByItem].reduce((sum, [itemId, quantity]) => sum + (itemId in MATERIAL_CAPACITY ? quantity : 0), 0);
+  const totalProductUsage = [...inventoryByItem].reduce((sum, [itemId, quantity]) => sum + (itemId in PRODUCT_CAPACITY ? quantity : 0), 0)
+    + [...activeOutputByProduct.values()].reduce((sum, quantity) => sum + quantity, 0);
+  if (totalMaterialUsage > warehouseCapacity.materials) addError(errors, 'profile.inventory:warehouse_material_capacity_exceeded');
+  if (totalProductUsage > warehouseCapacity.products) addError(errors, 'profile.inventory:warehouse_product_capacity_exceeded');
 
   const assetValues = assets;
   for (let index = 0; index < assetValues.length; index += 1) {
@@ -352,7 +373,7 @@ export function validatePlayerProfile(profile: unknown, previousProfile?: unknow
   speedCards.forEach((value, index) => {
     const card = requireRecord(value, `profile.speedCards[${index}]`, errors);
     checkAllowedKeys(card, ['kind', 'quantity'], `profile.speedCards[${index}]`, errors);
-    if (!['production-25', 'production-50', 'production-instant', 'capacity-boost'].includes(String(card.kind))) addError(errors, `profile.speedCards[${index}].kind:invalid_value`);
+    if (!['production-25', 'production-50', 'production-instant', 'capacity-boost', 'day-speed-2x', 'day-speed-3x'].includes(String(card.kind))) addError(errors, `profile.speedCards[${index}].kind:invalid_value`);
     if (typeof card.kind === 'string' && speedKinds.has(card.kind)) addError(errors, 'profile.speedCards:duplicate_kind');
     if (typeof card.kind === 'string') speedKinds.add(card.kind);
     requireNumber(card.quantity, `profile.speedCards[${index}].quantity`, errors, { min: 0, max: MAX_MONEY, integer: true });

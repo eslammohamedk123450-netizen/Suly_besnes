@@ -8,7 +8,7 @@ export interface GameNotification {
   title: string;
   detail: string;
   tone: NotificationTone;
-  section: 'home' | 'contracts' | 'staff' | 'bank' | 'auctions' | 'reports' | 'obligations' | 'companies' | 'production' | 'inventory';
+  section: 'home' | 'contracts' | 'staff' | 'bank' | 'auctions' | 'reports' | 'obligations' | 'companies' | 'lands' | 'production' | 'inventory';
   count?: number;
   target?: string;
 }
@@ -30,6 +30,15 @@ export function selectNotifications(profile: PlayerProfile): GameNotification[] 
     const output = newlyCompleted.reduce((sum, item) => sum + item.outputQuantity, 0);
     const ids = newlyCompleted.map((item) => item.id);
     notifications.push({ id: `production-completed:${ids.join(',')}`, title: 'إنتاج مكتمل', detail: `اكتملت ${newlyCompleted.length} أوامر إنتاج جديدة · إجمالي ${output.toLocaleString('ar-EG')} وحدة جاهزة في المخزن.`, tone: 'success', section: 'production', count: newlyCompleted.length, target: 'production-queue' });
+  }
+  const ownedLandIds = new Set(profile.companies.map((company) => company.landId));
+  for (const land of profile.lands) {
+    if (ownedLandIds.has(land.id) || land.availableForCompanyOnDay === undefined || land.availableForCompanyOnDay > profile.day) continue;
+    notifications.push({ id: `ownership-transfer-land:${land.id}:${land.availableForCompanyOnDay}`, title: 'اكتمل نقل ملكية الأرض', detail: `أصبحت ${land.label} متاحة للتأسيس بعد انتهاء فترة نقل الملكية.`, tone: 'success', section: 'lands' });
+  }
+  for (const company of profile.companies) {
+    if (company.operationalFromDay === undefined || company.operationalFromDay > profile.day) continue;
+    notifications.push({ id: `ownership-transfer-company:${company.id}:${company.operationalFromDay}`, title: 'اكتمل نقل ملكية الشركة', detail: `أصبحت ${company.name} جاهزة لبدء التشغيل بعد انتهاء فترة نقل الملكية.`, tone: 'success', section: 'companies' });
   }
   const dueLoans = profile.banking.loans.filter((loan) => loan.status === 'active' && loan.nextPaymentDay - profile.day <= 2);
   if (dueLoans.length > 0) {

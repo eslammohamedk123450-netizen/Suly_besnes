@@ -34,6 +34,8 @@ export interface PlayerLand {
   acquiredAt: string;
   /** Day on which the land entered the player's empire; optional for legacy saves. */
   acquiredOnDay?: number;
+  /** Land acquired today is reserved until the next in-game day. */
+  availableForCompanyOnDay?: number;
   landType?: 'industrial' | 'agricultural' | 'commercial';
   upgradeLevel?: number;
 }
@@ -45,6 +47,8 @@ export interface PlayerCompany {
   countryId: CountryId;
   foundedAt: string;
   foundedOnDay?: number;
+  /** Directly purchased companies begin operating after transfer paperwork completes. */
+  operationalFromDay?: number;
   landId?: string;
   licenseIds?: string[];
   energyUnits?: number;
@@ -79,6 +83,8 @@ export interface PlayerProfile {
   };
   /** Current simulation day. Day one is the day the world is created. */
   day: number;
+  warehouseLevel: number;
+  activeDaySpeedMultiplier: 1 | 2 | 3;
   inventory: InventoryLot[];
   licenses: LicenseRecord[];
   investments: InvestmentRecord[];
@@ -134,6 +140,8 @@ export function createNewPlayer(
     companies: [],
     finances: { netProfit: 0, totalRevenue: 0, totalExpenses: 0 },
     day: 1,
+    warehouseLevel: 1,
+    activeDaySpeedMultiplier: 1,
     inventory: [],
     licenses: [],
     investments: [],

@@ -21,7 +21,10 @@ import { getContractOffers } from './contracts';
 import { getSynergyOperatingMultiplier, getSynergyProductionMultiplier } from './synergy';
 import { resolveGlobalMarketOffer } from './globalMarket';
 import { getEconomicEventTemplate, type EconomicEventTemplate } from './economicEvents';
-import { SPEED_CARD_DIAMOND_COSTS, type SpeedCardKind } from '../domain/accountFeatures';
+import { SPEED_CARD_DIAMOND_COSTS, SPEED_CARD_LABELS, type SpeedCardKind } from '../domain/accountFeatures';
+import { getWarehouseCapacity, getWarehouseItemCapacity, getWarehouseMaterialQuantity, getWarehouseUsage, normalizeWarehouseLevel, removeWarehouseMaterials, WAREHOUSE_UPGRADE_REQUIREMENTS } from './warehouse';
+import { getCashPriceForDiamondPrice, getDiscountedDiamondPrice, type PurchasePaymentMethod } from './purchasePricing';
+import { claimLoginReward, claimSeasonChallenge, chooseSeasonEvent, LOGIN_REWARDS } from './season';
 
 export type GameErrorCode =
   | 'invalid-input'
@@ -133,6 +136,30 @@ function failure<T>(profile: PlayerProfile, reason: GameErrorCode, message: stri
 
 function isPositiveInteger(value: number): boolean {
   return Number.isInteger(value) && value > 0;
+}
+
+interface PurchaseDebit {
+  bankBalance: number;
+  diamonds: number;
+  diamondsSpent: number;
+}
+
+function resolvePurchaseDebit(
+  profile: PlayerProfile,
+  cashPrice: number,
+  paymentMethod: PurchasePaymentMethod = 'cash',
+  fixedDiamondPrice?: number,
+): PurchaseDebit | { message: string } {
+  if (paymentMethod !== 'cash' && paymentMethod !== 'diamonds') return { message: 'وسيلة الدفع غير صالحة.' };
+  if (!Number.isFinite(cashPrice) || cashPrice <= 0) return { message: 'سعر الشراء غير صالح.' };
+  if (paymentMethod === 'cash') {
+    if (profile.bankBalance < cashPrice) return { message: 'لا يكفي رصيد البنك لإتمام عملية الشراء.' };
+    return { bankBalance: profile.bankBalance - cashPrice, diamonds: profile.diamonds, diamondsSpent: 0 };
+  }
+  const diamondsSpent = fixedDiamondPrice ?? getDiscountedDiamondPrice(cashPrice);
+  if (!Number.isInteger(diamondsSpent) || diamondsSpent < 1) return { message: 'قيمة السلعة أقل من حد الدفع بماسة كاملة؛ اختر الدفع نقدًا.' };
+  if (profile.diamonds < diamondsSpent) return { message: `لا يكفي رصيد الماس؛ تحتاج إلى ${diamondsSpent} ماسة.` };
+  return { bankBalance: profile.bankBalance, diamonds: profile.diamonds - diamondsSpent, diamondsSpent };
 }
 
 function unpaidSalaryTotal(profile: PlayerProfile): number {
@@ -258,7 +285,11 @@ export function placeBid(profile: PlayerProfile, listingId: string, amount: numb
     const quantity = listing.quantity ?? 0;
     if (!material || !isPositiveInteger(quantity)) return failure(profile, 'not-found', 'بيانات شحنة المزاد غير مكتملة.');
     const existing = profile.inventory.find((lot) => lot.materialOrProductId === material.id);
-    if ((existing?.quantity ?? 0) + quantity > material.storageLimit) return failure(profile, 'storage-limit', 'سعة المخزن لا تكفي لاستلام الشحنة الفائزة.');
+    const level = normalizeWarehouseLevel(profile.warehouseLevel);
+    const itemLimit = getWarehouseItemCapacity(material.id, level) ?? material.storageLimit;
+    const warehouseUsage = getWarehouseUsage(profile.inventory, profile.productionOrders);
+    const warehouseCapacity = getWarehouseCapacity(level);
+    if ((existing?.quantity ?? 0) + quantity > itemLimit || warehouseUsage.materials + quantity > warehouseCapacity.materials) return failure(profile, 'storage-limit', 'سعة المخزن لا تكفي لاستلام الشحنة الفائزة؛ طوّر المخزن أو أفرغ مساحة.');
     const inventoryLotId = existing?.id ?? nextId(profile, 'inventory', profile.inventory.length);
     const unitCost = amount / quantity;
     const inventory = existing
@@ -278,6 +309,7 @@ export function placeBid(profile: PlayerProfile, listingId: string, amount: numb
     purchasePrice: amount,
     acquiredAt,
     acquiredOnDay: profile.day,
+    availableForCompanyOnDay: profile.day + 1,
     landType: listing.landType,
   };
   const nextProfile = addLedger(
@@ -285,7 +317,7 @@ export function placeBid(profile: PlayerProfile, listingId: string, amount: numb
     [ledgerEntry(profile, 'asset', amount, `شراء أرض بالمزاد: ${listing.label}`, 0)],
     profile.bankBalance - amount,
   );
-  return success(syncTasks(nextProfile), 'تم الفوز بالمزاد وتسجيل الأرض دون خصم عروض خاسرة.', {
+  return success(syncTasks(nextProfile), `تم الفوز بالمزاد. بدأ إنهاء عقود نقل الملكية؛ ستكون الأرض متاحة بعد يوم داخل اللعبة، في اليوم ${profile.day + 1}. تحلَّ بالصبر.`, {
     listingId,
     winner: 'player',
     winningAmount: amount,
@@ -294,41 +326,45 @@ export function placeBid(profile: PlayerProfile, listingId: string, amount: numb
   });
 }
 
-export function buyDirectLand(profile: PlayerProfile, listingId: string): GameResult<{ landId: string; price: number }> {
+export function buyDirectLand(profile: PlayerProfile, listingId: string, paymentMethod: PurchasePaymentMethod = 'cash'): GameResult<{ landId: string; price: number; diamondsSpent: number }> {
   const countryError = ensureEgypt(profile);
   if (countryError) return countryError;
   const listing = DIRECT_LAND_CATALOG.find((entry) => entry.id === listingId);
   if (!listing) return failure(profile, 'not-found', 'عرض الأرض غير موجود.');
   if (profile.lands.some((land) => land.id === listing.id)) return failure(profile, 'already-owned', 'تم شراء هذه الأرض بالفعل.');
-  if (profile.bankBalance < listing.price) return failure(profile, 'insufficient-funds', 'لا يكفي رصيدك لشراء الأرض مباشرة.');
-  const land: PlayerLand = { id: listing.id, label: listing.label, areaSquareMeters: listing.areaSquareMeters, purchasePrice: listing.price, acquiredAt: timestampFor(profile), acquiredOnDay: profile.day, landType: listing.landType };
+  const payment = resolvePurchaseDebit(profile, listing.price, paymentMethod);
+  if ('message' in payment) return failure(profile, 'insufficient-funds', payment.message);
+  const land: PlayerLand = { id: listing.id, label: listing.label, areaSquareMeters: listing.areaSquareMeters, purchasePrice: listing.price, acquiredAt: timestampFor(profile), acquiredOnDay: profile.day, availableForCompanyOnDay: profile.day + 1, landType: listing.landType };
   const nextProfile = addLedger(
     { ...profile, lands: [...profile.lands, land] },
     [ledgerEntry(profile, 'asset', listing.price, `شراء أرض مباشر: ${listing.label}`, 0)],
-    profile.bankBalance - listing.price,
+    payment.bankBalance,
+    { diamonds: payment.diamonds },
   );
-  return success(syncTasks(nextProfile), `تم شراء ${listing.label} مباشرة.`, { landId: land.id, price: listing.price });
+  return success(syncTasks(nextProfile), `تم شراء ${listing.label} ${paymentMethod === 'diamonds' ? `مقابل ${payment.diamondsSpent} ماسة` : 'نقدًا'}. بدأ إنهاء عقود نقل الملكية؛ ستكون الأرض متاحة بعد يوم داخل اللعبة، في اليوم ${profile.day + 1}. تحلَّ بالصبر.`, { landId: land.id, price: listing.price, diamondsSpent: payment.diamondsSpent });
 }
 
-export function buyDirectCompany(profile: PlayerProfile, listingId: string): GameResult<{ companyId: string; landId: string; price: number }> {
+export function buyDirectCompany(profile: PlayerProfile, listingId: string, paymentMethod: PurchasePaymentMethod = 'cash'): GameResult<{ companyId: string; landId: string; price: number; diamondsSpent: number }> {
   const countryError = ensureEgypt(profile);
   if (countryError) return countryError;
   const listing = DIRECT_COMPANY_CATALOG.find((entry) => entry.id === listingId);
   const industry = listing ? findIndustry(listing.industryId) : undefined;
   if (!listing || !industry) return failure(profile, 'not-found', 'عرض الشركة غير موجود.');
   if (profile.companies.some((company) => company.id === listing.id)) return failure(profile, 'already-owned', 'تم شراء هذه الشركة بالفعل.');
-  if (profile.bankBalance < listing.price) return failure(profile, 'insufficient-funds', 'لا يكفي رصيدك لشراء الشركة مباشرة.');
+  const payment = resolvePurchaseDebit(profile, listing.price, paymentMethod);
+  if ('message' in payment) return failure(profile, 'insufficient-funds', payment.message);
   const landId = `${listing.id}-land`;
   const licenseId = `${listing.id}-license`;
-  const land: PlayerLand = { id: landId, label: `${listing.name} · أرض الشركة`, areaSquareMeters: listing.areaSquareMeters, purchasePrice: Math.floor(listing.price * 0.45), acquiredAt: timestampFor(profile), acquiredOnDay: profile.day, landType: listing.landType };
-  const company: PlayerCompany = { id: listing.id, name: listing.name, industryId: listing.industryId, countryId: profile.countryId, foundedAt: timestampFor(profile), landId, licenseIds: [licenseId], energyUnits: industry.energyCapacity, energyCapacity: industry.energyCapacity, operatingCostPerDay: industry.dailyOperatingCost };
+  const land: PlayerLand = { id: landId, label: `${listing.name} · أرض الشركة`, areaSquareMeters: listing.areaSquareMeters, purchasePrice: Math.floor(listing.price * 0.45), acquiredAt: timestampFor(profile), acquiredOnDay: profile.day, availableForCompanyOnDay: profile.day + 1, landType: listing.landType };
+  const company: PlayerCompany = { id: listing.id, name: listing.name, industryId: listing.industryId, countryId: profile.countryId, foundedAt: timestampFor(profile), operationalFromDay: profile.day + 1, landId, licenseIds: [licenseId], energyUnits: industry.energyCapacity, energyCapacity: industry.energyCapacity, operatingCostPerDay: industry.dailyOperatingCost };
   const license = { id: licenseId, countryId: profile.countryId, industryId: listing.industryId, feePaid: Math.floor(listing.price * 0.15), issuedAt: timestampFor(profile) };
   const nextProfile = addLedger(
     { ...profile, lands: [...profile.lands, land], companies: [...profile.companies, company], licenses: [...profile.licenses, license] },
     [ledgerEntry(profile, 'asset', listing.price, `شراء شركة مباشر: ${listing.name}`, 0)],
-    profile.bankBalance - listing.price,
+    payment.bankBalance,
+    { diamonds: payment.diamonds },
   );
-  return success(syncTasks(nextProfile), `تم شراء ${listing.name} مع أرضها وتجهيزها للتشغيل.`, { companyId: company.id, landId, price: listing.price });
+  return success(syncTasks(nextProfile), `تم شراء ${listing.name} ${paymentMethod === 'diamonds' ? `مقابل ${payment.diamondsSpent} ماسة` : 'نقدًا'}. يجري إنهاء عقود نقل الملكية، ويبدأ التشغيل بعد يوم داخل اللعبة في اليوم ${profile.day + 1}. تحلَّ بالصبر.`, { companyId: company.id, landId, price: listing.price, diamondsSpent: payment.diamondsSpent });
 }
 
 export function sellLand(profile: PlayerProfile, landId: string): GameResult<{ landId: string; payout: number }> {
@@ -340,16 +376,17 @@ export function sellLand(profile: PlayerProfile, landId: string): GameResult<{ l
   return success(nextProfile, `تم بيع ${land.label} واسترداد 50% من قيمتها.`, { landId, payout });
 }
 
-export function upgradeLand(profile: PlayerProfile, landId: string): GameResult<{ landId: string; level: number; cost: number }> {
+export function upgradeLand(profile: PlayerProfile, landId: string, paymentMethod: PurchasePaymentMethod = 'cash'): GameResult<{ landId: string; level: number; cost: number; diamondsSpent: number }> {
   const land = profile.lands.find((item) => item.id === landId);
   if (!land) return failure(profile, 'not-found', 'الأرض غير موجودة.');
   const level = land.upgradeLevel ?? 1;
   if (level >= 5) return failure(profile, 'condition-not-met', 'وصلت الأرض إلى أعلى مستوى تطوير.');
   const cost = Math.round(80_000 * Math.pow(1.55, level - 1));
-  if (profile.bankBalance < cost) return failure(profile, 'insufficient-funds', 'لا يكفي الرصيد لتطوير هذه الأرض.');
+  const payment = resolvePurchaseDebit(profile, cost, paymentMethod);
+  if ('message' in payment) return failure(profile, 'insufficient-funds', payment.message);
   const upgraded = { ...land, upgradeLevel: level + 1, areaSquareMeters: Math.round(land.areaSquareMeters * 1.1), purchasePrice: land.purchasePrice + cost };
-  const nextProfile = addLedger({ ...profile, lands: profile.lands.map((item) => item.id === landId ? upgraded : item) }, [ledgerEntry(profile, 'expense', cost, `تطوير أرض ${land.label} إلى المستوى ${level + 1}`, 0)], profile.bankBalance - cost);
-  return success(nextProfile, `تم تطوير ${land.label} إلى المستوى ${level + 1}.`, { landId, level: level + 1, cost });
+  const nextProfile = addLedger({ ...profile, lands: profile.lands.map((item) => item.id === landId ? upgraded : item) }, [ledgerEntry(profile, 'expense', cost, `تطوير أرض ${land.label} إلى المستوى ${level + 1}`, 0)], payment.bankBalance, { diamonds: payment.diamonds });
+  return success(nextProfile, `تم تطوير ${land.label} إلى المستوى ${level + 1} ${paymentMethod === 'diamonds' ? `مقابل ${payment.diamondsSpent} ماسة` : 'نقدًا'}.`, { landId, level: level + 1, cost, diamondsSpent: payment.diamondsSpent });
 }
 
 export function sellCompany(profile: PlayerProfile, companyId: string): GameResult<{ companyId: string; payout: number }> {
@@ -377,7 +414,7 @@ export function buyMaterial(profile: PlayerProfile, _materialId: string, _quanti
   return failure(profile, 'condition-not-met', 'الشراء المباشر للمواد الخام غير متاح. استخدم عروض السوق أو المزاد.');
 }
 
-export function buyGlobalMaterial(profile: PlayerProfile, offerId: string, quantity: number, negotiatedUnitPrice?: number): GameResult<{ materialId: string; quantity: number; totalCost: number; unitPrice: number }> {
+export function buyGlobalMaterial(profile: PlayerProfile, offerId: string, quantity: number, negotiatedUnitPrice?: number, paymentMethod: PurchasePaymentMethod = 'cash'): GameResult<{ materialId: string; quantity: number; totalCost: number; unitPrice: number; diamondsSpent: number }> {
   const countryError = ensureEgypt(profile);
   if (countryError) return countryError;
   if (!isPositiveInteger(quantity)) return failure(profile, 'invalid-input', 'الكمية يجب أن تكون عددًا صحيحًا موجبًا.');
@@ -389,8 +426,14 @@ export function buyGlobalMaterial(profile: PlayerProfile, offerId: string, quant
     return failure(profile, 'invalid-input', 'السعر لا يطابق شروط العرض أو التفاوض.');
   }
   const totalCost = quantity * unitPrice;
-  if (profile.bankBalance < totalCost) return failure(profile, 'insufficient-funds', 'لا يكفي رصيدك لقبول هذه الصفقة.');
+  const payment = resolvePurchaseDebit(profile, totalCost, paymentMethod);
+  if ('message' in payment) return failure(profile, 'insufficient-funds', payment.message);
   const existing = profile.inventory.find((lot) => lot.materialOrProductId === material.id);
+  const level = normalizeWarehouseLevel(profile.warehouseLevel);
+  const itemLimit = getWarehouseItemCapacity(material.id, level) ?? material.storageLimit;
+  const warehouseUsage = getWarehouseUsage(profile.inventory, profile.productionOrders);
+  const warehouseCapacity = getWarehouseCapacity(level);
+  if ((existing?.quantity ?? 0) + quantity > itemLimit || warehouseUsage.materials + quantity > warehouseCapacity.materials) return failure(profile, 'storage-limit', `لا تتسع سعة المخزن للكمية المطلوبة. المتاح ${Math.max(0, Math.min(itemLimit - (existing?.quantity ?? 0), warehouseCapacity.materials - warehouseUsage.materials))} ${material.unit}.`);
   const inventory = existing
     ? profile.inventory.map((lot) => lot.materialOrProductId === material.id
       ? { ...lot, quantity: lot.quantity + quantity, unitCost: (lot.quantity * lot.unitCost + totalCost) / (lot.quantity + quantity) }
@@ -399,12 +442,40 @@ export function buyGlobalMaterial(profile: PlayerProfile, offerId: string, quant
   const nextProfile = addLedger(
     { ...profile, inventory },
     [ledgerEntry(profile, 'asset', totalCost, `شراء عالمي ${quantity} ${material.unit} من ${offer.sellerName}`, 0)],
-    profile.bankBalance - totalCost,
+    payment.bankBalance,
+    { diamonds: payment.diamonds },
   );
-  return success(syncTasks(nextProfile), `تم قبول عرض ${offer.sellerName} وشراء ${quantity} ${material.name} بلا حد تخزين.`, { materialId: material.id, quantity, totalCost, unitPrice });
+  return success(syncTasks(nextProfile), `تم قبول عرض ${offer.sellerName} وشراء ${quantity} ${material.name} وإضافتها إلى المخزن ${paymentMethod === 'diamonds' ? `مقابل ${payment.diamondsSpent} ماسة` : 'نقدًا'}.`, { materialId: material.id, quantity, totalCost, unitPrice, diamondsSpent: payment.diamondsSpent });
 }
 
-export function foundCompany(profile: PlayerProfile, industryId: IndustryId, landId: string, name: string): GameResult<{ companyId: string; totalCost: number }> {
+export function upgradeWarehouse(profile: PlayerProfile, paymentMethod: PurchasePaymentMethod = 'cash'): GameResult<{ level: number; cost: number; diamondsSpent: number; capacity: ReturnType<typeof getWarehouseCapacity> }> {
+  const currentLevel = normalizeWarehouseLevel(profile.warehouseLevel);
+  const nextLevel = currentLevel + 1;
+  const requirement = WAREHOUSE_UPGRADE_REQUIREMENTS[nextLevel];
+  if (!requirement) return failure(profile, 'condition-not-met', 'وصل المخزن إلى أعلى مستوى تطوير.');
+  const payment = resolvePurchaseDebit(profile, requirement.cash, paymentMethod);
+  if ('message' in payment) return failure(profile, 'insufficient-funds', `تحتاج إلى ${requirement.cash.toLocaleString('ar-EG')} ج.م أو ما يعادلها بالماس لتطوير المخزن. ${payment.message}`);
+  const missing = Object.entries(requirement.materials).filter(([materialId, quantity]) => getWarehouseMaterialQuantity(profile, materialId) < quantity);
+  if (missing.length > 0) {
+    const labels = missing.map(([materialId, quantity]) => {
+      const material = findMaterial(materialId);
+      const owned = getWarehouseMaterialQuantity(profile, materialId);
+      return `${material?.name ?? materialId}: ${Math.max(0, quantity - owned)} ${material?.unit ?? 'وحدة'}`;
+    });
+    return failure(profile, 'insufficient-materials', `مواد تطوير المخزن غير مكتملة: ${labels.join('، ')}.`);
+  }
+  const inventory = removeWarehouseMaterials(profile, requirement.materials);
+  const materialValue = Object.entries(requirement.materials).reduce((sum, [materialId, quantity]) => sum + quantity * (findMaterial(materialId)?.pricePerUnit ?? 0), 0);
+  const entries = [
+    ledgerEntry(profile, 'expense', requirement.cash, `تطوير المخزن إلى المستوى ${nextLevel}`, 0),
+    ...(materialValue > 0 ? [ledgerEntry(profile, 'expense', materialValue, 'مواد خام مستهلكة في تطوير المخزن', 1)] : []),
+  ];
+  const capacity = getWarehouseCapacity(nextLevel);
+  const nextProfile = addLedger({ ...profile, inventory, warehouseLevel: nextLevel }, entries, payment.bankBalance, { diamonds: payment.diamonds });
+  return success(nextProfile, `تم تطوير المخزن إلى المستوى ${nextLevel} ${paymentMethod === 'diamonds' ? `مقابل ${payment.diamondsSpent} ماسة` : 'نقدًا'}. سعة الخامات ${capacity.materials.toLocaleString('ar-EG')} وحدة وسعة المنتجات ${capacity.products.toLocaleString('ar-EG')} وحدة.`, { level: nextLevel, cost: requirement.cash, diamondsSpent: payment.diamondsSpent, capacity });
+}
+
+export function foundCompany(profile: PlayerProfile, industryId: IndustryId, landId: string, name: string, paymentMethod: PurchasePaymentMethod = 'cash'): GameResult<{ companyId: string; totalCost: number; diamondsSpent: number }> {
   const countryError = ensureEgypt(profile);
   if (countryError) return countryError;
   const industry = findIndustry(industryId);
@@ -412,6 +483,7 @@ export function foundCompany(profile: PlayerProfile, industryId: IndustryId, lan
   if (!industry || !country) return failure(profile, 'not-found', 'القطاع أو الدولة غير موجود.');
   const land = profile.lands.find((item) => item.id === landId);
   if (!land) return failure(profile, 'land-required', 'تحتاج إلى أرض مملوكة لتأسيس الشركة.');
+  if ((land.availableForCompanyOnDay ?? land.acquiredOnDay ?? 1) > profile.day) return failure(profile, 'condition-not-met', `الأرض قيد إنهاء عقود نقل الملكية، وستتاح للتأسيس في اليوم ${land.availableForCompanyOnDay}.`);
   if (profile.companies.some((company) => company.landId === landId)) return failure(profile, 'land-in-use', 'الأرض مرتبطة بشركة أخرى بالفعل.');
   if (land.landType && land.landType !== industry.requiredLandType) return failure(profile, 'wrong-land-type', 'نوع الأرض لا يناسب هذا القطاع.');
   const companyName = name.trim();
@@ -419,7 +491,8 @@ export function foundCompany(profile: PlayerProfile, industryId: IndustryId, lan
   const setupFee = country.economy.companySetupFee ?? industry.setupFee;
   const licenseFee = country.economy.licenseFeesByIndustry[industryId] ?? industry.licenseFee;
   const totalCost = setupFee + licenseFee;
-  if (profile.bankBalance < totalCost) return failure(profile, 'insufficient-funds', 'لا يكفي رصيدك لرسوم التأسيس والترخيص.');
+  const payment = resolvePurchaseDebit(profile, totalCost, paymentMethod);
+  if ('message' in payment) return failure(profile, 'insufficient-funds', `لا يكفي رصيدك لرسوم التأسيس والترخيص. ${payment.message}`);
 
   const companyId = nextId(profile, 'company', profile.companies.length);
   const licenseId = nextId(profile, 'license', profile.licenses.length);
@@ -443,12 +516,13 @@ export function foundCompany(profile: PlayerProfile, industryId: IndustryId, lan
       ledgerEntry(profile, 'expense', setupFee, `رسوم تأسيس شركة ${companyName}`, 0),
       ledgerEntry(profile, 'expense', licenseFee, `ترخيص قطاع ${industry.name}`, 1),
     ],
-    profile.bankBalance - totalCost,
+    payment.bankBalance,
+    { diamonds: payment.diamonds },
   );
-  return success(syncTasks(nextProfile), `تم تأسيس ${companyName} وترخيصها.`, { companyId, totalCost });
+  return success(syncTasks(nextProfile), `تم تأسيس ${companyName} وترخيصها ${paymentMethod === 'diamonds' ? `مقابل ${payment.diamondsSpent} ماسة` : 'نقدًا'}.`, { companyId, totalCost, diamondsSpent: payment.diamondsSpent });
 }
 
-export function upgradeCompany(profile: PlayerProfile, companyId: string): GameResult<{ companyId: string; level: number; cost: number }> {
+export function upgradeCompany(profile: PlayerProfile, companyId: string, paymentMethod: PurchasePaymentMethod = 'cash'): GameResult<{ companyId: string; level: number; cost: number; diamondsSpent: number }> {
   const company = profile.companies.find((item) => item.id === companyId);
   if (!company) return failure(profile, 'not-found', 'الشركة غير موجودة.');
   const level = company.upgradeLevel ?? 1;
@@ -459,13 +533,14 @@ export function upgradeCompany(profile: PlayerProfile, companyId: string): GameR
   const requiredBatches = level * 2;
   if (completedBatches < requiredBatches) return failure(profile, 'condition-not-met', `تحتاج إلى إكمال ${requiredBatches} دفعات إنتاج قبل الوصول إلى المستوى ${level + 1}. أكملت ${completedBatches}.`);
   const cost = Math.round(120_000 * Math.pow(1.55, level - 1));
-  if (profile.bankBalance < cost) return failure(profile, 'insufficient-funds', `تحتاج إلى ${cost.toLocaleString('ar-EG')} ج.م لتطوير الشركة.`);
+  const payment = resolvePurchaseDebit(profile, cost, paymentMethod);
+  if ('message' in payment) return failure(profile, 'insufficient-funds', `تحتاج إلى ${cost.toLocaleString('ar-EG')} ج.م أو ما يعادلها بالماس لتطوير الشركة. ${payment.message}`);
   const capacityBonus = 20 * level;
   const companies = profile.companies.map((item) => item.id === companyId
     ? { ...item, upgradeLevel: level + 1, energyCapacity: (item.energyCapacity ?? 0) + capacityBonus, energyUnits: (item.energyUnits ?? 0) + capacityBonus, maintenanceCondition: 100 }
     : item);
-  const nextProfile = addLedger({ ...profile, companies }, [ledgerEntry(profile, 'expense', cost, `تطوير ${company.name} إلى المستوى ${level + 1}`, 0)], profile.bankBalance - cost);
-  return success(nextProfile, `تم تطوير ${company.name} إلى المستوى ${level + 1} وزادت طاقتها.`, { companyId, level: level + 1, cost });
+  const nextProfile = addLedger({ ...profile, companies }, [ledgerEntry(profile, 'expense', cost, `تطوير ${company.name} إلى المستوى ${level + 1}`, 0)], payment.bankBalance, { diamonds: payment.diamonds });
+  return success(nextProfile, `تم تطوير ${company.name} إلى المستوى ${level + 1} ${paymentMethod === 'diamonds' ? `مقابل ${payment.diamondsSpent} ماسة` : 'نقدًا'} وزادت طاقتها.`, { companyId, level: level + 1, cost, diamondsSpent: payment.diamondsSpent });
 }
 
 export function runProduction(profile: PlayerProfile, companyId: string, batches: number): GameResult<ProductionOutcome> {
@@ -474,6 +549,7 @@ export function runProduction(profile: PlayerProfile, companyId: string, batches
   if (!isPositiveInteger(batches)) return failure(profile, 'invalid-input', 'عدد دفعات الإنتاج يجب أن يكون عددًا صحيحًا موجبًا.');
   const company = profile.companies.find((item) => item.id === companyId);
   if (!company) return failure(profile, 'not-found', 'الشركة غير موجودة.');
+  if ((company.operationalFromDay ?? 1) > profile.day) return failure(profile, 'condition-not-met', `يجري إنهاء عقود نقل الملكية؛ يبدأ تشغيل الشركة في اليوم ${company.operationalFromDay}.`);
   const recipe = findRecipeForIndustry(company.industryId);
   if (!recipe) return failure(profile, 'not-found', 'لا توجد وصفة لهذا القطاع.');
   const product = PRODUCT_CATALOG.find((item) => item.id === recipe.productId);
@@ -498,8 +574,14 @@ export function runProduction(profile: PlayerProfile, companyId: string, batches
     .filter((order) => order.status === 'active' && order.productId === product.id)
     .reduce((sum, order) => sum + order.outputQuantity, 0);
   const outputQuantity = Math.max(recipe.outputQuantity, Math.round(batches * recipe.outputQuantity * getSynergyProductionMultiplier(profile)));
-  if (currentProductQuantity + plannedProductQuantity + outputQuantity > product.storageLimit) {
-    return failure(profile, 'storage-limit', `سعة تخزين ${product.name} لا تكفي للإنتاج المخطط؛ المتاح ${Math.max(0, product.storageLimit - currentProductQuantity - plannedProductQuantity)} ${product.unit}.`);
+  const warehouseLevel = normalizeWarehouseLevel(profile.warehouseLevel);
+  const itemProductLimit = getWarehouseItemCapacity(product.id, warehouseLevel) ?? product.storageLimit;
+  const warehouseUsage = getWarehouseUsage(profile.inventory, profile.productionOrders);
+  const warehouseCapacity = getWarehouseCapacity(warehouseLevel);
+  if (currentProductQuantity + plannedProductQuantity + outputQuantity > itemProductLimit || warehouseUsage.products + outputQuantity > warehouseCapacity.products) {
+    const itemAvailable = itemProductLimit - currentProductQuantity - plannedProductQuantity;
+    const totalAvailable = warehouseCapacity.products - warehouseUsage.products;
+    return failure(profile, 'storage-limit', `سعة المخزن لا تكفي للإنتاج المخطط؛ المتاح لهذا المنتج ${Math.max(0, itemAvailable)} ${product.unit}، والسعة الكلية المتبقية ${Math.max(0, totalAvailable)} وحدة.`);
   }
 
   const inventory = profile.inventory.map((lot) => {
@@ -553,7 +635,7 @@ export function cancelProductionOrder(profile: PlayerProfile, orderId: string): 
 export function useProductionSpeedCard(profile: PlayerProfile, orderId: string, kind: SpeedCardKind): GameResult<{ orderId: string; kind: SpeedCardKind; completesOnDay: number }> {
   const card = profile.speedCards.find((item) => item.kind === kind && item.quantity > 0);
   if (!card) return failure(profile, 'insufficient-funds', 'لا تملك هذه البطاقة في مخزونك.');
-  if (kind === 'capacity-boost') return failure(profile, 'invalid-input', 'هذه البطاقة تستخدم عند ترقية السعة وليست على أمر إنتاج قائم.');
+  if (kind === 'capacity-boost' || kind.startsWith('day-speed-')) return failure(profile, 'invalid-input', 'هذه البطاقة ليست مخصصة لأوامر الإنتاج.');
   const order = profile.productionOrders.find((item) => item.id === orderId);
   if (!order || order.status !== 'active') return failure(profile, 'not-found', 'أمر الإنتاج غير نشط أو غير موجود.');
   const remainingDays = Math.max(1, order.completesOnDay - profile.day);
@@ -564,17 +646,33 @@ export function useProductionSpeedCard(profile: PlayerProfile, orderId: string, 
   return success({ ...profile, speedCards, productionOrders }, `تم استخدام بطاقة التسريع؛ يكتمل الأمر في اليوم ${completesOnDay}.`, { orderId, kind, completesOnDay });
 }
 
-export function buySpeedCard(profile: PlayerProfile, kind: SpeedCardKind, quantity: number): GameResult<{ kind: SpeedCardKind; quantity: number; diamondsSpent: number }> {
+export function useDaySpeedCard(profile: PlayerProfile, kind: SpeedCardKind): GameResult<{ kind: SpeedCardKind; multiplier: 2 | 3 }> {
+  if (kind !== 'day-speed-2x' && kind !== 'day-speed-3x') return failure(profile, 'invalid-input', 'اختر بطاقة تسريع اليوم ×2 أو ×3.');
+  if (profile.activeDaySpeedMultiplier > 1) return failure(profile, 'condition-not-met', 'بطاقة تسريع اليوم مستخدمة بالفعل؛ يمكنك تفعيل بطاقة جديدة بعد انتقال اليوم.');
+  const card = profile.speedCards.find((item) => item.kind === kind && item.quantity > 0);
+  if (!card) return failure(profile, 'insufficient-funds', 'لا تملك هذه البطاقة في مخزونك.');
+  const multiplier = kind === 'day-speed-2x' ? 2 : 3;
+  const speedCards = profile.speedCards.map((item) => item.kind === kind ? { ...item, quantity: item.quantity - 1 } : item).filter((item) => item.quantity > 0);
+  return success({ ...profile, speedCards, activeDaySpeedMultiplier: multiplier }, `تم تفعيل بطاقة ×${multiplier} لهذا اليوم؛ سيصبح اليوم أسرع.`, { kind, multiplier });
+}
+
+export function buySpeedCard(profile: PlayerProfile, kind: SpeedCardKind, quantity: number, paymentMethod: PurchasePaymentMethod = 'diamonds'): GameResult<{ kind: SpeedCardKind; quantity: number; diamondsSpent: number; cashSpent: number }> {
   if (!isPositiveInteger(quantity)) return failure(profile, 'invalid-input', 'عدد البطاقات يجب أن يكون عددًا صحيحًا موجبًا.');
   const cost = SPEED_CARD_DIAMOND_COSTS[kind];
   if (!cost) return failure(profile, 'not-found', 'نوع بطاقة السرعة غير معروف.');
   const diamondsSpent = cost * quantity;
-  if (profile.diamonds < diamondsSpent) return failure(profile, 'insufficient-funds', 'لا يكفي رصيد الماس لشراء هذه البطاقات.');
+  const cashPrice = getCashPriceForDiamondPrice(diamondsSpent);
+  const payment = resolvePurchaseDebit(profile, cashPrice, paymentMethod, diamondsSpent);
+  if ('message' in payment) return failure(profile, 'insufficient-funds', payment.message);
   const existing = profile.speedCards.find((card) => card.kind === kind);
   const speedCards = existing
     ? profile.speedCards.map((card) => card.kind === kind ? { ...card, quantity: card.quantity + quantity } : card)
     : [...profile.speedCards, { kind, quantity }];
-  return success({ ...profile, diamonds: profile.diamonds - diamondsSpent, speedCards }, `تم شراء ${quantity} بطاقة باستخدام ${diamondsSpent} ماسة.`, { kind, quantity, diamondsSpent });
+  const updated = { ...profile, speedCards };
+  const nextProfile = paymentMethod === 'cash'
+    ? addLedger(updated, [ledgerEntry(profile, 'expense', cashPrice, `شراء ${quantity} بطاقة ${SPEED_CARD_LABELS[kind]} نقدًا`, 0)], payment.bankBalance, { diamonds: payment.diamonds })
+    : { ...updated, diamonds: payment.diamonds };
+  return success(nextProfile, `تم شراء ${quantity} بطاقة ${paymentMethod === 'diamonds' ? `باستخدام ${diamondsSpent} ماسة` : `مقابل ${cashPrice.toLocaleString('ar-EG')} ج.م`}.`, { kind, quantity, diamondsSpent: payment.diamondsSpent, cashSpent: paymentMethod === 'cash' ? cashPrice : 0 });
 }
 
 export function sellProduct(profile: PlayerProfile, productId: string, quantity: number): GameResult<SaleOutcome> {
@@ -629,12 +727,25 @@ export function buyGold(profile: PlayerProfile, grams: number): GameResult<GoldT
   return success(nextProfile, `اشتريت ${grams.toFixed(1)} غرام ذهب بسعر محاكاة ${GOLD_PRICE_PER_GRAM} ج.م للغرام.`, { grams, cashAmount: amount, pricePerGram: GOLD_PRICE_PER_GRAM });
 }
 
-const DIAMONDS_PER_GOLD_GRAM = 60;
+const DIAMONDS_PER_GOLD_GRAM = 0.5;
 export function buyGoldWithDiamonds(profile: PlayerProfile, grams: number): GameResult<GoldTradeOutcome> {
+  const countryError = ensureEgypt(profile);
+  if (countryError) return countryError;
   if (!isPositiveTenth(grams)) return failure(profile, 'invalid-input', 'أدخل كمية ذهب موجبة بخطوة 0.1 غرام.');
-  const diamonds = Math.round(grams * DIAMONDS_PER_GOLD_GRAM);
+  const diamonds = grams * DIAMONDS_PER_GOLD_GRAM;
+  if (!Number.isInteger(diamonds)) return failure(profile, 'invalid-input', 'شراء الذهب بالماس متاح بزيادة 2 غرام لكل ماسة كاملة.');
   if (profile.diamonds < diamonds) return failure(profile, 'insufficient-funds', 'لا يكفي رصيد الماس لشراء هذه الكمية من الذهب.');
-  const nextProfile = { ...profile, diamonds: profile.diamonds - diamonds, goldGrams: Math.round((profile.goldGrams + grams) * 10) / 10, goldCostBasis: profile.goldCostBasis };
+  const goldCost = Math.round(grams * GOLD_PRICE_PER_GRAM);
+  const nextProfile = addLedger(
+    profile,
+    [ledgerEntry(profile, 'asset', goldCost, `شراء ${grams.toFixed(1)} غرام ذهب مقابل ${diamonds} ماسة`, 0)],
+    profile.bankBalance,
+    {
+      diamonds: profile.diamonds - diamonds,
+      goldGrams: Math.round((profile.goldGrams + grams) * 10) / 10,
+      goldCostBasis: profile.goldCostBasis + goldCost,
+    },
+  );
   return success(nextProfile, `تم شراء ${grams.toFixed(1)} غرام ذهب مقابل ${diamonds} ماسة.`, { grams, cashAmount: diamonds, pricePerGram: DIAMONDS_PER_GOLD_GRAM });
 }
 
@@ -1024,7 +1135,7 @@ export function advanceDay(profile: PlayerProfile): GameResult<DayOutcome> {
     occurredAt: now,
   };
   const nextProfile = addLedger(
-    { ...profile, day: nextDay, companies, investments, banking: { ...profile.banking, loans }, staff, productionOrders, inventory, unreadProductionOrderIds: [...new Set([...(profile.unreadProductionOrderIds ?? []), ...newlyCompletedProductionIds])].slice(-500), events: [...profile.events, event], payables, contracts, reputation },
+    { ...profile, day: nextDay, activeDaySpeedMultiplier: 1, companies, investments, banking: { ...profile.banking, loans }, staff, productionOrders, inventory, unreadProductionOrderIds: [...new Set([...(profile.unreadProductionOrderIds ?? []), ...newlyCompletedProductionIds])].slice(-500), events: [...profile.events, event], payables, contracts, reputation },
     entries,
     balance,
   );
@@ -1152,21 +1263,23 @@ export function updateNotificationState(profile: PlayerProfile, action: unknown,
 /** Serializable intent sent by authenticated clients; it deliberately contains no profile/save data. */
 export type GameCommand =
   | { name: 'place_bid'; args: { listingId: string; amount: number; targetCompanyId?: string } }
-  | { name: 'buy_direct_land'; args: { listingId: string } }
-  | { name: 'buy_direct_company'; args: { listingId: string } }
+  | { name: 'buy_direct_land'; args: { listingId: string; paymentMethod?: PurchasePaymentMethod } }
+  | { name: 'buy_direct_company'; args: { listingId: string; paymentMethod?: PurchasePaymentMethod } }
   | { name: 'sell_land'; args: { landId: string } }
-  | { name: 'upgrade_land'; args: { landId: string } }
+  | { name: 'upgrade_land'; args: { landId: string; paymentMethod?: PurchasePaymentMethod } }
   | { name: 'sell_company'; args: { companyId: string } }
   | { name: 'sell_asset'; args: { assetId: string } }
   | { name: 'buy_material'; args: { materialId: string; quantity: number } }
-  | { name: 'buy_global_material'; args: { offerId: string; quantity: number; negotiatedUnitPrice?: number } }
-  | { name: 'found_company'; args: { industryId: IndustryId; landId: string; name: string } }
-  | { name: 'upgrade_company'; args: { companyId: string } }
+  | { name: 'buy_global_material'; args: { offerId: string; quantity: number; negotiatedUnitPrice?: number; paymentMethod?: PurchasePaymentMethod } }
+  | { name: 'found_company'; args: { industryId: IndustryId; landId: string; name: string; paymentMethod?: PurchasePaymentMethod } }
+  | { name: 'upgrade_company'; args: { companyId: string; paymentMethod?: PurchasePaymentMethod } }
   | { name: 'run_production'; args: { companyId: string; batches: number } }
   | { name: 'service_company'; args: { companyId: string } }
   | { name: 'cancel_production'; args: { orderId: string } }
   | { name: 'use_speed_card'; args: { orderId: string; kind: SpeedCardKind } }
-  | { name: 'buy_speed_card'; args: { kind: SpeedCardKind; quantity: number } }
+  | { name: 'use_day_speed_card'; args: { kind: SpeedCardKind } }
+  | { name: 'buy_speed_card'; args: { kind: SpeedCardKind; quantity: number; paymentMethod?: PurchasePaymentMethod } }
+  | { name: 'upgrade_warehouse'; args: { paymentMethod?: PurchasePaymentMethod } }
   | { name: 'sell_product'; args: { productId: string; quantity: number } }
   | { name: 'buy_gold'; args: { grams: number } }
   | { name: 'buy_gold_with_diamonds'; args: { grams: number } }
@@ -1185,6 +1298,9 @@ export type GameCommand =
   | { name: 'deliver_contract'; args: { contractId: string } }
   | { name: 'negotiate_contract'; args: { contractId: string; mode: 'price' | 'deadline' | 'quality' } }
   | { name: 'claim_task'; args: { taskId: string } }
+  | { name: 'claim_season_challenge'; args: { challengeId: string } }
+  | { name: 'claim_login_reward'; args: { rewardId: (typeof LOGIN_REWARDS)[number]['id'] } }
+  | { name: 'choose_season_event'; args: { choiceId: string } }
   | { name: 'update_notification_state'; args: { action: 'read' | 'dismiss'; notificationIds: string[] } };
 
 export type GameCommandHandler = (command: GameCommand, fallback: (profile: PlayerProfile) => GameResult<unknown>) => void | Promise<void>;
@@ -1193,21 +1309,23 @@ export type GameCommandHandler = (command: GameCommand, fallback: (profile: Play
 export function executeGameCommand(profile: PlayerProfile, command: GameCommand): GameResult<unknown> {
   switch (command.name) {
     case 'place_bid': return placeBid(profile, command.args.listingId, command.args.amount, command.args.targetCompanyId);
-    case 'buy_direct_land': return buyDirectLand(profile, command.args.listingId);
-    case 'buy_direct_company': return buyDirectCompany(profile, command.args.listingId);
+    case 'buy_direct_land': return buyDirectLand(profile, command.args.listingId, command.args.paymentMethod);
+    case 'buy_direct_company': return buyDirectCompany(profile, command.args.listingId, command.args.paymentMethod);
     case 'sell_land': return sellLand(profile, command.args.landId);
-    case 'upgrade_land': return upgradeLand(profile, command.args.landId);
+    case 'upgrade_land': return upgradeLand(profile, command.args.landId, command.args.paymentMethod);
     case 'sell_company': return sellCompany(profile, command.args.companyId);
     case 'sell_asset': return sellAsset(profile, command.args.assetId);
     case 'buy_material': return buyMaterial(profile, command.args.materialId, command.args.quantity);
-    case 'buy_global_material': return buyGlobalMaterial(profile, command.args.offerId, command.args.quantity, command.args.negotiatedUnitPrice);
-    case 'found_company': return foundCompany(profile, command.args.industryId, command.args.landId, command.args.name);
-    case 'upgrade_company': return upgradeCompany(profile, command.args.companyId);
+    case 'buy_global_material': return buyGlobalMaterial(profile, command.args.offerId, command.args.quantity, command.args.negotiatedUnitPrice, command.args.paymentMethod);
+    case 'found_company': return foundCompany(profile, command.args.industryId, command.args.landId, command.args.name, command.args.paymentMethod);
+    case 'upgrade_company': return upgradeCompany(profile, command.args.companyId, command.args.paymentMethod);
     case 'run_production': return runProduction(profile, command.args.companyId, command.args.batches);
     case 'service_company': return serviceCompany(profile, command.args.companyId);
     case 'cancel_production': return cancelProductionOrder(profile, command.args.orderId);
     case 'use_speed_card': return useProductionSpeedCard(profile, command.args.orderId, command.args.kind);
-    case 'buy_speed_card': return buySpeedCard(profile, command.args.kind, command.args.quantity);
+    case 'use_day_speed_card': return useDaySpeedCard(profile, command.args.kind);
+    case 'buy_speed_card': return buySpeedCard(profile, command.args.kind, command.args.quantity, command.args.paymentMethod);
+    case 'upgrade_warehouse': return upgradeWarehouse(profile, command.args.paymentMethod);
     case 'sell_product': return sellProduct(profile, command.args.productId, command.args.quantity);
     case 'buy_gold': return buyGold(profile, command.args.grams);
     case 'buy_gold_with_diamonds': return buyGoldWithDiamonds(profile, command.args.grams);
@@ -1226,6 +1344,9 @@ export function executeGameCommand(profile: PlayerProfile, command: GameCommand)
     case 'deliver_contract': return deliverContract(profile, command.args.contractId);
     case 'negotiate_contract': return negotiateContract(profile, command.args.contractId, command.args.mode);
     case 'claim_task': return claimTask(profile, command.args.taskId);
+    case 'claim_season_challenge': return claimSeasonChallenge(profile, command.args.challengeId);
+    case 'claim_login_reward': return claimLoginReward(profile, command.args.rewardId);
+    case 'choose_season_event': return chooseSeasonEvent(profile, command.args.choiceId);
     case 'update_notification_state': return updateNotificationState(profile, command.args.action, command.args.notificationIds);
   }
 }

@@ -5,7 +5,7 @@ import { findIndustry, GOLD_PRICE_PER_GRAM } from '../game/catalog';
 import { normalizeAccountFeatures } from '../domain/accountFeatures';
 
 const SAVE_KEY = 'business-empire.save.v1';
-const SAVE_VERSION = 5;
+const SAVE_VERSION = 6;
 
 function saveKey(accountId?: string): string {
   return accountId ? `${SAVE_KEY}.${accountId}` : SAVE_KEY;
@@ -50,6 +50,8 @@ function isLand(value: unknown): value is PlayerLand {
     && isFiniteNonNegative(value.areaSquareMeters)
     && isFiniteNonNegative(value.purchasePrice)
     && isDateString(value.acquiredAt)
+    && (value.acquiredOnDay === undefined || (Number.isInteger(value.acquiredOnDay) && (value.acquiredOnDay as number) >= 1))
+    && (value.availableForCompanyOnDay === undefined || (Number.isInteger(value.availableForCompanyOnDay) && (value.availableForCompanyOnDay as number) >= 1))
     && (value.landType === undefined || value.landType === 'industrial' || value.landType === 'agricultural' || value.landType === 'commercial');
 }
 
@@ -62,6 +64,8 @@ function isCompany(value: unknown): value is PlayerCompany {
     && typeof value.countryId === 'string'
     && findCountry(value.countryId) !== undefined
     && isDateString(value.foundedAt)
+    && (value.foundedOnDay === undefined || (Number.isInteger(value.foundedOnDay) && (value.foundedOnDay as number) >= 1))
+    && (value.operationalFromDay === undefined || (Number.isInteger(value.operationalFromDay) && (value.operationalFromDay as number) >= 1))
     && (value.landId === undefined || isNonEmptyString(value.landId))
     && (value.licenseIds === undefined || (Array.isArray(value.licenseIds) && value.licenseIds.every(isNonEmptyString)))
     && (value.energyUnits === undefined || isFiniteNonNegative(value.energyUnits))
@@ -212,7 +216,7 @@ function isLegacyProfile(value: unknown): value is Record<string, unknown> {
     && (finances.totalExpenses === undefined || isFiniteNonNegative(finances.totalExpenses));
 }
 
-/** Converts old v1-v3 profiles into one canonical v4 shape without dropping ownership or financial history. */
+/** Converts older profiles into one canonical shape without dropping ownership or financial history. */
 function migrateProfile(value: unknown): PlayerProfile | null {
   if (!isLegacyProfile(value)) return null;
   const rawFinances = value.finances as { netProfit: number; totalRevenue?: number; totalExpenses?: number };
@@ -221,7 +225,12 @@ function migrateProfile(value: unknown): PlayerProfile | null {
   const day = typeof value.day === 'number' && Number.isInteger(value.day) && value.day >= 1 ? value.day : 1;
   const originalLands = value.lands as PlayerLand[];
   const originalCompanies = value.companies as PlayerCompany[];
-  const lands = originalLands.map((land) => ({ ...land }));
+  const lands = originalLands.map((land) => ({
+    ...land,
+    availableForCompanyOnDay: Number.isInteger(land.availableForCompanyOnDay)
+      ? land.availableForCompanyOnDay
+      : (Number.isInteger(land.acquiredOnDay) ? land.acquiredOnDay! : day),
+  }));
   const assignedLandIds = new Set<string>();
   const companies = originalCompanies.map((company) => {
     const industry = findIndustry(company.industryId);
@@ -239,6 +248,7 @@ function migrateProfile(value: unknown): PlayerProfile | null {
         ? company.operatingCostPerDay
         : industry?.dailyOperatingCost ?? 0,
       maintenanceCondition: isFiniteNonNegative(company.maintenanceCondition) ? Math.min(100, company.maintenanceCondition) : 100,
+      ...(Number.isInteger(company.operationalFromDay) ? { operationalFromDay: company.operationalFromDay } : {}),
     };
     const explicitLand = normalizedCompany.landId ? lands.find((land) => land.id === normalizedCompany.landId && !assignedLandIds.has(land.id)) : undefined;
     const linkedLand = explicitLand ?? (!normalizedCompany.landId ? lands.find((land) => !assignedLandIds.has(land.id)) : undefined);
@@ -293,6 +303,8 @@ function migrateProfile(value: unknown): PlayerProfile | null {
     companies,
     finances: { netProfit: totalRevenue - totalExpenses, totalRevenue, totalExpenses },
     day,
+    warehouseLevel: Number.isInteger(value.warehouseLevel) && (value.warehouseLevel as number) >= 1 && (value.warehouseLevel as number) <= 5 ? value.warehouseLevel as number : 1,
+    activeDaySpeedMultiplier: value.activeDaySpeedMultiplier === 2 || value.activeDaySpeedMultiplier === 3 ? value.activeDaySpeedMultiplier : 1,
     inventory: Array.isArray(value.inventory) && value.inventory.every(isInventoryLot) ? value.inventory : [],
     licenses: Array.isArray(value.licenses) && value.licenses.every(isLicense) ? value.licenses : [],
     investments: Array.isArray(value.investments) && value.investments.every(isInvestment) ? value.investments : [],
@@ -328,7 +340,7 @@ export function loadSavedGame(accountId?: string): PlayerProfile | null {
     const raw = globalThis.localStorage?.getItem(saveKey(accountId)) ?? (accountId ? globalThis.localStorage?.getItem(SAVE_KEY) : null);
     if (!raw) return null;
     const value: unknown = JSON.parse(raw);
-    if (!isRecord(value) || ![1, 2, 3, 4, SAVE_VERSION].includes(value.version as number) || !isDateString(value.savedAt)) return null;
+    if (!isRecord(value) || !Array.from({ length: SAVE_VERSION }, (_, index) => index + 1).includes(value.version as number) || !isDateString(value.savedAt)) return null;
     const profile = normalizeSavedProfile(value.profile);
     if (!profile) return null;
     if (value.version !== SAVE_VERSION || JSON.stringify(value.profile) !== JSON.stringify(profile)) saveGame(profile, accountId);

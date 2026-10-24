@@ -2,10 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { COUNTRIES } from '../domain/countries';
 import { createNewPlayer, type PlayerProfile } from '../domain/player';
 import { getContractOffers } from './contracts';
-import { advanceDay, acceptContract, buyGoldWithDiamonds, buyMaterial, buySpeedCard, createDeposit, deliverContract, foundCompany, getDayBriefing, mergeDeposits, payStaffSalary, repayLoan, runProduction, sellGold, takeLoan, updateNotificationState, upgradeLand, withdrawDeposit } from './engine';
+import { advanceDay, acceptContract, buyDirectLand, buyGoldWithDiamonds, buyMaterial, buySpeedCard, createDeposit, deliverContract, executeGameCommand, foundCompany, getDayBriefing, mergeDeposits, payStaffSalary, repayLoan, runProduction, sellGold, takeLoan, updateNotificationState, upgradeLand, upgradeWarehouse, useDaySpeedCard, withdrawDeposit } from './engine';
 import { negotiateContract } from './engine';
 import { getSynergyBonuses } from './synergy';
 import { normalizeSavedProfile } from '../storage/saveRepository';
+import { getCashPriceForDiamondPrice } from './purchasePricing';
 
 function profile(overrides: Partial<PlayerProfile> = {}): PlayerProfile {
   return {
@@ -120,6 +121,18 @@ describe('Business Empire economy invariants', () => {
     expect(buySpeedCard(bought.profile, 'production-instant', 1).ok).toBe(false);
   });
 
+  it('allows buying speed cards with cash at the matching 1%-discounted diamond rate', () => {
+    const base = profile({ bankBalance: 1_000_000, diamonds: 0 });
+    const cashPrice = getCashPriceForDiamondPrice(24);
+    const bought = buySpeedCard(base, 'production-50', 1, 'cash');
+    expect(bought.ok).toBe(true);
+    if (!bought.ok) return;
+    expect(bought.profile.bankBalance).toBe(base.bankBalance - cashPrice);
+    expect(bought.profile.diamonds).toBe(0);
+    expect(bought.data.cashSpent).toBe(cashPrice);
+    expect(bought.profile.finances.totalExpenses).toBe(base.finances.totalExpenses + cashPrice);
+  });
+
   it('awards the founder badge automatically after creating a company', () => {
     const base = profile({ lands: [{ id: 'land-1', label: 'أرض اختبار', landType: 'agricultural', areaSquareMeters: 500, purchasePrice: 100_000, acquiredAt: '2026-01-01T00:00:00.000Z', acquiredOnDay: 1 }] });
     const result = foundCompany(base, 'food', 'land-1', 'شركة الاختبار');
@@ -127,16 +140,41 @@ describe('Business Empire economy invariants', () => {
     if (result.ok) expect(result.profile.badges).toContain('شارة المؤسس');
   });
 
-  it('exchanges diamonds for gold and gold for cash without negative balances', () => {
-    const bought = buyGoldWithDiamonds(profile({ diamonds: 120 }), 1);
+  it('executes season points, login rewards and daily events through serializable game commands', () => {
+    const base = profile({ lands: [{ id: 'land-season', label: 'أرض الموسم', landType: 'agricultural', areaSquareMeters: 500, purchasePrice: 100_000, acquiredAt: '2026-01-01T00:00:00.000Z', acquiredOnDay: 1 }] });
+    const challenge = executeGameCommand(base, { name: 'claim_season_challenge', args: { challengeId: 'daily-empire' } });
+    expect(challenge.ok).toBe(true);
+    if (challenge.ok) expect(challenge.profile.season?.points).toBe(10);
+
+    const loginReward = executeGameCommand(base, { name: 'claim_login_reward', args: { rewardId: 'diamonds' } });
+    expect(loginReward.ok).toBe(true);
+    if (loginReward.ok) {
+      expect(loginReward.profile.season?.points).toBe(5);
+      expect(loginReward.profile.diamonds).toBe(base.diamonds + 8);
+    }
+
+    const event = executeGameCommand(base, { name: 'choose_season_event', args: { choiceId: 'safe' } });
+    expect(event.ok).toBe(true);
+    if (event.ok) {
+      expect(event.profile.season?.points).toBe(5);
+      expect(event.profile.bankBalance).toBe(base.bankBalance + 12_000);
+    }
+  });
+
+  it('exchanges 50 diamonds for 100 grams of gold at the configured rate', () => {
+    const bought = buyGoldWithDiamonds(profile({ diamonds: 60 }), 2);
     expect(bought.ok).toBe(true);
     if (!bought.ok) return;
-    expect(bought.profile.diamonds).toBe(60);
-    expect(bought.profile.goldGrams).toBe(1);
+    expect(bought.profile.diamonds).toBe(59);
+    expect(bought.profile.goldGrams).toBe(2);
+    expect(bought.profile.goldCostBasis).toBe(12_000);
+    expect(bought.profile.ledger.at(-1)?.amount).toBe(12_000);
     const sold = sellGold(bought.profile, 0.5);
     expect(sold.ok).toBe(true);
     if (sold.ok) expect(sold.profile.bankBalance).toBeGreaterThan(bought.profile.bankBalance);
-    expect(buyGoldWithDiamonds(bought.profile, 2).ok).toBe(false);
+    expect(buyGoldWithDiamonds(bought.profile, 120).ok).toBe(false);
+    expect(buyGoldWithDiamonds(profile({ diamonds: 50 }), 100).ok).toBe(true);
+    expect(buyGoldWithDiamonds(profile({ diamonds: 50 }), 0.1).ok).toBe(false);
   });
 
   it('supports paying several loan installments or the full balance at once', () => {
@@ -244,5 +282,62 @@ describe('Business Empire economy invariants', () => {
       expect(marked.profile.readNotificationIds).toContain('production-completed:production-notice-1');
       expect(marked.profile.unreadProductionOrderIds).toEqual([]);
     }
+  });
+
+  it('keeps a newly purchased land parcel unavailable until the next in-game day', () => {
+    const purchased = buyDirectLand(profile({ bankBalance: 1_000_000 }), 'starter-village-land');
+    expect(purchased.ok).toBe(true);
+    if (!purchased.ok) return;
+    expect(purchased.profile.lands[0].availableForCompanyOnDay).toBe(2);
+    const premature = foundCompany(purchased.profile, 'food', purchased.data.landId, 'شركة مبكرة');
+    expect(premature.ok).toBe(false);
+    if (!premature.ok) expect(premature.reason).toBe('condition-not-met');
+    const ready = foundCompany({ ...purchased.profile, day: 2 }, 'food', purchased.data.landId, 'شركة جاهزة');
+    expect(ready.ok).toBe(true);
+  });
+
+  it('charges the discounted whole-diamond price for land and rejects invalid payment methods', () => {
+    const base = profile({ bankBalance: 0, diamonds: 20 });
+    const purchased = buyDirectLand(base, 'starter-village-land', 'diamonds');
+    expect(purchased.ok).toBe(true);
+    if (!purchased.ok) return;
+    expect(purchased.profile.bankBalance).toBe(0);
+    expect(purchased.profile.diamonds).toBe(6);
+    expect(purchased.data.diamondsSpent).toBe(14);
+    const invalid = buyDirectLand(base, 'starter-village-land', 'credits' as never);
+    expect(invalid.ok).toBe(false);
+    if (!invalid.ok) expect(invalid.profile).toEqual(base);
+  });
+
+  it('consumes required raw materials and cash when upgrading warehouse capacity', () => {
+    const base = profile({
+      bankBalance: 100_000,
+      inventory: [
+        { id: 'steel-lot', materialOrProductId: 'steel', quantity: 2, unit: 'طن', unitCost: 6_000 },
+        { id: 'cement-lot', materialOrProductId: 'cement', quantity: 5, unit: 'طن', unitCost: 2_000 },
+      ],
+    });
+    const upgraded = upgradeWarehouse(base);
+    expect(upgraded.ok).toBe(true);
+    if (!upgraded.ok) return;
+    expect(upgraded.profile.warehouseLevel).toBe(2);
+    expect(upgraded.profile.bankBalance).toBe(60_000);
+    expect(upgraded.profile.inventory).toHaveLength(0);
+    expect(upgraded.data.capacity.materials).toBeGreaterThan(8_050);
+  });
+
+  it('activates a day-speed card once and restores normal speed after day rollover', () => {
+    const bought = buySpeedCard(profile({ diamonds: 30 }), 'day-speed-2x', 1);
+    expect(bought.ok).toBe(true);
+    if (!bought.ok) return;
+    const activated = useDaySpeedCard(bought.profile, 'day-speed-2x');
+    expect(activated.ok).toBe(true);
+    if (!activated.ok) return;
+    expect(activated.profile.activeDaySpeedMultiplier).toBe(2);
+    expect(activated.profile.speedCards).toHaveLength(0);
+    expect(useDaySpeedCard(activated.profile, 'day-speed-3x').ok).toBe(false);
+    const nextDay = advanceDay(activated.profile);
+    expect(nextDay.ok).toBe(true);
+    if (nextDay.ok) expect(nextDay.profile.activeDaySpeedMultiplier).toBe(1);
   });
 });

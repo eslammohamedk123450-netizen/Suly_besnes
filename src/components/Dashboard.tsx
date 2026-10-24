@@ -9,9 +9,11 @@ import { selectEmpirePoints, selectEmpirePulse, selectOperationsSnapshot } from 
 import { getPlayerProgress, getSectionUnlockHint, getUnlockedSectionIds } from '../game/onboarding';
 import { selectNotifications } from '../game/notifications';
 import { updateNotificationState, type GameCommand, type GameResult } from '../game/engine';
+import { getGameDayDurationMinutes } from '../game/time';
 import { NotificationCenter } from './NotificationCenter';
 import { getSynergyBonuses } from '../game/synergy';
 import { GlobalLeaderboardCard } from './GlobalLeaderboardCard';
+import { ProductionSummary } from './ProductionSummary';
 
 interface DashboardProps {
   profile: PlayerProfile;
@@ -30,6 +32,7 @@ function getAccountBadgeVariant(label: string): 'vip' | 'verified' | 'partner' |
 
 export function Dashboard({ profile, country, onNavigate, onCommand }: DashboardProps) {
   const totalAssets = calculateTotalAssets(profile);
+  const dayDurationMinutes = getGameDayDurationMinutes(profile.activeDaySpeedMultiplier ?? 1);
   const goldMarketValue = Math.round(profile.goldGrams * GOLD_PRICE_PER_GRAM);
   const quickSections = GAME_SECTIONS.filter((section) => section.id !== 'home');
   const unlockedSections = new Set(getUnlockedSectionIds(profile));
@@ -63,7 +66,8 @@ export function Dashboard({ profile, country, onNavigate, onCommand }: Dashboard
           <h1>مرحبًا، {profile.name}</h1>
           <p>الثروة بداية الحكاية؛ قراراتك هي ما يبني الإمبراطورية.</p>
           <div className="hero-meta"><span className="country-chip">{country.flag} {country.name}</span><span className="hero-divider" /><span>المستوى {playerProgress.level}</span><span className="hero-divider" /><span>{profile.companies.length} شركات</span></div>
-          <span className="dashboard-auto-note"><Icon name="clock" size={15} /> مدة اليوم 24 دقيقة حقيقية</span>
+          <span className="dashboard-auto-note"><Icon name="clock" size={15} /> مدة اليوم {profile.activeDaySpeedMultiplier > 1 ? `×${formatNumber(profile.activeDaySpeedMultiplier)} · ` : ''}{formatNumber(dayDurationMinutes)} دقيقة حقيقية</span>
+          <button className="dashboard-store-link" type="button" onClick={() => onNavigate('store')}><Icon name="store" size={17} /> متجر المشتريات <span>الماس · البطاقات · العروض</span></button>
         </div>
         <div className="hero-emblem"><Icon name="crown" size={25} /><span>BE</span></div>
       </section>
@@ -88,6 +92,8 @@ export function Dashboard({ profile, country, onNavigate, onCommand }: Dashboard
       {totalOutstanding > 0 && <div className="operating-warning" role="status">لديك التزامات ورواتب غير مسددة بقيمة {formatMoney(totalOutstanding, country)}؛ أُوقفت الطاقة مؤقتًا، وتُخصم الالتزامات من السيولة الجديدة.</div>}
 
       <NotificationCenter notifications={notifications} readNotificationIds={profile.readNotificationIds ?? []} onNavigate={onNavigate} onMarkRead={(id) => updateNotifications('read', [id])} onMarkAllRead={(ids) => updateNotifications('read', ids)} onDismissAll={(ids) => updateNotifications('dismiss', ids)} />
+
+      <ProductionSummary profile={profile} onNavigate={onNavigate} />
 
       {synergies.length > 0 && <section className="surface synergy-panel"><div className="panel-heading"><div><span className="section-kicker">ميزة تشغيلية</span><h2>التآزر بين الشركات</h2></div><span className="notification-count">{synergies.length} نشط</span></div><div className="economy-list">{synergies.map((synergy) => <article className="economy-card economy-card--soft" key={synergy.id}><div className="economy-card-head"><div className="economy-card-title"><span className="economy-card-icon"><Icon name="company" size={17} /></span><span><strong>{synergy.title}</strong><small>{synergy.description}</small></span></div><span className="economy-pill economy-pill--green">تكلفة −{Math.round((1 - synergy.costMultiplier) * 100)}%</span></div></article>)}</div></section>}
 

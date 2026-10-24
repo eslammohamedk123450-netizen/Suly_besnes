@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { COUNTRIES } from '../domain/countries';
+import { findCountry } from '../domain/countries';
 import { createNewPlayer } from '../domain/player';
-import { updateNotificationState } from './engine';
+import { advanceDay, buyDirectCompany, buyDirectLand, updateNotificationState } from './engine';
 import { selectNotifications } from './notifications';
 
 const completedOrder = {
@@ -11,7 +11,7 @@ const completedOrder = {
 };
 
 function profile() {
-  return createNewPlayer(COUNTRIES[0], 'اختبار', new Date('2026-01-01T00:00:00.000Z'));
+  return createNewPlayer(findCountry('egypt')!, 'اختبار', new Date('2026-01-01T00:00:00.000Z'));
 }
 
 describe('notification state and destinations', () => {
@@ -41,6 +41,34 @@ describe('notification state and destinations', () => {
     const dismissed = updateNotificationState(read.profile, 'dismiss', allIds);
     expect(dismissed.ok).toBe(true);
     if (dismissed.ok) expect(selectNotifications(dismissed.profile)).toEqual([]);
+  });
+
+  it('announces land and company availability once the ownership-transfer day has passed', () => {
+    const landPurchase = buyDirectLand({ ...profile(), bankBalance: 2_000_000 }, 'starter-village-land');
+    expect(landPurchase.ok).toBe(true);
+    if (!landPurchase.ok) return;
+    const landNoticeId = `ownership-transfer-land:${landPurchase.data.landId}:2`;
+    expect(selectNotifications(landPurchase.profile).some((item) => item.id === landNoticeId)).toBe(false);
+    const landDay = advanceDay(landPurchase.profile);
+    expect(landDay.ok).toBe(true);
+    if (!landDay.ok) return;
+    expect(selectNotifications(landDay.profile)).toContainEqual(expect.objectContaining({
+      id: landNoticeId,
+      title: 'اكتمل نقل ملكية الأرض',
+      section: 'lands',
+    }));
+
+    const companyPurchase = buyDirectCompany({ ...profile(), bankBalance: 2_000_000 }, 'direct-company-food');
+    expect(companyPurchase.ok).toBe(true);
+    if (!companyPurchase.ok) return;
+    const companyDay = advanceDay(companyPurchase.profile);
+    expect(companyDay.ok).toBe(true);
+    if (!companyDay.ok) return;
+    expect(selectNotifications(companyDay.profile)).toContainEqual(expect.objectContaining({
+      id: `ownership-transfer-company:${companyPurchase.data.companyId}:2`,
+      title: 'اكتمل نقل ملكية الشركة',
+      section: 'companies',
+    }));
   });
 
   it('routes grouped alerts to the intended actionable screens', () => {

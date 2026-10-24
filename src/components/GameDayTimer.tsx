@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { PlayerProfile } from '../domain/player';
 import { formatNumber } from '../domain/formatters';
 import { Icon } from './Icon';
-import { GAME_DAY_MS } from '../game/time';
+import { GAME_DAY_MS, getGameDayDurationMs } from '../game/time';
 
 const DAY_MS = GAME_DAY_MS;
 const CLOCK_KEY = 'business-empire-real-time-clock-v2';
@@ -11,6 +11,7 @@ const MAX_CATCH_UP_DAYS = 30;
 interface SavedClock {
   profileId: string;
   nextDayAt: number;
+  activeMultiplier: 1 | 2 | 3;
 }
 
 interface GameDayTimerProps {
@@ -18,15 +19,22 @@ interface GameDayTimerProps {
   onDaysElapsed: (days: number) => void;
 }
 
-function readClock(profileId: string): SavedClock {
+function readClock(profileId: string, activeMultiplier: 1 | 2 | 3): SavedClock {
   try {
     const raw = localStorage.getItem(CLOCK_KEY);
     const saved = raw ? JSON.parse(raw) as SavedClock : null;
-    if (saved?.profileId === profileId && Number.isFinite(saved.nextDayAt)) return saved;
+    if (saved?.profileId === profileId && Number.isFinite(saved.nextDayAt)) {
+      const previousMultiplier = saved.activeMultiplier === 2 || saved.activeMultiplier === 3 ? saved.activeMultiplier : 1;
+      if (previousMultiplier === activeMultiplier) return { ...saved, activeMultiplier };
+      const remaining = Math.max(0, saved.nextDayAt - Date.now());
+      const adjusted = { profileId, nextDayAt: Date.now() + remaining * previousMultiplier / activeMultiplier, activeMultiplier };
+      localStorage.setItem(CLOCK_KEY, JSON.stringify(adjusted));
+      return adjusted;
+    }
   } catch {
     // Fall back to a fresh local clock if storage is unavailable or corrupted.
   }
-  const fresh = { profileId, nextDayAt: Date.now() + DAY_MS };
+  const fresh = { profileId, nextDayAt: Date.now() + getGameDayDurationMs(activeMultiplier), activeMultiplier };
   try { localStorage.setItem(CLOCK_KEY, JSON.stringify(fresh)); } catch { /* best effort */ }
   return fresh;
 }
@@ -44,15 +52,15 @@ function countdown(milliseconds: number): string {
 }
 
 export function GameDayTimer({ profile, onDaysElapsed }: GameDayTimerProps) {
-  const [clock, setClock] = useState<SavedClock>(() => readClock(profile.id));
+  const [clock, setClock] = useState<SavedClock>(() => readClock(profile.id, profile.activeDaySpeedMultiplier ?? 1));
   const [now, setNow] = useState(() => Date.now());
   const processedClockRef = useRef(0);
 
   useEffect(() => {
-    const nextClock = readClock(profile.id);
+    const nextClock = readClock(profile.id, profile.activeDaySpeedMultiplier ?? 1);
     setClock(nextClock);
     setNow(Date.now());
-  }, [profile.id]);
+  }, [profile.id, profile.activeDaySpeedMultiplier]);
 
   useEffect(() => {
     const interval = window.setInterval(() => setNow(Date.now()), 1000);
@@ -63,7 +71,7 @@ export function GameDayTimer({ profile, onDaysElapsed }: GameDayTimerProps) {
     if (now < clock.nextDayAt || processedClockRef.current === clock.nextDayAt) return;
     processedClockRef.current = clock.nextDayAt;
     const elapsedDays = Math.min(MAX_CATCH_UP_DAYS, Math.floor((now - clock.nextDayAt) / DAY_MS) + 1);
-    const nextClock = { ...clock, nextDayAt: clock.nextDayAt + elapsedDays * DAY_MS };
+    const nextClock = { profileId: profile.id, nextDayAt: clock.nextDayAt + elapsedDays * DAY_MS, activeMultiplier: 1 as const };
     writeClock(nextClock);
     setClock(nextClock);
     onDaysElapsed(elapsedDays);
@@ -71,9 +79,9 @@ export function GameDayTimer({ profile, onDaysElapsed }: GameDayTimerProps) {
 
   const remaining = clock.nextDayAt - now;
   return (
-    <div className="game-day-timer" aria-live="off" aria-label={`اليوم ${profile.day}. الوقت المتبقي لليوم التالي ${countdown(remaining)}`}>
+    <div className="game-day-timer" aria-live="off" aria-label={`اليوم ${profile.day}${clock.activeMultiplier > 1 ? ` بسرعة ×${formatNumber(clock.activeMultiplier)}` : ''}. الوقت المتبقي لليوم التالي ${countdown(remaining)}`}>
       <span className="game-day-timer-icon"><Icon name="clock" size={15} /></span>
-      <span className="game-day-timer-copy"><small>اليوم {formatNumber(profile.day)} · الوقت المتبقي لليوم التالي</small><strong>{countdown(remaining)}</strong></span>
+      <span className="game-day-timer-copy"><small>اليوم {formatNumber(profile.day)}{clock.activeMultiplier > 1 ? ` · سرعة ×${formatNumber(clock.activeMultiplier)}` : ''} · الوقت المتبقي لليوم التالي</small><strong>{countdown(remaining)}</strong></span>
     </div>
   );
 }

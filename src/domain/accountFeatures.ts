@@ -1,6 +1,6 @@
 import type { PlayerProfile } from './player';
 
-export type SpeedCardKind = 'production-25' | 'production-50' | 'production-instant' | 'capacity-boost';
+export type SpeedCardKind = 'production-25' | 'production-50' | 'production-instant' | 'capacity-boost' | 'day-speed-2x' | 'day-speed-3x';
 
 export interface SpeedCardStack {
   kind: SpeedCardKind;
@@ -12,6 +12,8 @@ export const SPEED_CARD_LABELS: Record<SpeedCardKind, string> = {
   'production-50': 'تسريع الإنتاج 50%',
   'production-instant': 'إكمال الإنتاج فورًا',
   'capacity-boost': 'زيادة السعة المؤقتة',
+  'day-speed-2x': 'تسريع اليوم ×2',
+  'day-speed-3x': 'تسريع اليوم ×3',
 };
 
 export const SPEED_CARD_DIAMOND_COSTS: Record<SpeedCardKind, number> = {
@@ -19,6 +21,8 @@ export const SPEED_CARD_DIAMOND_COSTS: Record<SpeedCardKind, number> = {
   'production-50': 24,
   'production-instant': 60,
   'capacity-boost': 36,
+  'day-speed-2x': 30,
+  'day-speed-3x': 60,
 };
 
 function hashSeed(seed: string): number {

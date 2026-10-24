@@ -4,7 +4,7 @@ export type IconName =
   | 'home' | 'gavel' | 'company' | 'investment' | 'land' | 'factory'
   | 'warehouse' | 'report' | 'tasks' | 'settings' | 'gold' | 'bank'
   | 'crown' | 'arrow' | 'chevron' | 'close' | 'play' | 'shield'
-  | 'briefcase' | 'menu' | 'clock' | 'lock' | 'plus' | 'globe' | 'target' | 'logout' | 'user';
+  | 'briefcase' | 'menu' | 'clock' | 'lock' | 'plus' | 'globe' | 'target' | 'logout' | 'user' | 'store';
 
 const drawings: Record<IconName, ReactNode> = {
   home: <><path d="m3 10 9-7 9 7"/><path d="M5 9v11h14V9M9 20v-6h6v6"/></>,
@@ -34,6 +34,7 @@ const drawings: Record<IconName, ReactNode> = {
   target: <><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2"/></>,
   logout: <><path d="M10 5H5v14h5M14 8l4 4-4 4M18 12H8"/></>,
   user: <><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></>,
+  store: <><path d="M3 10h18l-2-6H5zM5 10v10h14V10M9 20v-6h6v6M3 10a3 3 0 0 0 6 0 3 3 0 0 0 6 0 3 3 0 0 0 6 0"/></>,
 };
 
 interface IconProps {

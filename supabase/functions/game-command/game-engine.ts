@@ -314,12 +314,185 @@ function getEconomicEventTemplate(day) {
 }
 
 // src/domain/accountFeatures.ts
+var SPEED_CARD_LABELS = {
+  "production-25": "\u062A\u0633\u0631\u064A\u0639 \u0627\u0644\u0625\u0646\u062A\u0627\u062C 25%",
+  "production-50": "\u062A\u0633\u0631\u064A\u0639 \u0627\u0644\u0625\u0646\u062A\u0627\u062C 50%",
+  "production-instant": "\u0625\u0643\u0645\u0627\u0644 \u0627\u0644\u0625\u0646\u062A\u0627\u062C \u0641\u0648\u0631\u064B\u0627",
+  "capacity-boost": "\u0632\u064A\u0627\u062F\u0629 \u0627\u0644\u0633\u0639\u0629 \u0627\u0644\u0645\u0624\u0642\u062A\u0629",
+  "day-speed-2x": "\u062A\u0633\u0631\u064A\u0639 \u0627\u0644\u064A\u0648\u0645 \xD72",
+  "day-speed-3x": "\u062A\u0633\u0631\u064A\u0639 \u0627\u0644\u064A\u0648\u0645 \xD73"
+};
 var SPEED_CARD_DIAMOND_COSTS = {
   "production-25": 12,
   "production-50": 24,
   "production-instant": 60,
-  "capacity-boost": 36
+  "capacity-boost": 36,
+  "day-speed-2x": 30,
+  "day-speed-3x": 60
 };
+
+// src/game/warehouse.ts
+var CAPACITIES = [
+  { materials: 0, products: 0 },
+  { materials: 8050, products: 6850 },
+  { materials: 1e4, products: 9e3 },
+  { materials: 13500, products: 12e3 },
+  { materials: 18e3, products: 16e3 },
+  { materials: 24e3, products: 22e3 }
+];
+var WAREHOUSE_UPGRADE_REQUIREMENTS = {
+  2: { cash: 4e4, materials: { steel: 2, cement: 5 } },
+  3: { cash: 9e4, materials: { steel: 8, cement: 16, components: 2 } },
+  4: { cash: 18e4, materials: { steel: 20, cement: 45, components: 8 } },
+  5: { cash: 35e4, materials: { steel: 50, cement: 100, components: 25 } }
+};
+function normalizeWarehouseLevel(level) {
+  return typeof level === "number" && Number.isInteger(level) && level >= 1 && level <= 5 ? level : 1;
+}
+function getWarehouseCapacity(level) {
+  return CAPACITIES[normalizeWarehouseLevel(level)];
+}
+function getWarehouseItemCapacity(itemId, level) {
+  const multiplier = 1 + (normalizeWarehouseLevel(level) - 1) * 0.5;
+  const item = MATERIAL_CATALOG.find((entry) => entry.id === itemId) ?? PRODUCT_CATALOG.find((entry) => entry.id === itemId);
+  return item ? Math.floor(item.storageLimit * multiplier) : void 0;
+}
+function getWarehouseUsage(inventory, productionOrders) {
+  const materials = new Set(MATERIAL_CATALOG.map((item) => item.id));
+  const products = new Set(PRODUCT_CATALOG.map((item) => item.id));
+  const materialUsage = inventory.reduce((sum, lot) => sum + (materials.has(lot.materialOrProductId) ? lot.quantity : 0), 0);
+  const storedProducts = inventory.reduce((sum, lot) => sum + (products.has(lot.materialOrProductId) ? lot.quantity : 0), 0);
+  const reservedProducts = productionOrders.reduce((sum, order) => sum + (order.status === "active" ? order.outputQuantity : 0), 0);
+  return { materials: materialUsage, products: storedProducts + reservedProducts };
+}
+function getWarehouseMaterialQuantity(profile, materialId) {
+  return profile.inventory.filter((lot) => lot.materialOrProductId === materialId).reduce((sum, lot) => sum + lot.quantity, 0);
+}
+function removeWarehouseMaterials(profile, requirements) {
+  const remaining = new Map(Object.entries(requirements));
+  const updated = profile.inventory.map((lot) => {
+    const needed = remaining.get(lot.materialOrProductId) ?? 0;
+    if (needed <= 0) return lot;
+    const removed = Math.min(needed, lot.quantity);
+    remaining.set(lot.materialOrProductId, needed - removed);
+    return { ...lot, quantity: lot.quantity - removed };
+  });
+  return updated.filter((lot) => lot.quantity > 0);
+}
+
+// src/game/purchasePricing.ts
+var DIAMOND_VALUE_EGP = 12e3;
+var DIAMOND_PURCHASE_DISCOUNT_RATE = 0.01;
+function getDiscountedDiamondPrice(cashPrice) {
+  if (!Number.isFinite(cashPrice) || cashPrice <= 0) return 0;
+  return Math.floor(cashPrice * (1 - DIAMOND_PURCHASE_DISCOUNT_RATE) / DIAMOND_VALUE_EGP);
+}
+function getCashPriceForDiamondPrice(diamondPrice) {
+  if (!Number.isFinite(diamondPrice) || diamondPrice <= 0) return 0;
+  return Math.ceil(diamondPrice * DIAMOND_VALUE_EGP / (1 - DIAMOND_PURCHASE_DISCOUNT_RATE));
+}
+
+// src/game/season.ts
+var SEASON_LENGTH_DAYS = 30;
+var SEASON_ID_PREFIX = "expansion-season-";
+function happenedOnDay(day, profile, occurredAt) {
+  if (day !== void 0) return day === profile.day;
+  if (!occurredAt) return false;
+  const createdAt = Date.parse(profile.createdAt);
+  const eventAt = Date.parse(occurredAt);
+  return Number.isFinite(createdAt) && Number.isFinite(eventAt) && Math.max(1, Math.floor((eventAt - createdAt) / 864e5) + 1) === profile.day;
+}
+function startedInSeason(day, season) {
+  return day !== void 0 && day >= season.startedOnDay && day <= season.endsOnDay;
+}
+var SEASON_CHALLENGES = [
+  { id: "daily-empire", kind: "daily", title: "\u062D\u0631\u0651\u0643 \u0627\u0644\u0625\u0645\u0628\u0631\u0627\u0637\u0648\u0631\u064A\u0629", description: "\u0627\u0645\u062A\u0644\u0643 \u0634\u0631\u0643\u0629 \u0623\u0648 \u0623\u0631\u0636\u064B\u0627 \u0644\u062A\u062B\u0628\u062A \u0623\u0646 \u0627\u0644\u0625\u0645\u0628\u0631\u0627\u0637\u0648\u0631\u064A\u0629 \u062A\u062A\u062D\u0631\u0643.", points: 10, reward: 1e4, available: (profile) => profile.companies.some((item) => happenedOnDay(item.foundedOnDay, profile, item.foundedAt)) || profile.lands.some((item) => happenedOnDay(item.acquiredOnDay, profile, item.acquiredAt)) },
+  { id: "daily-market", kind: "daily", title: "\u0646\u0628\u0636 \u0627\u0644\u0633\u0648\u0642", description: "\u0646\u0641\u0651\u0630 \u0639\u0645\u0644\u064A\u0629 \u0628\u064A\u0639 \u0648\u0627\u062D\u062F\u0629 \u0641\u064A \u0627\u0644\u0633\u0648\u0642.", points: 15, reward: 15e3, available: (profile) => profile.sales.some((item) => happenedOnDay(item.soldOnDay, profile, item.soldAt)) },
+  { id: "daily-auction", kind: "daily", title: "\u0635\u0648\u062A \u0627\u0644\u0645\u0637\u0631\u0642\u0629", description: "\u0634\u0627\u0631\u0643 \u0641\u064A \u0645\u0632\u0627\u062F \u0648\u0627\u062D\u062F \u0639\u0644\u0649 \u0627\u0644\u0623\u0642\u0644.", points: 15, reward: 15e3, available: (profile) => profile.auctionHistory.some((item) => item.bidder === "player" && item.day === profile.day) },
+  { id: "weekly-builder", kind: "weekly", title: "\u0645\u0648\u0633\u0651\u0639 \u0627\u0644\u0623\u0639\u0645\u0627\u0644", description: "\u0623\u0633\u0633 \u0634\u0631\u0643\u062A\u064A\u0646 \u0639\u0644\u0649 \u0627\u0644\u0623\u0642\u0644 \u062E\u0644\u0627\u0644 \u0627\u0644\u0645\u0648\u0633\u0645.", points: 45, reward: 45e3, available: (profile, season) => profile.companies.filter((item) => startedInSeason(item.foundedOnDay, season)).length >= 2 },
+  { id: "weekly-operator", kind: "weekly", title: "\u0642\u0627\u0626\u062F \u0627\u0644\u062A\u0634\u063A\u064A\u0644", description: "\u0634\u063A\u0651\u0644 \u0623\u0645\u0631 \u0625\u0646\u062A\u0627\u062C \u0648\u0627\u062D\u062F \u0639\u0644\u0649 \u0627\u0644\u0623\u0642\u0644.", points: 35, reward: 35e3, available: (profile, season) => profile.productionOrders.some((item) => startedInSeason(item.startedOnDay, season)) },
+  { id: "weekly-investor", kind: "weekly", title: "\u0639\u064A\u0646 \u0639\u0644\u0649 \u0627\u0644\u0645\u0633\u062A\u0642\u0628\u0644", description: "\u0623\u0646\u0634\u0626 \u0627\u0633\u062A\u062B\u0645\u0627\u0631\u064B\u0627 \u0623\u0648 \u0648\u062F\u064A\u0639\u0629 \u0645\u062D\u0627\u0643\u0627\u0629.", points: 30, reward: 3e4, available: (profile, season) => profile.investments.some((item) => startedInSeason(item.startedOnDay, season)) || profile.banking.deposits.some((item) => startedInSeason(item.startedOnDay, season)) }
+];
+var LOGIN_REWARDS = [
+  { id: "cash", title: "\u0633\u064A\u0648\u0644\u0629 \u0641\u0648\u0631\u064A\u0629", description: "25,000 \u062C\u0646\u064A\u0647 \u0645\u062D\u0627\u0643\u0627\u0629", points: 5 },
+  { id: "gold", title: "\u0630\u0647\u0628 \u0644\u0644\u0645\u062D\u0641\u0638\u0629", description: "0.5 \u063A\u0631\u0627\u0645 \u0630\u0647\u0628 \u0645\u062D\u0627\u0643\u0627\u0629", points: 5 },
+  { id: "diamonds", title: "\u0645\u0627\u0633 \u0627\u0644\u0625\u0645\u0628\u0631\u0627\u0637\u0648\u0631\u064A\u0629", description: "8 \u0645\u0627\u0633\u0627\u062A \u0645\u062C\u0627\u0646\u064A\u0629 \u0644\u0644\u0628\u0637\u0627\u0642\u0627\u062A", points: 5 }
+];
+function getSeasonId(day) {
+  return `${SEASON_ID_PREFIX}${Math.floor(Math.max(0, day - 1) / SEASON_LENGTH_DAYS) + 1}`;
+}
+function activeSeason(profile) {
+  const seasonId = getSeasonId(profile.day);
+  const start = Math.floor(Math.max(0, profile.day - 1) / SEASON_LENGTH_DAYS) * SEASON_LENGTH_DAYS + 1;
+  const current = profile.season;
+  if (current?.seasonId === seasonId) return current;
+  return { seasonId, startedOnDay: start, endsOnDay: start + SEASON_LENGTH_DAYS - 1, points: 0, claimedChallengeKeys: [] };
+}
+function getSeasonSnapshot(profile) {
+  const season = activeSeason(profile);
+  const challenges = SEASON_CHALLENGES.map((challenge) => {
+    const key = `${profile.day}:${challenge.id}`;
+    const claimed = challenge.kind === "daily" ? season.claimedChallengeKeys.includes(key) : season.claimedChallengeKeys.includes(challenge.id);
+    return { ...challenge, claimed, available: !claimed && challenge.available(profile, season) };
+  });
+  const nextReward = Math.min(100, 100 - season.points % 100);
+  return { season, challenges, nextReward, progressPercent: Math.min(100, season.points % 100), loginRewardClaimed: season.claimedLoginRewardDay === profile.day };
+}
+function withLedger(profile, amount, note, extra = {}) {
+  const entry = { id: `season-${profile.day}-${(profile.ledger ?? []).length + 1}`, category: "revenue", amount, countryId: profile.countryId, occurredAt: (/* @__PURE__ */ new Date()).toISOString(), note };
+  const ledger = [...profile.ledger, entry];
+  const totalRevenue = ledger.filter((item) => item.category === "revenue").reduce((sum, item) => sum + item.amount, 0);
+  const totalExpenses = ledger.filter((item) => item.category === "expense").reduce((sum, item) => sum + item.amount, 0);
+  return { ...profile, ...extra, bankBalance: profile.bankBalance + amount, ledger, finances: { netProfit: totalRevenue - totalExpenses, totalRevenue, totalExpenses } };
+}
+function claimSeasonChallenge(profile, challengeId) {
+  const snapshot = getSeasonSnapshot(profile);
+  const challenge = snapshot.challenges.find((item) => item.id === challengeId);
+  if (!challenge) return { ok: false, profile, reason: "not-found", message: "\u062A\u062D\u062F\u064A \u0627\u0644\u0645\u0648\u0633\u0645 \u063A\u064A\u0631 \u0645\u0648\u062C\u0648\u062F." };
+  if (challenge.claimed) return { ok: false, profile, reason: "already-claimed", message: "\u062A\u0645 \u062A\u062D\u0635\u064A\u0644 \u0647\u0630\u0627 \u0627\u0644\u062A\u062D\u062F\u064A \u0641\u064A \u0647\u0630\u0647 \u0627\u0644\u0641\u062A\u0631\u0629." };
+  if (!challenge.available) return { ok: false, profile, reason: "condition-not-met", message: "\u0644\u0645 \u064A\u062A\u062D\u0642\u0642 \u0634\u0631\u0637 \u0627\u0644\u062A\u062D\u062F\u064A \u0628\u0639\u062F." };
+  const key = challenge.kind === "daily" ? `${profile.day}:${challenge.id}` : challenge.id;
+  const season = { ...snapshot.season, points: snapshot.season.points + challenge.points, claimedChallengeKeys: [...snapshot.season.claimedChallengeKeys, key] };
+  const nextProfile = withLedger(profile, challenge.reward, `\u0645\u0643\u0627\u0641\u0623\u0629 \u0645\u0648\u0633\u0645 \u0627\u0644\u062A\u0648\u0633\u0639: ${challenge.title}`, { season });
+  return { ok: true, profile: nextProfile, message: `\u0623\u062D\u0633\u0646\u062A! \u062D\u0635\u0644\u062A \u0639\u0644\u0649 ${challenge.points} \u0646\u0642\u0637\u0629 \u0648${challenge.reward.toLocaleString("ar-EG")} \u062C.\u0645 \u0645\u0646 \u0627\u0644\u0645\u0648\u0633\u0645.`, data: { challengeId, points: challenge.points } };
+}
+function claimLoginReward(profile, rewardId) {
+  const snapshot = getSeasonSnapshot(profile);
+  if (snapshot.loginRewardClaimed) return { ok: false, profile, reason: "already-claimed", message: "\u0627\u0633\u062A\u0644\u0645\u062A \u0645\u0643\u0627\u0641\u0623\u0629 \u0627\u0644\u062F\u062E\u0648\u0644 \u0627\u0644\u064A\u0648\u0645." };
+  const reward = LOGIN_REWARDS.find((item) => item.id === rewardId);
+  if (!reward) return { ok: false, profile, reason: "not-found", message: "\u0645\u0643\u0627\u0641\u0623\u0629 \u0627\u0644\u062F\u062E\u0648\u0644 \u063A\u064A\u0631 \u0645\u0648\u062C\u0648\u062F\u0629." };
+  const season = { ...snapshot.season, points: snapshot.season.points + reward.points, claimedLoginRewardDay: profile.day };
+  if (rewardId === "gold") {
+    const nextProfile2 = withLedger(profile, 0, "\u0645\u0643\u0627\u0641\u0623\u0629 \u062F\u062E\u0648\u0644 \u0627\u0644\u0645\u0648\u0633\u0645: 0.5 \u063A\u0631\u0627\u0645 \u0630\u0647\u0628", { season, goldGrams: Math.round((profile.goldGrams + 0.5) * 10) / 10, goldCostBasis: profile.goldCostBasis + 3e3 });
+    return { ok: true, profile: nextProfile2, message: "\u062A\u0645\u062A \u0625\u0636\u0627\u0641\u0629 0.5 \u063A\u0631\u0627\u0645 \u0630\u0647\u0628 \u0645\u062D\u0627\u0643\u0627\u0629 \u0625\u0644\u0649 \u0645\u062D\u0641\u0638\u062A\u0643.", data: { rewardId } };
+  }
+  if (rewardId === "diamonds") {
+    const nextProfile2 = withLedger(profile, 0, "\u0645\u0643\u0627\u0641\u0623\u0629 \u062F\u062E\u0648\u0644 \u0627\u0644\u0645\u0648\u0633\u0645: 8 \u0645\u0627\u0633\u0627\u062A", { season, diamonds: profile.diamonds + 8 });
+    return { ok: true, profile: nextProfile2, message: "\u062A\u0645\u062A \u0625\u0636\u0627\u0641\u0629 8 \u0645\u0627\u0633\u0627\u062A \u0645\u062C\u0627\u0646\u064A\u0629 \u0625\u0644\u0649 \u062D\u0633\u0627\u0628\u0643.", data: { rewardId } };
+  }
+  const nextProfile = withLedger(profile, 25e3, "\u0645\u0643\u0627\u0641\u0623\u0629 \u062F\u062E\u0648\u0644 \u0627\u0644\u0645\u0648\u0633\u0645: \u0633\u064A\u0648\u0644\u0629 \u0641\u0648\u0631\u064A\u0629", { season });
+  return { ok: true, profile: nextProfile, message: "\u062A\u0645\u062A \u0625\u0636\u0627\u0641\u0629 25,000 \u062C.\u0645 \u0645\u062D\u0627\u0643\u0627\u0629 \u0625\u0644\u0649 \u0631\u0635\u064A\u062F\u0643.", data: { rewardId } };
+}
+var SEASON_EVENTS = [
+  { title: "\u0641\u0631\u0635\u0629 \u062A\u0648\u0631\u064A\u062F \u0639\u0627\u062C\u0644\u0629", description: "\u0648\u0635\u0644 \u0637\u0644\u0628 \u0643\u0628\u064A\u0631 \u0645\u0646 \u0627\u0644\u0633\u0648\u0642\u060C \u0644\u0643\u0646 \u0627\u0644\u0642\u0631\u0627\u0631 \u064A\u062D\u062A\u0627\u062C \u0633\u0631\u0639\u0629.", choices: [{ id: "safe", label: "\u0628\u064A\u0639 \u0645\u0646 \u0627\u0644\u0645\u062E\u0632\u0648\u0646", description: "12,000 \u062C.\u0645 \u06485 \u0646\u0642\u0627\u0637", reward: 12e3, points: 5 }, { id: "bold", label: "\u0627\u0642\u0628\u0644 \u0627\u0644\u0637\u0644\u0628 \u0627\u0644\u0643\u0628\u064A\u0631", description: "24,000 \u062C.\u0645 \u064810 \u0646\u0642\u0627\u0637", reward: 24e3, points: 10 }] },
+  { title: "\u0645\u0648\u0642\u0639 \u062A\u0648\u0633\u0639\u0629 \u062C\u062F\u064A\u062F", description: "\u0638\u0647\u0631 \u0645\u0648\u0642\u0639 \u0645\u0646\u0627\u0633\u0628 \u0642\u0631\u0628 \u0645\u0646\u0634\u0622\u062A\u0643 \u0648\u064A\u0645\u0643\u0646 \u0627\u0633\u062A\u063A\u0644\u0627\u0644\u0647 \u0627\u0644\u064A\u0648\u0645.", choices: [{ id: "reserve", label: "\u0627\u062D\u062C\u0632 \u0627\u0644\u0645\u0648\u0642\u0639", description: "18,000 \u062C.\u0645 \u06488 \u0646\u0642\u0627\u0637", reward: 18e3, points: 8 }, { id: "wait", label: "\u0627\u0646\u062A\u0638\u0631 \u0641\u0631\u0635\u0629 \u0623\u0641\u0636\u0644", description: "8,000 \u062C.\u0645 \u06484 \u0646\u0642\u0627\u0637", reward: 8e3, points: 4 }] },
+  { title: "\u0645\u0646\u0627\u0641\u0633 \u064A\u0636\u063A\u0637 \u0627\u0644\u0633\u0648\u0642", description: "\u062E\u0641\u0636 \u0645\u0646\u0627\u0641\u0633 \u0623\u0633\u0639\u0627\u0631\u0647\u060C \u0648\u064A\u0645\u0643\u0646\u0643 \u0627\u0644\u0631\u062F \u0628\u0647\u062F\u0648\u0621 \u0623\u0648 \u0628\u0627\u0644\u0645\u062E\u0627\u0637\u0631\u0629.", choices: [{ id: "steady", label: "\u062D\u0627\u0641\u0638 \u0639\u0644\u0649 \u0627\u0644\u0633\u0639\u0631", description: "10,000 \u062C.\u0645 \u06485 \u0646\u0642\u0627\u0637", reward: 1e4, points: 5 }, { id: "compete", label: "\u0646\u0627\u0641\u0633 \u0628\u0642\u0648\u0629", description: "22,000 \u062C.\u0645 \u06489 \u0646\u0642\u0627\u0637", reward: 22e3, points: 9 }] }
+];
+function getSeasonEventSnapshot(profile) {
+  const season = getSeasonSnapshot(profile);
+  const event = SEASON_EVENTS[(profile.day - 1) % SEASON_EVENTS.length];
+  return { event, claimed: season.season.claimedChallengeKeys.includes(`event:${profile.day}`) };
+}
+function chooseSeasonEvent(profile, choiceId) {
+  const snapshot = getSeasonEventSnapshot(profile);
+  if (snapshot.claimed) return { ok: false, profile, reason: "already-claimed", message: "\u0627\u062A\u062E\u0630\u062A \u0642\u0631\u0627\u0631 \u062D\u062F\u062B \u0627\u0644\u064A\u0648\u0645 \u0628\u0627\u0644\u0641\u0639\u0644." };
+  const choice = snapshot.event.choices.find((item) => item.id === choiceId);
+  if (!choice) return { ok: false, profile, reason: "not-found", message: "\u062E\u064A\u0627\u0631 \u0627\u0644\u062D\u062F\u062B \u063A\u064A\u0631 \u0645\u0648\u062C\u0648\u062F." };
+  const currentSeason = getSeasonSnapshot(profile).season;
+  const season = { ...currentSeason, points: currentSeason.points + choice.points, claimedChallengeKeys: [...currentSeason.claimedChallengeKeys, `event:${profile.day}`] };
+  const nextProfile = withLedger(profile, choice.reward, `\u0642\u0631\u0627\u0631 \u0645\u0648\u0633\u0645 \u0627\u0644\u062A\u0648\u0633\u0639: ${snapshot.event.title} \xB7 ${choice.label}`, { season });
+  return { ok: true, profile: nextProfile, message: `\u062A\u0645 \u062A\u0646\u0641\u064A\u0630 \u0627\u0644\u0642\u0631\u0627\u0631 \u0648\u062D\u0635\u0644\u062A \u0639\u0644\u0649 ${choice.reward.toLocaleString("ar-EG")} \u062C.\u0645 \u0648${choice.points} \u0646\u0642\u0627\u0637 \u0645\u0648\u0633\u0645.`, data: { choiceId } };
+}
 
 // src/game/engine.ts
 var DAY_MS = GAME_DAY_MS;
@@ -338,6 +511,18 @@ function failure(profile, reason, message) {
 }
 function isPositiveInteger(value) {
   return Number.isInteger(value) && value > 0;
+}
+function resolvePurchaseDebit(profile, cashPrice, paymentMethod = "cash", fixedDiamondPrice) {
+  if (paymentMethod !== "cash" && paymentMethod !== "diamonds") return { message: "\u0648\u0633\u064A\u0644\u0629 \u0627\u0644\u062F\u0641\u0639 \u063A\u064A\u0631 \u0635\u0627\u0644\u062D\u0629." };
+  if (!Number.isFinite(cashPrice) || cashPrice <= 0) return { message: "\u0633\u0639\u0631 \u0627\u0644\u0634\u0631\u0627\u0621 \u063A\u064A\u0631 \u0635\u0627\u0644\u062D." };
+  if (paymentMethod === "cash") {
+    if (profile.bankBalance < cashPrice) return { message: "\u0644\u0627 \u064A\u0643\u0641\u064A \u0631\u0635\u064A\u062F \u0627\u0644\u0628\u0646\u0643 \u0644\u0625\u062A\u0645\u0627\u0645 \u0639\u0645\u0644\u064A\u0629 \u0627\u0644\u0634\u0631\u0627\u0621." };
+    return { bankBalance: profile.bankBalance - cashPrice, diamonds: profile.diamonds, diamondsSpent: 0 };
+  }
+  const diamondsSpent = fixedDiamondPrice ?? getDiscountedDiamondPrice(cashPrice);
+  if (!Number.isInteger(diamondsSpent) || diamondsSpent < 1) return { message: "\u0642\u064A\u0645\u0629 \u0627\u0644\u0633\u0644\u0639\u0629 \u0623\u0642\u0644 \u0645\u0646 \u062D\u062F \u0627\u0644\u062F\u0641\u0639 \u0628\u0645\u0627\u0633\u0629 \u0643\u0627\u0645\u0644\u0629\u061B \u0627\u062E\u062A\u0631 \u0627\u0644\u062F\u0641\u0639 \u0646\u0642\u062F\u064B\u0627." };
+  if (profile.diamonds < diamondsSpent) return { message: `\u0644\u0627 \u064A\u0643\u0641\u064A \u0631\u0635\u064A\u062F \u0627\u0644\u0645\u0627\u0633\u061B \u062A\u062D\u062A\u0627\u062C \u0625\u0644\u0649 ${diamondsSpent} \u0645\u0627\u0633\u0629.` };
+  return { bankBalance: profile.bankBalance, diamonds: profile.diamonds - diamondsSpent, diamondsSpent };
 }
 function unpaidSalaryTotal(profile) {
   return profile.staff.filter((employee) => employee.status === "active").reduce((sum, employee) => sum + (employee.unpaidSalary ?? 0), 0);
@@ -442,7 +627,11 @@ function placeBid(profile, listingId, amount, targetCompanyId) {
     const quantity = listing.quantity ?? 0;
     if (!material || !isPositiveInteger(quantity)) return failure(profile, "not-found", "\u0628\u064A\u0627\u0646\u0627\u062A \u0634\u062D\u0646\u0629 \u0627\u0644\u0645\u0632\u0627\u062F \u063A\u064A\u0631 \u0645\u0643\u062A\u0645\u0644\u0629.");
     const existing = profile.inventory.find((lot) => lot.materialOrProductId === material.id);
-    if ((existing?.quantity ?? 0) + quantity > material.storageLimit) return failure(profile, "storage-limit", "\u0633\u0639\u0629 \u0627\u0644\u0645\u062E\u0632\u0646 \u0644\u0627 \u062A\u0643\u0641\u064A \u0644\u0627\u0633\u062A\u0644\u0627\u0645 \u0627\u0644\u0634\u062D\u0646\u0629 \u0627\u0644\u0641\u0627\u0626\u0632\u0629.");
+    const level = normalizeWarehouseLevel(profile.warehouseLevel);
+    const itemLimit = getWarehouseItemCapacity(material.id, level) ?? material.storageLimit;
+    const warehouseUsage = getWarehouseUsage(profile.inventory, profile.productionOrders);
+    const warehouseCapacity = getWarehouseCapacity(level);
+    if ((existing?.quantity ?? 0) + quantity > itemLimit || warehouseUsage.materials + quantity > warehouseCapacity.materials) return failure(profile, "storage-limit", "\u0633\u0639\u0629 \u0627\u0644\u0645\u062E\u0632\u0646 \u0644\u0627 \u062A\u0643\u0641\u064A \u0644\u0627\u0633\u062A\u0644\u0627\u0645 \u0627\u0644\u0634\u062D\u0646\u0629 \u0627\u0644\u0641\u0627\u0626\u0632\u0629\u061B \u0637\u0648\u0651\u0631 \u0627\u0644\u0645\u062E\u0632\u0646 \u0623\u0648 \u0623\u0641\u0631\u063A \u0645\u0633\u0627\u062D\u0629.");
     const inventoryLotId = existing?.id ?? nextId(profile, "inventory", profile.inventory.length);
     const unitCost = amount / quantity;
     const inventory = existing ? profile.inventory.map((lot) => lot.id === existing.id ? { ...lot, quantity: lot.quantity + quantity, unitCost: (lot.quantity * lot.unitCost + amount) / (lot.quantity + quantity) } : lot) : [...profile.inventory, { id: inventoryLotId, materialOrProductId: material.id, quantity, unit: material.unit, unitCost }];
@@ -460,6 +649,7 @@ function placeBid(profile, listingId, amount, targetCompanyId) {
     purchasePrice: amount,
     acquiredAt,
     acquiredOnDay: profile.day,
+    availableForCompanyOnDay: profile.day + 1,
     landType: listing.landType
   };
   const nextProfile = addLedger(
@@ -467,7 +657,7 @@ function placeBid(profile, listingId, amount, targetCompanyId) {
     [ledgerEntry(profile, "asset", amount, `\u0634\u0631\u0627\u0621 \u0623\u0631\u0636 \u0628\u0627\u0644\u0645\u0632\u0627\u062F: ${listing.label}`, 0)],
     profile.bankBalance - amount
   );
-  return success(syncTasks(nextProfile), "\u062A\u0645 \u0627\u0644\u0641\u0648\u0632 \u0628\u0627\u0644\u0645\u0632\u0627\u062F \u0648\u062A\u0633\u062C\u064A\u0644 \u0627\u0644\u0623\u0631\u0636 \u062F\u0648\u0646 \u062E\u0635\u0645 \u0639\u0631\u0648\u0636 \u062E\u0627\u0633\u0631\u0629.", {
+  return success(syncTasks(nextProfile), `\u062A\u0645 \u0627\u0644\u0641\u0648\u0632 \u0628\u0627\u0644\u0645\u0632\u0627\u062F. \u0628\u062F\u0623 \u0625\u0646\u0647\u0627\u0621 \u0639\u0642\u0648\u062F \u0646\u0642\u0644 \u0627\u0644\u0645\u0644\u0643\u064A\u0629\u061B \u0633\u062A\u0643\u0648\u0646 \u0627\u0644\u0623\u0631\u0636 \u0645\u062A\u0627\u062D\u0629 \u0628\u0639\u062F \u064A\u0648\u0645 \u062F\u0627\u062E\u0644 \u0627\u0644\u0644\u0639\u0628\u0629\u060C \u0641\u064A \u0627\u0644\u064A\u0648\u0645 ${profile.day + 1}. \u062A\u062D\u0644\u0651\u064E \u0628\u0627\u0644\u0635\u0628\u0631.`, {
     listingId,
     winner: "player",
     winningAmount: amount,
@@ -475,40 +665,44 @@ function placeBid(profile, listingId, amount, targetCompanyId) {
     landId: land.id
   });
 }
-function buyDirectLand(profile, listingId) {
+function buyDirectLand(profile, listingId, paymentMethod = "cash") {
   const countryError = ensureEgypt(profile);
   if (countryError) return countryError;
   const listing = DIRECT_LAND_CATALOG.find((entry) => entry.id === listingId);
   if (!listing) return failure(profile, "not-found", "\u0639\u0631\u0636 \u0627\u0644\u0623\u0631\u0636 \u063A\u064A\u0631 \u0645\u0648\u062C\u0648\u062F.");
   if (profile.lands.some((land2) => land2.id === listing.id)) return failure(profile, "already-owned", "\u062A\u0645 \u0634\u0631\u0627\u0621 \u0647\u0630\u0647 \u0627\u0644\u0623\u0631\u0636 \u0628\u0627\u0644\u0641\u0639\u0644.");
-  if (profile.bankBalance < listing.price) return failure(profile, "insufficient-funds", "\u0644\u0627 \u064A\u0643\u0641\u064A \u0631\u0635\u064A\u062F\u0643 \u0644\u0634\u0631\u0627\u0621 \u0627\u0644\u0623\u0631\u0636 \u0645\u0628\u0627\u0634\u0631\u0629.");
-  const land = { id: listing.id, label: listing.label, areaSquareMeters: listing.areaSquareMeters, purchasePrice: listing.price, acquiredAt: timestampFor(profile), acquiredOnDay: profile.day, landType: listing.landType };
+  const payment = resolvePurchaseDebit(profile, listing.price, paymentMethod);
+  if ("message" in payment) return failure(profile, "insufficient-funds", payment.message);
+  const land = { id: listing.id, label: listing.label, areaSquareMeters: listing.areaSquareMeters, purchasePrice: listing.price, acquiredAt: timestampFor(profile), acquiredOnDay: profile.day, availableForCompanyOnDay: profile.day + 1, landType: listing.landType };
   const nextProfile = addLedger(
     { ...profile, lands: [...profile.lands, land] },
     [ledgerEntry(profile, "asset", listing.price, `\u0634\u0631\u0627\u0621 \u0623\u0631\u0636 \u0645\u0628\u0627\u0634\u0631: ${listing.label}`, 0)],
-    profile.bankBalance - listing.price
+    payment.bankBalance,
+    { diamonds: payment.diamonds }
   );
-  return success(syncTasks(nextProfile), `\u062A\u0645 \u0634\u0631\u0627\u0621 ${listing.label} \u0645\u0628\u0627\u0634\u0631\u0629.`, { landId: land.id, price: listing.price });
+  return success(syncTasks(nextProfile), `\u062A\u0645 \u0634\u0631\u0627\u0621 ${listing.label} ${paymentMethod === "diamonds" ? `\u0645\u0642\u0627\u0628\u0644 ${payment.diamondsSpent} \u0645\u0627\u0633\u0629` : "\u0646\u0642\u062F\u064B\u0627"}. \u0628\u062F\u0623 \u0625\u0646\u0647\u0627\u0621 \u0639\u0642\u0648\u062F \u0646\u0642\u0644 \u0627\u0644\u0645\u0644\u0643\u064A\u0629\u061B \u0633\u062A\u0643\u0648\u0646 \u0627\u0644\u0623\u0631\u0636 \u0645\u062A\u0627\u062D\u0629 \u0628\u0639\u062F \u064A\u0648\u0645 \u062F\u0627\u062E\u0644 \u0627\u0644\u0644\u0639\u0628\u0629\u060C \u0641\u064A \u0627\u0644\u064A\u0648\u0645 ${profile.day + 1}. \u062A\u062D\u0644\u0651\u064E \u0628\u0627\u0644\u0635\u0628\u0631.`, { landId: land.id, price: listing.price, diamondsSpent: payment.diamondsSpent });
 }
-function buyDirectCompany(profile, listingId) {
+function buyDirectCompany(profile, listingId, paymentMethod = "cash") {
   const countryError = ensureEgypt(profile);
   if (countryError) return countryError;
   const listing = DIRECT_COMPANY_CATALOG.find((entry) => entry.id === listingId);
   const industry = listing ? findIndustry(listing.industryId) : void 0;
   if (!listing || !industry) return failure(profile, "not-found", "\u0639\u0631\u0636 \u0627\u0644\u0634\u0631\u0643\u0629 \u063A\u064A\u0631 \u0645\u0648\u062C\u0648\u062F.");
   if (profile.companies.some((company2) => company2.id === listing.id)) return failure(profile, "already-owned", "\u062A\u0645 \u0634\u0631\u0627\u0621 \u0647\u0630\u0647 \u0627\u0644\u0634\u0631\u0643\u0629 \u0628\u0627\u0644\u0641\u0639\u0644.");
-  if (profile.bankBalance < listing.price) return failure(profile, "insufficient-funds", "\u0644\u0627 \u064A\u0643\u0641\u064A \u0631\u0635\u064A\u062F\u0643 \u0644\u0634\u0631\u0627\u0621 \u0627\u0644\u0634\u0631\u0643\u0629 \u0645\u0628\u0627\u0634\u0631\u0629.");
+  const payment = resolvePurchaseDebit(profile, listing.price, paymentMethod);
+  if ("message" in payment) return failure(profile, "insufficient-funds", payment.message);
   const landId = `${listing.id}-land`;
   const licenseId = `${listing.id}-license`;
-  const land = { id: landId, label: `${listing.name} \xB7 \u0623\u0631\u0636 \u0627\u0644\u0634\u0631\u0643\u0629`, areaSquareMeters: listing.areaSquareMeters, purchasePrice: Math.floor(listing.price * 0.45), acquiredAt: timestampFor(profile), acquiredOnDay: profile.day, landType: listing.landType };
-  const company = { id: listing.id, name: listing.name, industryId: listing.industryId, countryId: profile.countryId, foundedAt: timestampFor(profile), landId, licenseIds: [licenseId], energyUnits: industry.energyCapacity, energyCapacity: industry.energyCapacity, operatingCostPerDay: industry.dailyOperatingCost };
+  const land = { id: landId, label: `${listing.name} \xB7 \u0623\u0631\u0636 \u0627\u0644\u0634\u0631\u0643\u0629`, areaSquareMeters: listing.areaSquareMeters, purchasePrice: Math.floor(listing.price * 0.45), acquiredAt: timestampFor(profile), acquiredOnDay: profile.day, availableForCompanyOnDay: profile.day + 1, landType: listing.landType };
+  const company = { id: listing.id, name: listing.name, industryId: listing.industryId, countryId: profile.countryId, foundedAt: timestampFor(profile), operationalFromDay: profile.day + 1, landId, licenseIds: [licenseId], energyUnits: industry.energyCapacity, energyCapacity: industry.energyCapacity, operatingCostPerDay: industry.dailyOperatingCost };
   const license = { id: licenseId, countryId: profile.countryId, industryId: listing.industryId, feePaid: Math.floor(listing.price * 0.15), issuedAt: timestampFor(profile) };
   const nextProfile = addLedger(
     { ...profile, lands: [...profile.lands, land], companies: [...profile.companies, company], licenses: [...profile.licenses, license] },
     [ledgerEntry(profile, "asset", listing.price, `\u0634\u0631\u0627\u0621 \u0634\u0631\u0643\u0629 \u0645\u0628\u0627\u0634\u0631: ${listing.name}`, 0)],
-    profile.bankBalance - listing.price
+    payment.bankBalance,
+    { diamonds: payment.diamonds }
   );
-  return success(syncTasks(nextProfile), `\u062A\u0645 \u0634\u0631\u0627\u0621 ${listing.name} \u0645\u0639 \u0623\u0631\u0636\u0647\u0627 \u0648\u062A\u062C\u0647\u064A\u0632\u0647\u0627 \u0644\u0644\u062A\u0634\u063A\u064A\u0644.`, { companyId: company.id, landId, price: listing.price });
+  return success(syncTasks(nextProfile), `\u062A\u0645 \u0634\u0631\u0627\u0621 ${listing.name} ${paymentMethod === "diamonds" ? `\u0645\u0642\u0627\u0628\u0644 ${payment.diamondsSpent} \u0645\u0627\u0633\u0629` : "\u0646\u0642\u062F\u064B\u0627"}. \u064A\u062C\u0631\u064A \u0625\u0646\u0647\u0627\u0621 \u0639\u0642\u0648\u062F \u0646\u0642\u0644 \u0627\u0644\u0645\u0644\u0643\u064A\u0629\u060C \u0648\u064A\u0628\u062F\u0623 \u0627\u0644\u062A\u0634\u063A\u064A\u0644 \u0628\u0639\u062F \u064A\u0648\u0645 \u062F\u0627\u062E\u0644 \u0627\u0644\u0644\u0639\u0628\u0629 \u0641\u064A \u0627\u0644\u064A\u0648\u0645 ${profile.day + 1}. \u062A\u062D\u0644\u0651\u064E \u0628\u0627\u0644\u0635\u0628\u0631.`, { companyId: company.id, landId, price: listing.price, diamondsSpent: payment.diamondsSpent });
 }
 function sellLand(profile, landId) {
   const land = profile.lands.find((item) => item.id === landId);
@@ -518,16 +712,17 @@ function sellLand(profile, landId) {
   const nextProfile = addLedger({ ...profile, lands: profile.lands.filter((item) => item.id !== landId) }, [ledgerEntry(profile, "revenue", payout, `\u0628\u064A\u0639 \u0623\u0631\u0636: ${land.label} \u0628\u0646\u0635\u0641 \u0627\u0644\u0642\u064A\u0645\u0629`, 0)], profile.bankBalance + payout);
   return success(nextProfile, `\u062A\u0645 \u0628\u064A\u0639 ${land.label} \u0648\u0627\u0633\u062A\u0631\u062F\u0627\u062F 50% \u0645\u0646 \u0642\u064A\u0645\u062A\u0647\u0627.`, { landId, payout });
 }
-function upgradeLand(profile, landId) {
+function upgradeLand(profile, landId, paymentMethod = "cash") {
   const land = profile.lands.find((item) => item.id === landId);
   if (!land) return failure(profile, "not-found", "\u0627\u0644\u0623\u0631\u0636 \u063A\u064A\u0631 \u0645\u0648\u062C\u0648\u062F\u0629.");
   const level = land.upgradeLevel ?? 1;
   if (level >= 5) return failure(profile, "condition-not-met", "\u0648\u0635\u0644\u062A \u0627\u0644\u0623\u0631\u0636 \u0625\u0644\u0649 \u0623\u0639\u0644\u0649 \u0645\u0633\u062A\u0648\u0649 \u062A\u0637\u0648\u064A\u0631.");
   const cost = Math.round(8e4 * Math.pow(1.55, level - 1));
-  if (profile.bankBalance < cost) return failure(profile, "insufficient-funds", "\u0644\u0627 \u064A\u0643\u0641\u064A \u0627\u0644\u0631\u0635\u064A\u062F \u0644\u062A\u0637\u0648\u064A\u0631 \u0647\u0630\u0647 \u0627\u0644\u0623\u0631\u0636.");
+  const payment = resolvePurchaseDebit(profile, cost, paymentMethod);
+  if ("message" in payment) return failure(profile, "insufficient-funds", payment.message);
   const upgraded = { ...land, upgradeLevel: level + 1, areaSquareMeters: Math.round(land.areaSquareMeters * 1.1), purchasePrice: land.purchasePrice + cost };
-  const nextProfile = addLedger({ ...profile, lands: profile.lands.map((item) => item.id === landId ? upgraded : item) }, [ledgerEntry(profile, "expense", cost, `\u062A\u0637\u0648\u064A\u0631 \u0623\u0631\u0636 ${land.label} \u0625\u0644\u0649 \u0627\u0644\u0645\u0633\u062A\u0648\u0649 ${level + 1}`, 0)], profile.bankBalance - cost);
-  return success(nextProfile, `\u062A\u0645 \u062A\u0637\u0648\u064A\u0631 ${land.label} \u0625\u0644\u0649 \u0627\u0644\u0645\u0633\u062A\u0648\u0649 ${level + 1}.`, { landId, level: level + 1, cost });
+  const nextProfile = addLedger({ ...profile, lands: profile.lands.map((item) => item.id === landId ? upgraded : item) }, [ledgerEntry(profile, "expense", cost, `\u062A\u0637\u0648\u064A\u0631 \u0623\u0631\u0636 ${land.label} \u0625\u0644\u0649 \u0627\u0644\u0645\u0633\u062A\u0648\u0649 ${level + 1}`, 0)], payment.bankBalance, { diamonds: payment.diamonds });
+  return success(nextProfile, `\u062A\u0645 \u062A\u0637\u0648\u064A\u0631 ${land.label} \u0625\u0644\u0649 \u0627\u0644\u0645\u0633\u062A\u0648\u0649 ${level + 1} ${paymentMethod === "diamonds" ? `\u0645\u0642\u0627\u0628\u0644 ${payment.diamondsSpent} \u0645\u0627\u0633\u0629` : "\u0646\u0642\u062F\u064B\u0627"}.`, { landId, level: level + 1, cost, diamondsSpent: payment.diamondsSpent });
 }
 function sellCompany(profile, companyId) {
   const company = profile.companies.find((item) => item.id === companyId);
@@ -551,7 +746,7 @@ function sellAsset(profile, assetId) {
 function buyMaterial(profile, _materialId, _quantity) {
   return failure(profile, "condition-not-met", "\u0627\u0644\u0634\u0631\u0627\u0621 \u0627\u0644\u0645\u0628\u0627\u0634\u0631 \u0644\u0644\u0645\u0648\u0627\u062F \u0627\u0644\u062E\u0627\u0645 \u063A\u064A\u0631 \u0645\u062A\u0627\u062D. \u0627\u0633\u062A\u062E\u062F\u0645 \u0639\u0631\u0648\u0636 \u0627\u0644\u0633\u0648\u0642 \u0623\u0648 \u0627\u0644\u0645\u0632\u0627\u062F.");
 }
-function buyGlobalMaterial(profile, offerId, quantity, negotiatedUnitPrice) {
+function buyGlobalMaterial(profile, offerId, quantity, negotiatedUnitPrice, paymentMethod = "cash") {
   const countryError = ensureEgypt(profile);
   if (countryError) return countryError;
   if (!isPositiveInteger(quantity)) return failure(profile, "invalid-input", "\u0627\u0644\u0643\u0645\u064A\u0629 \u064A\u062C\u0628 \u0623\u0646 \u062A\u0643\u0648\u0646 \u0639\u062F\u062F\u064B\u0627 \u0635\u062D\u064A\u062D\u064B\u0627 \u0645\u0648\u062C\u0628\u064B\u0627.");
@@ -563,17 +758,50 @@ function buyGlobalMaterial(profile, offerId, quantity, negotiatedUnitPrice) {
     return failure(profile, "invalid-input", "\u0627\u0644\u0633\u0639\u0631 \u0644\u0627 \u064A\u0637\u0627\u0628\u0642 \u0634\u0631\u0648\u0637 \u0627\u0644\u0639\u0631\u0636 \u0623\u0648 \u0627\u0644\u062A\u0641\u0627\u0648\u0636.");
   }
   const totalCost = quantity * unitPrice;
-  if (profile.bankBalance < totalCost) return failure(profile, "insufficient-funds", "\u0644\u0627 \u064A\u0643\u0641\u064A \u0631\u0635\u064A\u062F\u0643 \u0644\u0642\u0628\u0648\u0644 \u0647\u0630\u0647 \u0627\u0644\u0635\u0641\u0642\u0629.");
+  const payment = resolvePurchaseDebit(profile, totalCost, paymentMethod);
+  if ("message" in payment) return failure(profile, "insufficient-funds", payment.message);
   const existing = profile.inventory.find((lot) => lot.materialOrProductId === material.id);
+  const level = normalizeWarehouseLevel(profile.warehouseLevel);
+  const itemLimit = getWarehouseItemCapacity(material.id, level) ?? material.storageLimit;
+  const warehouseUsage = getWarehouseUsage(profile.inventory, profile.productionOrders);
+  const warehouseCapacity = getWarehouseCapacity(level);
+  if ((existing?.quantity ?? 0) + quantity > itemLimit || warehouseUsage.materials + quantity > warehouseCapacity.materials) return failure(profile, "storage-limit", `\u0644\u0627 \u062A\u062A\u0633\u0639 \u0633\u0639\u0629 \u0627\u0644\u0645\u062E\u0632\u0646 \u0644\u0644\u0643\u0645\u064A\u0629 \u0627\u0644\u0645\u0637\u0644\u0648\u0628\u0629. \u0627\u0644\u0645\u062A\u0627\u062D ${Math.max(0, Math.min(itemLimit - (existing?.quantity ?? 0), warehouseCapacity.materials - warehouseUsage.materials))} ${material.unit}.`);
   const inventory = existing ? profile.inventory.map((lot) => lot.materialOrProductId === material.id ? { ...lot, quantity: lot.quantity + quantity, unitCost: (lot.quantity * lot.unitCost + totalCost) / (lot.quantity + quantity) } : lot) : [...profile.inventory, { id: nextId(profile, "inventory", profile.inventory.length), materialOrProductId: material.id, quantity, unit: material.unit, unitCost: unitPrice }];
   const nextProfile = addLedger(
     { ...profile, inventory },
     [ledgerEntry(profile, "asset", totalCost, `\u0634\u0631\u0627\u0621 \u0639\u0627\u0644\u0645\u064A ${quantity} ${material.unit} \u0645\u0646 ${offer.sellerName}`, 0)],
-    profile.bankBalance - totalCost
+    payment.bankBalance,
+    { diamonds: payment.diamonds }
   );
-  return success(syncTasks(nextProfile), `\u062A\u0645 \u0642\u0628\u0648\u0644 \u0639\u0631\u0636 ${offer.sellerName} \u0648\u0634\u0631\u0627\u0621 ${quantity} ${material.name} \u0628\u0644\u0627 \u062D\u062F \u062A\u062E\u0632\u064A\u0646.`, { materialId: material.id, quantity, totalCost, unitPrice });
+  return success(syncTasks(nextProfile), `\u062A\u0645 \u0642\u0628\u0648\u0644 \u0639\u0631\u0636 ${offer.sellerName} \u0648\u0634\u0631\u0627\u0621 ${quantity} ${material.name} \u0648\u0625\u0636\u0627\u0641\u062A\u0647\u0627 \u0625\u0644\u0649 \u0627\u0644\u0645\u062E\u0632\u0646 ${paymentMethod === "diamonds" ? `\u0645\u0642\u0627\u0628\u0644 ${payment.diamondsSpent} \u0645\u0627\u0633\u0629` : "\u0646\u0642\u062F\u064B\u0627"}.`, { materialId: material.id, quantity, totalCost, unitPrice, diamondsSpent: payment.diamondsSpent });
 }
-function foundCompany(profile, industryId, landId, name) {
+function upgradeWarehouse(profile, paymentMethod = "cash") {
+  const currentLevel = normalizeWarehouseLevel(profile.warehouseLevel);
+  const nextLevel = currentLevel + 1;
+  const requirement = WAREHOUSE_UPGRADE_REQUIREMENTS[nextLevel];
+  if (!requirement) return failure(profile, "condition-not-met", "\u0648\u0635\u0644 \u0627\u0644\u0645\u062E\u0632\u0646 \u0625\u0644\u0649 \u0623\u0639\u0644\u0649 \u0645\u0633\u062A\u0648\u0649 \u062A\u0637\u0648\u064A\u0631.");
+  const payment = resolvePurchaseDebit(profile, requirement.cash, paymentMethod);
+  if ("message" in payment) return failure(profile, "insufficient-funds", `\u062A\u062D\u062A\u0627\u062C \u0625\u0644\u0649 ${requirement.cash.toLocaleString("ar-EG")} \u062C.\u0645 \u0623\u0648 \u0645\u0627 \u064A\u0639\u0627\u062F\u0644\u0647\u0627 \u0628\u0627\u0644\u0645\u0627\u0633 \u0644\u062A\u0637\u0648\u064A\u0631 \u0627\u0644\u0645\u062E\u0632\u0646. ${payment.message}`);
+  const missing = Object.entries(requirement.materials).filter(([materialId, quantity]) => getWarehouseMaterialQuantity(profile, materialId) < quantity);
+  if (missing.length > 0) {
+    const labels = missing.map(([materialId, quantity]) => {
+      const material = findMaterial(materialId);
+      const owned = getWarehouseMaterialQuantity(profile, materialId);
+      return `${material?.name ?? materialId}: ${Math.max(0, quantity - owned)} ${material?.unit ?? "\u0648\u062D\u062F\u0629"}`;
+    });
+    return failure(profile, "insufficient-materials", `\u0645\u0648\u0627\u062F \u062A\u0637\u0648\u064A\u0631 \u0627\u0644\u0645\u062E\u0632\u0646 \u063A\u064A\u0631 \u0645\u0643\u062A\u0645\u0644\u0629: ${labels.join("\u060C ")}.`);
+  }
+  const inventory = removeWarehouseMaterials(profile, requirement.materials);
+  const materialValue = Object.entries(requirement.materials).reduce((sum, [materialId, quantity]) => sum + quantity * (findMaterial(materialId)?.pricePerUnit ?? 0), 0);
+  const entries = [
+    ledgerEntry(profile, "expense", requirement.cash, `\u062A\u0637\u0648\u064A\u0631 \u0627\u0644\u0645\u062E\u0632\u0646 \u0625\u0644\u0649 \u0627\u0644\u0645\u0633\u062A\u0648\u0649 ${nextLevel}`, 0),
+    ...materialValue > 0 ? [ledgerEntry(profile, "expense", materialValue, "\u0645\u0648\u0627\u062F \u062E\u0627\u0645 \u0645\u0633\u062A\u0647\u0644\u0643\u0629 \u0641\u064A \u062A\u0637\u0648\u064A\u0631 \u0627\u0644\u0645\u062E\u0632\u0646", 1)] : []
+  ];
+  const capacity = getWarehouseCapacity(nextLevel);
+  const nextProfile = addLedger({ ...profile, inventory, warehouseLevel: nextLevel }, entries, payment.bankBalance, { diamonds: payment.diamonds });
+  return success(nextProfile, `\u062A\u0645 \u062A\u0637\u0648\u064A\u0631 \u0627\u0644\u0645\u062E\u0632\u0646 \u0625\u0644\u0649 \u0627\u0644\u0645\u0633\u062A\u0648\u0649 ${nextLevel} ${paymentMethod === "diamonds" ? `\u0645\u0642\u0627\u0628\u0644 ${payment.diamondsSpent} \u0645\u0627\u0633\u0629` : "\u0646\u0642\u062F\u064B\u0627"}. \u0633\u0639\u0629 \u0627\u0644\u062E\u0627\u0645\u0627\u062A ${capacity.materials.toLocaleString("ar-EG")} \u0648\u062D\u062F\u0629 \u0648\u0633\u0639\u0629 \u0627\u0644\u0645\u0646\u062A\u062C\u0627\u062A ${capacity.products.toLocaleString("ar-EG")} \u0648\u062D\u062F\u0629.`, { level: nextLevel, cost: requirement.cash, diamondsSpent: payment.diamondsSpent, capacity });
+}
+function foundCompany(profile, industryId, landId, name, paymentMethod = "cash") {
   const countryError = ensureEgypt(profile);
   if (countryError) return countryError;
   const industry = findIndustry(industryId);
@@ -581,6 +809,7 @@ function foundCompany(profile, industryId, landId, name) {
   if (!industry || !country) return failure(profile, "not-found", "\u0627\u0644\u0642\u0637\u0627\u0639 \u0623\u0648 \u0627\u0644\u062F\u0648\u0644\u0629 \u063A\u064A\u0631 \u0645\u0648\u062C\u0648\u062F.");
   const land = profile.lands.find((item) => item.id === landId);
   if (!land) return failure(profile, "land-required", "\u062A\u062D\u062A\u0627\u062C \u0625\u0644\u0649 \u0623\u0631\u0636 \u0645\u0645\u0644\u0648\u0643\u0629 \u0644\u062A\u0623\u0633\u064A\u0633 \u0627\u0644\u0634\u0631\u0643\u0629.");
+  if ((land.availableForCompanyOnDay ?? land.acquiredOnDay ?? 1) > profile.day) return failure(profile, "condition-not-met", `\u0627\u0644\u0623\u0631\u0636 \u0642\u064A\u062F \u0625\u0646\u0647\u0627\u0621 \u0639\u0642\u0648\u062F \u0646\u0642\u0644 \u0627\u0644\u0645\u0644\u0643\u064A\u0629\u060C \u0648\u0633\u062A\u062A\u0627\u062D \u0644\u0644\u062A\u0623\u0633\u064A\u0633 \u0641\u064A \u0627\u0644\u064A\u0648\u0645 ${land.availableForCompanyOnDay}.`);
   if (profile.companies.some((company2) => company2.landId === landId)) return failure(profile, "land-in-use", "\u0627\u0644\u0623\u0631\u0636 \u0645\u0631\u062A\u0628\u0637\u0629 \u0628\u0634\u0631\u0643\u0629 \u0623\u062E\u0631\u0649 \u0628\u0627\u0644\u0641\u0639\u0644.");
   if (land.landType && land.landType !== industry.requiredLandType) return failure(profile, "wrong-land-type", "\u0646\u0648\u0639 \u0627\u0644\u0623\u0631\u0636 \u0644\u0627 \u064A\u0646\u0627\u0633\u0628 \u0647\u0630\u0627 \u0627\u0644\u0642\u0637\u0627\u0639.");
   const companyName = name.trim();
@@ -588,7 +817,8 @@ function foundCompany(profile, industryId, landId, name) {
   const setupFee = country.economy.companySetupFee ?? industry.setupFee;
   const licenseFee = country.economy.licenseFeesByIndustry[industryId] ?? industry.licenseFee;
   const totalCost = setupFee + licenseFee;
-  if (profile.bankBalance < totalCost) return failure(profile, "insufficient-funds", "\u0644\u0627 \u064A\u0643\u0641\u064A \u0631\u0635\u064A\u062F\u0643 \u0644\u0631\u0633\u0648\u0645 \u0627\u0644\u062A\u0623\u0633\u064A\u0633 \u0648\u0627\u0644\u062A\u0631\u062E\u064A\u0635.");
+  const payment = resolvePurchaseDebit(profile, totalCost, paymentMethod);
+  if ("message" in payment) return failure(profile, "insufficient-funds", `\u0644\u0627 \u064A\u0643\u0641\u064A \u0631\u0635\u064A\u062F\u0643 \u0644\u0631\u0633\u0648\u0645 \u0627\u0644\u062A\u0623\u0633\u064A\u0633 \u0648\u0627\u0644\u062A\u0631\u062E\u064A\u0635. ${payment.message}`);
   const companyId = nextId(profile, "company", profile.companies.length);
   const licenseId = nextId(profile, "license", profile.licenses.length);
   const company = {
@@ -611,11 +841,12 @@ function foundCompany(profile, industryId, landId, name) {
       ledgerEntry(profile, "expense", setupFee, `\u0631\u0633\u0648\u0645 \u062A\u0623\u0633\u064A\u0633 \u0634\u0631\u0643\u0629 ${companyName}`, 0),
       ledgerEntry(profile, "expense", licenseFee, `\u062A\u0631\u062E\u064A\u0635 \u0642\u0637\u0627\u0639 ${industry.name}`, 1)
     ],
-    profile.bankBalance - totalCost
+    payment.bankBalance,
+    { diamonds: payment.diamonds }
   );
-  return success(syncTasks(nextProfile), `\u062A\u0645 \u062A\u0623\u0633\u064A\u0633 ${companyName} \u0648\u062A\u0631\u062E\u064A\u0635\u0647\u0627.`, { companyId, totalCost });
+  return success(syncTasks(nextProfile), `\u062A\u0645 \u062A\u0623\u0633\u064A\u0633 ${companyName} \u0648\u062A\u0631\u062E\u064A\u0635\u0647\u0627 ${paymentMethod === "diamonds" ? `\u0645\u0642\u0627\u0628\u0644 ${payment.diamondsSpent} \u0645\u0627\u0633\u0629` : "\u0646\u0642\u062F\u064B\u0627"}.`, { companyId, totalCost, diamondsSpent: payment.diamondsSpent });
 }
-function upgradeCompany(profile, companyId) {
+function upgradeCompany(profile, companyId, paymentMethod = "cash") {
   const company = profile.companies.find((item) => item.id === companyId);
   if (!company) return failure(profile, "not-found", "\u0627\u0644\u0634\u0631\u0643\u0629 \u063A\u064A\u0631 \u0645\u0648\u062C\u0648\u062F\u0629.");
   const level = company.upgradeLevel ?? 1;
@@ -624,11 +855,12 @@ function upgradeCompany(profile, companyId) {
   const requiredBatches = level * 2;
   if (completedBatches < requiredBatches) return failure(profile, "condition-not-met", `\u062A\u062D\u062A\u0627\u062C \u0625\u0644\u0649 \u0625\u0643\u0645\u0627\u0644 ${requiredBatches} \u062F\u0641\u0639\u0627\u062A \u0625\u0646\u062A\u0627\u062C \u0642\u0628\u0644 \u0627\u0644\u0648\u0635\u0648\u0644 \u0625\u0644\u0649 \u0627\u0644\u0645\u0633\u062A\u0648\u0649 ${level + 1}. \u0623\u0643\u0645\u0644\u062A ${completedBatches}.`);
   const cost = Math.round(12e4 * Math.pow(1.55, level - 1));
-  if (profile.bankBalance < cost) return failure(profile, "insufficient-funds", `\u062A\u062D\u062A\u0627\u062C \u0625\u0644\u0649 ${cost.toLocaleString("ar-EG")} \u062C.\u0645 \u0644\u062A\u0637\u0648\u064A\u0631 \u0627\u0644\u0634\u0631\u0643\u0629.`);
+  const payment = resolvePurchaseDebit(profile, cost, paymentMethod);
+  if ("message" in payment) return failure(profile, "insufficient-funds", `\u062A\u062D\u062A\u0627\u062C \u0625\u0644\u0649 ${cost.toLocaleString("ar-EG")} \u062C.\u0645 \u0623\u0648 \u0645\u0627 \u064A\u0639\u0627\u062F\u0644\u0647\u0627 \u0628\u0627\u0644\u0645\u0627\u0633 \u0644\u062A\u0637\u0648\u064A\u0631 \u0627\u0644\u0634\u0631\u0643\u0629. ${payment.message}`);
   const capacityBonus = 20 * level;
   const companies = profile.companies.map((item) => item.id === companyId ? { ...item, upgradeLevel: level + 1, energyCapacity: (item.energyCapacity ?? 0) + capacityBonus, energyUnits: (item.energyUnits ?? 0) + capacityBonus, maintenanceCondition: 100 } : item);
-  const nextProfile = addLedger({ ...profile, companies }, [ledgerEntry(profile, "expense", cost, `\u062A\u0637\u0648\u064A\u0631 ${company.name} \u0625\u0644\u0649 \u0627\u0644\u0645\u0633\u062A\u0648\u0649 ${level + 1}`, 0)], profile.bankBalance - cost);
-  return success(nextProfile, `\u062A\u0645 \u062A\u0637\u0648\u064A\u0631 ${company.name} \u0625\u0644\u0649 \u0627\u0644\u0645\u0633\u062A\u0648\u0649 ${level + 1} \u0648\u0632\u0627\u062F\u062A \u0637\u0627\u0642\u062A\u0647\u0627.`, { companyId, level: level + 1, cost });
+  const nextProfile = addLedger({ ...profile, companies }, [ledgerEntry(profile, "expense", cost, `\u062A\u0637\u0648\u064A\u0631 ${company.name} \u0625\u0644\u0649 \u0627\u0644\u0645\u0633\u062A\u0648\u0649 ${level + 1}`, 0)], payment.bankBalance, { diamonds: payment.diamonds });
+  return success(nextProfile, `\u062A\u0645 \u062A\u0637\u0648\u064A\u0631 ${company.name} \u0625\u0644\u0649 \u0627\u0644\u0645\u0633\u062A\u0648\u0649 ${level + 1} ${paymentMethod === "diamonds" ? `\u0645\u0642\u0627\u0628\u0644 ${payment.diamondsSpent} \u0645\u0627\u0633\u0629` : "\u0646\u0642\u062F\u064B\u0627"} \u0648\u0632\u0627\u062F\u062A \u0637\u0627\u0642\u062A\u0647\u0627.`, { companyId, level: level + 1, cost, diamondsSpent: payment.diamondsSpent });
 }
 function runProduction(profile, companyId, batches) {
   const countryError = ensureEgypt(profile);
@@ -636,6 +868,7 @@ function runProduction(profile, companyId, batches) {
   if (!isPositiveInteger(batches)) return failure(profile, "invalid-input", "\u0639\u062F\u062F \u062F\u0641\u0639\u0627\u062A \u0627\u0644\u0625\u0646\u062A\u0627\u062C \u064A\u062C\u0628 \u0623\u0646 \u064A\u0643\u0648\u0646 \u0639\u062F\u062F\u064B\u0627 \u0635\u062D\u064A\u062D\u064B\u0627 \u0645\u0648\u062C\u0628\u064B\u0627.");
   const company = profile.companies.find((item) => item.id === companyId);
   if (!company) return failure(profile, "not-found", "\u0627\u0644\u0634\u0631\u0643\u0629 \u063A\u064A\u0631 \u0645\u0648\u062C\u0648\u062F\u0629.");
+  if ((company.operationalFromDay ?? 1) > profile.day) return failure(profile, "condition-not-met", `\u064A\u062C\u0631\u064A \u0625\u0646\u0647\u0627\u0621 \u0639\u0642\u0648\u062F \u0646\u0642\u0644 \u0627\u0644\u0645\u0644\u0643\u064A\u0629\u061B \u064A\u0628\u062F\u0623 \u062A\u0634\u063A\u064A\u0644 \u0627\u0644\u0634\u0631\u0643\u0629 \u0641\u064A \u0627\u0644\u064A\u0648\u0645 ${company.operationalFromDay}.`);
   const recipe = findRecipeForIndustry(company.industryId);
   if (!recipe) return failure(profile, "not-found", "\u0644\u0627 \u062A\u0648\u062C\u062F \u0648\u0635\u0641\u0629 \u0644\u0647\u0630\u0627 \u0627\u0644\u0642\u0637\u0627\u0639.");
   const product = PRODUCT_CATALOG.find((item) => item.id === recipe.productId);
@@ -658,8 +891,14 @@ function runProduction(profile, companyId, batches) {
   const currentProductQuantity = profile.inventory.find((lot) => lot.materialOrProductId === product.id)?.quantity ?? 0;
   const plannedProductQuantity = profile.productionOrders.filter((order2) => order2.status === "active" && order2.productId === product.id).reduce((sum, order2) => sum + order2.outputQuantity, 0);
   const outputQuantity = Math.max(recipe.outputQuantity, Math.round(batches * recipe.outputQuantity * getSynergyProductionMultiplier(profile)));
-  if (currentProductQuantity + plannedProductQuantity + outputQuantity > product.storageLimit) {
-    return failure(profile, "storage-limit", `\u0633\u0639\u0629 \u062A\u062E\u0632\u064A\u0646 ${product.name} \u0644\u0627 \u062A\u0643\u0641\u064A \u0644\u0644\u0625\u0646\u062A\u0627\u062C \u0627\u0644\u0645\u062E\u0637\u0637\u061B \u0627\u0644\u0645\u062A\u0627\u062D ${Math.max(0, product.storageLimit - currentProductQuantity - plannedProductQuantity)} ${product.unit}.`);
+  const warehouseLevel = normalizeWarehouseLevel(profile.warehouseLevel);
+  const itemProductLimit = getWarehouseItemCapacity(product.id, warehouseLevel) ?? product.storageLimit;
+  const warehouseUsage = getWarehouseUsage(profile.inventory, profile.productionOrders);
+  const warehouseCapacity = getWarehouseCapacity(warehouseLevel);
+  if (currentProductQuantity + plannedProductQuantity + outputQuantity > itemProductLimit || warehouseUsage.products + outputQuantity > warehouseCapacity.products) {
+    const itemAvailable = itemProductLimit - currentProductQuantity - plannedProductQuantity;
+    const totalAvailable = warehouseCapacity.products - warehouseUsage.products;
+    return failure(profile, "storage-limit", `\u0633\u0639\u0629 \u0627\u0644\u0645\u062E\u0632\u0646 \u0644\u0627 \u062A\u0643\u0641\u064A \u0644\u0644\u0625\u0646\u062A\u0627\u062C \u0627\u0644\u0645\u062E\u0637\u0637\u061B \u0627\u0644\u0645\u062A\u0627\u062D \u0644\u0647\u0630\u0627 \u0627\u0644\u0645\u0646\u062A\u062C ${Math.max(0, itemAvailable)} ${product.unit}\u060C \u0648\u0627\u0644\u0633\u0639\u0629 \u0627\u0644\u0643\u0644\u064A\u0629 \u0627\u0644\u0645\u062A\u0628\u0642\u064A\u0629 ${Math.max(0, totalAvailable)} \u0648\u062D\u062F\u0629.`);
   }
   const inventory = profile.inventory.map((lot) => {
     const input = recipe.inputs.find((item) => item.materialId === lot.materialOrProductId);
@@ -709,7 +948,7 @@ function cancelProductionOrder(profile, orderId) {
 function useProductionSpeedCard(profile, orderId, kind) {
   const card = profile.speedCards.find((item) => item.kind === kind && item.quantity > 0);
   if (!card) return failure(profile, "insufficient-funds", "\u0644\u0627 \u062A\u0645\u0644\u0643 \u0647\u0630\u0647 \u0627\u0644\u0628\u0637\u0627\u0642\u0629 \u0641\u064A \u0645\u062E\u0632\u0648\u0646\u0643.");
-  if (kind === "capacity-boost") return failure(profile, "invalid-input", "\u0647\u0630\u0647 \u0627\u0644\u0628\u0637\u0627\u0642\u0629 \u062A\u0633\u062A\u062E\u062F\u0645 \u0639\u0646\u062F \u062A\u0631\u0642\u064A\u0629 \u0627\u0644\u0633\u0639\u0629 \u0648\u0644\u064A\u0633\u062A \u0639\u0644\u0649 \u0623\u0645\u0631 \u0625\u0646\u062A\u0627\u062C \u0642\u0627\u0626\u0645.");
+  if (kind === "capacity-boost" || kind.startsWith("day-speed-")) return failure(profile, "invalid-input", "\u0647\u0630\u0647 \u0627\u0644\u0628\u0637\u0627\u0642\u0629 \u0644\u064A\u0633\u062A \u0645\u062E\u0635\u0635\u0629 \u0644\u0623\u0648\u0627\u0645\u0631 \u0627\u0644\u0625\u0646\u062A\u0627\u062C.");
   const order = profile.productionOrders.find((item) => item.id === orderId);
   if (!order || order.status !== "active") return failure(profile, "not-found", "\u0623\u0645\u0631 \u0627\u0644\u0625\u0646\u062A\u0627\u062C \u063A\u064A\u0631 \u0646\u0634\u0637 \u0623\u0648 \u063A\u064A\u0631 \u0645\u0648\u062C\u0648\u062F.");
   const remainingDays = Math.max(1, order.completesOnDay - profile.day);
@@ -719,15 +958,28 @@ function useProductionSpeedCard(profile, orderId, kind) {
   const productionOrders = profile.productionOrders.map((item) => item.id === orderId ? { ...item, completesOnDay } : item);
   return success({ ...profile, speedCards, productionOrders }, `\u062A\u0645 \u0627\u0633\u062A\u062E\u062F\u0627\u0645 \u0628\u0637\u0627\u0642\u0629 \u0627\u0644\u062A\u0633\u0631\u064A\u0639\u061B \u064A\u0643\u062A\u0645\u0644 \u0627\u0644\u0623\u0645\u0631 \u0641\u064A \u0627\u0644\u064A\u0648\u0645 ${completesOnDay}.`, { orderId, kind, completesOnDay });
 }
-function buySpeedCard(profile, kind, quantity) {
+function useDaySpeedCard(profile, kind) {
+  if (kind !== "day-speed-2x" && kind !== "day-speed-3x") return failure(profile, "invalid-input", "\u0627\u062E\u062A\u0631 \u0628\u0637\u0627\u0642\u0629 \u062A\u0633\u0631\u064A\u0639 \u0627\u0644\u064A\u0648\u0645 \xD72 \u0623\u0648 \xD73.");
+  if (profile.activeDaySpeedMultiplier > 1) return failure(profile, "condition-not-met", "\u0628\u0637\u0627\u0642\u0629 \u062A\u0633\u0631\u064A\u0639 \u0627\u0644\u064A\u0648\u0645 \u0645\u0633\u062A\u062E\u062F\u0645\u0629 \u0628\u0627\u0644\u0641\u0639\u0644\u061B \u064A\u0645\u0643\u0646\u0643 \u062A\u0641\u0639\u064A\u0644 \u0628\u0637\u0627\u0642\u0629 \u062C\u062F\u064A\u062F\u0629 \u0628\u0639\u062F \u0627\u0646\u062A\u0642\u0627\u0644 \u0627\u0644\u064A\u0648\u0645.");
+  const card = profile.speedCards.find((item) => item.kind === kind && item.quantity > 0);
+  if (!card) return failure(profile, "insufficient-funds", "\u0644\u0627 \u062A\u0645\u0644\u0643 \u0647\u0630\u0647 \u0627\u0644\u0628\u0637\u0627\u0642\u0629 \u0641\u064A \u0645\u062E\u0632\u0648\u0646\u0643.");
+  const multiplier = kind === "day-speed-2x" ? 2 : 3;
+  const speedCards = profile.speedCards.map((item) => item.kind === kind ? { ...item, quantity: item.quantity - 1 } : item).filter((item) => item.quantity > 0);
+  return success({ ...profile, speedCards, activeDaySpeedMultiplier: multiplier }, `\u062A\u0645 \u062A\u0641\u0639\u064A\u0644 \u0628\u0637\u0627\u0642\u0629 \xD7${multiplier} \u0644\u0647\u0630\u0627 \u0627\u0644\u064A\u0648\u0645\u061B \u0633\u064A\u0635\u0628\u062D \u0627\u0644\u064A\u0648\u0645 \u0623\u0633\u0631\u0639.`, { kind, multiplier });
+}
+function buySpeedCard(profile, kind, quantity, paymentMethod = "diamonds") {
   if (!isPositiveInteger(quantity)) return failure(profile, "invalid-input", "\u0639\u062F\u062F \u0627\u0644\u0628\u0637\u0627\u0642\u0627\u062A \u064A\u062C\u0628 \u0623\u0646 \u064A\u0643\u0648\u0646 \u0639\u062F\u062F\u064B\u0627 \u0635\u062D\u064A\u062D\u064B\u0627 \u0645\u0648\u062C\u0628\u064B\u0627.");
   const cost = SPEED_CARD_DIAMOND_COSTS[kind];
   if (!cost) return failure(profile, "not-found", "\u0646\u0648\u0639 \u0628\u0637\u0627\u0642\u0629 \u0627\u0644\u0633\u0631\u0639\u0629 \u063A\u064A\u0631 \u0645\u0639\u0631\u0648\u0641.");
   const diamondsSpent = cost * quantity;
-  if (profile.diamonds < diamondsSpent) return failure(profile, "insufficient-funds", "\u0644\u0627 \u064A\u0643\u0641\u064A \u0631\u0635\u064A\u062F \u0627\u0644\u0645\u0627\u0633 \u0644\u0634\u0631\u0627\u0621 \u0647\u0630\u0647 \u0627\u0644\u0628\u0637\u0627\u0642\u0627\u062A.");
+  const cashPrice = getCashPriceForDiamondPrice(diamondsSpent);
+  const payment = resolvePurchaseDebit(profile, cashPrice, paymentMethod, diamondsSpent);
+  if ("message" in payment) return failure(profile, "insufficient-funds", payment.message);
   const existing = profile.speedCards.find((card) => card.kind === kind);
   const speedCards = existing ? profile.speedCards.map((card) => card.kind === kind ? { ...card, quantity: card.quantity + quantity } : card) : [...profile.speedCards, { kind, quantity }];
-  return success({ ...profile, diamonds: profile.diamonds - diamondsSpent, speedCards }, `\u062A\u0645 \u0634\u0631\u0627\u0621 ${quantity} \u0628\u0637\u0627\u0642\u0629 \u0628\u0627\u0633\u062A\u062E\u062F\u0627\u0645 ${diamondsSpent} \u0645\u0627\u0633\u0629.`, { kind, quantity, diamondsSpent });
+  const updated = { ...profile, speedCards };
+  const nextProfile = paymentMethod === "cash" ? addLedger(updated, [ledgerEntry(profile, "expense", cashPrice, `\u0634\u0631\u0627\u0621 ${quantity} \u0628\u0637\u0627\u0642\u0629 ${SPEED_CARD_LABELS[kind]} \u0646\u0642\u062F\u064B\u0627`, 0)], payment.bankBalance, { diamonds: payment.diamonds }) : { ...updated, diamonds: payment.diamonds };
+  return success(nextProfile, `\u062A\u0645 \u0634\u0631\u0627\u0621 ${quantity} \u0628\u0637\u0627\u0642\u0629 ${paymentMethod === "diamonds" ? `\u0628\u0627\u0633\u062A\u062E\u062F\u0627\u0645 ${diamondsSpent} \u0645\u0627\u0633\u0629` : `\u0645\u0642\u0627\u0628\u0644 ${cashPrice.toLocaleString("ar-EG")} \u062C.\u0645`}.`, { kind, quantity, diamondsSpent: payment.diamondsSpent, cashSpent: paymentMethod === "cash" ? cashPrice : 0 });
 }
 function sellProduct(profile, productId, quantity) {
   const countryError = ensureEgypt(profile);
@@ -777,12 +1029,25 @@ function buyGold(profile, grams) {
   );
   return success(nextProfile, `\u0627\u0634\u062A\u0631\u064A\u062A ${grams.toFixed(1)} \u063A\u0631\u0627\u0645 \u0630\u0647\u0628 \u0628\u0633\u0639\u0631 \u0645\u062D\u0627\u0643\u0627\u0629 ${GOLD_PRICE_PER_GRAM} \u062C.\u0645 \u0644\u0644\u063A\u0631\u0627\u0645.`, { grams, cashAmount: amount, pricePerGram: GOLD_PRICE_PER_GRAM });
 }
-var DIAMONDS_PER_GOLD_GRAM = 60;
+var DIAMONDS_PER_GOLD_GRAM = 0.5;
 function buyGoldWithDiamonds(profile, grams) {
+  const countryError = ensureEgypt(profile);
+  if (countryError) return countryError;
   if (!isPositiveTenth(grams)) return failure(profile, "invalid-input", "\u0623\u062F\u062E\u0644 \u0643\u0645\u064A\u0629 \u0630\u0647\u0628 \u0645\u0648\u062C\u0628\u0629 \u0628\u062E\u0637\u0648\u0629 0.1 \u063A\u0631\u0627\u0645.");
-  const diamonds = Math.round(grams * DIAMONDS_PER_GOLD_GRAM);
+  const diamonds = grams * DIAMONDS_PER_GOLD_GRAM;
+  if (!Number.isInteger(diamonds)) return failure(profile, "invalid-input", "\u0634\u0631\u0627\u0621 \u0627\u0644\u0630\u0647\u0628 \u0628\u0627\u0644\u0645\u0627\u0633 \u0645\u062A\u0627\u062D \u0628\u0632\u064A\u0627\u062F\u0629 2 \u063A\u0631\u0627\u0645 \u0644\u0643\u0644 \u0645\u0627\u0633\u0629 \u0643\u0627\u0645\u0644\u0629.");
   if (profile.diamonds < diamonds) return failure(profile, "insufficient-funds", "\u0644\u0627 \u064A\u0643\u0641\u064A \u0631\u0635\u064A\u062F \u0627\u0644\u0645\u0627\u0633 \u0644\u0634\u0631\u0627\u0621 \u0647\u0630\u0647 \u0627\u0644\u0643\u0645\u064A\u0629 \u0645\u0646 \u0627\u0644\u0630\u0647\u0628.");
-  const nextProfile = { ...profile, diamonds: profile.diamonds - diamonds, goldGrams: Math.round((profile.goldGrams + grams) * 10) / 10, goldCostBasis: profile.goldCostBasis };
+  const goldCost = Math.round(grams * GOLD_PRICE_PER_GRAM);
+  const nextProfile = addLedger(
+    profile,
+    [ledgerEntry(profile, "asset", goldCost, `\u0634\u0631\u0627\u0621 ${grams.toFixed(1)} \u063A\u0631\u0627\u0645 \u0630\u0647\u0628 \u0645\u0642\u0627\u0628\u0644 ${diamonds} \u0645\u0627\u0633\u0629`, 0)],
+    profile.bankBalance,
+    {
+      diamonds: profile.diamonds - diamonds,
+      goldGrams: Math.round((profile.goldGrams + grams) * 10) / 10,
+      goldCostBasis: profile.goldCostBasis + goldCost
+    }
+  );
   return success(nextProfile, `\u062A\u0645 \u0634\u0631\u0627\u0621 ${grams.toFixed(1)} \u063A\u0631\u0627\u0645 \u0630\u0647\u0628 \u0645\u0642\u0627\u0628\u0644 ${diamonds} \u0645\u0627\u0633\u0629.`, { grams, cashAmount: diamonds, pricePerGram: DIAMONDS_PER_GOLD_GRAM });
 }
 function sellGold(profile, grams) {
@@ -1141,7 +1406,7 @@ function advanceDay(profile) {
     occurredAt: now
   };
   const nextProfile = addLedger(
-    { ...profile, day: nextDay, companies, investments, banking: { ...profile.banking, loans }, staff, productionOrders, inventory, unreadProductionOrderIds: [.../* @__PURE__ */ new Set([...profile.unreadProductionOrderIds ?? [], ...newlyCompletedProductionIds])].slice(-500), events: [...profile.events, event], payables, contracts, reputation },
+    { ...profile, day: nextDay, activeDaySpeedMultiplier: 1, companies, investments, banking: { ...profile.banking, loans }, staff, productionOrders, inventory, unreadProductionOrderIds: [.../* @__PURE__ */ new Set([...profile.unreadProductionOrderIds ?? [], ...newlyCompletedProductionIds])].slice(-500), events: [...profile.events, event], payables, contracts, reputation },
     entries,
     balance
   );
@@ -1256,13 +1521,13 @@ function executeGameCommand(profile, command) {
     case "place_bid":
       return placeBid(profile, command.args.listingId, command.args.amount, command.args.targetCompanyId);
     case "buy_direct_land":
-      return buyDirectLand(profile, command.args.listingId);
+      return buyDirectLand(profile, command.args.listingId, command.args.paymentMethod);
     case "buy_direct_company":
-      return buyDirectCompany(profile, command.args.listingId);
+      return buyDirectCompany(profile, command.args.listingId, command.args.paymentMethod);
     case "sell_land":
       return sellLand(profile, command.args.landId);
     case "upgrade_land":
-      return upgradeLand(profile, command.args.landId);
+      return upgradeLand(profile, command.args.landId, command.args.paymentMethod);
     case "sell_company":
       return sellCompany(profile, command.args.companyId);
     case "sell_asset":
@@ -1270,11 +1535,11 @@ function executeGameCommand(profile, command) {
     case "buy_material":
       return buyMaterial(profile, command.args.materialId, command.args.quantity);
     case "buy_global_material":
-      return buyGlobalMaterial(profile, command.args.offerId, command.args.quantity, command.args.negotiatedUnitPrice);
+      return buyGlobalMaterial(profile, command.args.offerId, command.args.quantity, command.args.negotiatedUnitPrice, command.args.paymentMethod);
     case "found_company":
-      return foundCompany(profile, command.args.industryId, command.args.landId, command.args.name);
+      return foundCompany(profile, command.args.industryId, command.args.landId, command.args.name, command.args.paymentMethod);
     case "upgrade_company":
-      return upgradeCompany(profile, command.args.companyId);
+      return upgradeCompany(profile, command.args.companyId, command.args.paymentMethod);
     case "run_production":
       return runProduction(profile, command.args.companyId, command.args.batches);
     case "service_company":
@@ -1283,8 +1548,12 @@ function executeGameCommand(profile, command) {
       return cancelProductionOrder(profile, command.args.orderId);
     case "use_speed_card":
       return useProductionSpeedCard(profile, command.args.orderId, command.args.kind);
+    case "use_day_speed_card":
+      return useDaySpeedCard(profile, command.args.kind);
     case "buy_speed_card":
-      return buySpeedCard(profile, command.args.kind, command.args.quantity);
+      return buySpeedCard(profile, command.args.kind, command.args.quantity, command.args.paymentMethod);
+    case "upgrade_warehouse":
+      return upgradeWarehouse(profile, command.args.paymentMethod);
     case "sell_product":
       return sellProduct(profile, command.args.productId, command.args.quantity);
     case "buy_gold":
@@ -1321,6 +1590,12 @@ function executeGameCommand(profile, command) {
       return negotiateContract(profile, command.args.contractId, command.args.mode);
     case "claim_task":
       return claimTask(profile, command.args.taskId);
+    case "claim_season_challenge":
+      return claimSeasonChallenge(profile, command.args.challengeId);
+    case "claim_login_reward":
+      return claimLoginReward(profile, command.args.rewardId);
+    case "choose_season_event":
+      return chooseSeasonEvent(profile, command.args.choiceId);
     case "update_notification_state":
       return updateNotificationState(profile, command.args.action, command.args.notificationIds);
   }
@@ -1371,6 +1646,8 @@ export {
   updateNotificationState,
   upgradeCompany,
   upgradeLand,
+  upgradeWarehouse,
+  useDaySpeedCard,
   useProductionSpeedCard,
   withdrawDeposit
 };

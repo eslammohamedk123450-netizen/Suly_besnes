@@ -2,6 +2,7 @@ import type { IconName } from '../components/Icon';
 
 export type SectionId =
   | 'home'
+  | 'store'
   | 'auctions'
   | 'companies'
   | 'investments'
@@ -33,6 +34,7 @@ export interface SectionGroup {
 
 export const GAME_SECTIONS: readonly SectionItem[] = [
   { id: 'home', label: 'الرئيسية', shortLabel: 'الرئيسية', subtitle: 'ملخص إمبراطوريتك', icon: 'home' },
+  { id: 'store', label: 'متجر المشتريات', shortLabel: 'المتجر', subtitle: 'الماس والبطاقات والعروض', icon: 'store' },
   { id: 'auctions', label: 'المزادات', shortLabel: 'المزادات', subtitle: 'أراضٍ وأصول وفرص جديدة', icon: 'gavel' },
   { id: 'companies', label: 'الشركات', shortLabel: 'الشركات', subtitle: 'إدارة أعمالك وقطاعاتك', icon: 'company' },
   { id: 'investments', label: 'الاستثمارات', shortLabel: 'الاستثمار', subtitle: 'خطط لتوسّعك القادم', icon: 'investment' },
@@ -50,7 +52,7 @@ export const GAME_SECTIONS: readonly SectionItem[] = [
 ];
 
 export const SECTION_GROUPS: readonly SectionGroup[] = [
-  { id: 'home', label: 'المركز', sections: ['home'] },
+  { id: 'home', label: 'المركز', sections: ['home', 'store'] },
   { id: 'market', label: 'السوق والتوسع', sections: ['auctions', 'lands', 'companies'] },
   { id: 'operations', label: 'التشغيل', sections: ['production', 'inventory'] },
   { id: 'finance', label: 'المال والتقدم', sections: ['investments', 'bank', 'staff', 'obligations', 'reports', 'contracts', 'tasks'] },
