@@ -17,9 +17,9 @@ export const SPEED_CARD_LABELS: Record<SpeedCardKind, string> = {
 };
 
 export const SPEED_CARD_DIAMOND_COSTS: Record<SpeedCardKind, number> = {
-  'production-25': 4,
-  'production-50': 24,
-  'production-instant': 60,
+  'production-25': 1,
+  'production-50': 2,
+  'production-instant': 3,
   'capacity-boost': 36,
   'day-speed-2x': 10,
   'day-speed-3x': 60,

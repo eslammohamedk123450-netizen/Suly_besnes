@@ -145,13 +145,15 @@ export function DiamondStore({ profile, isGuest, onLinkAccount, onRefreshProfile
         </div>
         <div className="diamond-card-grid">
           {([
-            { kind: 'production-25' as const, title: 'تسريع الإنتاج', detail: 'تقلل مدة أمر الإنتاج بنسبة 25%', price: 4 },
+            { kind: 'production-25' as const, title: 'تسريع الإنتاج 25%', detail: 'تقلل مدة أمر الإنتاج بنسبة 25%', price: 1 },
+            { kind: 'production-50' as const, title: 'تسريع الإنتاج 50%', detail: 'تقلل مدة أمر الإنتاج بنسبة 50%', price: 2 },
+            { kind: 'production-instant' as const, title: 'إكمال فوري', detail: 'يكمل أمر الإنتاج فورًا', price: 3 },
             { kind: 'day-speed-2x' as const, title: 'تسريع اليوم ×2', detail: 'تجعل اليوم داخل اللعبة أسرع بمرتين', price: 10 },
           ]).map((card) => {
             const owned = profile.speedCards.find((item) => item.kind === card.kind)?.quantity ?? 0;
             const canBuy = !isGuest && profile.diamonds >= card.price;
             return <article className="diamond-card-item" key={card.kind}>
-              <span className="diamond-card-icon">×{card.kind === 'day-speed-2x' ? '2' : '25%'}</span>
+              <span className="diamond-card-icon">{card.kind === 'day-speed-2x' ? '×2' : card.kind === 'production-instant' ? 'فوري' : card.kind === 'production-50' ? '50%' : '25%'}</span>
               <strong>{card.title}</strong>
               <small>{card.detail}</small>
               <span className="diamond-card-price">◆ {card.price} ماسة</span>
