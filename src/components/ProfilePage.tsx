@@ -50,8 +50,8 @@ export function ProfilePage({ profile, country, accountId, isGuest, isSynced, on
   const [copyMessage, setCopyMessage] = useState<{ text: string; success: boolean } | null>(null);
   const progress = getPlayerProgress(profile);
   const accountCode = accountCodeFromSeed(accountId);
-  const badges = (profile.badges ?? []).filter((badge) => badge.trim().length > 0);
   const badgeCatalog = selectEmpirePulse(profile).badges;
+  const earnedBadges = badgeCatalog.filter((badge) => badge.earned);
   const progressPercent = Math.min(
     100,
     Math.max(0, (progress.experienceInLevel / progress.experienceForNextLevel) * 100),
@@ -171,7 +171,7 @@ export function ProfilePage({ profile, country, accountId, isGuest, isSynced, on
         </article>
         <article className="profile-stat profile-stat--badges-count">
           <span>الشارات</span>
-          <strong>{formatNumber(badges.length)}</strong>
+          <strong>{formatNumber(earnedBadges.length)}</strong>
         </article>
       </section>
 
@@ -181,12 +181,12 @@ export function ProfilePage({ profile, country, accountId, isGuest, isSynced, on
             <span className="profile-eyebrow">المكتسبات</span>
             <h2 id="profile-badges-title">شاراتي</h2>
           </div>
-          <span className="profile-badges-total">{formatNumber(badges.length)}</span>
+          <span className="profile-badges-total">{formatNumber(earnedBadges.length)}</span>
         </div>
-        {badgeCatalog.length > 0 ? (
-          <ul className="profile-badge-list">
-            {badgeCatalog.map((badge) => (
-              <li className={`profile-badge${badge.earned ? ' profile-badge--earned' : ' profile-badge--locked'}`} key={badge.id}><span className="profile-badge-mark">{badge.earned ? '◆' : '◇'}</span><span><strong>{badge.label}</strong><small>{badge.earned ? 'مكتسبة ومفعلة' : 'لم تُكتسب بعد'}</small></span></li>
+        {earnedBadges.length > 0 ? (
+          <ul className="profile-badge-list profile-badge-list--dashboard-style">
+            {earnedBadges.map((badge) => (
+              <li className="empire-badge empire-badge--earned" key={badge.id}><span aria-hidden="true">◆</span> {badge.label}</li>
             ))}
           </ul>
         ) : (
