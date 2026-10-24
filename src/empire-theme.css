@@ -441,3 +441,113 @@
   .page-help-button { width: 34px; justify-content: center; overflow: hidden; padding: 0; font-size: 0; }
   .app-frame .section-cards { grid-template-columns: 1fr; }
 }
+
+
+/* Staff command center — first visual redesign pass */
+.app-frame .staff-command-surface { display: grid; gap: 13px; }
+.app-frame .staff-command-head { display: grid; grid-template-columns: 42px minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 7px 4px 13px; border-bottom: 1px solid rgba(151,185,211,.13); }
+.app-frame .staff-back-button { display: grid; place-items: center; width: 42px; height: 42px; color: var(--ui-green); background: transparent; border: 0; border-radius: 12px; cursor: pointer; }
+.app-frame .staff-back-button:hover { background: rgba(22,199,154,.1); }
+.app-frame .staff-command-title { display: flex; align-items: center; gap: 11px; min-width: 0; }
+.app-frame .staff-command-icon { display: grid; place-items: center; width: 48px; height: 48px; color: var(--ui-green); background: rgba(22,199,154,.1); border: 1px solid rgba(22,199,154,.18); border-radius: 15px; }
+.app-frame .staff-command-title h2 { margin: 0; color: #f5f8fb; font-size: clamp(19px, 2.4vw, 29px); letter-spacing: -.4px; }
+.app-frame .staff-command-title p { margin: 4px 0 0; color: #8da6bb; font-size: 10px; }
+.app-frame .staff-count-badge { display: grid; grid-template-columns: 24px auto; align-items: center; column-gap: 7px; min-width: 75px; padding: 9px 10px; color: #dbeaf3; background: rgba(22,199,154,.07); border: 1px solid rgba(22,199,154,.2); border-radius: 12px; text-align: center; }
+.app-frame .staff-count-badge svg { grid-row: span 2; color: var(--ui-green); }
+.app-frame .staff-count-badge strong { color: #f1f7fa; font-size: 18px; line-height: 1; }
+.app-frame .staff-count-badge small { color: #8da6bb; font-size: 8px; }
+.app-frame .staff-roster { display: grid; gap: 10px; }
+.app-frame .staff-member-card { display: grid; grid-template-columns: 76px minmax(0, 1fr) auto auto; align-items: center; gap: 13px; padding: 12px; background: linear-gradient(145deg, rgba(20,48,78,.98), rgba(14,35,59,.98)); border: 1px solid rgba(151,185,211,.17); border-radius: 15px; box-shadow: 0 9px 24px rgba(0,0,0,.12); }
+.app-frame .staff-member-card:hover { border-color: rgba(22,199,154,.38); }
+.app-frame .staff-avatar { display: grid; place-items: center; width: 76px; height: 76px; color: #0b2840; background: linear-gradient(145deg, #f6d889, #bd8234); border: 2px solid rgba(255,255,255,.3); border-radius: 12px; font-size: 21px; font-weight: 900; letter-spacing: -1px; box-shadow: inset 0 0 0 1px rgba(8,24,42,.18); }
+.app-frame .staff-avatar--1 { color: #17314b; background: linear-gradient(145deg, #c8d8f7, #729bd2); }
+.app-frame .staff-avatar--2 { color: #3b244e; background: linear-gradient(145deg, #ebc5df, #9b75b7); }
+.app-frame .staff-avatar--3 { color: #173d3b; background: linear-gradient(145deg, #a6e5d1, #4aaf9c); }
+.app-frame .staff-member-copy { min-width: 0; }
+.app-frame .staff-member-name-row { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.app-frame .staff-member-name-row h3 { margin: 0; color: #f4f8fb; font-size: 16px; }
+.app-frame .staff-status-pill { display: inline-flex; align-items: center; gap: 5px; padding: 4px 8px; color: #7de9ca; background: rgba(22,199,154,.1); border: 1px solid rgba(22,199,154,.24); border-radius: 99px; font-size: 8px; font-weight: 800; }
+.app-frame .staff-status-pill i { width: 7px; height: 7px; background: currentColor; border-radius: 50%; }
+.app-frame .staff-status-pill.is-ended { color: #ff9b91; background: rgba(255,120,106,.1); border-color: rgba(255,120,106,.24); }
+.app-frame .staff-role-chip { display: inline-flex; align-items: center; gap: 5px; margin-top: 7px; padding: 5px 9px; color: #142c43; background: #f5c553; border-radius: 99px; font-size: 9px; font-weight: 900; }
+.app-frame .staff-role-chip--accountant { background: #88b5ef; }
+.app-frame .staff-role-chip--lawyer { background: #c1a8e9; }
+.app-frame .staff-role-chip--hr { background: #8dd9c4; }
+.app-frame .staff-member-copy p { display: flex; align-items: center; gap: 5px; margin: 8px 0 0; color: #95acc0; font-size: 9px; }
+.app-frame .staff-member-copy p svg { color: #71d9bd; }
+.app-frame .staff-member-salary { display: grid; gap: 4px; min-width: 122px; padding-inline: 12px; border-inline: 1px solid rgba(151,185,211,.15); text-align: right; }
+.app-frame .staff-member-salary span { color: #8da6bb; font-size: 9px; }
+.app-frame .staff-member-salary strong { color: #f5f8fb; font-size: 17px; font-variant-numeric: tabular-nums; }
+.app-frame .staff-member-salary small { color: #8da6bb; font-size: 8px; }
+.app-frame .staff-member-salary .staff-due-label { color: #ffd47b; }
+.app-frame .staff-member-actions { display: grid; justify-items: end; gap: 8px; min-width: 105px; }
+.app-frame .staff-more-button { width: 28px; height: 28px; padding: 0; color: #8fa7ba; background: transparent; border: 0; border-radius: 8px; font-size: 22px; line-height: 1; cursor: pointer; }
+.app-frame .staff-more-button:hover { color: var(--ui-coral); background: rgba(255,120,106,.1); }
+.app-frame .staff-pay-button { min-height: 31px; padding-inline: 10px; color: #082a35; background: var(--ui-green); border: 0; border-radius: 9px; font-size: 8px; font-weight: 900; }
+.app-frame .staff-hire-cta { display: flex; justify-content: center; align-items: center; gap: 9px; min-height: 56px; color: #073040; background: linear-gradient(100deg, #16c79a, #26d7b2); border: 0; border-radius: 15px; box-shadow: 0 9px 22px rgba(22,199,154,.18); font-size: 17px; cursor: pointer; }
+.app-frame .staff-hire-cta:hover { filter: brightness(1.08); transform: translateY(-1px); }
+.app-frame .staff-hire-form { display: grid; gap: 13px; padding: 16px; background: linear-gradient(145deg, rgba(20,48,78,.98), rgba(14,35,59,.98)); border: 1px solid rgba(22,199,154,.25); border-radius: 15px; }
+.app-frame .staff-form-heading { display: flex; justify-content: space-between; align-items: center; gap: 10px; color: var(--ui-green); }
+.app-frame .staff-form-heading > div { display: grid; gap: 4px; }
+.app-frame .staff-form-heading strong { color: #f2f7fb; font-size: 14px; }
+.app-frame .staff-form-heading span { color: #91a9bd; font-size: 9px; }
+.app-frame .staff-payroll-summary { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px 20px; align-items: center; padding: 16px; background: linear-gradient(145deg, rgba(20,48,78,.9), rgba(14,35,59,.94)); border: 1px solid rgba(246,196,83,.2); border-radius: 15px; }
+.app-frame .staff-payroll-copy { display: flex; align-items: center; gap: 10px; }
+.app-frame .staff-summary-icon { display: grid; place-items: center; width: 43px; height: 43px; color: #ffd56f; background: rgba(246,196,83,.1); border-radius: 12px; }
+.app-frame .staff-payroll-copy div, .app-frame .staff-payroll-total { display: grid; gap: 4px; }
+.app-frame .staff-payroll-copy strong { color: #eaf4f8; font-size: 14px; }
+.app-frame .staff-payroll-copy small, .app-frame .staff-payroll-total small { color: #91a9bd; font-size: 9px; }
+.app-frame .staff-payroll-total { justify-items: end; }
+.app-frame .staff-payroll-total strong { color: var(--ui-gold); font-size: 24px; font-variant-numeric: tabular-nums; }
+.app-frame .staff-payroll-track { grid-column: 1 / -1; height: 9px; overflow: hidden; background: rgba(255,255,255,.1); border-radius: 99px; }
+.app-frame .staff-payroll-track span { display: block; height: 100%; background: linear-gradient(90deg, #16c79a, #4fe2bf); border-radius: inherit; }
+.app-frame .staff-payroll-foot { grid-column: 1 / -1; justify-self: end; margin-top: -4px; color: #8ea7ba; font-size: 8px; }
+.app-frame .staff-mini-stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+.app-frame .staff-mini-stats > div { display: grid; grid-template-columns: 34px auto; align-items: center; column-gap: 8px; padding: 12px 14px; background: rgba(20,48,78,.72); border: 1px solid rgba(151,185,211,.15); border-radius: 13px; }
+.app-frame .staff-mini-stats svg { grid-row: span 2; color: var(--ui-green); }
+.app-frame .staff-mini-stats strong { color: #f3f7fb; font-size: 20px; }
+.app-frame .staff-mini-stats span { color: #91a9bd; font-size: 9px; }
+.app-frame .staff-empire-note { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 13px; color: #f5d77d; background: rgba(246,196,83,.055); border: 1px solid rgba(246,196,83,.25); border-radius: 13px; font-size: 10px; }
+.app-frame .staff-empire-note svg { color: var(--ui-gold); }
+.app-frame .staff-empty { display: grid; justify-items: center; gap: 8px; padding: 38px 16px; color: #91a9bd; background: rgba(20,48,78,.72); border: 1px dashed rgba(151,185,211,.2); border-radius: 15px; text-align: center; }
+.app-frame .staff-empty svg { color: var(--ui-green); }
+.app-frame .staff-empty strong { color: #eef6fa; font-size: 14px; }
+.app-frame .staff-empty span { max-width: 340px; font-size: 10px; line-height: 1.8; }
+
+@media (max-width: 760px) {
+  .app-frame .staff-command-head { grid-template-columns: 34px minmax(0, 1fr) auto; gap: 7px; padding-inline: 0; }
+  .app-frame .staff-back-button { width: 34px; height: 34px; }
+  .app-frame .staff-command-icon { width: 39px; height: 39px; border-radius: 12px; }
+  .app-frame .staff-command-title { gap: 8px; }
+  .app-frame .staff-command-title h2 { font-size: 18px; }
+  .app-frame .staff-command-title p { font-size: 8px; }
+  .app-frame .staff-count-badge { min-width: 64px; padding: 7px 8px; }
+  .app-frame .staff-member-card { grid-template-columns: 58px minmax(0, 1fr) auto; gap: 9px; padding: 10px; }
+  .app-frame .staff-avatar { width: 58px; height: 58px; border-radius: 10px; font-size: 16px; }
+  .app-frame .staff-member-name-row h3 { font-size: 12px; }
+  .app-frame .staff-role-chip { margin-top: 5px; padding: 4px 7px; font-size: 8px; }
+  .app-frame .staff-member-copy p { margin-top: 5px; font-size: 8px; }
+  .app-frame .staff-member-salary { grid-column: 2 / 3; min-width: 0; padding: 8px 0 0; border-inline: 0; border-top: 1px solid rgba(151,185,211,.12); text-align: right; }
+  .app-frame .staff-member-salary strong { font-size: 13px; }
+  .app-frame .staff-member-actions { grid-column: 3 / 4; grid-row: 1 / span 2; min-width: 34px; }
+  .app-frame .staff-pay-button { font-size: 7px; }
+  .app-frame .staff-payroll-summary { padding: 13px; gap: 9px 12px; }
+  .app-frame .staff-payroll-total strong { font-size: 18px; }
+  .app-frame .staff-payroll-copy strong { font-size: 12px; }
+  .app-frame .staff-payroll-copy small, .app-frame .staff-payroll-total small { font-size: 8px; }
+}
+
+@media (max-width: 420px) {
+  .app-frame .staff-command-title h2 { font-size: 16px; }
+  .app-frame .staff-count-badge { grid-template-columns: 18px auto; min-width: 57px; }
+  .app-frame .staff-count-badge svg { width: 17px; }
+  .app-frame .staff-count-badge strong { font-size: 15px; }
+  .app-frame .staff-member-card { grid-template-columns: 50px minmax(0, 1fr) auto; }
+  .app-frame .staff-avatar { width: 50px; height: 50px; font-size: 14px; }
+  .app-frame .staff-member-name-row { display: grid; gap: 4px; }
+  .app-frame .staff-member-name-row h3 { font-size: 11px; }
+  .app-frame .staff-status-pill { width: fit-content; }
+  .app-frame .staff-member-salary { grid-column: 2 / -1; }
+  .app-frame .staff-mini-stats > div { padding: 10px; }
+  .app-frame .staff-mini-stats strong { font-size: 17px; }
+}
