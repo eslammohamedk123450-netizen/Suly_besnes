@@ -1,0 +1,123 @@
+.production-summary {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  padding: 16px 18px;
+}
+
+.production-summary__heading,
+.production-summary__title,
+.production-summary__company summary {
+  display: flex;
+  align-items: center;
+}
+
+.production-summary__heading {
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.production-summary__title { gap: 10px; min-width: 0; }
+.production-summary__title h2 { margin: 0; color: var(--navy); font-size: 15px; }
+.production-summary__title .section-kicker { margin-bottom: 1px; font-size: 9px; }
+
+.production-summary__icon {
+  display: grid;
+  flex: 0 0 36px;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  color: #927126;
+  background: #f7f0dc;
+  border-radius: 11px;
+}
+
+.production-summary__link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-height: 34px;
+  padding: 0 9px;
+  color: #82651d;
+  background: #fffdf7;
+  border: 1px solid #eee2bd;
+  border-radius: 9px;
+  font-size: 10px;
+  font-weight: 800;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.production-summary__link:hover { background: #fbf4df; }
+.production-summary__link svg { transform: rotate(180deg); }
+
+.production-summary__metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.production-summary__metric {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+  padding: 10px 12px;
+  background: #f7f9fb;
+  border: 1px solid #edf0f3;
+  border-radius: 10px;
+}
+.production-summary__metric span { color: #68798a; font-size: 10px; line-height: 1.5; }
+.production-summary__metric strong { color: var(--navy); font-size: 17px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+.production-summary__companies { display: grid; gap: 6px; }
+.production-summary__company { min-width: 0; overflow: hidden; border: 1px solid #e9edf1; border-radius: 10px; }
+.production-summary__company summary {
+  gap: 10px;
+  min-height: 49px;
+  padding: 7px 11px;
+  list-style: none;
+  cursor: pointer;
+}
+.production-summary__company summary::-webkit-details-marker { display: none; }
+.production-summary__company summary::marker { content: ''; }
+.production-summary__company summary:hover { background: #fafbfd; }
+.production-summary__company-name { display: grid; flex: 1; gap: 2px; min-width: 0; }
+.production-summary__company-name strong { overflow: hidden; color: #23394d; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.production-summary__company-name small { color: #83909b; font-size: 9px; }
+.production-summary__company-status { color: #3c8066; font-size: 9px; font-weight: 800; white-space: nowrap; }
+.production-summary__toggle { display: grid; place-items: center; width: 23px; height: 23px; color: #728293; background: #f2f5f7; border-radius: 7px; transition: transform .16s; }
+.production-summary__company[open] .production-summary__toggle { transform: rotate(90deg); }
+.production-summary__details {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  padding: 9px 11px 10px;
+  color: #718092;
+  background: #fafbfd;
+  border-top: 1px solid #edf0f3;
+  font-size: 9px;
+}
+.production-summary__details span { display: inline-flex; align-items: baseline; gap: 4px; }
+.production-summary__details strong { color: #24394c; font-size: 10px; font-variant-numeric: tabular-nums; }
+.production-summary__empty { margin: 0; padding: 10px 12px; color: #758493; background: #f8fafb; border: 1px dashed #dfe5ea; border-radius: 10px; font-size: 11px; line-height: 1.7; }
+
+@media (max-width: 560px) {
+  .production-summary { gap: 10px; padding: 14px; }
+  .production-summary__metric { align-items: flex-start; flex-direction: column; gap: 2px; padding: 9px 10px; }
+  .production-summary__metric span { font-size: 9px; }
+  .production-summary__metric strong { font-size: 15px; }
+  .production-summary__company summary { padding-inline: 9px; }
+}
+
+@media (max-width: 360px) {
+  .production-summary__heading { align-items: flex-start; }
+  .production-summary__link { gap: 3px; padding-inline: 7px; font-size: 9px; }
+  .production-summary__metrics { gap: 6px; }
+  .production-summary__metric { padding: 8px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .production-summary__toggle { transition: none; }
+}

@@ -13,7 +13,11 @@ import type {
   ProductionOrder,
   TaskProgress,
   SeasonProgress,
+  BusinessContract,
+  AchievementRecord,
+  OnboardingProgress,
 } from './futureSystems';
+import type { SpeedCardStack } from './accountFeatures';
 
 export interface PlayerAsset {
   id: string;
@@ -28,7 +32,12 @@ export interface PlayerLand {
   areaSquareMeters: number;
   purchasePrice: number;
   acquiredAt: string;
+  /** Day on which the land entered the player's empire; optional for legacy saves. */
+  acquiredOnDay?: number;
+  /** Land acquired today is reserved until the next in-game day. */
+  availableForCompanyOnDay?: number;
   landType?: 'industrial' | 'agricultural' | 'commercial';
+  upgradeLevel?: number;
 }
 
 export interface PlayerCompany {
@@ -37,6 +46,9 @@ export interface PlayerCompany {
   industryId: IndustryId;
   countryId: CountryId;
   foundedAt: string;
+  foundedOnDay?: number;
+  /** Directly purchased companies begin operating after transfer paperwork completes. */
+  operationalFromDay?: number;
   landId?: string;
   licenseIds?: string[];
   energyUnits?: number;
@@ -48,6 +60,8 @@ export interface PlayerCompany {
 
 export interface PlayerProfile {
   id: string;
+  /** Public support/admin identifier; never contains the user's email. */
+  accountCode: string;
   name: string;
   level: number;
   countryId: CountryId;
@@ -56,6 +70,9 @@ export interface PlayerProfile {
   payables: number;
   goldGrams: number;
   goldCostBasis: number;
+  diamonds: number;
+  speedCards: SpeedCardStack[];
+  badges: string[];
   assets: PlayerAsset[];
   lands: PlayerLand[];
   companies: PlayerCompany[];
@@ -66,6 +83,8 @@ export interface PlayerProfile {
   };
   /** Current simulation day. Day one is the day the world is created. */
   day: number;
+  warehouseLevel: number;
+  activeDaySpeedMultiplier: 1 | 2 | 3;
   inventory: InventoryLot[];
   licenses: LicenseRecord[];
   investments: InvestmentRecord[];
@@ -82,7 +101,14 @@ export interface PlayerProfile {
   events: GameEventRecord[];
   tasks: TaskProgress[];
   completedTaskIds: string[];
+  readNotificationIds: string[];
+  dismissedNotificationIds: string[];
+  unreadProductionOrderIds: string[];
   season?: SeasonProgress;
+  reputation: number;
+  contracts: BusinessContract[];
+  achievements: AchievementRecord[];
+  onboarding: OnboardingProgress;
 }
 
 function createId(): string {
@@ -97,6 +123,7 @@ export function createNewPlayer(
   const createdAt = now.toISOString();
   return {
     id: createId(),
+    accountCode: '',
     name: playerName.trim() || 'المستثمر الجديد',
     level: 1,
     countryId: country.id,
@@ -105,11 +132,16 @@ export function createNewPlayer(
     payables: 0,
     goldGrams: 0,
     goldCostBasis: 0,
+    diamonds: 0,
+    speedCards: [],
+    badges: [],
     assets: [],
     lands: [],
     companies: [],
     finances: { netProfit: 0, totalRevenue: 0, totalExpenses: 0 },
     day: 1,
+    warehouseLevel: 1,
+    activeDaySpeedMultiplier: 1,
     inventory: [],
     licenses: [],
     investments: [],
@@ -123,6 +155,13 @@ export function createNewPlayer(
     events: [],
     tasks: [],
     completedTaskIds: [],
+    readNotificationIds: [],
+    dismissedNotificationIds: [],
+    unreadProductionOrderIds: [],
+    reputation: 50,
+    contracts: [],
+    achievements: [],
+    onboarding: { introCompleted: false, chapter: 0, seenGuides: [] },
     season: { seasonId: 'expansion-season-1', startedOnDay: 1, endsOnDay: 30, points: 0, claimedChallengeKeys: [] },
   };
 }

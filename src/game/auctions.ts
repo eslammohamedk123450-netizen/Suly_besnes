@@ -3,15 +3,12 @@ import type { PlayerProfile } from '../domain/player';
 import { AUCTION_CATALOG } from './catalog';
 import { GAME_DAY_MS } from './time';
 
-const DAY_MS = GAME_DAY_MS;
+const AUCTION_CYCLE_DAYS = 1;
 
 export function getAuctionCloseAt(profile: PlayerProfile, listing: AuctionListing): string {
-  const base = Date.parse(profile.createdAt);
-  const safeBase = Number.isFinite(base) ? base : Date.now();
-  const cycleStart = safeBase + Math.max(0, profile.day - 1) * DAY_MS;
-  const index = Math.max(0, AUCTION_CATALOG.findIndex((item) => item.id === listing.id));
-  const closeHour = Math.min(23, 20 + index);
-  return new Date(cycleStart + closeHour * 60 * 60 * 1000).toISOString();
+  const parsedStart = Date.parse(profile.createdAt);
+  const worldStart = Number.isFinite(parsedStart) ? parsedStart : Date.now();
+  return listing.closesAt || new Date(worldStart + AUCTION_CYCLE_DAYS * GAME_DAY_MS).toISOString();
 }
 
 function wasWon(profile: PlayerProfile, listingId: string): boolean {
@@ -21,8 +18,16 @@ function wasWon(profile: PlayerProfile, listingId: string): boolean {
 }
 
 export function getAuctionListings(profile: PlayerProfile): AuctionListing[] {
-  // الفوز يستهلك المزاد نهائيًا؛ لا نعيد إدراج نفس السلعة تلقائيًا.
-  const regular = AUCTION_CATALOG.filter((base) => !wasWon(profile, base.id));
+  // كل يوم هو دورة جديدة بمعرّفات مستقلة؛ الفوز يمنع إعادة العرض داخل الدورة فقط.
+  const worldStart = Number.isFinite(Date.parse(profile.createdAt)) ? Date.parse(profile.createdAt) : Date.now();
+  const closesAt = new Date(worldStart + (profile.day + AUCTION_CYCLE_DAYS) * GAME_DAY_MS).toISOString();
+  const regular = AUCTION_CATALOG.map((base) => ({
+    ...base,
+    id: `${base.id}-day-${profile.day}`,
+    label: `${base.label} · دورة اليوم ${profile.day}`,
+    closesAt,
+    status: 'open' as const,
+  })).filter((listing) => !wasWon(profile, listing.id));
   const rareId = `season-rare-${profile.day}`;
   const rare: AuctionListing = {
     id: rareId,
@@ -33,7 +38,7 @@ export function getAuctionListings(profile: PlayerProfile): AuctionListing[] {
     areaSquareMeters: 0,
     minimumBid: 450_000 + (profile.day % 3) * 25_000,
     bidIncrement: 25_000,
-    closesAt: '2099-12-31T00:00:00.000Z',
+    closesAt,
     status: 'open',
     energyCapacityBonus: 90,
   };

@@ -7,6 +7,7 @@ import { formatMoney, formatNumber } from '../domain/formatters';
 import { AUCTION_BID_STEP, AUCTION_DEFAULT_LEAD } from '../game/time';
 import { MATERIAL_CATALOG } from '../game/catalog';
 import { Icon } from './Icon';
+import { useDialogA11y } from './useDialogA11y';
 
 interface AuctionRoomProps {
   profile: PlayerProfile;
@@ -47,6 +48,8 @@ export function AuctionRoom({ profile, country, listing, onClose, onBid }: Aucti
   const pendingAmountRef = useRef(0);
   const lastBotAtRef = useRef(Date.now());
   const botIndexRef = useRef(0);
+  const dialogRef = useRef<HTMLElement | null>(null);
+  useDialogA11y(dialogRef, onClose);
 
   useEffect(() => { currentBidRef.current = currentBid; }, [currentBid]);
   useEffect(() => { roundEndsAtRef.current = roundEndsAt; }, [roundEndsAt]);
@@ -123,7 +126,7 @@ export function AuctionRoom({ profile, country, listing, onClose, onBid }: Aucti
   const seatNames = useMemo(() => ['أنت', ...AI_PARTICIPANTS.slice(0, 3)], []);
   return (
     <div className="auction-room-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
-      <section className="auction-room" role="dialog" aria-modal="true" aria-labelledby="auction-room-title" dir="rtl">
+      <section ref={dialogRef} className="auction-room" role="dialog" aria-modal="true" aria-labelledby="auction-room-title" dir="rtl" tabIndex={-1}>
         <header className="auction-room-header"><div><span className="section-kicker">قاعة المزاد · منافسون خياليون</span><h2 id="auction-room-title">{listing.label}</h2><p>{lotSummary}</p></div><button className="icon-button auction-room-close" type="button" onClick={onClose} aria-label="إغلاق قاعة المزاد"><Icon name="close" size={19} /></button></header>
         <div className={`auction-room-status${finished ? ' auction-room-status--ended' : ''}`}><span><i className="auction-live-dot" /> {finished ? 'انتهت الجولة' : 'الجولة مفتوحة'} · {totalBids} عروض</span><strong className="auction-countdown"><Icon name="clock" size={14} /> {remainingSeconds} ثوانٍ</strong></div>
         <div className="auction-room-grid"><div className="auction-room-stage">
@@ -131,7 +134,7 @@ export function AuctionRoom({ profile, country, listing, onClose, onBid }: Aucti
           <div className="auction-room-table"><div className="auction-room-table-top"><span>المشاركون</span><small>أسماء خيالية تتغير في كل جولة</small></div><div className="auction-seats">{seatNames.map((name, index) => <div className={`auction-seat${index === 0 ? ' auction-seat--player' : ''}`} key={name}><span className="auction-seat-avatar">{index === 0 ? 'أ' : index + 1}</span><span>{name}</span><small>{index === 0 ? (leader === 'أنت' ? 'المتصدر' : 'مشارك') : leader === name ? 'يدفع الآن' : 'مشارك'}</small></div>)}</div></div>
         </div><aside className="auction-room-sidebar">
           <div className="auction-room-panel"><div className="auction-room-panel-heading"><strong>سجل النداء</strong><span>الأحدث أولًا</span></div>{feed.length === 0 ? <div className="auction-room-empty"><Icon name="gavel" size={20} /><span>افتح الجولة بأول عرض لك</span></div> : <div className="auction-bid-feed">{feed.map((bid, index) => <div className={`auction-bid-row${index === 0 ? ' auction-bid-row--latest' : ''}`} key={bid.id}><span className="auction-bid-badge">{bid.player ? 'أنت' : bid.bidder}</span><span>{bid.player ? 'عرضك المسجل' : 'رفع العرض'}</span><strong>{formatMoney(bid.amount, country)}</strong></div>)}</div>}</div>
-          <form className="auction-room-bid-form" onSubmit={submit}><div className="auction-room-panel-heading"><strong>زاوية المزايدة</strong><span>+20,000 تلقائيًا</span></div><label className="economy-field"><span>عرضك ({country.currency.symbol})</span><input autoFocus type="number" min={listing.minimumBid} step={AUCTION_BID_STEP} value={amount} onChange={(event) => setAmount(event.target.value)} disabled={finished} /></label><div className="auction-amount-controls"><button type="button" className="button button-secondary" onClick={() => changeAmount(-AUCTION_BID_STEP)} disabled={finished || Number(amount) <= listing.minimumBid}>− 10,000</button><button type="button" className="button button-secondary" onClick={() => changeAmount(AUCTION_BID_STEP)} disabled={finished}>+ 10,000</button></div>{listing.lotType === 'factory' && <label className="economy-field"><span>الشركة المستقبلة للتوسعة</span><select value={targetCompanyId} onChange={(event) => setTargetCompanyId(event.target.value)} disabled={finished}>{profile.companies.map((company) => <option value={company.id} key={company.id}>{company.name}</option>)}</select></label>}<button className="button button-primary auction-room-bid-button" type="submit" disabled={busy || finished || profile.bankBalance < numericAmountSafe(amount)}><Icon name="gavel" size={17} />{busy ? 'جارٍ إغلاق الجولة...' : finished ? 'انتهت الجولة' : 'قدّم العرض'}</button>{message && <p className="auction-room-message" role="status">{message}</p>}</form>
+          <form className="auction-room-bid-form" onSubmit={submit}><div className="auction-room-panel-heading"><strong>زاوية المزايدة</strong><span>زيادة 20,000</span></div><label className="economy-field"><span>عرضك ({country.currency.symbol})</span><input autoFocus type="number" min={listing.minimumBid} step={AUCTION_BID_STEP} value={amount} onChange={(event) => setAmount(event.target.value)} disabled={finished} /></label><div className="auction-amount-controls"><button type="button" className="button button-secondary" onClick={() => changeAmount(-AUCTION_BID_STEP)} disabled={finished || Number(amount) <= listing.minimumBid}>− 10,000</button><button type="button" className="button button-secondary" onClick={() => changeAmount(AUCTION_BID_STEP)} disabled={finished}>+ 10,000</button></div>{listing.lotType === 'factory' && <label className="economy-field"><span>الشركة المستقبلة للتوسعة</span><select value={targetCompanyId} onChange={(event) => setTargetCompanyId(event.target.value)} disabled={finished}>{profile.companies.map((company) => <option value={company.id} key={company.id}>{company.name}</option>)}</select></label>}<button className="button button-primary auction-room-bid-button" type="submit" disabled={busy || finished || profile.bankBalance < numericAmountSafe(amount)}><Icon name="gavel" size={17} />{busy ? 'جارٍ إغلاق الجولة...' : finished ? 'انتهت الجولة' : 'قدّم العرض'}</button>{message && <p className="auction-room-message" role="status">{message}</p>}</form>
         </aside></div>
         <footer className="auction-room-footer"><span><Icon name="shield" size={14} /> لا يُخصم المال إلا بعد انتهاء الـ10 ثوانٍ وفوز عرضك. الأسماء داخل الجولة خيالية.</span><button className="button button-secondary" type="button" onClick={onClose}>العودة إلى قائمة المزادات</button></footer>
       </section>

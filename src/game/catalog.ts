@@ -43,6 +43,7 @@ export interface ProductCatalogEntry {
   name: string;
   unit: string;
   baseSellPrice: number;
+  storageLimit: number;
 }
 
 export interface InvestmentCatalogEntry {
@@ -116,15 +117,15 @@ export const MATERIAL_CATALOG: readonly MaterialCatalogEntry[] = [
 ];
 
 export const PRODUCT_CATALOG: readonly ProductCatalogEntry[] = [
-  { id: 'refined-fuel', name: 'وقود مكرر', unit: 'وحدة', baseSellPrice: 14_000 },
-  { id: 'power-units', name: 'وحدات كهرباء', unit: 'وحدة', baseSellPrice: 3_000 },
-  { id: 'bottled-gas', name: 'غاز معبأ', unit: 'وحدة', baseSellPrice: 10_000 },
-  { id: 'clean-water', name: 'مياه نظيفة', unit: 'وحدة', baseSellPrice: 2_000 },
-  { id: 'detergent', name: 'منظفات', unit: 'عبوة', baseSellPrice: 4_000 },
-  { id: 'food-pack', name: 'عبوات غذائية', unit: 'عبوة', baseSellPrice: 2_500 },
-  { id: 'building-blocks', name: 'مواد بناء', unit: 'وحدة', baseSellPrice: 16_000 },
-  { id: 'electronics', name: 'أجهزة إلكترونية', unit: 'جهاز', baseSellPrice: 45_000 },
-  { id: 'freight-service', name: 'خدمات نقل', unit: 'رحلة', baseSellPrice: 22_000 },
+  { id: 'refined-fuel', name: 'وقود مكرر', unit: 'وحدة', baseSellPrice: 14_000, storageLimit: 500 },
+  { id: 'power-units', name: 'وحدات كهرباء', unit: 'وحدة', baseSellPrice: 3_000, storageLimit: 1_000 },
+  { id: 'bottled-gas', name: 'غاز معبأ', unit: 'وحدة', baseSellPrice: 10_000, storageLimit: 500 },
+  { id: 'clean-water', name: 'مياه نظيفة', unit: 'وحدة', baseSellPrice: 2_000, storageLimit: 2_000 },
+  { id: 'detergent', name: 'منظفات', unit: 'عبوة', baseSellPrice: 4_000, storageLimit: 800 },
+  { id: 'food-pack', name: 'عبوات غذائية', unit: 'عبوة', baseSellPrice: 2_500, storageLimit: 1_000 },
+  { id: 'building-blocks', name: 'مواد بناء', unit: 'وحدة', baseSellPrice: 16_000, storageLimit: 500 },
+  { id: 'electronics', name: 'أجهزة إلكترونية', unit: 'جهاز', baseSellPrice: 45_000, storageLimit: 250 },
+  { id: 'freight-service', name: 'خدمات نقل', unit: 'رحلة', baseSellPrice: 22_000, storageLimit: 300 },
 ];
 
 export const RECIPE_CATALOG: readonly RecipeCatalogEntry[] = [
@@ -148,6 +149,7 @@ export const AUCTION_CATALOG: readonly AuctionListing[] = [
 ];
 
 export const DIRECT_LAND_CATALOG: readonly DirectLandListing[] = [
+  { id: 'starter-village-land', label: 'أرض قرية النخيل · عرض وجيه القرية', landType: 'agricultural', areaSquareMeters: 520, price: 180_000 },
   { id: 'direct-land-port-said', label: 'أرض بورسعيد اللوجستية', landType: 'commercial', areaSquareMeters: 420, price: 285_000 },
   { id: 'direct-land-minya-farm', label: 'مزرعة المنيا الإنتاجية', landType: 'agricultural', areaSquareMeters: 900, price: 240_000 },
   { id: 'direct-land-sokhna-industrial', label: 'موقع العين السخنة الصناعي', landType: 'industrial', areaSquareMeters: 520, price: 360_000 },

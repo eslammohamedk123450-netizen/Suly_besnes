@@ -1,13 +1,16 @@
 import type { ReactNode } from 'react';
+import { formatNumber } from '../domain/formatters';
 import { Icon } from './Icon';
 
 interface EconomyPageShellProps {
   dayLabel: string;
   balanceLabel: string;
+  dayDurationMinutes: number;
+  daySpeedMultiplier: 1 | 2 | 3;
   children: ReactNode;
 }
 
-export function EconomyPageShell({ dayLabel, balanceLabel, children }: EconomyPageShellProps) {
+export function EconomyPageShell({ dayLabel, balanceLabel, dayDurationMinutes, daySpeedMultiplier, children }: EconomyPageShellProps) {
   return (
     <div className="economy-page">
       <div className="economy-toolbar">
@@ -16,7 +19,7 @@ export function EconomyPageShell({ dayLabel, balanceLabel, children }: EconomyPa
           <small>{balanceLabel} · تقدمك محفوظ محليًا</small>
         </div>
         <span className="economy-day"><Icon name="clock" size={15} />{dayLabel}</span>
-        <span className="economy-auto-note"><Icon name="clock" size={14} /> اليوم يتقدم تلقائيًا كل 24 دقيقة</span>
+        <span className="economy-auto-note"><Icon name="clock" size={14} /> مدة اليوم {daySpeedMultiplier > 1 ? `×${formatNumber(daySpeedMultiplier)} · ` : ''}{formatNumber(dayDurationMinutes)} دقيقة</span>
       </div>
       {children}
     </div>
@@ -24,6 +27,7 @@ export function EconomyPageShell({ dayLabel, balanceLabel, children }: EconomyPa
 }
 
 interface EconomyPanelProps {
+  id?: string;
   title: string;
   description?: string;
   aside?: ReactNode;
@@ -31,9 +35,9 @@ interface EconomyPanelProps {
   className?: string;
 }
 
-export function EconomyPanel({ title, description, aside, children, className = '' }: EconomyPanelProps) {
+export function EconomyPanel({ id, title, description, aside, children, className = '' }: EconomyPanelProps) {
   return (
-    <section className={`economy-panel${className ? ` ${className}` : ''}`}>
+    <section id={id} className={`economy-panel${className ? ` ${className}` : ''}`}>
       <div className="economy-panel-heading">
         <div><h2>{title}</h2>{description && <p>{description}</p>}</div>
         {aside}

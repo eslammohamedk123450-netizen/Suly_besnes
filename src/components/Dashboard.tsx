@@ -5,21 +5,50 @@ import { formatGold, formatMoney, formatNumber } from '../domain/formatters';
 import { GOLD_PRICE_PER_GRAM } from '../game/catalog';
 import { GAME_SECTIONS, type SectionId } from '../domain/navigation';
 import { Icon } from './Icon';
-import { selectEmpirePulse, selectOperationsSnapshot } from '../game/selectors';
+import { selectEmpirePoints, selectEmpirePulse, selectOperationsSnapshot } from '../game/selectors';
+import { getPlayerProgress, getSectionUnlockHint, getUnlockedSectionIds } from '../game/onboarding';
+import { selectNotifications } from '../game/notifications';
+import { updateNotificationState, type GameCommand, type GameResult } from '../game/engine';
+import { getGameDayDurationMinutes } from '../game/time';
+import { NotificationCenter } from './NotificationCenter';
+import { getSynergyBonuses } from '../game/synergy';
+import { GlobalLeaderboardCard } from './GlobalLeaderboardCard';
+import { ProductionSummary } from './ProductionSummary';
 
 interface DashboardProps {
   profile: PlayerProfile;
   country: CountryDefinition;
-  onNavigate: (section: SectionId) => void;
+  onNavigate: (section: SectionId, target?: string) => void;
+  onCommand: (command: GameCommand, fallback: (current: PlayerProfile) => GameResult<unknown>) => void;
 }
 
-export function Dashboard({ profile, country, onNavigate }: DashboardProps) {
+function getAccountBadgeVariant(label: string): 'vip' | 'verified' | 'partner' | 'default' {
+  const normalized = label.normalize('NFKC').toLocaleLowerCase('ar-EG').replace(/[\u064b-\u065f\u0670]/g, '');
+  if (normalized.includes('vip') || normalized.includes('مميز')) return 'vip';
+  if (normalized.includes('موثق') || normalized.includes('رسمي') || normalized.includes('verified')) return 'verified';
+  if (normalized.includes('شريك') || normalized.includes('معتمد') || normalized.includes('partner')) return 'partner';
+  return 'default';
+}
+
+export function Dashboard({ profile, country, onNavigate, onCommand }: DashboardProps) {
   const totalAssets = calculateTotalAssets(profile);
+  const dayDurationMinutes = getGameDayDurationMinutes(profile.activeDaySpeedMultiplier ?? 1);
   const goldMarketValue = Math.round(profile.goldGrams * GOLD_PRICE_PER_GRAM);
   const quickSections = GAME_SECTIONS.filter((section) => section.id !== 'home');
+  const unlockedSections = new Set(getUnlockedSectionIds(profile));
   const latestEntries = profile.ledger.slice(-5).reverse();
   const operations = selectOperationsSnapshot(profile, country.economy.operatingCostMultiplier ?? 1);
   const pulse = selectEmpirePulse(profile);
+  const empirePoints = selectEmpirePoints(profile);
+  const playerProgress = getPlayerProgress(profile);
+  const unpaidSalary = profile.staff.filter((employee) => employee.status === 'active').reduce((sum, employee) => sum + (employee.unpaidSalary ?? 0), 0);
+  const totalOutstanding = profile.payables + unpaidSalary;
+  const notifications = selectNotifications(profile);
+  const synergies = getSynergyBonuses(profile);
+  const updateNotifications = (action: 'read' | 'dismiss', notificationIds: string[]) => onCommand(
+    { name: 'update_notification_state', args: { action, notificationIds } },
+    (current) => updateNotificationState(current, action, notificationIds),
+  );
   const ledgerDay = (occurredAt: string) => {
     const createdAt = Date.parse(profile.createdAt);
     const entryAt = Date.parse(occurredAt);
@@ -36,13 +65,41 @@ export function Dashboard({ profile, country, onNavigate }: DashboardProps) {
           <span className="eyebrow"><span className="live-dot" /> {country.name} · اليوم {formatNumber(profile.day)}</span>
           <h1>مرحبًا، {profile.name}</h1>
           <p>الثروة بداية الحكاية؛ قراراتك هي ما يبني الإمبراطورية.</p>
-          <div className="hero-meta"><span className="country-chip">{country.flag} {country.name}</span><span className="hero-divider" /><span>المستوى {profile.level}</span><span className="hero-divider" /><span>{profile.companies.length} شركات</span></div>
-          <span className="dashboard-auto-note"><Icon name="clock" size={15} /> اليوم يتقدم تلقائيًا كل 24 دقيقة حقيقية</span>
+          <div className="hero-meta"><span className="country-chip">{country.flag} {country.name}</span><span className="hero-divider" /><span>المستوى {playerProgress.level}</span><span className="hero-divider" /><span>{profile.companies.length} شركات</span></div>
+          <span className="dashboard-auto-note"><Icon name="clock" size={15} /> مدة اليوم {profile.activeDaySpeedMultiplier > 1 ? `×${formatNumber(profile.activeDaySpeedMultiplier)} · ` : ''}{formatNumber(dayDurationMinutes)} دقيقة حقيقية</span>
+          <button className="dashboard-store-link" type="button" onClick={() => onNavigate('store')}><Icon name="store" size={17} /> متجر المشتريات <span>الماس · البطاقات · العروض</span></button>
         </div>
         <div className="hero-emblem"><Icon name="crown" size={25} /><span>BE</span></div>
       </section>
 
-      {profile.payables > 0 && <div className="operating-warning" role="status">لديك التزامات غير مسددة بقيمة {formatMoney(profile.payables, country)}؛ أُوقفت الطاقة مؤقتًا، وتُخصم الالتزامات من السيولة الجديدة.</div>}
+      <section className="account-badges-panel" aria-label="شارات الحساب">
+        <div className="account-badges-heading"><span className="section-kicker">الامتيازات الحالية</span><h2>شارات الحساب</h2></div>
+        {profile.badges.length > 0 ? (
+          <ul className="account-badges-list" aria-label="الشارات الممنوحة لهذا الحساب">
+            {profile.badges.map((badge, index) => {
+              const variant = getAccountBadgeVariant(badge);
+              return <li className={`account-badge account-badge--${variant}`} key={`${badge}-${index}`}>
+                <span className="account-badge-label">{badge}</span>
+                <span className="account-badge-mark" aria-hidden="true">
+                  {variant === 'vip' ? <Icon name="crown" size={15} /> : variant === 'verified' || variant === 'default' ? <Icon name="shield" size={15} /> : <span className="account-badge-check">✓</span>}
+                </span>
+              </li>;
+            })}
+          </ul>
+        ) : <p className="account-badges-empty">لم تُضف شارات لهذا الحساب بعد.</p>}
+      </section>
+
+      {totalOutstanding > 0 && <div className="operating-warning" role="status">لديك التزامات ورواتب غير مسددة بقيمة {formatMoney(totalOutstanding, country)}؛ أُوقفت الطاقة مؤقتًا، وتُخصم الالتزامات من السيولة الجديدة.</div>}
+
+      <NotificationCenter notifications={notifications} readNotificationIds={profile.readNotificationIds ?? []} onNavigate={onNavigate} onMarkRead={(id) => updateNotifications('read', [id])} onMarkAllRead={(ids) => updateNotifications('read', ids)} onDismissAll={(ids) => updateNotifications('dismiss', ids)} />
+
+      <ProductionSummary profile={profile} onNavigate={onNavigate} />
+
+      {synergies.length > 0 && <section className="surface synergy-panel"><div className="panel-heading"><div><span className="section-kicker">ميزة تشغيلية</span><h2>التآزر بين الشركات</h2></div><span className="notification-count">{synergies.length} نشط</span></div><div className="economy-list">{synergies.map((synergy) => <article className="economy-card economy-card--soft" key={synergy.id}><div className="economy-card-head"><div className="economy-card-title"><span className="economy-card-icon"><Icon name="company" size={17} /></span><span><strong>{synergy.title}</strong><small>{synergy.description}</small></span></div><span className="economy-pill economy-pill--green">تكلفة −{Math.round((1 - synergy.costMultiplier) * 100)}%</span></div></article>)}</div></section>}
+
+      <section className="surface asset-map-panel"><div className="panel-heading"><div><span className="section-kicker">خريطة الملكية</span><h2>خريطة أصول الإمبراطورية</h2></div><button className="text-link" type="button" onClick={() => onNavigate('lands')}>إدارة الأراضي <Icon name="chevron" size={14} /></button></div><div className="asset-map-grid">{profile.lands.length === 0 ? <p className="notification-empty">لا توجد أصول مسجلة بعد. ابدأ بشراء أرض من قسم الأراضي.</p> : profile.lands.map((land) => { const company = profile.companies.find((item) => item.landId === land.id); return <article className="asset-map-node" key={land.id}><span className="asset-map-icon"><Icon name={company ? 'factory' : 'land'} size={17} /></span><div><strong>{land.label}</strong><small>{land.landType ?? 'أصل عقاري'} · {company ? `تشغلها ${company.name}` : 'أرض متاحة للتأسيس'}</small></div><span className={`economy-pill ${company ? 'economy-pill--green' : 'economy-pill--gold'}`}>{company ? 'مشغّلة' : 'متاحة'}</span></article>; })}</div></section>
+
+      <GlobalLeaderboardCard />
 
       <section className={`operations-next operations-next--${operations.nextStep.tone}`}>
         <div className="operations-next-mark"><Icon name="target" size={21} /></div>
@@ -59,6 +116,23 @@ export function Dashboard({ profile, country, onNavigate }: DashboardProps) {
         <div className={`operations-metric${operations.runwayDays !== null && operations.runwayDays < 5 ? ' operations-metric--warning' : ''}`}><span><Icon name="bank" size={15} /> مدة الصمود بالنقد</span><strong>{operations.runwayDays === null ? '—' : `${formatNumber(operations.runwayDays)} يوم`}</strong></div>
         <div className="operations-metric"><span><Icon name="factory" size={15} /> خطوط جاهزة للتشغيل</span><strong>{formatNumber(operations.readyProductionCompanies)}</strong></div>
         <div className="operations-metric"><span><Icon name="briefcase" size={15} /> منتجات قابلة للبيع</span><strong>{formatNumber(operations.productUnits)}</strong></div>
+        <div className="operations-metric"><span><Icon name="target" size={15} /> عقود نشطة</span><strong>{formatNumber(operations.activeContracts)}</strong></div>
+        <div className="operations-metric"><span><Icon name="shield" size={15} /> السمعة التجارية</span><strong>{formatNumber(operations.reputation)} / 100</strong></div>
+      </section>
+
+      <section className="empire-points-card" aria-label="نقاط الإمبراطورية">
+        <div className="empire-points-heading">
+          <div className="empire-points-title"><span className="empire-points-icon"><Icon name="crown" size={20} /></span><div><span className="section-kicker">التقييم الموحد للحساب</span><h2>نقاط الإمبراطورية</h2></div></div>
+          <div className="empire-points-total"><strong>{formatNumber(empirePoints.total)} نقطة</strong><span>{empirePoints.title}</span></div>
+        </div>
+        <div className="empire-points-breakdown">
+          <div><span>الثروة والأصول</span><strong>{formatNumber(empirePoints.wealth)} نقطة</strong></div>
+          <div><span>الأداء المالي</span><strong>{formatNumber(empirePoints.performance)} نقطة</strong></div>
+          <div><span>السمعة</span><strong>{formatNumber(empirePoints.reputation)} نقطة</strong></div>
+          <div><span>الاستقرار</span><strong>{formatNumber(empirePoints.stability)} نقطة</strong></div>
+          <div><span>التوسع</span><strong>{formatNumber(empirePoints.expansion)} نقطة</strong></div>
+        </div>
+        <p className="empire-points-note"><Icon name="shield" size={14} /> تُعاد حساباتها مباشرة من بيانات الحساب عند العرض، ولا تُحفظ كرصيد قابل للتعديل.</p>
       </section>
 
       <section className={`empire-pulse empire-pulse--${pulse.rankTone}`}>
@@ -110,12 +184,13 @@ export function Dashboard({ profile, country, onNavigate }: DashboardProps) {
       <section className="sections-area">
         <div className="panel-heading sections-heading"><div><span className="section-kicker">إدارة الإمبراطورية</span><h2>أنظمة اللعبة</h2></div><span className="phase-pill">تعمل دون إنترنت</span></div>
         <div className="section-cards">
-          {quickSections.map((section) => (
-            <button className={`section-card${section.id === 'settings' ? ' section-card--settings' : ''}`} type="button" key={section.id} onClick={() => onNavigate(section.id)}>
-              <span className="section-card-copy"><strong>{section.label}</strong><small>{section.subtitle}</small></span>
-              <Icon name="chevron" size={17} className="section-chevron" />
-            </button>
-          ))}
+          {quickSections.map((section) => {
+            const unlocked = unlockedSections.has(section.id);
+            return <button className={`section-card${section.id === 'settings' ? ' section-card--settings' : ''}${unlocked ? '' : ' is-locked'}`} type="button" key={section.id} onClick={() => onNavigate(section.id)} aria-disabled={!unlocked} title={unlocked ? section.subtitle : getSectionUnlockHint(profile, section.id)}>
+              <span className="section-card-copy"><strong>{section.label}</strong><small>{unlocked ? section.subtitle : getSectionUnlockHint(profile, section.id)}</small></span>
+              <Icon name={unlocked ? 'chevron' : 'lock'} size={17} className="section-chevron" />
+            </button>;
+          })}
         </div>
       </section>
       <p className="data-footnote">الأرصدة والأسعار والأحداث محاكاة لأغراض اللعبة <span>·</span> تقدمك محفوظ محليًا على هذا الجهاز</p>

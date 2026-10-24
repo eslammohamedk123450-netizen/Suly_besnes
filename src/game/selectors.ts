@@ -1,8 +1,10 @@
 import type { SectionId } from '../domain/navigation';
 import type { PlayerProfile } from '../domain/player';
+import { calculateTotalAssets } from '../domain/player';
 import { AUCTION_CATALOG, findIndustry, findMaterial, findInvestment, PRODUCT_CATALOG, RECIPE_CATALOG, TASK_CATALOG } from './catalog';
 import { getAuctionListings, isAuctionOpen } from './auctions';
 import { getOperatingCostProgression } from './economyBalance';
+import { getSynergyOperatingMultiplier } from './synergy';
 
 export interface InventorySummaryRow {
   id: string;
@@ -25,6 +27,18 @@ export interface FinancialReport {
   recentEntries: PlayerProfile['ledger'];
 }
 
+export interface CompanyPerformanceReport {
+  companyId: string;
+  completedOrders: number;
+  activeOrders: number;
+  outputUnits: number;
+  productionCost: number;
+  payroll: number;
+  dailyOperatingCost: number;
+  estimatedDailyNet: number;
+  quality: number;
+}
+
 export interface AdvancedStatistics {
   production: { totalOrders: number; completedOrders: number; activeOrders: number; cancelledOrders: number; totalBatches: number; totalOutput: number; totalProductionCost: number; averageQuality: number; companies: Array<{ id: string; name: string; level: number; batches: number; completedOrders: number; output: number; cost: number; quality: number; utilization: number }> };
   sales: { totalUnits: number; totalRevenue: number; totalTax: number; netRevenue: number; averageUnitPrice: number; products: Array<{ id: string; name: string; units: number; revenue: number; tax: number; averagePrice: number }> };
@@ -45,6 +59,8 @@ export interface OperationsSnapshot {
   runwayDays: number | null;
   readyProductionCompanies: number;
   productUnits: number;
+  activeContracts: number;
+  reputation: number;
 }
 
 export interface ObligationRow {
@@ -75,6 +91,16 @@ export interface EmpirePulse {
   badges: Array<{ id: string; label: string; earned: boolean }>;
 }
 
+export interface EmpirePoints {
+  total: number;
+  title: string;
+  wealth: number;
+  performance: number;
+  reputation: number;
+  stability: number;
+  expansion: number;
+}
+
 export function selectAvailableAuctions(profile: PlayerProfile): typeof AUCTION_CATALOG {
   return getAuctionListings(profile).filter((listing) => isAuctionOpen(profile, listing));
 }
@@ -82,13 +108,14 @@ export function selectAvailableAuctions(profile: PlayerProfile): typeof AUCTION_
 export function selectEmpirePulse(profile: PlayerProfile): EmpirePulse {
   const activeStaff = profile.staff.filter((member) => member.status === 'active').length;
   const activeOrders = profile.productionOrders.filter((order) => order.status === 'active').length;
-  const score = profile.day * 4 + profile.lands.length * 12 + profile.companies.length * 28 + activeStaff * 7 + profile.sales.length * 6 + profile.banking.loans.filter((loan) => loan.status === 'paid').length * 10 + profile.completedTaskIds.length * 12;
+  const score = profile.day * 4 + profile.lands.length * 12 + profile.companies.length * 28 + activeStaff * 7 + profile.sales.length * 6 + profile.banking.loans.filter((loan) => loan.status === 'paid').length * 10 + profile.completedTaskIds.length * 12 + (profile.reputation ?? 50) + (profile.contracts ?? []).filter((contract) => contract.status === 'completed').length * 18;
   const ranks = [{ name: 'تاجر ناشئ', tone: 'bronze' as const, score: 0 }, { name: 'صاحب أعمال', tone: 'silver' as const, score: 80 }, { name: 'بارون صناعي', tone: 'gold' as const, score: 180 }, { name: 'إمبراطور اقتصادي', tone: 'royal' as const, score: 360 }];
   const current = ranks.slice().reverse().find((rank) => score >= rank.score) ?? ranks[0];
   const next = ranks.find((rank) => rank.score > score) ?? { name: 'القمة', score: current.score + 100 };
   let focusTitle = 'ابنِ أول أصل مؤثر';
   let focusDescription = 'اشترِ أرضًا مناسبة أو افتح مسارًا جديدًا حتى يبدأ اقتصادك في الحركة.';
   if (profile.payables > 0) { focusTitle = 'استعد السيطرة على السيولة'; focusDescription = 'سدّد الالتزامات قبل التوسع حتى لا تتحول السرعة إلى ضغط مالي.'; }
+  else if ((profile.contracts ?? []).some((contract) => contract.status === 'active')) { focusTitle = 'احمِ سمعتك التجارية'; focusDescription = 'لديك عقد نشط. الإنتاج لا يكفي؛ راجع الكمية وسلّم الطلب يدويًا قبل الموعد.'; }
   else if (activeOrders > 0) { focusTitle = 'احرس خط الإنتاج'; focusDescription = `لديك ${activeOrders} أمر إنتاج في الطابور. راقب الجودة والطلب عند التسليم.`; }
   else if (profile.companies.length > 0 && profile.staff.length === 0) { focusTitle = 'كوّن فريق القيادة'; focusDescription = 'مدير أو محاسب جيد قد يصنع الفارق بين شركة تعمل وإمبراطورية تتوسع.'; }
   else if (profile.inventory.some((lot) => PRODUCT_CATALOG.some((product) => product.id === lot.materialOrProductId))) { focusTitle = 'حوّل الإنجاز إلى نقد'; focusDescription = 'السوق يتغير يوميًا؛ اختر توقيت البيع قبل أن تتراجع فرصة الطلب.'; }
@@ -103,13 +130,31 @@ export function selectEmpirePulse(profile: PlayerProfile): EmpirePulse {
   return { score, rank: current.name, rankTone: current.tone, nextRank: next.name, nextRankScore: next.score, focusTitle, focusDescription, badges };
 }
 
+/** تقييم مشتق متزايد بلا سقف؛ لا يُحفظ كرقم قابل للتعديل داخل ملف اللاعب. */
+export function selectEmpirePoints(profile: PlayerProfile): EmpirePoints {
+  const totalAssets = calculateTotalAssets(profile);
+  const wealth = Math.floor(Math.log1p(Math.max(0, totalAssets) / 100_000) * 45);
+  const completedContracts = (profile.contracts ?? []).filter((contract) => contract.status === 'completed').length;
+  const performance = Math.floor(Math.log1p(Math.max(0, profile.finances.netProfit) / 50_000) * 28) + profile.sales.length * 3 + completedContracts * 10;
+  const reputation = Math.max(0, Math.round((profile.reputation ?? 50) * 0.8));
+  const overduePenalty = Math.floor(Math.max(0, profile.payables) / 50_000) * 8;
+  const defaultPenalty = profile.banking.loans.filter((loan) => loan.status === 'defaulted').length * 20;
+  const stability = Math.max(0, 75 - overduePenalty - defaultPenalty);
+  const activeStaff = profile.staff.filter((member) => member.status === 'active').length;
+  const expansion = profile.companies.length * 15 + profile.lands.length * 6 + activeStaff * 3;
+  const total = wealth + performance + reputation + stability + expansion;
+  const title = total >= 2_000 ? 'إمبراطورية أسطورية' : total >= 1_500 ? 'إمبراطورية كبرى' : total >= 1_100 ? 'قوة اقتصادية' : total >= 750 ? 'إمبراطورية راسخة' : total >= 450 ? 'إمبراطورية صاعدة' : total >= 200 ? 'تاجر واعد' : 'بداية الإمبراطورية';
+  return { total, title, wealth, performance, reputation, stability, expansion };
+}
+
 export function selectOperationsSnapshot(profile: PlayerProfile, operatingCostMultiplier = 1): OperationsSnapshot {
   const managedCompanyIds = new Set(profile.staff.filter((member) => member.status === 'active' && member.role === 'manager' && member.companyId).map((member) => member.companyId));
-  const dailyOperatingCost = profile.companies.reduce((sum, company) => sum + (company.operatingCostPerDay ?? 0) * (managedCompanyIds.has(company.id) ? 0.92 : 1), 0) * operatingCostMultiplier * getOperatingCostProgression(profile.day);
+  const dailyOperatingCost = profile.companies.reduce((sum, company) => sum + (company.operatingCostPerDay ?? 0) * (managedCompanyIds.has(company.id) ? 0.92 : 1), 0) * operatingCostMultiplier * getOperatingCostProgression(profile.day) * getSynergyOperatingMultiplier(profile);
   const runwayDays = dailyOperatingCost > 0 ? Math.floor(profile.bankBalance / dailyOperatingCost) : null;
   const productUnits = (profile.inventory ?? []).reduce((sum, lot) => (
     PRODUCT_CATALOG.some((product) => product.id === lot.materialOrProductId) ? sum + lot.quantity : sum
   ), 0);
+  const activeContracts = (profile.contracts ?? []).filter((contract) => contract.status === 'active').length;
   const readyProductionCompanies = profile.companies.filter((company) => {
     const recipe = RECIPE_CATALOG.find((item) => item.industryId === company.industryId);
     return Boolean(recipe && recipe.inputs.every((input) => (
@@ -119,8 +164,10 @@ export function selectOperationsSnapshot(profile: PlayerProfile, operatingCostMu
   let nextStep: OperationsNextStep;
   if (profile.payables > 0) {
     nextStep = { section: 'obligations', title: 'سدّد الالتزامات الحرجة', description: `لديك ${Math.round(profile.payables).toLocaleString('ar-EG')} ج.م مسجلة كالتزامات. راجع الأولويات قبل التوسع حتى لا تتوقف الطاقة.`, actionLabel: 'فتح الالتزامات', tone: 'gold' };
+  } else if (activeContracts > 0) {
+    nextStep = { section: 'contracts', title: 'سلّم عقدك قبل الموعد', description: `لديك ${activeContracts} عقد نشط. راجع المخزون وأكمل التوريد يدويًا حتى تحافظ على سمعتك التجارية.`, actionLabel: 'فتح العقود', tone: 'green' };
   } else if (profile.lands.length === 0) {
-    nextStep = { section: 'auctions', title: 'اشترِ أول أرض', description: 'الأرض هي مفتاح تأسيس أول نشاط. ابدأ بمزاد يناسب القطاع الذي تريد دخوله.', actionLabel: 'فتح المزادات', tone: 'gold' };
+    nextStep = { section: 'lands', title: 'اشترِ أول أرض', description: 'عرض البداية في صفحة الأراضي مضمون ولا يحتاج مزادًا. احتفظ بما يكفي من السيولة للتأسيس والتشغيل.', actionLabel: 'عرض الأرض المباشر', tone: 'gold' };
   } else if (profile.companies.length === 0) {
     nextStep = { section: 'companies', title: 'أسس أول شركة', description: 'لديك أصل يمكن تشغيله. اختر قطاعًا يناسب نوع الأرض واترك احتياطيًا للتشغيل.', actionLabel: 'تأسيس شركة', tone: 'blue' };
   } else if (productUnits > 0) {
@@ -130,12 +177,12 @@ export function selectOperationsSnapshot(profile: PlayerProfile, operatingCostMu
   } else {
     nextStep = { section: 'inventory', title: 'أمّن مدخلات التشغيل', description: 'الشركات متوقفة بانتظار مواد خام. اشترِ الكمية الضرورية فقط حتى تحافظ على السيولة.', actionLabel: 'فتح المخازن', tone: 'gold' };
   }
-  return { nextStep, dailyOperatingCost, runwayDays, readyProductionCompanies, productUnits };
+  return { nextStep, dailyOperatingCost, runwayDays, readyProductionCompanies, productUnits, activeContracts, reputation: profile.reputation ?? 50 };
 }
 
 export function selectObligations(profile: PlayerProfile, operatingCostMultiplier = 1): ObligationsSummary {
   const managedCompanyIds = new Set(profile.staff.filter((member) => member.status === 'active' && member.role === 'manager' && member.companyId).map((member) => member.companyId));
-  const dailyOperatingCost = profile.companies.reduce((sum, company) => sum + (company.operatingCostPerDay ?? 0) * (managedCompanyIds.has(company.id) ? 0.92 : 1), 0) * operatingCostMultiplier * getOperatingCostProgression(profile.day);
+  const dailyOperatingCost = profile.companies.reduce((sum, company) => sum + (company.operatingCostPerDay ?? 0) * (managedCompanyIds.has(company.id) ? 0.92 : 1), 0) * operatingCostMultiplier * getOperatingCostProgression(profile.day) * getSynergyOperatingMultiplier(profile);
   const dailyPayroll = profile.staff.filter((member) => member.status === 'active').reduce((sum, member) => sum + member.dailySalary, 0);
   const rows: ObligationRow[] = [];
   if (profile.payables > 0) rows.push({ id: 'payables', category: 'payable', label: 'التزامات متأخرة من التشغيل والأحداث', amount: profile.payables, dueDay: profile.day, overdue: true });
@@ -202,6 +249,18 @@ export function selectAdvancedStatistics(profile: PlayerProfile): AdvancedStatis
   const grossMargin = totalRevenue - totalTax - totalProductionCost;
   const totalUnits = sales.reduce((sum, sale) => sum + sale.quantity, 0);
   return { production: { totalOrders: orders.length, completedOrders: completedOrders.length, activeOrders: activeOrders.length, cancelledOrders: cancelledOrders.length, totalBatches, totalOutput, totalProductionCost, averageQuality, companies }, sales: { totalUnits, totalRevenue, totalTax, netRevenue: totalRevenue - totalTax, averageUnitPrice: totalUnits > 0 ? totalRevenue / totalUnits : 0, products }, profit: { grossMargin, operatingExpenses, investmentIncome, payroll, productionExpenses, otherExpenses, marginPercent: totalRevenue > 0 ? (grossMargin / totalRevenue) * 100 : 0 } };
+}
+
+
+export function selectCompanyPerformance(profile: PlayerProfile, companyId: string): CompanyPerformanceReport {
+  const company = profile.companies.find((item) => item.id === companyId);
+  const orders = profile.productionOrders.filter((order) => order.companyId === companyId);
+  const completed = orders.filter((order) => order.status === 'completed');
+  const payroll = profile.staff.filter((member) => member.companyId === companyId && member.status === 'active').reduce((sum, member) => sum + member.dailySalary, 0);
+  const productionCost = orders.reduce((sum, order) => sum + order.materialCost + order.energyCost + order.maintenanceCost, 0);
+  const quality = completed.length > 0 ? completed.reduce((sum, order) => sum + order.qualityScore, 0) / completed.length : 0;
+  const dailyOperatingCost = company?.operatingCostPerDay ?? 0;
+  return { companyId, completedOrders: completed.length, activeOrders: orders.filter((order) => order.status === 'active').length, outputUnits: completed.reduce((sum, order) => sum + order.outputQuantity, 0), productionCost, payroll, dailyOperatingCost, estimatedDailyNet: -(dailyOperatingCost + payroll), quality };
 }
 
 export function selectFinancialReport(profile: PlayerProfile): FinancialReport {

@@ -1,0 +1,18 @@
+.diamond-package-bonus {
+  display: block;
+  align-self: stretch;
+  padding: 5px 7px;
+  color: #28634e;
+  background: #eaf6ef;
+  border: 1px solid #cce8d7;
+  border-radius: 7px;
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 800;
+  line-height: 1.5;
+}
+.diamond-package-bonus--base {
+  color: #7b6942;
+  background: #faf5e7;
+  border-color: #eee2c1;
+}

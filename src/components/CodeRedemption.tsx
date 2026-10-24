@@ -2,7 +2,7 @@ import { useState, type FormEvent } from 'react';
 import type { PlayerProfile } from '../domain/player';
 import { redeemRewardCode } from '../game/rewards';
 
-interface CodeRedemptionProps { profile: PlayerProfile; onRedeemed: (profile: PlayerProfile, message: string, codeId: string) => Promise<boolean> }
+interface CodeRedemptionProps { profile: PlayerProfile; onRedeemed: (profile: PlayerProfile, message: string, codeId: string, rawCode: string) => Promise<boolean> }
 
 export function CodeRedemption({ profile, onRedeemed }: CodeRedemptionProps) {
   const [code, setCode] = useState('');
@@ -15,9 +15,9 @@ export function CodeRedemption({ profile, onRedeemed }: CodeRedemptionProps) {
     const result = await redeemRewardCode(profile, code);
     setBusy(false); setSuccess(result.ok); setNotice(result.message);
     if (result.ok && result.codeId) {
-      const committed = await onRedeemed(result.profile, result.message, result.codeId);
+      const committed = await onRedeemed(result.profile, result.message, result.codeId, code.trim());
       setSuccess(committed);
-      setNotice(committed ? result.message.replace('جارٍ تسجيل المكافأة عالميًا؛ ', '') : 'تعذر تسجيل الكود سحابيًا. لم تُمنح المكافأة؛ حاول مرة أخرى مع اتصال بالإنترنت.');
+      setNotice(committed ? result.message.replace('جارٍ تسجيل المكافأة عالميًا؛ ', '') : 'تعذر تسجيل الكود. لم تُمنح المكافأة؛ حاول مرة أخرى مع اتصال بالإنترنت.');
       if (committed) setCode('');
     }
   }

@@ -68,6 +68,9 @@ export interface ProductSale {
   unitPrice: number;
   grossRevenue: number;
   tax: number;
+  costOfGoods?: number;
+  soldOnDay?: number;
+  contractId?: string;
   soldAt: string;
 }
 
@@ -91,7 +94,7 @@ export interface InvestmentRecord {
   settledAmount?: number;
 }
 
-export interface DepositRecord {
+export interface DepositTranche {
   id: string;
   principal: number;
   annualRate: number;
@@ -99,6 +102,18 @@ export interface DepositRecord {
   maturityDay: number;
   status: 'active' | 'paid' | 'withdrawn';
   settledAmount?: number;
+}
+
+export interface DepositRecord {
+  id: string;
+  principal: number;
+  annualRate: number;
+  startedOnDay: number;
+  maturityDay: number;
+  status: 'active' | 'paid' | 'withdrawn' | 'merged';
+  settledAmount?: number;
+  mergedIntoId?: string;
+  tranches?: DepositTranche[];
 }
 
 export interface LoanRecord {
@@ -180,8 +195,15 @@ export interface GameEventRecord {
   id: string;
   day: number;
   title: string;
+  description?: string;
   cashImpact: number;
   occurredAt: string;
+  industryId?: IndustryId;
+  materialId?: string;
+  productId?: string;
+  materialPriceMultiplier?: number;
+  demandMultiplier?: number;
+  effectExpiresOnDay?: number;
 }
 
 export interface SeasonProgress {
@@ -191,4 +213,38 @@ export interface SeasonProgress {
   points: number;
   claimedChallengeKeys: string[];
   claimedLoginRewardDay?: number;
+}
+
+export type ContractStatus = 'active' | 'completed' | 'failed';
+
+export interface BusinessContract {
+  id: string;
+  clientName: string;
+  clientType: 'budget' | 'quality' | 'bulk' | 'urgent';
+  productId: string;
+  productName: string;
+  quantity: number;
+  unitPrice: number;
+  reward: number;
+  reputationReward: number;
+  minimumQuality?: number;
+  deadlineDay: number;
+  acceptedOnDay: number;
+  status: ContractStatus;
+  completedOnDay?: number;
+  failedOnDay?: number;
+  negotiated?: boolean;
+  negotiationNote?: string;
+}
+
+export interface AchievementRecord {
+  id: string;
+  earnedAtDay: number;
+  title: string;
+}
+
+export interface OnboardingProgress {
+  introCompleted: boolean;
+  chapter: number;
+  seenGuides: string[];
 }

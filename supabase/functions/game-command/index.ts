@@ -1,0 +1,85 @@
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { executeGameCommand } from 'https://raw.githubusercontent.com/eslammohamedk123450-netizen/Suly_besnes/main/supabase/functions/game-command/game-engine.ts';
+import { validatePlayerProfile } from './profile-validator.ts';
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+};
+const allowedCommands = new Set([
+  'place_bid', 'buy_direct_land', 'buy_direct_company', 'sell_land', 'upgrade_land', 'sell_company', 'sell_asset',
+  'buy_global_material', 'found_company', 'upgrade_company', 'run_production', 'service_company',
+  'cancel_production', 'use_speed_card', 'use_day_speed_card', 'buy_speed_card', 'upgrade_warehouse', 'sell_product', 'buy_gold', 'buy_gold_with_diamonds', 'sell_gold', 'hire_staff',
+  'pay_staff_salary', 'terminate_staff', 'create_deposit', 'merge_deposits', 'withdraw_deposit', 'take_loan', 'repay_loan',
+  'create_investment', 'advance_day', 'accept_contract', 'deliver_contract', 'negotiate_contract', 'claim_task',
+  'claim_season_challenge', 'claim_login_reward', 'choose_season_event', 'update_notification_state',
+]);
+function json(body: Record<string, unknown>, status = 200) {
+  return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+}
+function newItems(previous: unknown, next: unknown, predicate: (item: Record<string, unknown>) => boolean): string[] {
+  const before = Array.isArray(previous) ? previous : [];
+  const seen = new Set(before.filter((item) => item && typeof item === 'object').map((item) => JSON.stringify(item)));
+  return (Array.isArray(next) ? next : []).filter((item) => item && typeof item === 'object' && predicate(item as Record<string, unknown>) && !seen.has(JSON.stringify(item))).map((item) => item as Record<string, unknown> as any);
+}
+async function recordVerifiedTransactions(admin: ReturnType<typeof createClient>, userId: string, before: Record<string, unknown>, after: Record<string, unknown>) {
+  const seasonId = typeof (after.season as Record<string, unknown> | undefined)?.seasonId === 'string' ? (after.season as Record<string, unknown>).seasonId : null;
+  if (!seasonId) return;
+  const sales = newItems(before.sales, after.sales, () => true).map((item) => item.id).filter((id): id is string => typeof id === 'string');
+  const production = newItems(before.productionOrders, after.productionOrders, (item) => item.status === 'completed').map((item) => item.id).filter((id): id is string => typeof id === 'string');
+  const contracts = newItems(before.contracts, after.contracts, (item) => item.status === 'completed').map((item) => item.id).filter((id): id is string => typeof id === 'string');
+  const auctions = newItems(before.auctionHistory, after.auctionHistory, (item) => item.bidder === 'player').map((item) => item.listingId).filter((id): id is string => typeof id === 'string');
+  for (const [transactionType, ids] of [['sale_completed', sales], ['production_completed', production], ['contract_delivered', contracts], ['auction_won', auctions]] as const) {
+    for (const sourceId of ids) {
+      await admin.rpc('record_verified_game_transaction', { p_user_id: userId, p_season_id: seasonId, p_transaction_type: transactionType, p_idempotency_key: `${transactionType}:${sourceId}`, p_source_id: sourceId, p_metadata: { source: 'game-command-edge-function' } });
+    }
+  }
+}
+Deno.serve(async (request) => {
+  if (request.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+  if (request.method !== 'POST') return json({ error: 'method_not_allowed' }, 405);
+  const authorization = request.headers.get('Authorization');
+  if (!authorization?.startsWith('Bearer ')) return json({ error: 'missing_authorization' }, 401);
+  const supabaseUrl = Deno.env.get('SUPABASE_URL');
+  const anonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? Deno.env.get('SUPABASE_PUBLISHABLE_KEY');
+  const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+  if (!supabaseUrl || !anonKey || !serviceRoleKey) return json({ error: 'server_configuration_error' }, 500);
+  const userClient = createClient(supabaseUrl, anonKey, { global: { headers: { Authorization: authorization } } });
+  const { data: { user }, error: authError } = await userClient.auth.getUser();
+  if (authError || !user) return json({ error: 'invalid_session' }, 401);
+  let payload: { command?: { name?: unknown; args?: unknown }; commandKey?: unknown; saveData?: unknown };
+  try { payload = await request.json(); } catch { return json({ error: 'invalid_json' }, 400); }
+  if ('saveData' in payload) return json({ error: 'save_data_not_accepted' }, 400);
+  const command = payload.command;
+  if (!command || typeof command !== 'object' || typeof command.name !== 'string' || !allowedCommands.has(command.name) || !command.args || typeof command.args !== 'object' || Array.isArray(command.args)) return json({ error: 'invalid_command' }, 400);
+  const commandKey = typeof payload.commandKey === 'string' && payload.commandKey.length >= 16 ? payload.commandKey : crypto.randomUUID();
+  const admin = createClient(supabaseUrl, serviceRoleKey, { auth: { persistSession: false, autoRefreshToken: false } });
+  const { data: existingReceipt, error: receiptError } = await admin.from('game_command_receipts').select('result').eq('user_id', user.id).eq('command_key', commandKey).maybeSingle();
+  if (receiptError) return json({ error: 'receipt_lookup_failed' }, 500);
+  if (existingReceipt?.result && typeof existingReceipt.result === 'object') return json({ ...(existingReceipt.result as Record<string, unknown>), duplicate: true });
+  const { data: row, error: readError } = await admin.from('game_profiles').select('save_data, updated_at').eq('user_id', user.id).maybeSingle();
+  if (readError || !row?.save_data || typeof row.save_data !== 'object') return json({ error: 'profile_not_found' }, 404);
+  const before = row.save_data as Record<string, unknown>;
+  const beforeValidation = validatePlayerProfile(before);
+  if (!beforeValidation.ok) return json({ error: 'stored_profile_invalid', details: beforeValidation.errors }, 409);
+  const result = executeGameCommand(before as never, command as never) as { ok: boolean; profile: Record<string, unknown>; message: string; data?: unknown; reason?: string };
+  const nextProfile = result.profile;
+  const afterValidation = validatePlayerProfile(nextProfile, before);
+  if (!afterValidation.ok) return json({ error: 'command_result_invalid', details: afterValidation.errors }, 409);
+  if (!result.ok) return json({ ok: true, result });
+  const commitResult = { ok: true, profile: nextProfile, result };
+  const { data: committed, error: commitError } = await admin.rpc('commit_game_command', {
+    p_user_id: user.id,
+    p_command_key: commandKey,
+    p_command_name: command.name,
+    p_expected_updated_at: row.updated_at,
+    p_player_name: String(nextProfile.name ?? 'المستثمر الجديد'),
+    p_game_day: Number(nextProfile.day ?? 1),
+    p_save_data: nextProfile,
+    p_result: commitResult,
+  });
+  if (commitError) return json({ error: 'command_commit_failed', detail: commitError.message }, 409);
+  await recordVerifiedTransactions(admin, user.id, before, nextProfile);
+  return json({ ok: true, profile: committed?.profile ?? nextProfile, result: committed?.result ?? result });
+});
