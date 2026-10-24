@@ -32,6 +32,7 @@ import { claimDailySeasonLogin, getVisibleSeasons, recordVerifiedGameTransaction
 import { ResourceBar, type ResourceSyncState } from './components/ResourceBar';
 import { acknowledgeGameCommand, blockGameCommand, createGameCommandKey, enqueueGameCommand, loadQueuedGameCommands } from './storage/commandOutbox';
 import { clearPendingInitialProfile, loadPendingInitialProfile, queueInitialProfile } from './storage/pendingInitialProfile';
+import { playSound } from './game/soundEffects';
 
 function getPendingSyncCount(accountId: string): number {
   return loadQueuedGameCommands(accountId).length + (loadPendingInitialProfile(accountId) ? 1 : 0);
@@ -446,6 +447,17 @@ export default function App() {
     saveNotificationTheme(notificationTheme);
   }, [notificationTheme]);
 
+  useEffect(() => {
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target as HTMLElement | null;
+      const button = target?.closest('button, [role="button"]') as HTMLButtonElement | null;
+      if (!button || button.disabled || button.dataset.sound === 'none') return;
+      playSound('click');
+    };
+    document.addEventListener('pointerdown', handlePointerDown, { passive: true });
+    return () => document.removeEventListener('pointerdown', handlePointerDown);
+  }, []);
+
   function startNewWorld() {
     const chosenCountry = findCountry(selectedCountryId);
     if (!chosenCountry) return;
@@ -470,12 +482,14 @@ export default function App() {
     saveGame(nextProfile, account?.id);
     if (account && !account.isGuest) setSyncState('local');
     setProfile(nextProfile);
+    playSound('success');
     setNotice('بدأ الفصل الأول. ابدأ بالأرض ثم أسس شركتك الأولى.');
     setNoticeTone('success');
   }
 
   function handleGameResult<T>(result: GameResult<T>, options: { syncRemote?: boolean } = {}) {
     if (!result.ok) {
+      playSound('error');
       setNotice(result.message);
       setNoticeTone('error');
       return;
@@ -485,6 +499,7 @@ export default function App() {
     const settledAmount = Math.max(0, (profile?.payables ?? result.profile.payables) - result.profile.payables);
     const settlementNote = settledAmount > 0 ? ` وُجّه ${formatMoney(settledAmount, country)} لسداد التزامات سابقة.` : '';
     setProfile(result.profile);
+    playSound('success');
     setNotice(saved.ok ? `${result.message}${settlementNote}` : `${result.message}${settlementNote} تعذر تثبيت الحفظ على هذا الجهاز.`);
     setNoticeTone(saved.ok ? 'success' : 'error');
   }
@@ -603,13 +618,14 @@ export default function App() {
 
   function navigate(section: SectionId, focus?: string) {
     if (!profile || !isSectionUnlocked(profile, section)) {
+      playSound('error');
       setNotice(profile ? getSectionUnlockHint(profile, section) : 'ابدأ عالمك أولًا لفتح أنظمة اللعبة.');
       setNoticeTone('error');
       return;
     }
     setActiveSection(section);
     setSectionFocus(focus);
-    if (section !== 'home' && section !== 'profile' && !profile.onboarding.seenGuides.includes(section)) setPendingGuide(section);
+    if (section !== 'home' && section !== 'profile' && !profile.onboarding.seenGuides.includes(section)) { setPendingGuide(section); playSound('unlock'); }
     setMobileMenuOpen(false);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
