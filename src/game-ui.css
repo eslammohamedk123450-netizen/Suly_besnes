@@ -323,6 +323,8 @@
 .auction-room-current small { color: #8b9aa5; font-size: 9px; }
 .auction-room-current strong { color: #a37b25; font-size: 25px; font-variant-numeric: tabular-nums; }
 .auction-room-current span { color: #6e8290; font-size: 9px; }
+.auction-bid-progress { height: 6px; overflow: hidden; margin-top: 5px; background: #edf1f4; border-radius: 99px; }
+.auction-bid-progress span { display: block; height: 100%; background: linear-gradient(90deg, #b18a34, #e4c96e); border-radius: inherit; transition: width .2s ease; }
 .auction-room-table, .auction-room-panel, .auction-room-bid-form { padding: 14px; background: #fff; border: 1px solid #e4ebef; border-radius: 14px; }
 .auction-room-table-top, .auction-room-panel-heading { display: flex; justify-content: space-between; align-items: center; gap: 9px; margin-bottom: 12px; }
 .auction-room-table-top span, .auction-room-panel-heading strong { color: #29465b; font-size: 11px; }
@@ -350,6 +352,7 @@
 .auction-amount-controls .button { min-height: 34px; padding-inline: 8px; font-size: 9px; }
 .auction-room-bid-button { width: 100%; min-height: 42px; }
 .auction-room-message { margin: 0; padding: 8px; color: #456779; background: #f2f7f8; border-radius: 7px; font-size: 9px; line-height: 1.7; }
+.economy-alert--warning { color: #8b6420; background: #fff8e5; border-color: #ecd99f; }
 .auction-room-footer { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 13px 17px; color: #748592; background: #fff; border-top: 1px solid #e6edf1; font-size: 9px; }
 .auction-room-footer > span { display: inline-flex; align-items: center; gap: 5px; }
 .auction-room-footer svg { color: #b38d35; }

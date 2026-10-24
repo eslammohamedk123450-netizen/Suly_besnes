@@ -309,7 +309,7 @@ export function SectionPage({ section, profile, country, focus, notificationThem
           {profile.lands.length === 0 ? <EconomyEmpty title="لا توجد أراضٍ مملوكة بعد" message="افتح مزادًا وقدّم عرضًا لتسجيل أول أصل عقاري." /> : <div className="economy-list">{profile.lands.map((land) => <article className="economy-card economy-card--soft" key={land.id}><div className="economy-card-head"><div className="economy-card-title"><span className="economy-card-icon"><Icon name="land" size={18} /></span><span><strong>{land.label}</strong><small>{formatNumber(land.areaSquareMeters)} م² · {land.landType ? landTypeNames[land.landType] : 'أرض'}</small></span></div><span className="economy-price">{formatMoney(land.purchasePrice, country)}</span></div></article>)}</div>}
         </EconomyPanel>
       </>,
-    )}{selectedAuction && <AuctionRoom profile={profile} country={country} listing={selectedAuction} onClose={() => setSelectedAuctionId(null)} onBid={(amount, targetCompanyId) => { const result = placeBid(profile, selectedAuction.id, amount, targetCompanyId); onAction(result); if (result.ok) setSelectedAuctionId(null); return result; }} />}</div>;
+    )}{selectedAuction && <AuctionRoom profile={profile} country={country} listing={selectedAuction} initialBid={Number(bidAmounts[selectedAuction.id]) || undefined} onClose={() => setSelectedAuctionId(null)} onBid={(amount, targetCompanyId) => { const result = placeBid(profile, selectedAuction.id, amount, targetCompanyId); onAction(result); if (result.ok) setSelectedAuctionId(null); return result; }} />}</div>;
   }
 
   if (section.id === 'lands') {
