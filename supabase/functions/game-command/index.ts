@@ -1,6 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { executeGameCommand } from 'https://raw.githubusercontent.com/eslammohamedk123450-netizen/Suly_besnes/main/supabase/functions/game-command/game-engine.ts';
-import { validatePlayerProfile } from 'https://raw.githubusercontent.com/eslammohamedk123450-netizen/Suly_besnes/main/supabase/functions/game-command/profile-validator.ts';
+import { executeGameCommand } from 'https://esm.sh/gh/eslammohamedk123450-netizen/Suly_besnes@7facf89/supabase/functions/game-command/game-engine.ts';
+import { validatePlayerProfile } from 'https://esm.sh/gh/eslammohamedk123450-netizen/Suly_besnes@7facf89/supabase/functions/game-command/profile-validator.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
