@@ -469,3 +469,5 @@
 .warehouse-upgrade-card>div:first-child{display:grid;gap:5px}.warehouse-upgrade-card>div:first-child strong{color:#f2d38b}.warehouse-upgrade-card>div:first-child small{color:#aebdc7}
 @media(max-width:720px){.store-category-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.store-category-card{min-height:88px;padding:12px}.warehouse-capacity-grid{grid-template-columns:1fr}.store-hero{padding:17px}.store-hero h2{font-size:21px}}
 @media(max-width:460px){.dashboard-store-link{gap:6px;padding:8px 10px;font-size:12px}.dashboard-store-link span{font-size:9px}.store-category-grid{gap:8px}.store-category-card small{font-size:10px}}
+
+.production-history-toggle { width: 100%; margin-top: 10px; }
