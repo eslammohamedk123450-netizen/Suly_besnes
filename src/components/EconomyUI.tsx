@@ -1,18 +1,19 @@
-import type { ReactNode } from 'react';
+import { useId, type ReactNode } from 'react';
 import { formatNumber } from '../domain/formatters';
-import { Icon } from './Icon';
+import { Icon, type IconName } from './Icon';
 
 interface EconomyPageShellProps {
   dayLabel: string;
   balanceLabel: string;
   dayDurationMinutes: number;
   daySpeedMultiplier: 1 | 2 | 3;
+  compact?: boolean;
   children: ReactNode;
 }
 
-export function EconomyPageShell({ dayLabel, balanceLabel, dayDurationMinutes, daySpeedMultiplier, children }: EconomyPageShellProps) {
+export function EconomyPageShell({ dayLabel, balanceLabel, dayDurationMinutes, daySpeedMultiplier, compact = false, children }: EconomyPageShellProps) {
   return (
-    <div className="economy-page">
+    <div className={`economy-page${compact ? ' economy-page--compact' : ''}`}>
       <div className="economy-toolbar">
         <div className="economy-toolbar-copy">
           <strong>إدارة الإمبراطورية</strong>
@@ -26,16 +27,39 @@ export function EconomyPageShell({ dayLabel, balanceLabel, dayDurationMinutes, d
   );
 }
 
-interface EconomyPanelProps {
+export interface EconomyPanelProps {
   id?: string;
   title: string;
   description?: string;
   aside?: ReactNode;
   children: ReactNode;
   className?: string;
+  compact?: boolean;
+  icon?: IconName;
+  expanded?: boolean;
+  onToggle?: () => void;
 }
 
-export function EconomyPanel({ id, title, description, aside, children, className = '' }: EconomyPanelProps) {
+export function EconomyPanel({ id, title, description, aside, children, className = '', compact = false, icon = 'briefcase', expanded = false, onToggle }: EconomyPanelProps) {
+  const contentId = useId();
+  if (compact) {
+    return (
+      <section id={id} className={`economy-panel economy-panel--compact${expanded ? ' is-expanded' : ''}${className ? ` ${className}` : ''}`}>
+        <button className="economy-panel-tile" type="button" aria-expanded={expanded} aria-controls={contentId} onClick={onToggle}>
+          <span className="economy-panel-tile-icon"><Icon name={icon} size={25} /></span>
+          <span className="economy-panel-tile-copy"><strong>{title}</strong>{description && <small>{description}</small>}</span>
+          <span className="economy-panel-tile-arrow"><Icon name={expanded ? 'close' : 'chevron'} size={16} /></span>
+        </button>
+        <div id={contentId} className="economy-panel-content" hidden={!expanded}>
+          <div className="economy-panel-heading economy-panel-heading--compact">
+            <div><h2>{title}</h2>{description && <p>{description}</p>}</div>
+            {aside}
+          </div>
+          {children}
+        </div>
+      </section>
+    );
+  }
   return (
     <section id={id} className={`economy-panel${className ? ` ${className}` : ''}`}>
       <div className="economy-panel-heading">
