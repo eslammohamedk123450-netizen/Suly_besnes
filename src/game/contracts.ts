@@ -3,11 +3,11 @@ import type { BusinessContract } from '../domain/futureSystems';
 import { PRODUCT_CATALOG } from './catalog';
 import { getMarketQuote } from './market';
 
-const CLIENTS: readonly { name: string; type: BusinessContract['clientType']; multiplier: number; description: string }[] = [
-  { name: 'متجر المدينة الاقتصادي', type: 'budget', multiplier: 0.92, description: 'يركّز على السعر المنخفض والتوريد المنتظم.' },
-  { name: 'مؤسسة الجودة الأولى', type: 'quality', multiplier: 1.18, description: 'يدفع أكثر للمنتجات ذات الجودة العالية.' },
-  { name: 'شركة التوزيع الكبرى', type: 'bulk', multiplier: 1.04, description: 'يطلب كميات كبيرة مقابل مكافأة حجم.' },
-  { name: 'عميل التوريد العاجل', type: 'urgent', multiplier: 1.28, description: 'مهلة قصيرة ومكافأة مرتفعة للمستعد.' },
+const CLIENTS: readonly { name: string; type: BusinessContract['clientType']; multiplier: number; minimumQuality: number; description: string }[] = [
+  { name: 'متجر المدينة الاقتصادي', type: 'budget', multiplier: 0.92, minimumQuality: 0, description: 'يركّز على السعر المنخفض والتوريد المنتظم.' },
+  { name: 'مؤسسة الجودة الأولى', type: 'quality', multiplier: 1.18, minimumQuality: 92, description: 'يدفع أكثر، لكنه لا يقبل منتجًا بجودة أقل من 92%.' },
+  { name: 'شركة التوزيع الكبرى', type: 'bulk', multiplier: 1.04, minimumQuality: 75, description: 'يطلب كميات كبيرة بمستوى جودة تجاري.' },
+  { name: 'عميل التوريد العاجل', type: 'urgent', multiplier: 1.28, minimumQuality: 70, description: 'مهلة قصيرة ومكافأة مرتفعة للمستعد.' },
 ];
 
 function hash(value: string): number {
@@ -39,7 +39,7 @@ export function getContractOffers(profile: PlayerProfile): ContractOffer[] {
       unitPrice,
       reward: Math.round(unitPrice * quantity * 0.12),
       reputationReward: client.type === 'urgent' ? 8 : 5,
-      minimumQuality: client.type === 'quality' ? 92 : undefined,
+      minimumQuality: client.minimumQuality,
       deadlineDay: deadline,
       description: client.description,
     };
