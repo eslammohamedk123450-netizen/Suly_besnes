@@ -373,3 +373,10 @@
   .advanced-stat-columns { grid-template-columns: 1fr; gap: 14px; }
   .advanced-stat-row-head span, .advanced-stat-row-meta span { font-size: 7px; }
 }
+
+.store-banner { display: flex; align-items: center; gap: 10px; margin-bottom: 13px; padding: 11px 12px; color: #536779; background: linear-gradient(105deg, #fffaf0, #f6fbfd); border: 1px solid #e8dfc7; border-radius: 10px; }
+.store-banner > svg { flex: 0 0 auto; color: #aa832b; }
+.store-banner div { display: grid; gap: 3px; }
+.store-banner strong { color: #29465b; font-size: 10px; }
+.store-banner span { color: #84929d; font-size: 8px; line-height: 1.7; }
+@media (max-width: 760px) { .store-banner { align-items: flex-start; } }
