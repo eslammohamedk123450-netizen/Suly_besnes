@@ -102,6 +102,8 @@
 .economy-alert { display: flex; align-items: center; gap: 8px; padding: 10px 12px; color: #806727; background: #fff9e9; border: 1px solid #f1e5c3; border-radius: 9px; font-size: 9px; line-height: 1.8; }
 .economy-divider { height: 1px; background: #edf1f3; }
 .economy-full { grid-column: 1 / -1; }
+.staff-progress-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin-top: 10px; }
+.staff-progress-grid span { padding: 7px 8px; color: #627587; background: #f4f7f8; border-radius: 7px; font-size: 8px; font-weight: 800; text-align: center; }
 
 @media (max-width: 760px) {
   .economy-page { gap: 10px; }
@@ -119,6 +121,8 @@
   .economy-stat strong { font-size: 13px; }
   .economy-form-row { gap: 7px; }
   .economy-card { padding: 11px; }
+  .staff-progress-grid { gap: 4px; }
+  .staff-progress-grid span { padding: 6px 4px; font-size: 7px; }
   .economy-task { grid-template-columns: 32px minmax(0, 1fr); }
   .economy-task .button { grid-column: 1 / -1; width: 100%; }
 }

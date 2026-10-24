@@ -126,9 +126,19 @@ function isStaffContract(value: unknown): value is StaffContract {
   return isRecord(value) && isNonEmptyString(value.id) && isNonEmptyString(value.name)
     && (value.role === 'manager' || value.role === 'accountant' || value.role === 'lawyer' || value.role === 'hr')
     && (value.companyId === undefined || isNonEmptyString(value.companyId)) && isFiniteNonNegative(value.dailySalary)
+    && (value.level === undefined || (Number.isInteger(value.level) && (value.level as number) >= 1 && (value.level as number) <= 5))
+    && (value.experience === undefined || (isFiniteNonNegative(value.experience) && value.experience <= 100))
     && Number.isInteger(value.hiredOnDay) && (value.hiredOnDay as number) >= 1
     && Number.isInteger(value.nextPayDay) && (value.nextPayDay as number) >= (value.hiredOnDay as number)
     && (value.status === 'active' || value.status === 'terminated');
+}
+
+function normalizeStaffContract(value: StaffContract): StaffContract {
+  return {
+    ...value,
+    level: Math.min(5, Math.max(1, value.level ?? 1)),
+    experience: Math.min(100, Math.max(0, value.experience ?? 0)),
+  };
 }
 
 function isProductionOrder(value: unknown): value is ProductionOrder {
@@ -279,7 +289,7 @@ function migrateProfile(value: unknown): PlayerProfile | null {
     deposits: Array.isArray(rawBanking.deposits) && rawBanking.deposits.every(isDeposit) ? rawBanking.deposits : [],
     loans: Array.isArray(rawBanking.loans) && rawBanking.loans.every(isLoan) ? rawBanking.loans : [],
   };
-  const staff = Array.isArray(value.staff) && value.staff.every(isStaffContract) ? value.staff : [];
+  const staff = Array.isArray(value.staff) && value.staff.every(isStaffContract) ? value.staff.map(normalizeStaffContract) : [];
   const productionOrders = Array.isArray(value.productionOrders) && value.productionOrders.every(isProductionOrder) ? value.productionOrders : [];
   const auctionHistory = Array.isArray(value.auctionHistory) && value.auctionHistory.every(isAuctionBidRecord) ? value.auctionHistory : [];
   const redeemedCodeIds = Array.isArray(value.redeemedCodeIds) && value.redeemedCodeIds.every(isNonEmptyString) ? value.redeemedCodeIds : [];
