@@ -14,6 +14,7 @@ import { getInvestmentPayoutRate, getOperatingCostProgression } from '../game/ec
 import { getContractOffers, getCustomerSegmentLabel } from '../game/contracts';
 import { selectActiveInvestments, selectAdvancedStatistics, selectAvailableAuctions, selectCompanyPerformance, selectEmpirePoints, selectFinancialReport, selectInventorySummary, selectObligations, selectSalesSummary, selectTaskBoard } from '../game/selectors';
 import { Icon } from './Icon';
+import { isSoundEnabled, setSoundEnabled } from '../game/soundEffects';
 import { EconomyEmpty, EconomyPageShell, EconomyPanel, EconomyStat } from './EconomyUI';
 import { DiamondStore } from './DiamondStore';
 import { PurchaseOptions } from './PurchaseOptions';
@@ -169,6 +170,13 @@ export function SectionPage({ section, profile, country, focus, notificationThem
           <div className="settings-note"><Icon name="shield" size={17} /><p>{isGuest ? 'عالم الضيف محفوظ على هذا الجهاز. اربط حسابًا لاستعادة العالم على أجهزة أخرى.' : 'يُحفظ العالم على جهازك ويتزامن عند الاتصال؛ اللعب الأساسي متاح دون اتصال.'}</p></div>
           {isGuest && <button className="button button-primary account-link-button" type="button" onClick={onLinkAccount}>ربط الحساب ونسخ العالم واستعادته</button>}
           <button className="button button-secondary settings-store-link" type="button" onClick={() => onNavigate('store')}><Icon name="store" size={16} /> فتح متجر المشتريات</button>
+          <div className="settings-notice-theme">
+            <span>المؤثرات الصوتية</span>
+            <div className="settings-theme-switch" role="group" aria-label="تشغيل المؤثرات الصوتية">
+              <button className={isSoundEnabled() ? 'is-selected' : ''} type="button" aria-pressed={isSoundEnabled()} onClick={() => setSoundEnabled(true)}>تشغيل</button>
+              <button className={!isSoundEnabled() ? 'is-selected' : ''} type="button" aria-pressed={!isSoundEnabled()} onClick={() => setSoundEnabled(false)}>كتم</button>
+            </div>
+          </div>
           <div className="settings-notice-theme">
             <span>مظهر الإشعارات</span>
             <div className="settings-theme-switch" role="group" aria-label="اختيار مظهر الإشعارات">
