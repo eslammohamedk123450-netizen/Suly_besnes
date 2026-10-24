@@ -27,6 +27,20 @@
 .diamond-package-reward { color: #a9e6cc; }
 .diamond-package > small { color: #c7cce0; }
 
+.diamond-card-shop { margin-top: 16px; padding-top: 15px; border-top: 1px solid rgba(255,255,255,.13); }
+.diamond-card-shop-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+.diamond-card-shop-heading h4 { margin: 3px 0 4px; color: #ffe9a1; font-size: 17px; }
+.diamond-card-shop-heading p { margin: 0; color: #c7cce0; font-size: 10px; }
+.diamond-card-balance { padding: 8px 10px; color: #1c2947; background: linear-gradient(135deg, #fff0ad, #d5a63e); border-radius: 9px; font-size: 10px; font-weight: 900; white-space: nowrap; }
+.diamond-card-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.diamond-card-item { display: grid; justify-items: center; gap: 6px; padding: 13px 10px; text-align: center; background: rgba(255,255,255,.055); border: 1px solid rgba(226, 194, 111, .4); border-radius: 11px; }
+.diamond-card-icon { display: grid; place-items: center; width: 42px; height: 42px; color: #fff1ad; background: rgba(221, 177, 67, .2); border: 1px solid rgba(255, 226, 128, .65); border-radius: 50%; font-size: 12px; font-weight: 900; }
+.diamond-card-item strong { color: #ffeba7; font-size: 12px; }
+.diamond-card-item small, .diamond-card-item em { color: #c7cce0; font-size: 9px; line-height: 1.5; }
+.diamond-card-item em { color: #a9e6cc; font-style: normal; }
+.diamond-card-price { color: #ffe07d; font-size: 13px; font-weight: 900; }
+.diamond-card-item .button { width: 100%; padding: 8px; font-size: 10px; }
+
 .diamond-transfer-panel { margin-top: 14px; padding: 14px; color: #f5f4e9; background: rgba(4, 9, 25, .7); border: 1px solid rgba(230, 194, 101, .35); border-radius: 13px; }
 .diamond-transfer-title { display: flex; justify-content: space-between; gap: 10px; color: #ffe5a0; }
 .diamond-transfer-title span { color: #fff; font-weight: 900; }
@@ -52,4 +66,6 @@
   .diamond-package { min-height: 190px; }
   .diamond-store-heading { display: grid; }
   .diamond-store-rate { justify-self: start; }
+  .diamond-card-shop-heading { display: grid; }
+  .diamond-card-balance { justify-self: start; }
 }

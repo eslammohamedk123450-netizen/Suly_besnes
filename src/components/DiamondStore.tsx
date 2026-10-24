@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { PlayerProfile } from '../domain/player';
+import type { SpeedCardKind } from '../domain/accountFeatures';
 import { formatNumber } from '../domain/formatters';
 import { createDiamondTopupRequest, listMyDiamondTopupRequests, type DiamondPackageId, type DiamondTopupOrder } from '../storage/diamondTopupRepository';
 import { DIAMOND_PACKAGES, getDiamondPackageBonus } from '../game/diamondPackages';
@@ -10,6 +11,7 @@ interface DiamondStoreProps {
   isGuest: boolean;
   onLinkAccount: () => void;
   onRefreshProfile: () => Promise<void>;
+  onPurchaseSpeedCard: (kind: SpeedCardKind) => void;
 }
 
 const VODAFONE_CASH_NUMBER = '01093629700';
@@ -34,7 +36,7 @@ function newRequestId() {
   return crypto.randomUUID();
 }
 
-export function DiamondStore({ profile, isGuest, onLinkAccount, onRefreshProfile }: DiamondStoreProps) {
+export function DiamondStore({ profile, isGuest, onLinkAccount, onRefreshProfile, onPurchaseSpeedCard }: DiamondStoreProps) {
   const [selectedId, setSelectedId] = useState<DiamondPackageId | null>(null);
   const [copied, setCopied] = useState(false);
   const [orders, setOrders] = useState<DiamondTopupOrder[]>([]);
@@ -135,6 +137,33 @@ export function DiamondStore({ profile, isGuest, onLinkAccount, onRefreshProfile
           </button>;
         })}
       </div>
+
+      <div className="diamond-card-shop">
+        <div className="diamond-card-shop-heading">
+          <div><span className="section-kicker">متجر البطاقات</span><h4>بطاقات التسريع</h4><p>استخدم الماس لشراء بطاقة واحدة، وتُضاف مباشرة إلى مخزونك.</p></div>
+          <span className="diamond-card-balance">رصيدك: ◆ {formatNumber(profile.diamonds)}</span>
+        </div>
+        <div className="diamond-card-grid">
+          {([
+            { kind: 'production-25' as const, title: 'تسريع الإنتاج', detail: 'تقلل مدة أمر الإنتاج بنسبة 25%', price: 4 },
+            { kind: 'day-speed-2x' as const, title: 'تسريع اليوم ×2', detail: 'تجعل اليوم داخل اللعبة أسرع بمرتين', price: 10 },
+          ]).map((card) => {
+            const owned = profile.speedCards.find((item) => item.kind === card.kind)?.quantity ?? 0;
+            const canBuy = !isGuest && profile.diamonds >= card.price;
+            return <article className="diamond-card-item" key={card.kind}>
+              <span className="diamond-card-icon">×{card.kind === 'day-speed-2x' ? '2' : '25%'}</span>
+              <strong>{card.title}</strong>
+              <small>{card.detail}</small>
+              <span className="diamond-card-price">◆ {card.price} ماسة</span>
+              {owned > 0 && <em>في المخزون: {formatNumber(owned)}</em>}
+              <button className="button button-primary" type="button" disabled={!canBuy} onClick={() => onPurchaseSpeedCard(card.kind)}>
+                {isGuest ? 'اربط الحساب للشراء' : profile.diamonds < card.price ? 'الماس غير كافٍ' : 'شراء بطاقة'}
+              </button>
+            </article>;
+          })}
+        </div>
+      </div>
+
       {selected && (
         <div className="diamond-transfer-panel" aria-label="تعليمات تحويل قيمة الماس">
           <div className="diamond-transfer-title"><strong>قيمة {selected.diamonds.toLocaleString('ar-EG')} ماسة</strong><span>${selected.priceUsd.toLocaleString('en-US')}</span></div>

@@ -179,7 +179,7 @@ export function SectionPage({ section, profile, country, focus, notificationThem
       <>
         <div className="store-hero"><div><span className="section-kicker">المتجر الماسي</span><h2>اشترِ الماس والمكافآت</h2><p>اختر باقتك، راجع السعر والمكافآت، ثم أرسل طلب الشحن للمراجعة.</p></div><Icon name="store" size={38} /></div>
         <SectionPanel title="باقات الماس" description="الأسعار بالدولار، وكل بطاقة تعرض إجمالي الماس والمكافآت الإضافية بوضوح.">
-          <DiamondStore profile={profile} isGuest={isGuest} onLinkAccount={onLinkAccount} onRefreshProfile={onRefreshProfile} />
+          <DiamondStore profile={profile} isGuest={isGuest} onLinkAccount={onLinkAccount} onRefreshProfile={onRefreshProfile} onPurchaseSpeedCard={(kind) => runCommand({ name: 'buy_speed_card', args: { kind, quantity: 1, paymentMethod: 'diamonds' } }, (current) => buySpeedCard(current, kind, 1, 'diamonds'))} />
         </SectionPanel>
       </>,
     )}</div>;
