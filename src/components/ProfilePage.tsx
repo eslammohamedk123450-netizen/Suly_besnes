@@ -608,13 +608,76 @@ export function ProfilePage({
                   <strong className="text-slate-200">AI Studio Web Edition</strong>
                 </div>
               </div>
+
+              {/* Account Actions Section inside Settings (تسجيل الخروج وحذف الحساب) */}
+              <div className="pt-2 space-y-2 border-t border-slate-800">
+                <span className="text-xs font-bold text-amber-400 block mb-1">
+                  إدارة الجلسة والحساب:
+                </span>
+
+                {/* Logout Option in Settings */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    playSound('click');
+                    setShowSettingsModal(false);
+                    setShowLogoutModal(true);
+                  }}
+                  className="w-full p-3 rounded-2xl bg-slate-950/70 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-slate-200 hover:text-white flex items-center justify-between transition cursor-pointer"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center shrink-0">
+                      <LogOut className="w-4 h-4" />
+                    </div>
+                    <div className="text-right">
+                      <strong className="text-xs sm:text-sm block">
+                        {isGuest ? 'إنهاء جلسة الضيف' : 'تسجيل الخروج من الحساب'}
+                      </strong>
+                      <span className="text-[10px] text-slate-400">
+                        {isGuest ? 'حفظ محلي فقط على هذا الجهاز' : 'إنهاء الجلسة والعودة لاحقاً'}
+                      </span>
+                    </div>
+                  </div>
+                  <span className="text-[11px] text-amber-400 font-bold bg-amber-500/15 px-2.5 py-1 rounded-lg border border-amber-500/30">
+                    خروج ↩
+                  </span>
+                </button>
+
+                {/* Delete Account Option in Settings */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    playSound('click');
+                    setShowSettingsModal(false);
+                    handleOpenDeleteModal();
+                  }}
+                  className="w-full p-3 rounded-2xl bg-rose-950/30 hover:bg-rose-900/40 border border-rose-500/30 hover:border-rose-500/60 text-rose-300 hover:text-rose-200 flex items-center justify-between transition cursor-pointer"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-xl bg-rose-500/20 text-rose-400 flex items-center justify-center shrink-0">
+                      <Trash2 className="w-4 h-4" />
+                    </div>
+                    <div className="text-right">
+                      <strong className="text-xs sm:text-sm block text-rose-300">
+                        {isGuest ? 'حذف حساب الضيف والبدء من جديد' : 'حذف الحساب نهائياً'}
+                      </strong>
+                      <span className="text-[10px] text-rose-400/80">
+                        {isGuest ? 'محو بيانات اللعبة وإعادة ضبط من الصفر' : 'محو كافة البيانات والأصول والشركات'}
+                      </span>
+                    </div>
+                  </div>
+                  <span className="text-[11px] text-rose-400 font-bold bg-rose-500/20 px-2.5 py-1 rounded-lg border border-rose-500/40">
+                    حذف 🗑️
+                  </span>
+                </button>
+              </div>
             </div>
 
             <div className="pt-3 border-t border-slate-800 flex justify-end">
               <button
                 type="button"
                 onClick={() => setShowSettingsModal(false)}
-                className="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs transition"
+                className="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs transition cursor-pointer"
               >
                 تم الحفظ والإغلاق ✓
               </button>
