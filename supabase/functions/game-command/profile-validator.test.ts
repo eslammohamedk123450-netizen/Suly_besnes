@@ -1,0 +1,187 @@
+import { describe, expect, it } from 'vitest';
+import { validatePlayerProfile } from './profile-validator';
+
+const validProfile = () => ({
+  id: 'player-1', accountCode: 'BE-ABCDE-12345', name: 'مستثمر', level: 1, countryId: 'egypt',
+  createdAt: '2026-10-23T00:00:00.000Z', bankBalance: 1_000_000, payables: 0, goldGrams: 0,
+  goldCostBasis: 0, diamonds: 0, speedCards: [], badges: [], assets: [], lands: [], companies: [],
+  finances: { netProfit: 0, totalRevenue: 0, totalExpenses: 0 }, day: 1, inventory: [], licenses: [],
+  investments: [], banking: { deposits: [], loans: [] }, staff: [], productionOrders: [], auctionHistory: [],
+  redeemedCodeIds: [], sales: [], ledger: [], events: [], tasks: [], completedTaskIds: [],
+  readNotificationIds: [], dismissedNotificationIds: [], unreadProductionOrderIds: [],
+  season: { seasonId: 'season-1', startedOnDay: 1, endsOnDay: 30, points: 0, claimedChallengeKeys: [] },
+  reputation: 50, contracts: [], achievements: [], onboarding: { introCompleted: false, chapter: 0, seenGuides: [] },
+});
+
+const hasError = (profile: unknown, fragment: string, previous?: unknown) => {
+  const result = validatePlayerProfile(profile, previous);
+  return !result.ok && result.errors.some((error) => error.includes(fragment));
+};
+
+describe('validatePlayerProfile', () => {
+  it('accepts a valid new player profile', () => {
+    expect(validatePlayerProfile(validProfile())).toEqual({ ok: true });
+  });
+
+  it('accepts persisted notification state and rejects duplicate notification IDs', () => {
+    const profile = validProfile();
+    profile.readNotificationIds = ['salary-overdue'];
+    profile.dismissedNotificationIds = ['global-market-open'];
+    profile.unreadProductionOrderIds = ['order-1'];
+    expect(validatePlayerProfile(profile)).toEqual({ ok: true });
+    profile.readNotificationIds = ['salary-overdue', 'salary-overdue'];
+    expect(hasError(profile, 'profile.readNotificationIds:duplicate_value')).toBe(true);
+  });
+
+  it('accepts a legacy profile without persisted notification arrays', () => {
+    const legacy = { ...validProfile() } as Record<string, unknown>;
+    delete legacy.readNotificationIds;
+    delete legacy.dismissedNotificationIds;
+    delete legacy.unreadProductionOrderIds;
+    expect(validatePlayerProfile(legacy)).toEqual({ ok: true });
+  });
+
+  it('accepts day-speed cards, warehouse upgrades, and transfer availability fields', () => {
+    const profile = {
+      ...validProfile(),
+      warehouseLevel: 2,
+      activeDaySpeedMultiplier: 3,
+      speedCards: [{ kind: 'day-speed-2x', quantity: 1 }],
+      lands: [{ id: 'land-1', label: 'أرض', areaSquareMeters: 100, purchasePrice: 100, acquiredAt: validProfile().createdAt, acquiredOnDay: 1, availableForCompanyOnDay: 2 }],
+      companies: [{ id: 'company-1', name: 'شركة', industryId: 'food', countryId: 'egypt', foundedAt: validProfile().createdAt, foundedOnDay: 1, operationalFromDay: 2, landId: 'land-1', licenseIds: [], energyUnits: 10, energyCapacity: 20, operatingCostPerDay: 0 }],
+    };
+    expect(validatePlayerProfile(profile)).toEqual({ ok: true });
+  });
+
+  it('rejects total warehouse material stock above its level capacity', () => {
+    const limits = [['crude-oil', 500], ['natural-gas', 500], ['water', 2_000], ['chemicals', 800], ['grain', 1_000], ['steel', 400], ['cement', 800], ['silicon', 250], ['fuel', 500], ['components', 300], ['packaging', 1_000]] as const;
+    const inventory = limits.flatMap(([materialOrProductId, quantity], index) => [0, 1].map((copy) => ({ id: `lot-${index}-${copy}`, materialOrProductId, quantity, unit: 'وحدة', unitCost: 1 })));
+    expect(hasError({ ...validProfile(), inventory }, 'warehouse_material_capacity_exceeded')).toBe(true);
+  });
+
+  it('validates scoped and time-bounded economic event effects', () => {
+    const profile = validProfile();
+    profile.events = [{ id: 'event-1', day: 1, title: 'نقص فولاذ', description: 'يرتفع السعر مؤقتًا.', cashImpact: -10, occurredAt: profile.createdAt, industryId: 'construction', materialId: 'steel', materialPriceMultiplier: 1.25, effectExpiresOnDay: 4 }];
+    expect(validatePlayerProfile(profile)).toEqual({ ok: true });
+    profile.events[0].materialPriceMultiplier = 4;
+    expect(hasError(profile, 'profile.events[0].materialPriceMultiplier:invalid_number')).toBe(true);
+  });
+
+  it('rejects negative balances and gold', () => {
+    expect(hasError({ ...validProfile(), bankBalance: -1 }, 'bankBalance')).toBe(true);
+    expect(hasError({ ...validProfile(), goldGrams: -0.1 }, 'goldGrams')).toBe(true);
+  });
+
+  it('rejects duplicate entity IDs', () => {
+    const profile = validProfile();
+    profile.assets = [
+      { id: 'asset-1', label: 'A', value: 100, acquiredAt: profile.createdAt },
+      { id: 'asset-1', label: 'B', value: 100, acquiredAt: profile.createdAt },
+    ];
+    expect(hasError(profile, 'duplicate_id')).toBe(true);
+  });
+
+  it('accepts merged deposits with preserved tranches and rejects invalid tranche status', () => {
+    const profile = validProfile();
+    profile.banking.deposits = [
+      { id: 'deposit-1', principal: 50_000, annualRate: 0.05, startedOnDay: 1, maturityDay: 4, status: 'merged', mergedIntoId: 'deposit-3' },
+      { id: 'deposit-2', principal: 50_000, annualRate: 0.08, startedOnDay: 1, maturityDay: 8, status: 'merged', mergedIntoId: 'deposit-3' },
+      { id: 'deposit-3', principal: 100_000, annualRate: 0.065, startedOnDay: 1, maturityDay: 8, status: 'active', tranches: [
+        { id: 'tranche-1', principal: 50_000, annualRate: 0.05, startedOnDay: 1, maturityDay: 4, status: 'active' },
+        { id: 'tranche-2', principal: 50_000, annualRate: 0.08, startedOnDay: 1, maturityDay: 8, status: 'active' },
+      ] },
+    ];
+    expect(validatePlayerProfile(profile)).toEqual({ ok: true });
+    profile.banking.deposits[2].tranches[0].status = 'unknown';
+    expect(hasError(profile, 'tranches[0].status:invalid_value')).toBe(true);
+  });
+
+  it('requires each company to reference an owned land parcel', () => {
+    const profile = validProfile();
+    profile.companies = [{
+      id: 'company-1', name: 'شركة', industryId: 'food', countryId: 'egypt',
+      foundedAt: profile.createdAt, landId: 'missing-land', licenseIds: [], energyUnits: 10, energyCapacity: 20,
+    }];
+    expect(hasError(profile, 'company_requires_owned_land')).toBe(true);
+  });
+
+  it('rejects products without a completed production order', () => {
+    const profile = validProfile();
+    profile.inventory = [{ id: 'lot-1', materialOrProductId: 'food-pack', quantity: 1, unit: 'عبوة', unitCost: 10 }];
+    expect(hasError(profile, 'product_without_completed_production')).toBe(true);
+  });
+
+  it('rejects an order whose product does not match the company industry', () => {
+    const profile = validProfile();
+    profile.lands = [{ id: 'land-1', label: 'أرض', areaSquareMeters: 10, purchasePrice: 100, acquiredAt: profile.createdAt }];
+    profile.companies = [{
+      id: 'company-1', name: 'شركة', industryId: 'food', countryId: 'egypt',
+      foundedAt: profile.createdAt, landId: 'land-1', licenseIds: [], energyUnits: 10, energyCapacity: 20,
+    }];
+    profile.productionOrders = [{
+      id: 'order-1', companyId: 'company-1', productId: 'refined-fuel', productName: 'منتج', batches: 1,
+      outputQuantity: 4, outputUnit: 'وحدة', materialCost: 1, energyCost: 1, expectedUnitCost: 1,
+      demandForecast: 1, qualityScore: 90, maintenanceCost: 1, startedOnDay: 1, completesOnDay: 2, status: 'completed',
+    }];
+    expect(hasError(profile, 'invalid_company_product')).toBe(true);
+  });
+
+  it('rejects energy above a company capacity and inventory above catalog capacity', () => {
+    const profile = validProfile();
+    profile.lands = [{ id: 'land-1', label: 'أرض', areaSquareMeters: 10, purchasePrice: 100, acquiredAt: profile.createdAt }];
+    profile.companies = [{
+      id: 'company-1', name: 'شركة', industryId: 'food', countryId: 'egypt',
+      foundedAt: profile.createdAt, landId: 'land-1', licenseIds: [], energyUnits: 21, energyCapacity: 20,
+    }];
+    profile.inventory = [{ id: 'lot-1', materialOrProductId: 'grain', quantity: 1001, unit: 'كجم', unitCost: 1 }];
+    const result = validatePlayerProfile(profile);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.errors.some((error) => error.includes('exceeds_capacity'))).toBe(true);
+      expect(result.errors.some((error) => error.includes('exceeds_storage_capacity'))).toBe(true);
+    }
+  });
+
+  it('rejects a game day that moves backward and preserves profile identity', () => {
+    const previous = { ...validProfile(), day: 5 };
+    expect(hasError({ ...validProfile(), day: 4 }, 'cannot_move_backward', previous)).toBe(true);
+    expect(hasError({ ...validProfile(), id: 'different-player' }, 'identity_changed', previous)).toBe(true);
+  });
+
+  it('rejects out-of-range level and seasonal points', () => {
+    const profile = validProfile();
+    profile.level = 1001;
+    profile.season.points = 1_000_000_001;
+    const result = validatePlayerProfile(profile);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.errors.some((error) => error.includes('profile.level'))).toBe(true);
+      expect(result.errors.some((error) => error.includes('profile.season.points'))).toBe(true);
+    }
+  });
+
+  it('rejects unexpected profile fields and oversized content', () => {
+    expect(hasError({ ...validProfile(), clientInjected: true }, 'unexpected_field')).toBe(true);
+    const profile = validProfile();
+    profile.events = [{ id: 'event-1', day: 1, title: 'x'.repeat(530_000), cashImpact: 0, occurredAt: profile.createdAt }];
+    expect(hasError(profile, 'payload_too_large')).toBe(true);
+  });
+
+  it('accepts a valid product backed by completed production and rejects over-capacity plans', () => {
+    const profile = validProfile();
+    profile.lands = [{ id: 'land-1', label: 'أرض', areaSquareMeters: 10, purchasePrice: 100, acquiredAt: profile.createdAt }];
+    profile.companies = [{
+      id: 'company-1', name: 'شركة', industryId: 'food', countryId: 'egypt',
+      foundedAt: profile.createdAt, landId: 'land-1', licenseIds: [], energyUnits: 10, energyCapacity: 20,
+    }];
+    profile.productionOrders = [{
+      id: 'order-1', companyId: 'company-1', productId: 'food-pack', productName: 'عبوات غذائية', batches: 1,
+      outputQuantity: 8, outputUnit: 'عبوة', materialCost: 10, energyCost: 1, expectedUnitCost: 2,
+      demandForecast: 10, qualityScore: 90, maintenanceCost: 1, startedOnDay: 1, completesOnDay: 2, status: 'completed',
+    }];
+    profile.inventory = [{ id: 'lot-1', materialOrProductId: 'food-pack', quantity: 8, unit: 'عبوة', unitCost: 2, qualityScore: 90 }];
+    expect(validatePlayerProfile(profile)).toEqual({ ok: true });
+    profile.productionOrders[0].status = 'active';
+    expect(hasError(profile, 'product_without_completed_production')).toBe(true);
+  });
+});

@@ -1,0 +1,317 @@
+/* Right-Docked Floating Action Hub (Non-Obtrusive UI) */
+.right-hub-handle {
+  position: fixed;
+  right: 0;
+  bottom: 160px;
+  z-index: 998;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 44px;
+  min-height: 64px;
+  padding: 8px 4px;
+  background: linear-gradient(135deg, #10243d 0%, #081323 100%);
+  border: 1px solid rgba(234, 179, 8, 0.4);
+  border-right: none;
+  border-radius: 16px 0 0 16px;
+  box-shadow: -4px 8px 25px rgba(0, 0, 0, 0.5), 0 0 15px rgba(234, 179, 8, 0.2);
+  color: #fbbf24;
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  direction: rtl;
+}
+
+.right-hub-handle:hover {
+  width: 52px;
+  background: linear-gradient(135deg, #183457 0%, #0d1e36 100%);
+  border-color: rgba(234, 179, 8, 0.7);
+  box-shadow: -6px 12px 30px rgba(0, 0, 0, 0.6), 0 0 20px rgba(234, 179, 8, 0.35);
+}
+
+.right-hub-handle-icon {
+  font-size: 1.2rem;
+  line-height: 1;
+  animation: rightHubPulse 2s infinite;
+}
+
+@keyframes rightHubPulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.15); }
+}
+
+.right-hub-badge {
+  background: #ef4444;
+  color: #ffffff;
+  font-size: 0.68rem;
+  font-weight: 900;
+  padding: 1px 5px;
+  border-radius: 999px;
+  border: 1px solid #ffffff;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.4);
+}
+
+.right-hub-label-dots {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 2px;
+}
+
+.right-hub-label-dots span {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: #fbbf24;
+}
+
+/* Expanded Modal / Drawer Overlay */
+.right-hub-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 999;
+  background: rgba(8, 15, 26, 0.7);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 16px;
+  animation: rightHubFadeIn 0.22s ease-out forwards;
+}
+
+@keyframes rightHubFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.right-hub-drawer {
+  width: 100%;
+  max-width: 380px;
+  max-height: 85vh;
+  overflow-y: auto;
+  background: linear-gradient(145deg, #11223b 0%, #091424 100%);
+  border: 1px solid rgba(234, 179, 8, 0.35);
+  border-radius: 20px;
+  padding: 20px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6), 0 0 30px rgba(234, 179, 8, 0.15);
+  color: #f8fafc;
+  direction: rtl;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  animation: rightHubSlideIn 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes rightHubSlideIn {
+  from {
+    opacity: 0;
+    transform: translateX(30px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+.right-hub-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.right-hub-header h3 {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: #fef08a;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.right-hub-close-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #cbd5e1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.right-hub-close-btn:hover {
+  background: rgba(239, 68, 68, 0.2);
+  color: #fca5a5;
+  border-color: rgba(239, 68, 68, 0.4);
+}
+
+/* 1-Tap Collect Profit Banner */
+.right-hub-collect-btn {
+  width: 100%;
+  padding: 14px 18px;
+  border-radius: 14px;
+  border: none;
+  background: linear-gradient(135deg, #10b981 0%, #047857 100%);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  box-shadow: 0 8px 20px rgba(16, 185, 129, 0.3);
+  transition: all 0.2s ease;
+}
+
+.right-hub-collect-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 25px rgba(16, 185, 129, 0.45);
+  background: linear-gradient(135deg, #34d399 0%, #059669 100%);
+}
+
+.right-hub-collect-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.right-hub-collect-icon {
+  font-size: 1.5rem;
+}
+
+.right-hub-collect-text {
+  display: flex;
+  flex-direction: column;
+  text-align: right;
+}
+
+.right-hub-collect-text strong {
+  font-size: 0.95rem;
+  font-weight: 800;
+}
+
+.right-hub-collect-text small {
+  font-size: 0.78rem;
+  color: #a7f3d0;
+}
+
+/* Section Block */
+.right-hub-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.right-hub-section-title {
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: #fbbf24;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.right-hub-missions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.right-hub-mission-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  color: #f1f5f9;
+  text-align: right;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.right-hub-mission-item:hover {
+  background: rgba(234, 179, 8, 0.1);
+  border-color: rgba(234, 179, 8, 0.3);
+}
+
+.right-hub-mission-item.is-completed {
+  opacity: 0.6;
+  background: rgba(16, 185, 129, 0.05);
+  border-color: rgba(16, 185, 129, 0.2);
+}
+
+.right-hub-mission-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.right-hub-mission-info strong {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: #f8fafc;
+}
+
+.right-hub-mission-info small {
+  font-size: 0.75rem;
+  color: #94a3b8;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.right-hub-shortcuts-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.right-hub-shortcut-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 12px 8px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  color: #e2e8f0;
+  cursor: pointer;
+  text-align: center;
+  transition: all 0.18s ease;
+}
+
+.right-hub-shortcut-card:hover {
+  background: rgba(234, 179, 8, 0.12);
+  border-color: rgba(234, 179, 8, 0.35);
+  transform: translateY(-2px);
+}
+
+.right-hub-shortcut-icon {
+  font-size: 1.4rem;
+}
+
+.right-hub-shortcut-card span {
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+/* Mobile Responsiveness */
+@media (max-width: 768px) {
+  .right-hub-handle {
+    bottom: 120px;
+  }
+  .right-hub-backdrop {
+    padding: 12px;
+  }
+}
