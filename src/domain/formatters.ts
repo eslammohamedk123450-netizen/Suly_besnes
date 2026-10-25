@@ -1,4 +1,4 @@
-import { COUNTRIES, findCountry, type CountryDefinition, type CountryId } from './countries';
+import { findCountry, type CountryDefinition, type CountryId } from './countries';
 
 const integerFormat = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 });
 
@@ -10,7 +10,7 @@ export function formatMoney(
   value: number, 
   country?: CountryDefinition | CountryId | string
 ): string {
-  let symbol = 'ج.م';
+  let symbol = '$';
 
   if (country) {
     if (typeof country === 'object' && country.currency?.symbol) {
@@ -30,6 +30,6 @@ export function formatGold(grams: number): string {
   return `${formatNumber(grams ?? 0)} غ`;
 }
 
-export function formatCurrency(value: number, currencySymbol = 'ج.م'): string {
+export function formatCurrency(value: number, currencySymbol = '$'): string {
   return `${currencySymbol} ${formatNumber(value ?? 0)}`;
 }

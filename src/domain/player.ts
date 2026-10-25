@@ -122,23 +122,34 @@ export function createNewPlayer(
 ): PlayerProfile {
   const createdAt = now.toISOString();
 
-  const rate = country.economy.exchangeRateToEgp || 1;
-  const initialCash = Math.max(1000, Math.round(120_000 / rate));
-  const initialLoanPrincipal = Math.max(500, Math.round(50_000 / rate));
-  const initialLoanRepay = Math.round(initialLoanPrincipal * 1.05);
-  const initialLandValue = Math.round(350_000 / rate);
-  const initialOperatingCost = Math.max(50, Math.round(3500 / rate));
+  const initialCash = 15_000;
+  const initialLoanPrincipal = 5_000;
+  const initialLoanRepay = 5_250;
+  const initialLandValue = 7_000;
+  const initialOperatingCost = 80;
 
   const countryLandNames: Record<string, string> = {
-    egypt: 'أرض مصنع العاشر القديم (ميراث مهدد)',
+    egypt: 'أرض مجمع العاشر من رمضان الصناعي (ميراث مهدد)',
     saudi: 'أرض المدينة الصناعية الثانية بالرياض (ميراث مهدد)',
-    uae: 'أرض منطقة جبل علي الصناعية بدبي (ميراث مهدد)',
-    usa: 'أرض كوينز الصناعية بنيويورك (ميراث مهدد)',
-    kuwait: 'أرض منطقة الشويخ الصناعية (ميراث مهدد)',
-    qatar: 'أرض المنطقة الصناعية بالدوحة (ميراث مهدد)',
-    uk: 'أرض مجمع مانشستر الصناعي (ميراث مهدد)',
-    germany: 'أرض فرانكفورت الصناعية (ميراث مهدد)',
-    japan: 'أرض مجمع يوكوهاما للأتمتة (ميراث مهدد)',
+    uae: 'أرض منطقة جبل علي الحرة JAFZA بدبي (ميراث مهدد)',
+    usa: 'أرض مجمع كوينز الصناعي واللوجستي · نيويورك (ميراث مهدد)',
+    kuwait: 'أرض منطقة الشويخ الصناعية · العاصمة (ميراث مهدد)',
+    qatar: 'أرض المنطقة الصناعية الجديدة بالدوحة (ميراث مهدد)',
+    uk: 'أرض مجمع ترافورد بارك الصناعي · مانشستر (ميراث مهدد)',
+    germany: 'أرض حزام الرور الصناعي · دوسلدورف (ميراث مهدد)',
+    japan: 'أرض مجمع يوكوهاما البحري الصناعي · خليج طوكيو (ميراث مهدد)',
+  };
+
+  const countryCompanyNames: Record<string, string> = {
+    egypt: 'مصنع الأغذية النموذجي · العاشر من رمضان',
+    saudi: 'مصنع نجد للأغذية والتموين · الرياض',
+    uae: 'مصنع دبي للأغذية والضيافة · جبل علي',
+    usa: 'مصنع مانهاتن للسلع الغذائية · نيويورك',
+    kuwait: 'مصنع الديرة للمنتجات الغذائية · الشويخ',
+    qatar: 'مصنع الدوحة للتعبئة والمنتجات الغذائية',
+    uk: 'مصنع التايمز للصناعات الغذائية · مانشستر',
+    germany: 'مصنع بافاريا للصناعات الغذائية · الرور',
+    japan: 'مصنع طوكيو للمنتجات الغذائية · يوكوهاما',
   };
 
   const countryBankNames: Record<string, string> = {
@@ -154,7 +165,8 @@ export function createNewPlayer(
   };
 
   const landLabel = countryLandNames[country.id] || `أرض المنطقة الصناعية - ${country.name}`;
-  const bankName = countryBankNames[country.id] || 'البنك التجاري الوطني';
+  const companyName = countryCompanyNames[country.id] || `مصنع المنتجات الغذائية (${country.name})`;
+  const bankName = countryBankNames[country.id] || 'البنك التجاري الدولي';
 
   // Initial collapsing land
   const inheritedLand: PlayerLand = {
@@ -172,7 +184,7 @@ export function createNewPlayer(
   // Initial collapsing company
   const inheritedCompany: PlayerCompany = {
     id: 'inherited-food-company',
-    name: `مصنع سولي للأغذية (${country.name})`,
+    name: companyName,
     industryId: 'food',
     countryId: country.id,
     foundedAt: createdAt,
@@ -230,7 +242,7 @@ export function createNewPlayer(
         id: 'lic-food-inherited',
         industryId: 'food',
         countryId: country.id,
-        feePaid: Math.round(45000 / rate),
+        feePaid: 1_200,
         issuedAt: createdAt,
       },
     ],
@@ -248,7 +260,7 @@ export function createNewPlayer(
         amount: initialCash,
         countryId: country.id,
         occurredAt: createdAt,
-        note: `رصيد الطوارئ المتبقي بخزينة المصنع (${country.currency.code})`,
+        note: `رصيد الطوارئ المتبقي بخزينة المصنع ($)`,
       },
       {
         id: createId(),

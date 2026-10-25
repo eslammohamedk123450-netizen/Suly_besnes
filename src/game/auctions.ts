@@ -1,6 +1,6 @@
 import type { AuctionListing } from '../domain/futureSystems';
 import type { PlayerProfile } from '../domain/player';
-import { AUCTION_CATALOG } from './catalog';
+import { AUCTION_CATALOG, getAuctionsForCountry } from './catalog';
 import { GAME_DAY_MS } from './time';
 
 const AUCTION_CYCLE_DAYS = 1;
@@ -21,8 +21,10 @@ export function getAuctionListings(profile: PlayerProfile): AuctionListing[] {
   // كل يوم هو دورة جديدة بمعرّفات مستقلة؛ الفوز يمنع إعادة العرض داخل الدورة فقط.
   const worldStart = Number.isFinite(Date.parse(profile.createdAt)) ? Date.parse(profile.createdAt) : Date.now();
   const closesAt = new Date(worldStart + (profile.day + AUCTION_CYCLE_DAYS) * GAME_DAY_MS).toISOString();
-  const regular = AUCTION_CATALOG.map((base) => ({
+  const countryAuctions = getAuctionsForCountry(profile.countryId);
+  const regular = countryAuctions.map((base) => ({
     ...base,
+    countryId: profile.countryId,
     id: `${base.id}-day-${profile.day}`,
     label: `${base.label} · دورة اليوم ${profile.day}`,
     closesAt,
@@ -31,13 +33,13 @@ export function getAuctionListings(profile: PlayerProfile): AuctionListing[] {
   const rareId = `season-rare-${profile.day}`;
   const rare: AuctionListing = {
     id: rareId,
-    countryId: 'egypt',
+    countryId: profile.countryId,
     lotType: 'factory',
-    label: `مزاد الموسم النادر · توسعة اليوم ${profile.day}`,
+    label: `مزاد استثماري استثنائي · توسعة اليوم ${profile.day}`,
     landType: 'industrial',
     areaSquareMeters: 0,
-    minimumBid: 450_000 + (profile.day % 3) * 25_000,
-    bidIncrement: 25_000,
+    minimumBid: 9_000 + (profile.day % 3) * 500,
+    bidIncrement: 500,
     closesAt,
     status: 'open',
     energyCapacityBonus: 90,
