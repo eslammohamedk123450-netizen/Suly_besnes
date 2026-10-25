@@ -38,7 +38,9 @@ import {
   Eye,
   EyeOff,
   Lock,
-  FileText
+  FileText,
+  Trophy,
+  Medal
 } from 'lucide-react';
 import './ProfilePage.css';
 
@@ -121,6 +123,9 @@ export function ProfilePage({
   // Copy code feedback
   const [copyMessage, setCopyMessage] = useState<string | null>(null);
 
+  // Badges filter tab
+  const [badgeFilter, setBadgeFilter] = useState<'all' | 'earned' | 'locked'>('all');
+
   const progress = getPlayerProgress(profile);
   const accountCode = accountCodeFromSeed(accountId);
   const badgeCatalog = selectEmpirePulse(profile).badges;
@@ -129,6 +134,137 @@ export function ProfilePage({
     100,
     Math.max(0, (progress.experienceInLevel / progress.experienceForNextLevel) * 100),
   );
+
+  // Comprehensive Badges Registry & History
+  const badgesList = [
+    {
+      id: 'founder',
+      title: 'شارة المؤسس',
+      category: 'ريادة الأعمال',
+      icon: '🏢',
+      description: 'تأسيس أول شركة صناعية أو تجارية وبدء مسار الإنقاذ',
+      earned: profile.companies.length > 0 || (profile.badges ?? []).includes('شارة المؤسس'),
+      progressText: profile.companies.length > 0 ? 'مكتمل ✓' : '0/1 شركة',
+      perk: '+50 XP خبرة قيادية',
+    },
+    {
+      id: 'land_baron',
+      title: 'شارة المستثمر العقاري',
+      category: 'الأصول العقارية',
+      icon: '🏞️',
+      description: 'شراء وتملك أول قطعة أرض استثمارية أو صناعية',
+      earned: profile.lands.length > 0 || (profile.badges ?? []).includes('شارة المستثمر العقاري'),
+      progressText: profile.lands.length > 0 ? 'مكتمل ✓' : '0/1 أرض',
+      perk: '+5% سرعة التراخيص',
+    },
+    {
+      id: 'trader',
+      title: 'شارة صائد الأسواق',
+      category: 'التجارة الحرة',
+      icon: '📈',
+      description: 'إتمام 3 صفقات بيع بضائع ناجحة على الأقل في البورصة والسوق',
+      earned: profile.sales.length >= 3 || (profile.badges ?? []).includes('شارة تاجر الأسواق'),
+      progressText: `${Math.min(3, profile.sales.length)}/3 صفقات`,
+      perk: '+3% هوامش ربحية',
+    },
+    {
+      id: 'supplier',
+      title: 'شارة المورّد المعتمد',
+      category: 'العقود والعملاء',
+      icon: '📜',
+      description: 'تسليم وإتمام أول عقد توريد رسمي لكبار التجار',
+      earned: (profile.contracts ?? []).some((c) => c.status === 'completed') || (profile.badges ?? []).includes('شارة المورّد المعتمد'),
+      progressText: (profile.contracts ?? []).some((c) => c.status === 'completed') ? 'مكتمل ✓' : '0/1 عقد',
+      perk: '+10 نقاط سمعة',
+    },
+    {
+      id: 'banker',
+      title: 'شارة الشريك المصرفي',
+      category: 'المالية والبنوك',
+      icon: '🏦',
+      description: 'فتح وديعة استثمارية في البنك أو الحصول على تسهيلات ائتمانية',
+      earned: profile.banking.deposits.length > 0 || profile.banking.loans.length > 0,
+      progressText: (profile.banking.deposits.length > 0 || profile.banking.loans.length > 0) ? 'مكتمل ✓' : '0/1 معاملة',
+      perk: 'تسهيلات ائتمانية مرنة',
+    },
+    {
+      id: 'gold_vault',
+      title: 'شارة خازن الذهب',
+      category: 'المعادن النفيسة',
+      icon: '🥇',
+      description: 'حيازة 100 جرام على الأقل من سبائك الذهب الخالص في الخزينة',
+      earned: profile.goldGrams >= 100 || (profile.badges ?? []).includes('شارة خازن الذهب'),
+      progressText: `${Math.min(100, Math.round(profile.goldGrams))}/100 جم`,
+      perk: 'حماية من تقلبات العملة',
+    },
+    {
+      id: 'diamond_wealth',
+      title: 'شارة الثري الإمبراطوري',
+      category: 'الثروة الفاخرة',
+      icon: '💎',
+      description: 'حيازة 50 ماسة إمبراطورية أو أكثر في الخزينة السحابية',
+      earned: profile.diamonds >= 50 || (profile.badges ?? []).includes('شارة الثري الإمبراطوري'),
+      progressText: `${Math.min(50, profile.diamonds)}/50 💎`,
+      perk: 'خصومات حصرية بالمتجر',
+    },
+    {
+      id: 'executive_leader',
+      title: 'شارة القائد التنفيذي',
+      category: 'الكوادر والإدارة',
+      icon: '👔',
+      description: 'تعيين فريق تنفيذي يضم مديرين أو محاسبين لإدارة الإمبراطورية',
+      earned: profile.staff.length >= 2 || (profile.badges ?? []).includes('شارة المدير التنفيذي'),
+      progressText: `${Math.min(2, profile.staff.length)}/2 موظفين`,
+      perk: '+10% كفاءة التشغيل',
+    },
+    {
+      id: 'industrialist',
+      title: 'شارة سيّد الصناعة',
+      category: 'الصناعة والتصنيع',
+      icon: '⚙️',
+      description: 'تشغيل وإتمام أوامر الإنتاج وتحويل الخامات إلى منتجات',
+      earned: profile.productionOrders.length >= 2,
+      progressText: `${Math.min(2, profile.productionOrders.length)}/2 أوامر`,
+      perk: '+5% سرعة خطوط الإنتاج',
+    },
+    {
+      id: 'credit_honor',
+      title: 'شارة الأمانة والوفاء البنكي',
+      category: 'النزاهة والائتمان',
+      icon: '🛡️',
+      description: 'سداد الالتزامات والتمويلات المصرفية في موعدها دون تعثر',
+      earned: profile.banking.loans.some((l) => l.status === 'paid') || (profile.badges ?? []).includes('شارة الوفاء المصرفي'),
+      progressText: profile.banking.loans.some((l) => l.status === 'paid') ? 'مكتمل ✓' : 'سداد أول قرض',
+      perk: 'فائدة بنكية تفضيلية',
+    },
+    {
+      id: 'millionaire',
+      title: 'شارة المليونير العصامي',
+      category: 'السيولة والنقد',
+      icon: '💰',
+      description: 'تجاوز السيولة النقدية حاجز 1,000,000 $ في حسابك البنكي',
+      earned: profile.bankBalance >= 1000000,
+      progressText: `${Math.min(1000000, Math.round(profile.bankBalance)).toLocaleString('en-US')} / 1,000,000 $`,
+      perk: 'لقب المستثمر المليونير',
+    },
+    {
+      id: 'conglomerate',
+      title: 'شارة التكتل الإمبراطوري',
+      category: 'التوسع الشامل',
+      icon: '👑',
+      description: 'امتلاك وتوسيع 3 شركات أو أكثر في قطاعات اقتصادية متعددة',
+      earned: profile.companies.length >= 3,
+      progressText: `${Math.min(3, profile.companies.length)}/3 شركات`,
+      perk: '+15% نقاط هيبة وطنية',
+    },
+  ];
+
+  const totalBadgesEarned = badgesList.filter((b) => b.earned).length;
+  const filteredBadges = badgesList.filter((b) => {
+    if (badgeFilter === 'earned') return b.earned;
+    if (badgeFilter === 'locked') return !b.earned;
+    return true;
+  });
 
   const isReasonValid = deleteReason.trim().length >= 3;
   const isEmailMatching = isGuest || (
@@ -429,81 +565,137 @@ export function ProfilePage({
         </div>
       </section>
 
-      {/* 5. Separate Side-by-Side Cards: Logout (تسجيل خروج) and Delete Account (حذف الحساب) */}
-      <section className="pt-2">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* SIDE A: LOGOUT CARD */}
-          <div className="bg-slate-900/90 border border-slate-800 hover:border-slate-700 rounded-3xl p-5 sm:p-6 shadow-xl flex flex-col justify-between transition">
+      {/* 5. شارات الإمبراطورية وسجل الإنجازات (Badges & Milestones Record) */}
+      <section className="bg-slate-900/90 border border-amber-500/30 rounded-3xl p-5 sm:p-7 shadow-2xl relative overflow-hidden">
+        <div className="absolute top-0 left-0 w-72 h-72 bg-amber-500/5 rounded-full blur-3xl pointer-events-none" />
+        
+        {/* Section Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-slate-800 relative z-10">
+          <div className="flex items-center gap-3.5">
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-amber-600 via-amber-500 to-yellow-400 text-slate-950 flex items-center justify-center font-black text-2xl shadow-lg shadow-amber-500/20">
+              <Trophy className="w-6 h-6 text-slate-950" />
+            </div>
             <div>
-              <div className="flex items-center gap-3 mb-2.5">
-                <div className="w-10 h-10 rounded-xl bg-slate-800 text-slate-200 flex items-center justify-center">
-                  <LogOut className="w-5 h-5 text-amber-400" />
-                </div>
-                <div>
-                  <h3 className="font-extrabold text-sm sm:text-base text-white">
-                    {isGuest ? 'إنهاء جلسة الضيف' : 'تسجيل الخروج من الحساب'}
-                  </h3>
-                  <small className="text-[11px] text-slate-400">
-                    {isGuest ? 'حفظ محلي فقط على هذا الجهاز' : 'إنهاء الجلسة الحالية بأمان'}
-                  </small>
-                </div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-lg sm:text-xl font-black text-white">
+                  شارات الإمبراطورية وسجل الإنجازات
+                </h2>
+                <span className="px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 text-xs font-black">
+                  {totalBadgesEarned} / {badgesList.length} مكتسبة
+                </span>
               </div>
-              <p className="text-xs text-slate-400 leading-relaxed mb-4">
-                {isGuest ? (
-                  <>أنت تلعب حالياً كـ <strong className="text-amber-400">ضيف محلي</strong> (البيانات محفوظة على هذا الجهاز فقط). يمكنك تسجيل الخروج لبدء جلسة جديدة أو ربط حسابك لحفظ تقدمك بالسحابة.</>
-                ) : (
-                  <>بيانات إمبراطوريتك وتقدمك محفوظة بالسحابة. يمكنك العودة وتسجيل الدخول في أي وقت لمتابعة إمبراطوريتك.</>
-                )}
+              <p className="text-xs text-slate-400 mt-0.5">
+                سجل الأوسمة والشارات الفخرية التي توثق نمو إمبراطوريتك ومحطات نجاحك
               </p>
             </div>
-
-            <button
-              type="button"
-              onClick={() => {
-                playSound('click');
-                setShowLogoutModal(true);
-              }}
-              className="w-full py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white font-bold text-xs sm:text-sm border border-slate-700 transition flex items-center justify-center gap-2 cursor-pointer shadow-sm"
-            >
-              <LogOut className="w-4 h-4 text-amber-400" />
-              <span>{isGuest ? 'إنهاء جلسة الضيف الحالية' : 'تسجيل الخروج من الحساب'}</span>
-            </button>
           </div>
 
-          {/* SIDE B: DELETE ACCOUNT CARD */}
-          <div className="bg-slate-900/90 border border-rose-500/30 hover:border-rose-500/60 rounded-3xl p-5 sm:p-6 shadow-xl flex flex-col justify-between transition">
-            <div>
-              <div className="flex items-center gap-3 mb-2.5">
-                <div className="w-10 h-10 rounded-xl bg-rose-500/20 text-rose-400 flex items-center justify-center">
-                  <Trash2 className="w-5 h-5" />
+          {/* Filter Pills */}
+          <div className="flex items-center gap-1.5 p-1 rounded-2xl bg-slate-950 border border-slate-800">
+            <button
+              type="button"
+              onClick={() => setBadgeFilter('all')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+                badgeFilter === 'all'
+                  ? 'bg-amber-500 text-slate-950 shadow-md font-black'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              الكل ({badgesList.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setBadgeFilter('earned')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1 ${
+                badgeFilter === 'earned'
+                  ? 'bg-emerald-500 text-slate-950 shadow-md font-black'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <span>المكتسبة 🏆</span>
+              <span>({totalBadgesEarned})</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setBadgeFilter('locked')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1 ${
+                badgeFilter === 'locked'
+                  ? 'bg-slate-700 text-white shadow-md font-black'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <span>قيد العمل 🔒</span>
+              <span>({badgesList.length - totalBadgesEarned})</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Badges Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5 pt-5 relative z-10">
+          {filteredBadges.map((badge) => (
+            <div
+              key={badge.id}
+              className={`p-4 rounded-2xl border transition-all duration-200 flex flex-col justify-between ${
+                badge.earned
+                  ? 'bg-gradient-to-br from-slate-900 via-slate-900 to-amber-950/25 border-amber-500/40 hover:border-amber-400 shadow-lg shadow-amber-950/20'
+                  : 'bg-slate-950/50 border-slate-800/80 hover:border-slate-700 opacity-70 hover:opacity-90'
+              }`}
+            >
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2.5">
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-xl shadow ${
+                      badge.earned 
+                        ? 'bg-gradient-to-tr from-amber-500/20 to-yellow-500/20 border border-amber-500/40' 
+                        : 'bg-slate-800/60 border border-slate-700/60 grayscale'
+                    }`}>
+                      {badge.icon}
+                    </div>
+                    <div>
+                      <h3 className={`text-xs sm:text-sm font-black ${badge.earned ? 'text-white' : 'text-slate-300'}`}>
+                        {badge.title}
+                      </h3>
+                      <span className="text-[10px] text-amber-400/90 font-medium block">
+                        {badge.category}
+                      </span>
+                    </div>
+                  </div>
+
+                  {badge.earned ? (
+                    <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[10px] font-black flex items-center gap-1 shrink-0">
+                      <Check className="w-3 h-3" />
+                      مكتسبة
+                    </span>
+                  ) : (
+                    <span className="px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 text-[10px] font-bold flex items-center gap-1 shrink-0">
+                      <Lock className="w-3 h-3" />
+                      قيد العمل
+                    </span>
+                  )}
                 </div>
-                <div>
-                  <h3 className="font-extrabold text-sm sm:text-base text-white">
-                    {isGuest ? 'منطقة الخطر: حذف حساب الضيف' : 'منطقة الخطر: حذف الحساب'}
-                  </h3>
-                  <small className="text-[11px] text-rose-400">
-                    {isGuest ? 'محو بيانات اللعبة المحلية والبدء من جديد' : 'إجراء نهائي لمحو البيانات والأصول من السحابة'}
-                  </small>
-                </div>
+
+                <p className="text-[11px] text-slate-400 leading-relaxed mb-3">
+                  {badge.description}
+                </p>
               </div>
-              <p className="text-xs text-slate-400 leading-relaxed mb-4">
-                {isGuest ? (
-                  <>حذف حساب الضيف سيمحو جميع الشركات والأموال وتقدم اللعبة من هذا الجهاز نهائياً. يتطلب تأكيد الموافقة على الشروط والسياسة قبل الحذف.</>
-                ) : (
-                  <>حذف الحساب سيمحو جميع الشركات والأصول والمعرفات نهائياً من السحابة. يتطلب كتابة البريد وكلمة المرور والموافقة على الشروط والسياسة.</>
-                )}
-              </p>
-            </div>
 
-            <button
-              type="button"
-              onClick={handleOpenDeleteModal}
-              className="w-full py-3 px-4 rounded-xl bg-rose-950/50 hover:bg-rose-900/60 text-rose-300 hover:text-rose-200 font-bold text-xs sm:text-sm border border-rose-500/40 transition flex items-center justify-center gap-2 cursor-pointer shadow-sm"
-            >
-              <Trash2 className="w-4 h-4 text-rose-400" />
-              <span>{isGuest ? 'حذف حساب الضيف والبدء من جديد' : 'حذف الحساب والبيانات نهائياً'}</span>
-            </button>
-          </div>
+              <div className="pt-2.5 border-t border-slate-800/80 flex items-center justify-between text-[11px]">
+                <span className="text-slate-400 flex items-center gap-1">
+                  <span>الميزة:</span>
+                  <strong className={badge.earned ? 'text-amber-300' : 'text-slate-400'}>
+                    {badge.perk}
+                  </strong>
+                </span>
+                <span className={`font-mono text-[10px] px-2 py-0.5 rounded-md ${
+                  badge.earned 
+                    ? 'bg-emerald-950/60 text-emerald-300 border border-emerald-500/30' 
+                    : 'bg-slate-900 text-slate-400 border border-slate-800'
+                }`}>
+                  {badge.progressText}
+                </span>
+              </div>
+            </div>
+          ))}
         </div>
       </section>
 

@@ -16,7 +16,6 @@ export type SectionId =
   | 'contracts'
   | 'tasks'
   | 'profile'
-  | 'settings'
   | 'territory'
   | 'tech_tree'
   | 'luxury'
@@ -62,7 +61,6 @@ export const GAME_SECTIONS: readonly SectionItem[] = [
   { id: 'contracts', label: 'العقود والعملاء', shortLabel: 'العقود', subtitle: 'طلبات السوق والسمعة التجارية', icon: 'briefcase' },
   { id: 'tasks', label: 'المهام والإنجازات', shortLabel: 'المهام', subtitle: 'أهداف وتحديات مستقبلية', icon: 'tasks' },
   { id: 'profile', label: 'الملف الشخصي', shortLabel: 'ملفي', subtitle: 'معرفك وتقدمك وشاراتك', icon: 'user' },
-  { id: 'settings', label: 'الإعدادات', shortLabel: 'الإعدادات', subtitle: 'إدارة ملفك المحلي', icon: 'settings' },
 ];
 
 export const SECTION_GROUPS: readonly SectionGroup[] = [
@@ -70,7 +68,7 @@ export const SECTION_GROUPS: readonly SectionGroup[] = [
   { id: 'business_group', label: 'الأعمال والأصول', sections: ['companies', 'lands', 'production', 'inventory'] },
   { id: 'market_group', label: 'السوق والمالية والبورصة', sections: ['auctions', 'investments', 'bank', 'contracts'] },
   { id: 'management_group', label: 'الإدارة والتقدم', sections: ['staff', 'tasks', 'reports', 'obligations'] },
-  { id: 'profile_group', label: 'الحساب والنظام', sections: ['profile', 'store', 'settings'] },
+  { id: 'profile_group', label: 'الحساب والنظام', sections: ['profile', 'store'] },
 ];
 
 export function getSection(id: SectionId): SectionItem {

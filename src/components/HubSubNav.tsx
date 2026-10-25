@@ -29,7 +29,7 @@ export const HUB_GROUPS: HubGroup[] = [
   {
     id: 'profile_hub',
     title: '👤 مركز الحساب والمتجر',
-    sections: ['profile', 'store', 'settings'],
+    sections: ['profile', 'store'],
   },
 ];
 

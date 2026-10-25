@@ -33,7 +33,6 @@ export interface SectionUnlockRequirement {
 export const SECTION_UNLOCK_CONFIG: Record<SectionId, SectionUnlockRequirement> = {
   home: { sectionId: 'home', requiredLevel: 1, storyHint: 'مقر القيادة متاح دائماً', badgeLabel: 'متاح', chapterNumber: 1 },
   profile: { sectionId: 'profile', requiredLevel: 1, storyHint: 'الملف الشخصي وإعداداتك', badgeLabel: 'متاح', chapterNumber: 1 },
-  settings: { sectionId: 'settings', requiredLevel: 1, storyHint: 'إدارة الحفظ وإعدادات اللعبة', badgeLabel: 'متاح', chapterNumber: 1 },
   store: { sectionId: 'store', requiredLevel: 1, storyHint: 'متجر الماس والباقات الحصرية', badgeLabel: 'متاح', chapterNumber: 1 },
   tasks: { sectionId: 'tasks', requiredLevel: 1, storyHint: 'مهام القصة والإنجازات الوطنية', badgeLabel: 'متاح', chapterNumber: 1 },
   lands: { sectionId: 'lands', requiredLevel: 1, storyHint: 'شراء وتطوير الأراضي الاستثمارية (الفصل الأول)', badgeLabel: 'متاح', chapterNumber: 1 },
@@ -89,7 +88,7 @@ export function getSectionUnlockBadge(section: SectionId): string {
 }
 
 const EXPERIENCE_PER_LEVEL = 150;
-const INTRO_UNLOCKS: SectionId[] = ['home', 'store', 'profile', 'lands', 'companies', 'settings', 'tasks', 'auctions', 'obligations'];
+const INTRO_UNLOCKS: SectionId[] = ['home', 'store', 'profile', 'lands', 'companies', 'tasks', 'auctions', 'obligations'];
 
 /** Experience is derived from durable accomplishments so old saves migrate without data loss. */
 export function getPlayerProgress(profile: PlayerProfile): PlayerProgress {

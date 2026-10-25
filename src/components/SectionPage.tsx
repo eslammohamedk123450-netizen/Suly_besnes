@@ -61,7 +61,7 @@ interface SectionPageProps {
 
 const landTypeNames = { industrial: 'صناعية', agricultural: 'زراعية', commercial: 'تجارية' } as const;
 const ledgerLabels = { revenue: 'إيراد', expense: 'مصروف', asset: 'أصل', liability: 'التزام', settlement: 'سداد التزام' } as const;
-const compactSectionIds = new Set<SectionId>(['auctions', 'obligations', 'bank', 'staff', 'lands', 'companies', 'production', 'inventory', 'investments', 'reports', 'contracts', 'tasks', 'settings']);
+const compactSectionIds = new Set<SectionId>(['auctions', 'obligations', 'bank', 'staff', 'lands', 'companies', 'production', 'inventory', 'investments', 'reports', 'contracts', 'tasks']);
 
 function panelIconFor(sectionId: SectionId, title: string): IconName {
   const normalized = title.toLocaleLowerCase('ar');
@@ -79,7 +79,7 @@ function panelIconFor(sectionId: SectionId, title: string): IconName {
   if (normalized.includes('التزام') || normalized.includes('سداد')) return 'shield';
   if (normalized.includes('سوق') || normalized.includes('شراء') || normalized.includes('بيع')) return 'store';
   const fallback: Record<SectionId, IconName> = {
-    home: 'home', auctions: 'gavel', companies: 'company', investments: 'investment', lands: 'land', production: 'factory', inventory: 'warehouse', reports: 'report', tasks: 'tasks', settings: 'settings', profile: 'user', bank: 'bank', staff: 'users', obligations: 'shield', store: 'store', contracts: 'briefcase', territory: 'land', tech_tree: 'factory', luxury: 'crown', cartel: 'company', maritime: 'land', megaprojects: 'gavel', incubator: 'investment',
+    home: 'home', auctions: 'gavel', companies: 'company', investments: 'investment', lands: 'land', production: 'factory', inventory: 'warehouse', reports: 'report', tasks: 'tasks', profile: 'user', bank: 'bank', staff: 'users', obligations: 'shield', store: 'store', contracts: 'briefcase', territory: 'land', tech_tree: 'factory', luxury: 'crown', cartel: 'company', maritime: 'land', megaprojects: 'gavel', incubator: 'investment',
   };
   return fallback[sectionId];
 }
@@ -329,45 +329,6 @@ export function SectionPage({ section, profile, country, focus, notificationThem
           <DiamondStore profile={profile} isGuest={isGuest} onLinkAccount={onLinkAccount} onRefreshProfile={onRefreshProfile} onBack={onHome} onPurchaseSpeedCard={(kind) => runCommand({ name: 'buy_speed_card', args: { kind, quantity: 1, paymentMethod: 'diamonds' } }, (current) => buySpeedCard(current, kind, 1, 'diamonds'))} />
         </SectionPanel>
       </>,
-    )}</div>;
-  }
-
-  if (section.id === 'settings') {
-    const empirePoints = selectEmpirePoints(profile);
-    return <div className="section-page">{heading}{pageShell(
-      <SectionPanel title="ملف اللاعب" description="إعدادات هذا العالم المحلي المحفوظ على الجهاز.">
-        <div className="settings-card settings-card--inner">
-          <div className="settings-row"><span>اسم المستثمر</span><strong>{profile.name}</strong></div>
-          <div className="settings-row"><span>معرّف الحساب للدعم</span><strong className="account-code-value">{profile.accountCode}</strong></div>
-          <div className="settings-row"><span>الدولة الأساسية</span><strong>{country.flag} {country.name} · {country.currency.code}</strong></div>
-          <div className="settings-row"><span>اليوم داخل العالم</span><strong>{formatNumber(profile.day)}</strong></div>
-          <div className="settings-row"><span>المستوى / الخبرة</span><strong>{formatNumber(playerProgress.level)} · {formatNumber(playerProgress.totalExperience)} XP</strong></div>
-          <div className="settings-row settings-row--highlight"><span>نقاط الإمبراطورية</span><strong>{formatNumber(empirePoints.total)} نقطة · {empirePoints.title}</strong></div>
-          <div className="settings-row"><span>الماس</span><strong>{formatNumber(profile.diamonds)}</strong></div>
-          <div className="settings-row"><span>بطاقات التسريع</span><strong>{formatNumber(profile.speedCards.reduce((sum, stack) => sum + stack.quantity, 0))}</strong></div>
-          <div className="settings-row"><span>الشارات الخاصة</span><strong>{formatNumber(profile.badges.length)}</strong></div>
-          <div className="settings-row"><span>طريقة الحفظ</span><strong className="saved-status"><span /> {isGuest ? 'ضيف · محلي فقط' : 'حفظ متصل'}</strong></div>
-          <div className="settings-note"><Icon name="shield" size={17} /><p>{isGuest ? 'عالم الضيف محفوظ على هذا الجهاز. اربط حسابًا لاستعادة العالم على أجهزة أخرى.' : 'يُحفظ العالم على جهازك ويتزامن عند الاتصال؛ اللعب الأساسي متاح دون اتصال.'}</p></div>
-          {isGuest && <button className="button button-primary account-link-button" type="button" onClick={onLinkAccount}>ربط الحساب ونسخ العالم واستعادته</button>}
-          <button className="button button-secondary settings-store-link" type="button" onClick={() => onNavigate('store')}><Icon name="store" size={16} /> فتح متجر المشتريات</button>
-          <div className="settings-notice-theme">
-            <span>المؤثرات الصوتية</span>
-            <div className="settings-theme-switch" role="group" aria-label="تشغيل المؤثرات الصوتية">
-              <button className={isSoundEnabled() ? 'is-selected' : ''} type="button" aria-pressed={isSoundEnabled()} onClick={() => setSoundEnabled(true)}>تشغيل</button>
-              <button className={!isSoundEnabled() ? 'is-selected' : ''} type="button" aria-pressed={!isSoundEnabled()} onClick={() => setSoundEnabled(false)}>كتم</button>
-            </div>
-          </div>
-          <div className="settings-notice-theme">
-            <span>مظهر الإشعارات</span>
-            <div className="settings-theme-switch" role="group" aria-label="اختيار مظهر الإشعارات">
-              <button className={notificationTheme === 'dark' ? 'is-selected' : ''} type="button" aria-pressed={notificationTheme === 'dark'} onClick={() => onNotificationThemeChange('dark')}>داكن</button>
-              <button className={notificationTheme === 'light' ? 'is-selected' : ''} type="button" aria-pressed={notificationTheme === 'light'} onClick={() => onNotificationThemeChange('light')}>فاتح</button>
-            </div>
-          </div>
-          <div className="settings-actions"><button className="button button-secondary" type="button" onClick={onHome}>العودة للرئيسية</button><button className="button button-danger" type="button" onClick={onLogout}><Icon name="logout" size={16} /> تسجيل الخروج</button></div>
-          <div className="settings-credit">تطوير شركة <strong>Suly- Technologies</strong></div>
-        </div>
-      </SectionPanel>,
     )}</div>;
   }
 
