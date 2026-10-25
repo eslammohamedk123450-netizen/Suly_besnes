@@ -37,6 +37,7 @@ import { loadExpansionState } from '../game/expansionEngine';
 import { loadMegaExpansionState } from '../game/expansionV2Engine';
 import { HubSubNav } from './HubSubNav';
 import { ItemImage } from './ItemImage';
+import { BankTerminal } from './BankTerminal';
 
 interface SectionPageProps {
   section: SectionItem;
@@ -247,33 +248,19 @@ export function SectionPage({ section, profile, country, focus, notificationThem
   }
 
   if (section.id === 'bank') {
-    const collateralOptions = [
-      ...profile.lands.map((land) => ({ id: land.id, label: land.label, type: 'land' as const, value: land.purchasePrice })),
-      ...profile.companies.map((company) => ({ id: company.id, label: company.name, type: 'company' as const, value: 0 })),
-    ];
-    const selectedCollateral = collateralOptions.find((item) => item.id === (loanCollateral || collateralOptions[0]?.id));
-    const activeLoans = profile.banking.loans.filter((loan) => loan.status === 'active');
-    const activeDeposits = profile.banking.deposits.filter((deposit) => deposit.status === 'active');
-    const totalDeposits = activeDeposits.reduce((sum, deposit) => sum + deposit.principal, 0);
-    const expectedInterest = activeDeposits.reduce((sum, deposit) => sum + getDepositExpectedInterest(deposit), 0);
-    const depositLimitReached = activeDeposits.length >= 5;
-    const loanLimitReached = activeLoans.length >= 3;
-    const loanRate = Number(loanTerm) === 7 ? 0.18 : Number(loanTerm) === 14 ? 0.22 : 0.28;
-    const estimatedRepayment = Math.round(Number(loanAmount) * (1 + loanRate * Number(loanTerm) / 30));
-    return <div className="section-page bank-page">{heading}{pageShell(
-      <>
-        <div className="bank-hero"><div><span className="section-kicker">إدارة السيولة</span><h2>إمبراطورية الأعمال</h2><p>تابع ودائعك وقروضك من مكان واحد.</p></div><Icon name="bank" size={42} /></div>
-        <div className="bank-tabs" role="tablist" aria-label="أنظمة البنك"><button className={bankTab === 'deposits' ? 'is-active' : ''} type="button" role="tab" aria-selected={bankTab === 'deposits'} onClick={() => setBankTab('deposits')}><Icon name="bank" size={21} /> الودائع</button><button className={bankTab === 'loans' ? 'is-active' : ''} type="button" role="tab" aria-selected={bankTab === 'loans'} onClick={() => setBankTab('loans')}><Icon name="briefcase" size={21} /> القروض</button></div>
-        <div className="bank-summary-grid"><article><span>إجمالي الودائع</span><strong>{formatMoney(totalDeposits, country)}</strong></article><article><span>الأرباح المتوقعة</span><strong>+{formatMoney(expectedInterest, country)}</strong></article></div>
-        {bankTab === 'deposits' ? <>
-          <section className="bank-section"><div className="bank-section-heading"><div><span className="section-kicker">{formatNumber(activeDeposits.length)}/5 ودائع نشطة</span><h3>الودائع النشطة</h3></div><div className="bank-section-count">{formatNumber(activeDeposits.length)}</div></div>{activeDeposits.length === 0 ? <EconomyEmpty title="لا توجد ودائع نشطة" message="افتح أول وديعة وابدأ بتنمية السيولة المحجوزة." /> : <div className="bank-deposit-grid">{activeDeposits.slice().reverse().map((deposit) => { const interest = getDepositExpectedInterest(deposit); const maturity = getDepositMaturityRange(deposit); const merged = Boolean(deposit.tranches); return <article className="bank-deposit-card" key={deposit.id}><span className="bank-status">{merged ? 'وديعة مدمجة' : 'نشطة'}</span><strong>{formatMoney(deposit.principal, country)}</strong><div><span>عائد تقريبي {Math.round(deposit.annualRate * 100)}%</span><span>ربح متوقع +{formatMoney(interest, country)}</span></div><small>{maturity.firstDay === maturity.lastDay ? `تستحق في اليوم ${formatNumber(maturity.firstDay)}` : `استحقاق الأجزاء من اليوم ${formatNumber(maturity.firstDay)} إلى ${formatNumber(maturity.lastDay)}`}</small>{hasMaturedDepositTranche(deposit, profile.day) && <button className="button button-secondary" type="button" onClick={() => runCommand({ name: 'withdraw_deposit', args: { depositId: deposit.id } }, (current) => withdrawDeposit(current, deposit.id))}>استرداد المستحق</button>}</article>; })}</div>}{activeDeposits.length > 1 && <button className="button button-secondary" type="button" onClick={() => runCommand({ name: 'merge_deposits', args: { depositIds: activeDeposits.map((deposit) => deposit.id) } }, (current) => mergeDeposits(current, activeDeposits.map((deposit) => deposit.id)))}>دمج كل الودائع النشطة في وديعة واحدة</button>}</section>
-          <section className="bank-section bank-open-section"><div className="bank-section-heading"><div><span className="section-kicker">استثمار محاكى</span><h3>فتح وديعة جديدة</h3></div><Icon name="plus" size={24} /></div>{depositLimitReached && <p className="economy-meta">وصلت إلى الحد الأقصى البالغ 5 ودائع نشطة. ادمج الودائع أو استرد مستحقًا لإضافة وديعة.</p>}<form className="bank-deposit-form" onSubmit={(event: FormEvent<HTMLFormElement>) => { event.preventDefault(); runCommand({ name: 'create_deposit', args: { amount: Number(depositAmount), durationDays: Number(depositDuration) } }, (current) => createDeposit(current, Number(depositAmount), Number(depositDuration))); }}><div className="economy-field"><label htmlFor="deposit-amount">مبلغ الوديعة</label><input id="deposit-amount" type="number" min="50000" step="1000" value={depositAmount} onChange={(event) => setDepositAmount(event.target.value)} /></div><div className="economy-field"><label htmlFor="deposit-duration">المدة والعائد</label><select id="deposit-duration" value={depositDuration} onChange={(event) => setDepositDuration(event.target.value)}><option value="3">3 أيام · عائد 5%</option><option value="7">7 أيام · عائد 8%</option><option value="14">14 يومًا · عائد 12%</option></select></div><button className="button button-primary bank-open-button" type="submit" disabled={depositLimitReached || Number(depositAmount) < 50000 || Number(depositAmount) > profile.bankBalance}><Icon name="plus" size={18} /> فتح وديعة جديدة</button></form></section>
-        </> : <>
-          <section className="bank-section"><div className="bank-section-heading"><div><span className="section-kicker">{formatNumber(activeLoans.length)}/3 قروض نشطة</span><h3>القروض النشطة</h3></div><span className="bank-section-count">{formatNumber(activeLoans.length)}</span></div>{activeLoans.length === 0 ? <EconomyEmpty title="لا توجد قروض نشطة" message="يمكنك طلب قرض بضمان أرض أو شركة مؤهلة." /> : <div className="bank-deposit-grid">{activeLoans.map((loan) => { const repaymentCount = loanRepaymentCounts[loan.id] ?? '1'; return <article className="bank-deposit-card bank-loan-card" key={loan.id}><span className="bank-status bank-status--loan">قسط يوم {formatNumber(loan.nextPaymentDay)}</span><strong>{formatMoney(loan.principal, country)}</strong><div><span>المتبقي {formatMoney(loan.remainingBalance, country)}</span><span>القسط {formatMoney(loan.installmentAmount, country)}</span></div><small>الضمان: {loan.collateralType === 'land' ? 'أرض' : 'شركة'} · مدة {formatNumber(loan.termDays)} يوم</small><div className="loan-repayment-row"><input type="number" min="1" max={Math.ceil(loan.remainingBalance / loan.installmentAmount)} step="1" value={repaymentCount} onChange={(event) => setLoanRepaymentCounts((previous) => ({ ...previous, [loan.id]: event.target.value }))} aria-label="عدد الأقساط" /><button className="button button-secondary" type="button" disabled={Number(repaymentCount) < 1 || profile.bankBalance < Math.min(loan.remainingBalance, loan.installmentAmount * Number(repaymentCount))} onClick={() => runCommand({ name: 'repay_loan', args: { loanId: loan.id, installments: Number(repaymentCount) } }, (current) => repayLoan(current, loan.id, Number(repaymentCount)))}>سداد الأقساط</button><button className="button button-primary" type="button" disabled={profile.bankBalance < loan.remainingBalance} onClick={() => runCommand({ name: 'repay_loan', args: { loanId: loan.id, installments: 'all' } }, (current) => repayLoan(current, loan.id, 'all'))}>سداد كامل</button></div></article>; })}</div>}</section>
-          <section className="bank-section bank-open-section"><div className="bank-section-heading"><div><span className="section-kicker">تمويل بضمان</span><h3>طلب قرض جديد</h3></div><Icon name="briefcase" size={24} /></div>{loanLimitReached && <p className="economy-meta">وصلت إلى الحد الأقصى البالغ 3 قروض نشطة. سدّد قرضًا قائمًا قبل طلب قرض جديد.</p>}{selectedCollateral ? <form className="bank-deposit-form" onSubmit={(event: FormEvent<HTMLFormElement>) => { event.preventDefault(); runCommand({ name: 'take_loan', args: { collateralType: selectedCollateral.type, collateralId: selectedCollateral.id, amount: Number(loanAmount), termDays: Number(loanTerm) } }, (current) => takeLoan(current, selectedCollateral.type, selectedCollateral.id, Number(loanAmount), Number(loanTerm))); }}><div className="economy-field"><label htmlFor="loan-collateral">الضمان</label><select id="loan-collateral" value={selectedCollateral.id} onChange={(event) => setLoanCollateral(event.target.value)}>{collateralOptions.map((item) => <option value={item.id} key={item.id}>{item.label} · {item.type === 'land' ? 'أرض' : 'شركة'}</option>)}</select></div><div className="economy-field"><label htmlFor="loan-amount">مبلغ القرض</label><input id="loan-amount" type="number" min="25000" step="1000" value={loanAmount} onChange={(event) => setLoanAmount(event.target.value)} /></div><div className="economy-field"><label htmlFor="loan-term">مدة السداد</label><select id="loan-term" value={loanTerm} onChange={(event) => setLoanTerm(event.target.value)}><option value="7">7 أيام · 18%</option><option value="14">14 يومًا · 22%</option><option value="30">30 يومًا · 28%</option></select></div><button className="button button-primary bank-open-button" type="submit" disabled={loanLimitReached || Number(loanAmount) < 25000}>طلب القرض</button><div className="economy-meta"><span>إجمالي السداد المتوقع {formatMoney(estimatedRepayment, country)}</span><span>القسط التقريبي {formatMoney(Math.ceil(estimatedRepayment / Math.max(1, Number(loanTerm))), country)} يوميًا</span></div></form> : <EconomyEmpty title="لا يوجد ضمان مؤهل" message="اشترِ أرضًا أو أسس شركة أولًا حتى يظهر خيار التمويل." />}</section>
-        </>}
-      </>,
-    )}</div>;
+    return (
+      <div className="section-page bank-page">
+        {heading}
+        {pageShell(
+          <BankTerminal
+            profile={profile}
+            country={country}
+            initialTab={bankTab}
+            onCommand={runCommand}
+          />,
+        )}
+      </div>
+    );
   }
 
   if (section.id === 'staff') {

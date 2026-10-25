@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import type { PlayerProfile } from '../domain/player';
 import type { CountryDefinition } from '../domain/countries';
 import type { SectionId } from '../domain/navigation';
@@ -8,6 +8,7 @@ import { getMarketQuote } from '../game/market';
 import { getStarterMissions, isSectionUnlocked } from '../game/onboarding';
 import { Icon } from './Icon';
 import { playSound } from '../game/soundEffects';
+import { getLuckySpinState } from '../game/luckyWheelService';
 import './RightActionHub.css';
 
 interface RightActionHubProps {
@@ -17,6 +18,7 @@ interface RightActionHubProps {
   onCollectActualProfit: (amount: number) => void;
   onSellProduct: (productId: string, quantity: number) => void;
   onAdvanceDay: () => void;
+  onOpenLuckyWheel?: () => void;
 }
 
 export function RightActionHub({
@@ -26,10 +28,20 @@ export function RightActionHub({
   onCollectActualProfit,
   onSellProduct,
   onAdvanceDay,
+  onOpenLuckyWheel,
 }: RightActionHubProps) {
   const [open, setOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'all' | 'earnings' | 'market'>('all');
   const [justCollected, setJustCollected] = useState(false);
+  const [spinState, setSpinState] = useState(() => getLuckySpinState(profile.lastSpinTimestamp));
+
+  useEffect(() => {
+    setSpinState(getLuckySpinState(profile.lastSpinTimestamp));
+    const timer = setInterval(() => {
+      setSpinState(getLuckySpinState(profile.lastSpinTimestamp));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [profile.lastSpinTimestamp]);
 
   // Check if player collected actual profits for the current game day
   const storageKey = `suly_biz_collected_day_${profile.id || 'default'}`;
@@ -114,30 +126,56 @@ export function RightActionHub({
 
   return (
     <>
-      {/* 1. Resting Handle (Right Docked Handle) */}
+      {/* 1. Resting Handle Dock (Lucky Wheel + Imperial Hub side-by-side) */}
       {!open && (
-        <button
-          type="button"
-          className="right-hub-handle"
-          onClick={() => setOpen(true)}
-          aria-label="المركز الإمبراطوري السريع"
-          title="المركز الإمبراطوري السريع - الجمع الفعلي وطرح المنتجات"
-        >
-          <span className="right-hub-handle-icon">⚡</span>
-          {(remainingCount > 0 || (!alreadyCollectedToday && actualDailyProfit > 0) || finishedProductsInStock.length > 0) && (
-            <span
-              className="right-hub-badge"
-              title={`${remainingCount} مهام - ${finishedProductsInStock.length} منتجات جاهزة للطرح`}
+        <div className="right-floating-dock-group">
+          {onOpenLuckyWheel && (
+            <button
+              type="button"
+              className="right-wheel-handle"
+              onClick={() => {
+                playSound('click');
+                onOpenLuckyWheel();
+              }}
+              aria-label="عجلة الحظ والاستثمار (مجانية كل 50 دقيقة)"
+              title="عجلة الحظ والاستثمار - مجانية كل 50 دقيقة"
             >
-              {finishedProductsInStock.length > 0 ? '🏪' : remainingCount || '✓'}
-            </span>
+              <span className="right-wheel-handle-icon">🎡</span>
+              {spinState.isFree ? (
+                <span className="right-wheel-badge right-wheel-badge--free">
+                  مجاناً
+                </span>
+              ) : (
+                <span className="right-wheel-badge right-wheel-badge--timer">
+                  {spinState.formattedCountdown}
+                </span>
+              )}
+            </button>
           )}
-          <div className="right-hub-label-dots">
-            <span />
-            <span />
-            <span />
-          </div>
-        </button>
+
+          <button
+            type="button"
+            className="right-hub-handle"
+            onClick={() => setOpen(true)}
+            aria-label="المركز الإمبراطوري السريع"
+            title="المركز الإمبراطوري السريع - الجمع الفعلي وطرح المنتجات"
+          >
+            <span className="right-hub-handle-icon">⚡</span>
+            {(remainingCount > 0 || (!alreadyCollectedToday && actualDailyProfit > 0) || finishedProductsInStock.length > 0) && (
+              <span
+                className="right-hub-badge"
+                title={`${remainingCount} مهام - ${finishedProductsInStock.length} منتجات جاهزة للطرح`}
+              >
+                {finishedProductsInStock.length > 0 ? '🏪' : remainingCount || '✓'}
+              </span>
+            )}
+            <div className="right-hub-label-dots">
+              <span />
+              <span />
+              <span />
+            </div>
+          </button>
+        </div>
       )}
 
       {/* 2. Expanded Drawer Modal */}
@@ -327,7 +365,7 @@ export function RightActionHub({
                         <button
                           type="button"
                           className="right-hub-btn-guide-action right-hub-btn-guide-secondary"
-                          onClick={() => handleNavigate('market')}
+                          onClick={() => handleNavigate('inventory')}
                         >
                           <Icon name="store" size={15} />
                           <span>شراء خامات الإنتاج</span>
@@ -409,7 +447,7 @@ export function RightActionHub({
 
                   <div
                     className="right-hub-shortcut-card"
-                    onClick={() => handleNavigate('stock_exchange')}
+                    onClick={() => handleNavigate('investments')}
                   >
                     <span className="right-hub-shortcut-icon">📈</span>
                     <span>البورصة</span>

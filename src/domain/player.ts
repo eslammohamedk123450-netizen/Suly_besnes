@@ -109,6 +109,8 @@ export interface PlayerProfile {
   contracts: BusinessContract[];
   achievements: AchievementRecord[];
   onboarding: OnboardingProgress;
+  lastSpinTimestamp?: number;
+  lastSpinDay?: number;
 }
 
 function createId(): string {

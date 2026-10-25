@@ -1,13 +1,19 @@
-import React, { useState } from 'react';
-import { X, Sparkles, Trophy, Award, RefreshCw, Coins, Zap } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, Sparkles, Trophy, RefreshCw, Coins, Clock } from 'lucide-react';
 import type { PlayerProfile } from '../domain/player';
 import { playSound } from '../game/soundEffects';
+import { getLuckySpinState, recordLuckySpinUsed } from '../game/luckyWheelService';
 
 interface DailyLuckySpinModalProps {
   isOpen: boolean;
   onClose: () => void;
   profile: PlayerProfile;
-  onRewardWon: (reward: { type: 'cash' | 'gold' | 'diamonds' | 'speed_card'; amount: number; label: string }) => void;
+  onRewardWon: (reward: { 
+    type: 'cash' | 'gold' | 'diamonds' | 'speed_card'; 
+    amount: number; 
+    label: string;
+    wasFree: boolean;
+  }) => void;
 }
 
 interface Prize {
@@ -39,11 +45,21 @@ export const DailyLuckySpinModal: React.FC<DailyLuckySpinModalProps> = ({
   const [isSpinning, setIsSpinning] = useState(false);
   const [rotation, setRotation] = useState(0);
   const [wonPrize, setWonPrize] = useState<Prize | null>(null);
+  const [spinState, setSpinState] = useState(() => getLuckySpinState(profile.lastSpinTimestamp));
+
+  // Ticking countdown timer for 50-minute free cycle
+  useEffect(() => {
+    if (!isOpen) return;
+    setSpinState(getLuckySpinState(profile.lastSpinTimestamp));
+    const timer = setInterval(() => {
+      setSpinState(getLuckySpinState(profile.lastSpinTimestamp));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [isOpen, profile.lastSpinTimestamp]);
 
   if (!isOpen) return null;
 
-  const lastSpinDay = (profile as any).lastSpinDay ?? -1;
-  const isFreeSpinAvailable = lastSpinDay !== profile.day;
+  const isFreeSpinAvailable = spinState.isFree;
 
   const handleSpin = () => {
     if (isSpinning) return;
@@ -52,6 +68,7 @@ export const DailyLuckySpinModal: React.FC<DailyLuckySpinModalProps> = ({
       return;
     }
 
+    const wasFree = isFreeSpinAvailable;
     setIsSpinning(true);
     setWonPrize(null);
     playSound('auction');
@@ -74,17 +91,24 @@ export const DailyLuckySpinModal: React.FC<DailyLuckySpinModalProps> = ({
       setWonPrize(targetPrize);
       playSound('cash');
       playSound('levelUp');
+      
+      if (wasFree) {
+        recordLuckySpinUsed();
+        setSpinState(getLuckySpinState(Date.now()));
+      }
+
       onRewardWon({
         type: targetPrize.type,
         amount: targetPrize.amount,
         label: targetPrize.label,
+        wasFree,
       });
     }, 4500);
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md animate-fade-in" dir="rtl">
-      <div className="relative bg-slate-900 border border-amber-500/40 rounded-3xl max-w-md w-full p-6 text-center text-slate-100 shadow-2xl overflow-hidden shadow-amber-500/15 flex flex-col items-center">
+      <div className="relative bg-slate-900 border border-amber-500/40 rounded-3xl max-w-md w-full p-5 sm:p-6 text-center text-slate-100 shadow-2xl overflow-hidden shadow-amber-500/15 flex flex-col items-center">
         {/* Ambient glow */}
         <div className="absolute -top-20 left-1/2 -translate-x-1/2 w-64 h-64 bg-amber-500/15 rounded-full blur-3xl pointer-events-none" />
 
@@ -99,20 +123,34 @@ export const DailyLuckySpinModal: React.FC<DailyLuckySpinModalProps> = ({
 
         <div className="flex items-center gap-2 text-amber-400 font-extrabold text-sm mb-1">
           <Sparkles className="w-4 h-4" />
-          <span>عجلة الحظ والاستثمار اليومية</span>
+          <span>عجلة الحظ والاستثمار (مجانية كل 50 دقيقة)</span>
         </div>
 
         <h3 className="text-xl font-black text-white mb-1">
           دوّر العجلة واربح موارد فورية! 🎡
         </h3>
-        <p className="text-xs text-slate-400 mb-6">
-          {isFreeSpinAvailable 
-            ? '✨ دورة مجانية متاحة لك اليوم!' 
-            : 'يمكنك التدوير مجدداً مقابل 2 ماسة فقط 💎'}
+
+        {/* 50-minute Free Spin Timer Status */}
+        <div className="my-2.5 px-3.5 py-1.5 rounded-full text-xs font-bold inline-flex items-center gap-2 border shadow-sm">
+          {isFreeSpinAvailable ? (
+            <span className="flex items-center gap-1.5 text-emerald-400 bg-emerald-950/60 border-emerald-500/50 px-3 py-1 rounded-full border">
+              <Sparkles className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
+              <span>دورة مجانية متاحة لك الآن! 🎉</span>
+            </span>
+          ) : (
+            <span className="flex items-center gap-1.5 text-amber-300 bg-amber-950/50 border-amber-500/40 px-3 py-1 rounded-full border">
+              <Clock className="w-3.5 h-3.5 text-amber-400" />
+              <span>الدورة المجانية القادمة بعد: <strong className="font-mono text-amber-200">{spinState.formattedCountdown}</strong></span>
+            </span>
+          )}
+        </div>
+
+        <p className="text-[11px] text-slate-400 mb-4">
+          تتجدد كل 50 دقيقة مجاناً، أو يمكنك التدوير في أي وقت مقابل 2 ماسة فقط 💎
         </p>
 
         {/* Wheel Container */}
-        <div className="relative w-64 h-64 sm:w-72 sm:h-72 my-2 flex items-center justify-center">
+        <div className="relative w-64 h-64 sm:w-72 sm:h-72 my-1 flex items-center justify-center">
           {/* Top Pointer */}
           <div className="absolute -top-3 left-1/2 -translate-x-1/2 z-20 w-0 h-0 border-l-[14px] border-l-transparent border-r-[14px] border-r-transparent border-t-[24px] border-t-amber-400 filter drop-shadow-[0_4px_6px_rgba(245,158,11,0.5)]" />
 
@@ -154,18 +192,18 @@ export const DailyLuckySpinModal: React.FC<DailyLuckySpinModalProps> = ({
 
         {/* Won Prize Notification */}
         {wonPrize && (
-          <div className="mt-4 p-3 rounded-2xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-sm font-bold flex items-center gap-2 animate-bounce">
+          <div className="mt-4 p-3 rounded-2xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-xs sm:text-sm font-bold flex items-center gap-2 animate-bounce">
             <Trophy className="w-5 h-5 text-emerald-400 shrink-0" />
             <span>مبروك! ربحت {wonPrize.label} تمت إضافتها إلى رصيدك فوراً! 🎁</span>
           </div>
         )}
 
         {/* Spin Action Button */}
-        <div className="w-full mt-6 space-y-2">
+        <div className="w-full mt-5 space-y-2">
           <button
             onClick={handleSpin}
             disabled={isSpinning || (!isFreeSpinAvailable && (profile.diamonds ?? 0) < 2)}
-            className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-amber-500 via-amber-400 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 disabled:opacity-50 text-slate-950 font-black text-sm shadow-lg shadow-amber-500/25 transition-transform active:scale-95 flex items-center justify-center gap-2"
+            className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-amber-500 via-amber-400 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 disabled:opacity-50 text-slate-950 font-black text-sm shadow-lg shadow-amber-500/25 transition-transform active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
           >
             {isSpinning ? (
               <>
@@ -175,12 +213,12 @@ export const DailyLuckySpinModal: React.FC<DailyLuckySpinModalProps> = ({
             ) : isFreeSpinAvailable ? (
               <>
                 <Sparkles className="w-4 h-4 text-slate-950" />
-                <span>تدوير مجاني الآن! 🎯</span>
+                <span>تدوير مجاني الآن! 🎯 (كل 50 دقيقة)</span>
               </>
             ) : (
               <>
                 <Coins className="w-4 h-4 text-slate-950" />
-                <span>تدوير إضافي (2 💎)</span>
+                <span>تدوير إضافي بـ 2 ماسة (أو انتظر {spinState.formattedCountdown})</span>
               </>
             )}
           </button>

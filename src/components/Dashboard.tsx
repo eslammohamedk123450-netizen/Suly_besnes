@@ -1,16 +1,34 @@
-import { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import type { CountryDefinition } from '../domain/countries';
 import { type PlayerProfile, calculateTotalAssets } from '../domain/player';
 import type { SectionId } from '../domain/navigation';
-import { Icon } from './Icon';
-import { ItemImage } from './ItemImage';
-import { selectOperationsSnapshot } from '../game/selectors';
+import { formatMoney } from '../domain/formatters';
 import { type GameCommand, type GameResult } from '../game/engine';
-import { MarketNewsTicker } from './MarketNewsTicker';
-import { StoryCampaignHub } from './StoryCampaignHub';
-import { SmartOnboardingQuests } from './SmartOnboardingQuests';
-import { RivalCharactersHub } from './RivalCharactersHub';
-import { StruggleStoryHub } from './StruggleStoryHub';
+import { playSound } from '../game/soundEffects';
+import { LeaderboardModal } from './LeaderboardModal';
+import { FinanceReportModal } from './FinanceReportModal';
+import { getLuckySpinState } from '../game/luckyWheelService';
+import { 
+  Trophy, 
+  FileText, 
+  Sparkles, 
+  Building2, 
+  Factory, 
+  TrendingUp, 
+  Gavel, 
+  Map, 
+  Landmark, 
+  Gem, 
+  Crown, 
+  Coins, 
+  Wallet, 
+  ArrowUpRight, 
+  ArrowDownLeft, 
+  Plus, 
+  Flame, 
+  ChevronLeft,
+  Briefcase
+} from 'lucide-react';
 
 interface DashboardProps {
   profile: PlayerProfile;
@@ -28,542 +46,526 @@ export function Dashboard({
   country, 
   onNavigate, 
   onCommand,
-  onClaimReward,
-  onRequestEmergencyLoan,
-  onUpdateProfile,
   onOpenLuckyWheel,
 }: DashboardProps) {
-  const [campaignOpen, setCampaignOpen] = useState(false);
-  const operations = selectOperationsSnapshot(profile, country.economy.operatingCostMultiplier ?? 1);
-  const companyCount = profile.companies.length;
+  const [isLeaderboardOpen, setIsLeaderboardOpen] = useState(false);
+  const [isFinanceModalOpen, setIsFinanceModalOpen] = useState(false);
+  const [spinState, setSpinState] = useState(() => getLuckySpinState(profile.lastSpinTimestamp));
 
-  // Real operations from player's finance ledger
-  const recentOperations = profile.ledger.length > 0
-    ? [...profile.ledger].reverse().slice(0, 4).map((entry) => ({
-        id: entry.id,
-        title: entry.note,
-        subtitle: new Date(entry.occurredAt).toLocaleDateString('ar-EG'),
-        amount: `${entry.category === 'expense' || entry.category === 'liability' ? '-' : '+'} ${entry.amount.toLocaleString()} ${country.currency.code}`,
-        type: (entry.category === 'expense' || entry.category === 'liability' ? 'expense' : 'revenue') as 'expense' | 'revenue',
-        icon: (entry.category === 'expense' ? 'factory' : 'briefcase') as any,
-      }))
+  // Keep countdown updated
+  useEffect(() => {
+    setSpinState(getLuckySpinState(profile.lastSpinTimestamp));
+    const timer = setInterval(() => {
+      setSpinState(getLuckySpinState(profile.lastSpinTimestamp));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [profile.lastSpinTimestamp]);
+
+  const totalAssets = calculateTotalAssets(profile);
+  const companyCount = profile.companies.length;
+  const landsCount = profile.lands.length;
+
+  // Real recent transactions from ledger
+  const recentTransactions = profile.ledger && profile.ledger.length > 0
+    ? [...profile.ledger].reverse().slice(0, 4)
     : [
-        { id: '1', title: 'خطة إنقاذ المصنع المنهار', subtitle: `اليوم ${profile.day}`, amount: `+ ${(profile.bankBalance || 0).toLocaleString()} ${country.currency.code}`, type: 'revenue' as const, icon: 'briefcase' as const },
+        {
+          id: 'initial-setup',
+          category: 'revenue',
+          amount: profile.bankBalance || 50000,
+          occurredAt: new Date().toISOString(),
+          note: 'رأس مال التأسيس والتشغيل الأولي',
+        },
       ];
 
-  // Dynamic real leaderboard sorted by assets/score
-  const playerTotalAssets = calculateTotalAssets(profile);
-  const rivalCompetitors = [
-    { name: 'صالح ثونة', score: 3_500_000, avatar: '👳‍♂️', isPlayer: false },
-    { name: 'داوود الهزاع', score: 2_850_000, avatar: '👨‍💼', isPlayer: false },
-    { name: 'تقى الشمري', score: 2_150_000, avatar: '👩‍💼', isPlayer: false },
-    { name: 'فارس الماجد', score: 1_650_000, avatar: '🧑‍💼', isPlayer: false },
-    { name: 'سالم الرويس', score: 1_250_000, avatar: '🧔', isPlayer: false },
-    { name: 'ياسر المستثمر', score: 950_000, avatar: '👨‍💻', isPlayer: false },
-    { name: 'ليلى القاسمي', score: 720_000, avatar: '🧕', isPlayer: false },
-    { name: 'مريم التنمية', score: 550_000, avatar: '👩‍💼', isPlayer: false },
-    { name: 'جابر الابتكار', score: 380_000, avatar: '👨‍🔬', isPlayer: false },
-    { name: 'سارة المستقبل', score: 220_000, avatar: '👩‍🎓', isPlayer: false },
-  ];
-
-  const allCompetitors = [
-    ...rivalCompetitors,
-    {
-      name: `${profile.name || 'المستثمر الصاعد'} (أنت)`,
-      score: playerTotalAssets,
-      avatar: '👑',
-      isPlayer: true,
-    },
-  ].sort((a, b) => b.score - a.score);
-
-  const leaderboardTop3 = allCompetitors.slice(0, 3).map((item, idx) => ({
-    rank: idx + 1,
-    name: item.name,
-    score: item.score.toLocaleString(),
-    avatar: item.avatar,
-    isPlayer: item.isPlayer,
-  }));
-
-  const leaderboardRanks = allCompetitors.slice(3, 10).map((item, idx) => ({
-    rank: idx + 4,
-    name: item.name,
-    score: item.score.toLocaleString(),
-    isPlayer: item.isPlayer,
-  }));
+  const handleNav = (section: SectionId, target?: string) => {
+    playSound('click');
+    onNavigate(section, target);
+  };
 
   return (
-    <div className="empire-dashboard-grid">
-      {/* Live Breaking Market News Banner */}
-      <MarketNewsTicker day={profile.day} onOpenCampaign={() => setCampaignOpen(true)} />
+    <div className="space-y-6 max-w-7xl mx-auto pb-12 animate-fade-in" dir="rtl">
+      {/* 1. Sleek News & Market Ticker Bar */}
+      <div className="bg-gradient-to-r from-slate-900 via-amber-950/40 to-slate-900 border border-amber-500/30 rounded-2xl p-2.5 sm:p-3 flex items-center justify-between gap-3 shadow-lg">
+        <div className="flex items-center gap-2 overflow-hidden text-xs sm:text-sm">
+          <span className="px-2 py-0.5 rounded-lg bg-amber-500 text-slate-950 font-black text-[11px] shrink-0 flex items-center gap-1">
+            <Flame className="w-3.5 h-3.5 fill-slate-950" />
+            عاجل الأسواق
+          </span>
+          <span className="text-slate-200 truncate">
+            ارتفاع الطلب على المواد الأولية في {country.name} · دورة اليوم {profile.day} بدأت الآن بعوائد استثمارية واعدة
+          </span>
+        </div>
+        <div className="text-[11px] text-amber-300 font-bold shrink-0 hidden sm:block">
+          {country.flag} {country.name}
+        </div>
+      </div>
 
-      {/* Daily Lucky Spin Interactive Banner */}
-      {onOpenLuckyWheel && (
-        <div 
-          onClick={onOpenLuckyWheel}
-          className="p-3 sm:p-4 rounded-2xl bg-gradient-to-r from-amber-950/40 via-amber-900/30 to-yellow-950/40 border border-amber-500/40 flex items-center justify-between gap-3 cursor-pointer hover:border-amber-400/70 transition shadow-lg shadow-amber-950/30 my-2"
-        >
-          <div className="flex items-center gap-3">
-            <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-amber-500 to-yellow-400 text-slate-950 flex items-center justify-center font-black text-xl shadow-md shadow-amber-500/30 shrink-0">
-              🎡
-            </div>
-            <div>
-              <h4 className="font-extrabold text-sm text-white flex items-center gap-1.5">
-                عجلة الحظ والاستثمار اليومية
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                  متاحة مجاناً!
-                </span>
-              </h4>
-              <p className="text-xs text-amber-200/80">
-                دوّر العجلة واربح سيولة طارئة، سبائك ذهب، أو ماسات لدعم إمبراطوريتك
-              </p>
+      {/* 2. Executive Wealth Overview (4 Premium Cards) */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        {/* Total Net Worth */}
+        <div className="bg-slate-900/90 border border-amber-500/40 rounded-2xl p-4 shadow-xl shadow-amber-950/20 relative overflow-hidden group hover:border-amber-400/80 transition">
+          <div className="absolute top-0 right-0 w-24 h-24 bg-amber-500/10 rounded-full blur-2xl group-hover:bg-amber-500/20 transition" />
+          <div className="flex items-center justify-between text-slate-400 text-xs mb-1">
+            <span className="font-semibold">صافي الثروة الإجمالية</span>
+            <div className="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-300 flex items-center justify-center font-bold">
+              <Crown className="w-4 h-4 text-amber-400" />
             </div>
           </div>
-          <button 
-            type="button" 
-            className="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-400 hover:from-amber-400 hover:to-yellow-300 text-slate-950 font-bold text-xs shrink-0 shadow-md transition"
+          <strong className="text-lg sm:text-xl font-black text-amber-400 block tracking-tight">
+            {formatMoney(totalAssets, country)}
+          </strong>
+          <span className="text-[10px] text-slate-400 mt-1 block">
+            تقييم الشركات والأراضي والسيولة
+          </span>
+        </div>
+
+        {/* Bank Cash Balance */}
+        <div className="bg-slate-900/90 border border-emerald-500/40 rounded-2xl p-4 shadow-xl shadow-emerald-950/20 relative overflow-hidden group hover:border-emerald-400/80 transition">
+          <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/10 rounded-full blur-2xl group-hover:bg-emerald-500/20 transition" />
+          <div className="flex items-center justify-between text-slate-400 text-xs mb-1">
+            <span className="font-semibold">السيولة النقدية المتاحة</span>
+            <div className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-300 flex items-center justify-center font-bold">
+              <Wallet className="w-4 h-4 text-emerald-400" />
+            </div>
+          </div>
+          <strong className="text-lg sm:text-xl font-black text-emerald-400 block tracking-tight">
+            {formatMoney(profile.bankBalance, country)}
+          </strong>
+          <span className="text-[10px] text-slate-400 mt-1 block">
+            جاهزة للمزايدة والتوسع الفوري
+          </span>
+        </div>
+
+        {/* Pure Gold Bullion */}
+        <div className="bg-slate-900/90 border border-yellow-500/40 rounded-2xl p-4 shadow-xl shadow-yellow-950/20 relative overflow-hidden group hover:border-yellow-400/80 transition">
+          <div className="absolute top-0 right-0 w-24 h-24 bg-yellow-500/10 rounded-full blur-2xl group-hover:bg-yellow-500/20 transition" />
+          <div className="flex items-center justify-between text-slate-400 text-xs mb-1">
+            <span className="font-semibold">احتياطي الذهب الخالص</span>
+            <div className="w-8 h-8 rounded-xl bg-yellow-500/20 text-yellow-300 flex items-center justify-center font-bold">
+              <Coins className="w-4 h-4 text-yellow-400" />
+            </div>
+          </div>
+          <strong className="text-lg sm:text-xl font-black text-yellow-300 block tracking-tight">
+            {(profile.goldGrams ?? 0).toFixed(2)} غرام
+          </strong>
+          <span className="text-[10px] text-slate-400 mt-1 block">
+            ملاذ آمن ضد تقلبات التضخم
+          </span>
+        </div>
+
+        {/* Diamonds */}
+        <div className="bg-slate-900/90 border border-cyan-500/40 rounded-2xl p-4 shadow-xl shadow-cyan-950/20 relative overflow-hidden group hover:border-cyan-400/80 transition">
+          <div className="absolute top-0 right-0 w-24 h-24 bg-cyan-500/10 rounded-full blur-2xl group-hover:bg-cyan-500/20 transition" />
+          <div className="flex items-center justify-between text-slate-400 text-xs mb-1">
+            <span className="font-semibold">رصيد الماس الإمبراطوري</span>
+            <div className="w-8 h-8 rounded-xl bg-cyan-500/20 text-cyan-300 flex items-center justify-center font-bold">
+              <Gem className="w-4 h-4 text-cyan-400" />
+            </div>
+          </div>
+          <strong className="text-lg sm:text-xl font-black text-cyan-300 block tracking-tight">
+            {profile.diamonds ?? 0} 💎
+          </strong>
+          <span className="text-[10px] text-slate-400 mt-1 block">
+            للتسريع والترقيات والفرص النادرة
+          </span>
+        </div>
+      </div>
+
+      {/* 3. Executive Command Operations Bar (Clean Icons with Names Underneath) */}
+      <div className="bg-slate-900/95 border border-slate-800 rounded-3xl p-4 sm:p-6 shadow-2xl backdrop-blur-md">
+        <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-800/80">
+          <div className="flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping" />
+            <h3 className="font-extrabold text-sm sm:text-base text-white">
+              غرفة العمليات المركزية
+            </h3>
+            <span className="text-xs text-slate-400 hidden sm:inline">
+              (انقر على أيقونة لفتح الخدمة)
+            </span>
+          </div>
+          <span className="text-xs text-amber-400/90 font-bold bg-amber-500/10 px-3 py-1 rounded-full border border-amber-500/30">
+            المستوى {profile.level ?? 1} · {profile.name || 'المستثمر الصاعد'}
+          </span>
+        </div>
+
+        {/* Icons Grid with Names Underneath */}
+        <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-10 gap-2 sm:gap-3">
+          {/* 1. المتصدرون (Opens Leaderboard Modal) */}
+          <button
+            onClick={() => {
+              playSound('click');
+              setIsLeaderboardOpen(true);
+            }}
+            className="flex flex-col items-center justify-center p-2.5 rounded-2xl bg-slate-950/60 border border-amber-500/40 hover:border-amber-400 hover:bg-amber-950/30 transition group cursor-pointer shadow-md"
+            title="فتح قائمة المتصدرين وقادة الأعمال"
           >
-            تدوير 🎯
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-amber-600 via-amber-500 to-yellow-400 text-slate-950 flex items-center justify-center shadow-lg shadow-amber-500/25 group-hover:scale-105 transition-transform">
+              <Trophy className="w-6 h-6 text-slate-950" />
+            </div>
+            <span className="text-[11px] sm:text-xs font-bold text-slate-200 mt-2 text-center group-hover:text-amber-300">
+              المتصدرين
+            </span>
+          </button>
+
+          {/* 2. التقارير المالية (Opens Finance Report Modal) */}
+          <button
+            onClick={() => {
+              playSound('click');
+              setIsFinanceModalOpen(true);
+            }}
+            className="flex flex-col items-center justify-center p-2.5 rounded-2xl bg-slate-950/60 border border-emerald-500/40 hover:border-emerald-400 hover:bg-emerald-950/30 transition group cursor-pointer shadow-md"
+            title="عرض التقارير المالية وقوائم الأرباح"
+          >
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-400 text-slate-950 flex items-center justify-center shadow-lg shadow-emerald-500/25 group-hover:scale-105 transition-transform">
+              <FileText className="w-6 h-6 text-slate-950" />
+            </div>
+            <span className="text-[11px] sm:text-xs font-bold text-slate-200 mt-2 text-center group-hover:text-emerald-300">
+              التقارير المالية
+            </span>
+          </button>
+
+          {/* 3. عجلة الحظ (Opens Lucky Spin Modal - Free every 50 mins) */}
+          <button
+            onClick={() => {
+              playSound('click');
+              onOpenLuckyWheel?.();
+            }}
+            className="flex flex-col items-center justify-center p-2.5 rounded-2xl bg-slate-950/60 border border-yellow-500/40 hover:border-yellow-400 hover:bg-yellow-950/30 transition group cursor-pointer shadow-md relative"
+            title="عجلة الحظ والاستثمار - مجانية كل 50 دقيقة"
+          >
+            {spinState.isFree ? (
+              <span className="absolute -top-1.5 -right-1.5 px-1.5 py-0.5 rounded-full bg-emerald-500 text-white font-extrabold text-[9px] shadow-sm animate-pulse">
+                مجاناً
+              </span>
+            ) : (
+              <span className="absolute -top-1.5 -right-1.5 px-1.5 py-0.5 rounded-full bg-slate-800 text-amber-300 font-bold text-[8px] border border-amber-500/30 font-mono">
+                {spinState.formattedCountdown}
+              </span>
+            )}
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-amber-500 to-yellow-400 text-slate-950 flex items-center justify-center shadow-lg shadow-yellow-500/25 group-hover:scale-105 transition-transform">
+              <Sparkles className="w-6 h-6 text-slate-950" />
+            </div>
+            <span className="text-[11px] sm:text-xs font-bold text-slate-200 mt-2 text-center group-hover:text-yellow-300">
+              عجلة الحظ
+            </span>
+          </button>
+
+          {/* 4. الشركات */}
+          <button
+            onClick={() => handleNav('companies')}
+            className="flex flex-col items-center justify-center p-2.5 rounded-2xl bg-slate-950/60 border border-slate-800 hover:border-slate-700 hover:bg-slate-900 transition group cursor-pointer shadow-md"
+            title="إدارة وتطوير الشركات والمؤسسات"
+          >
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-500 text-white flex items-center justify-center shadow-lg shadow-blue-500/20 group-hover:scale-105 transition-transform">
+              <Building2 className="w-6 h-6 text-white" />
+            </div>
+            <span className="text-[11px] sm:text-xs font-bold text-slate-200 mt-2 text-center group-hover:text-blue-300">
+              الشركات
+            </span>
+          </button>
+
+          {/* 5. المصانع والإنتاج */}
+          <button
+            onClick={() => handleNav('production')}
+            className="flex flex-col items-center justify-center p-2.5 rounded-2xl bg-slate-950/60 border border-slate-800 hover:border-slate-700 hover:bg-slate-900 transition group cursor-pointer shadow-md"
+            title="تشغيل خطوط الإنتاج والتصنيع"
+          >
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-teal-600 to-emerald-500 text-white flex items-center justify-center shadow-lg shadow-teal-500/20 group-hover:scale-105 transition-transform">
+              <Factory className="w-6 h-6 text-white" />
+            </div>
+            <span className="text-[11px] sm:text-xs font-bold text-slate-200 mt-2 text-center group-hover:text-teal-300">
+              الإنتاج
+            </span>
+          </button>
+
+          {/* 6. البورصة والاستثمار */}
+          <button
+            onClick={() => handleNav('investments')}
+            className="flex flex-col items-center justify-center p-2.5 rounded-2xl bg-slate-950/60 border border-slate-800 hover:border-slate-700 hover:bg-slate-900 transition group cursor-pointer shadow-md"
+            title="البورصة وأسواق المال والاكتتابات"
+          >
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-purple-600 to-pink-500 text-white flex items-center justify-center shadow-lg shadow-purple-500/20 group-hover:scale-105 transition-transform">
+              <TrendingUp className="w-6 h-6 text-white" />
+            </div>
+            <span className="text-[11px] sm:text-xs font-bold text-slate-200 mt-2 text-center group-hover:text-purple-300">
+              البورصة
+            </span>
+          </button>
+
+          {/* 7. المزادات */}
+          <button
+            onClick={() => handleNav('auctions')}
+            className="flex flex-col items-center justify-center p-2.5 rounded-2xl bg-slate-950/60 border border-slate-800 hover:border-slate-700 hover:bg-slate-900 transition group cursor-pointer shadow-md"
+            title="المزادات العلنية على الأصول والمصانع"
+          >
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-amber-700 to-orange-500 text-white flex items-center justify-center shadow-lg shadow-orange-500/20 group-hover:scale-105 transition-transform">
+              <Gavel className="w-6 h-6 text-white" />
+            </div>
+            <span className="text-[11px] sm:text-xs font-bold text-slate-200 mt-2 text-center group-hover:text-orange-300">
+              المزادات
+            </span>
+          </button>
+
+          {/* 8. الأراضي والعقارات */}
+          <button
+            onClick={() => handleNav('lands')}
+            className="flex flex-col items-center justify-center p-2.5 rounded-2xl bg-slate-950/60 border border-slate-800 hover:border-slate-700 hover:bg-slate-900 transition group cursor-pointer shadow-md"
+            title="المواقع العقارية وتراخيص البناء"
+          >
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-green-600 to-emerald-600 text-white flex items-center justify-center shadow-lg shadow-green-500/20 group-hover:scale-105 transition-transform">
+              <Map className="w-6 h-6 text-white" />
+            </div>
+            <span className="text-[11px] sm:text-xs font-bold text-slate-200 mt-2 text-center group-hover:text-green-300">
+              الأراضي
+            </span>
+          </button>
+
+          {/* 9. البنك والتمويل */}
+          <button
+            onClick={() => handleNav('bank')}
+            className="flex flex-col items-center justify-center p-2.5 rounded-2xl bg-slate-950/60 border border-slate-800 hover:border-slate-700 hover:bg-slate-900 transition group cursor-pointer shadow-md"
+            title="البنك، الودائع، والقروض الميسرة"
+          >
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-sky-600 to-blue-500 text-white flex items-center justify-center shadow-lg shadow-sky-500/20 group-hover:scale-105 transition-transform">
+              <Landmark className="w-6 h-6 text-white" />
+            </div>
+            <span className="text-[11px] sm:text-xs font-bold text-slate-200 mt-2 text-center group-hover:text-sky-300">
+              البنك
+            </span>
+          </button>
+
+          {/* 10. متجر الماس والعروض */}
+          <button
+            onClick={() => handleNav('store')}
+            className="flex flex-col items-center justify-center p-2.5 rounded-2xl bg-slate-950/60 border border-slate-800 hover:border-slate-700 hover:bg-slate-900 transition group cursor-pointer shadow-md"
+            title="متجر الماس والبطاقات والباقات الحصرية"
+          >
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-cyan-600 to-blue-400 text-white flex items-center justify-center shadow-lg shadow-cyan-500/20 group-hover:scale-105 transition-transform">
+              <Gem className="w-6 h-6 text-white" />
+            </div>
+            <span className="text-[11px] sm:text-xs font-bold text-slate-200 mt-2 text-center group-hover:text-cyan-300">
+              المتجر
+            </span>
           </button>
         </div>
-      )}
+      </div>
 
-      {/* سيناريو قصة كفاح: إنقاذ المصنع المنهار (The Struggle & Turnaround Hub) */}
-      <StruggleStoryHub
-        profile={profile}
-        onNavigate={onNavigate}
-        onUpdateProfile={onUpdateProfile ?? ((updater) => {
-          onCommand(
-            { name: 'redeem_reward_code', args: { code: 'STORY-UPDATE' } } as any,
-            (curr) => ({ ok: true, profile: updater(curr), message: 'تم تحديث قصة الكفاح', data: null })
-          );
-        })}
-      />
-
-      {/* Smart Guided Onboarding Quests & Emergency Loan (التعديل الجديد: دليل المبتدئ والتسهيل الائتماني) */}
-      <SmartOnboardingQuests
-        profile={profile}
-        onNavigate={onNavigate}
-        onClaimReward={onClaimReward ?? ((cash, diamonds) => {
-          onCommand(
-            { name: 'redeem_reward_code', args: { code: 'QUEST-CLAIM' } } as any,
-            (curr) => ({ 
-              ok: true, 
-              profile: { ...curr, bankBalance: (curr.bankBalance ?? 0) + cash, diamonds: (curr.diamonds ?? 0) + diamonds },
-              message: 'تم استلام مكافأة المهمة',
-              data: null
-            })
-          );
-        })}
-        onRequestEmergencyLoan={onRequestEmergencyLoan ?? (() => {
-          onCommand(
-            { name: 'redeem_reward_code', args: { code: 'EMERGENCY-LOAN' } } as any,
-            (curr) => ({ 
-              ok: true, 
-              profile: { ...curr, bankBalance: (curr.bankBalance ?? 0) + 250000 },
-              message: 'تم إيداع التسهيل الائتماني',
-              data: null
-            })
-          );
-        })}
-      />
-
-      {/* Rival Characters Hub (التعديل الجديد: شخصيات المنافسين التفاعلية) */}
-      <RivalCharactersHub profile={profile} />
-
-      {/* ================= TOP ROW: STORY CARD + COMPANIES OVERVIEW ================= */}
-      <div className="empire-top-row">
-        {/* LEFT COLUMN: STORY & QUEST */}
-        <div className="empire-left-col">
-          {/* Story Card */}
-          <section className="empire-card empire-story-card">
-            <div className="empire-story-bg" />
-            <div className="empire-story-content">
-              <span className="empire-badge-kicker">الفصل الأول</span>
-              <h2>إرث عائلة النيل</h2>
-              <p>رحلة تبدأ من قلب القاهرة، حيث تتحول الطموحات إلى إمبراطورية.</p>
-              <div className="empire-story-footer">
-                <span className="empire-story-tag">ماضٍ عريق.. مستقبل أبهر</span>
-                <button className="empire-btn-gold" type="button" onClick={() => setCampaignOpen(true)}>
-                  تابع القصة <Icon name="chevron" size={14} />
-                </button>
-              </div>
-            </div>
-          </section>
-
-          {/* Current Quest Card */}
-          <section className="empire-card empire-quest-card">
-            <div className="empire-quest-icon">
-              <Icon name="tasks" size={28} />
-            </div>
-            <div className="empire-quest-info">
-              <span className="empire-quest-label">مهمتك الحالية</span>
-              <h3>{operations.nextStep.title || 'تأسيس شركتك الأولى'}</h3>
-              <div className="empire-quest-bar">
-                <div className="empire-quest-track">
-                  <span style={{ width: `${companyCount > 0 ? 100 : 0}%` }} />
+      {/* 4. Balanced Two-Column Operational Hub */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        {/* LEFT COLUMN: Active Companies & Factories Status */}
+        <div className="bg-slate-900/95 border border-slate-800 rounded-3xl p-5 sm:p-6 shadow-xl flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between pb-3 mb-4 border-b border-slate-800">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center">
+                  <Building2 className="w-5 h-5" />
                 </div>
-                <small>{companyCount > 0 ? '1/1' : '0/1'}</small>
+                <div>
+                  <h3 className="font-extrabold text-sm sm:text-base text-white">
+                    شركاتك الصناعية والتجارية
+                  </h3>
+                  <small className="text-xs text-slate-400">
+                    {companyCount > 0 ? `${companyCount} شركات قيد النشاط والتشغيل` : 'لم يتم تأسيس شركات بعد'}
+                  </small>
+                </div>
               </div>
-            </div>
-            <button className="empire-btn-teal" type="button" onClick={() => onNavigate(operations.nextStep.section)}>
-              أذهب المهمة <Icon name="chevron" size={14} />
-            </button>
-          </section>
-        </div>
 
-        {/* RIGHT COLUMN: COMPANIES SECTION */}
-        <div className="empire-right-col">
-          <section className="empire-card empire-companies-card">
-            <div className="empire-card-header empire-companies-header">
-              <div>
-                <h2>الشركات</h2>
-                <small>شركاتك تقود الإمبراطورية</small>
-              </div>
-              <span className="empire-pill-count">{companyCount} / 10 شركات</span>
+              <button
+                onClick={() => handleNav('companies')}
+                className="text-xs text-amber-400 hover:text-amber-300 font-bold flex items-center gap-1 transition"
+              >
+                <span>إدارة الكل</span>
+                <ChevronLeft className="w-4 h-4" />
+              </button>
             </div>
 
-            {/* Real Player Companies List */}
+            {/* Featured Active Company or Get Started Callout */}
             {profile.companies.length > 0 ? (
-              <>
-                {/* Featured Active Company Card */}
-                {(() => {
-                  const featured = profile.companies[0];
-                  const condition = featured.maintenanceCondition ?? 100;
-                  const level = featured.upgradeLevel ?? 1;
-                  const cost = featured.operatingCostPerDay ?? 15000;
-                  return (
-                    <div className="empire-company-featured">
-                      <div className="empire-company-head">
-                        <div className="empire-company-logo">
-                          {featured.industryId.includes('food') ? '🌾' : featured.industryId.includes('energy') ? '⚡' : featured.industryId.includes('petro') ? '🛢️' : '🏭'}
-                        </div>
-                        <div className="empire-company-title">
-                          <h3>{featured.name}</h3>
-                          <small>قطاع {featured.industryId} · كفاءة {condition}%</small>
-                        </div>
-                        <span className="empire-level-badge">المستوى {level}</span>
-                      </div>
-                      <div className="empire-company-stats">
-                        <div>
-                          <small>تكلفة التشغيل</small>
-                          <strong>{cost.toLocaleString()} {country.currency.code}</strong>
+              (() => {
+                const featured = profile.companies[0];
+                const condition = featured.maintenanceCondition ?? 100;
+                const level = featured.upgradeLevel ?? 1;
+                const cost = featured.operatingCostPerDay ?? 15000;
+                return (
+                  <div className="bg-slate-950/70 border border-slate-800 rounded-2xl p-4 mb-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-300 flex items-center justify-center text-xl">
+                          {featured.industryId.includes('food') ? '🌾' : featured.industryId.includes('energy') ? '⚡' : '🏭'}
                         </div>
                         <div>
-                          <small>كفاءة الماكينات</small>
-                          <strong className={condition < 50 ? 'text-rose-400' : 'text-emerald-400'}>{condition}%</strong>
-                        </div>
-                        <div>
-                          <small>مستوى التطوير</small>
-                          <strong>{level} / 5</strong>
+                          <h4 className="font-extrabold text-white text-sm">
+                            {featured.name}
+                          </h4>
+                          <span className="text-[11px] text-slate-400">
+                            قطاع {featured.industryId} · المستوى {level}
+                          </span>
                         </div>
                       </div>
-                      <div className="empire-company-progress">
-                        <div className="empire-progress-track">
-                          <span style={{ width: `${Math.min(100, (level / 5) * 100)}%` }} />
-                        </div>
-                        <small>{Math.round((level / 5) * 100)}%</small>
+                      <span className={`text-xs px-2.5 py-1 rounded-full font-bold border ${
+                        condition >= 70 ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40' : 'bg-rose-500/20 text-rose-300 border-rose-500/40'
+                      }`}>
+                        كفاءة {condition}%
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-2 text-center text-xs my-3 p-2.5 bg-slate-900 rounded-xl border border-slate-800/80">
+                      <div>
+                        <span className="text-[10px] text-slate-400 block">التكلفة اليومية</span>
+                        <strong className="text-slate-200">{cost.toLocaleString()} {country.currency.code}</strong>
                       </div>
-                      <div className="empire-company-actions">
-                        <button className="empire-btn-outline" type="button" onClick={() => onNavigate('production')}>
-                          تشغيل الإنتاج ⚡
-                        </button>
-                        <button className="empire-btn-dark" type="button" onClick={() => onNavigate('companies')}>
-                          إدارة وصيانة ⚙️
-                        </button>
+                      <div>
+                        <span className="text-[10px] text-slate-400 block">حالة الماكينات</span>
+                        <strong className={condition < 50 ? 'text-rose-400' : 'text-emerald-400'}>{condition}%</strong>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-slate-400 block">المستوى</span>
+                        <strong className="text-amber-400">{level} / 5</strong>
                       </div>
                     </div>
-                  );
-                })()}
 
-                {/* Sub-Companies Grid if more than 1 company */}
-                {profile.companies.length > 1 && (
-                  <div className="empire-companies-grid">
-                    {profile.companies.slice(1, 3).map((subCo) => (
-                      <div className="empire-company-sub" key={subCo.id}>
-                        <div className="empire-sub-head">
-                          <div className="empire-sub-icon">
-                            {subCo.industryId.includes('food') ? '🌾' : subCo.industryId.includes('energy') ? '⚡' : subCo.industryId.includes('transport') ? '🚢' : '🏭'}
-                          </div>
-                          <div>
-                            <h4>{subCo.name}</h4>
-                            <small>المستوى {subCo.upgradeLevel ?? 1} · كفاءة {subCo.maintenanceCondition ?? 100}%</small>
-                          </div>
-                        </div>
-                        <div className="empire-sub-metrics">
-                          <div><span>التشغيل</span><strong>{(subCo.operatingCostPerDay ?? 10000).toLocaleString()}</strong></div>
-                          <div><span>الكفاءة</span><strong>{subCo.maintenanceCondition ?? 100}%</strong></div>
-                          <div><span>المستوى</span><strong>{subCo.upgradeLevel ?? 1}</strong></div>
-                        </div>
-                        <div className="empire-sub-actions">
-                          <button className="empire-btn-sm-teal" type="button" onClick={() => onNavigate('production')}>إنتاج ⚡</button>
-                          <button className="empire-btn-sm-dark" type="button" onClick={() => onNavigate('companies')}>إدارة ⚙️</button>
-                        </div>
-                      </div>
-                    ))}
+                    <div className="flex items-center gap-2 pt-1">
+                      <button
+                        onClick={() => handleNav('production')}
+                        className="flex-1 py-2.5 px-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs shadow-md transition text-center"
+                      >
+                        تشغيل خط الإنتاج ⚡
+                      </button>
+                      <button
+                        onClick={() => handleNav('companies')}
+                        className="py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs transition border border-slate-700"
+                      >
+                        تطوير وصيانة ⚙️
+                      </button>
+                    </div>
                   </div>
-                )}
-              </>
+                );
+              })()
             ) : (
-              <div className="p-5 text-center bg-slate-900/60 rounded-2xl border border-dashed border-slate-700 my-3">
+              <div className="bg-slate-950/60 border border-dashed border-slate-800 rounded-2xl p-6 text-center my-2">
                 <span className="text-3xl block mb-2">🏭</span>
-                <h4 className="font-bold text-white text-sm mb-1">لا توجد شركات مؤسسة بعد</h4>
-                <p className="text-xs text-slate-400 mb-4">
-                  ابدأ بتأسيس أول مصنع أو شركة صناعية لبدء دوران عجلة الإنتاج والأرباح.
+                <h4 className="font-extrabold text-sm text-white mb-1">
+                  لا توجد شركات مؤسسة بعد
+                </h4>
+                <p className="text-xs text-slate-400 mb-4 max-w-sm mx-auto">
+                  اختر القطاع المناسب وأطلق أول مشروع استثماري لك لبدء دوران عجلة الأرباح اليومية.
                 </p>
-                <button className="empire-btn-teal px-4 py-2 text-xs font-bold" type="button" onClick={() => onNavigate('companies')}>
-                  تأسيس شركتك الأولى الآن 🚀
+                <button
+                  onClick={() => handleNav('companies')}
+                  className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-400 hover:from-amber-400 hover:to-yellow-300 text-slate-950 font-black text-xs shadow-lg transition"
+                >
+                  تأسيس أول شركة الآن 🚀
                 </button>
               </div>
             )}
-
-            {/* Add Company CTA */}
-            <button className="empire-btn-add-company" type="button" onClick={() => onNavigate('companies')}>
-              <span>+</span> تأسيس شركة جديدة
-            </button>
-          </section>
-        </div>
-      </div>
-
-      {/* ================= MIDDLE ROW: LANDS SECTION ================= */}
-      <section className="empire-card empire-lands-section">
-        <div className="empire-card-header">
-          <div>
-            <h2>الأراضي</h2>
-            <small>اختر موقع توسعك الاستثماري.</small>
           </div>
-          <button className="empire-link-btn" type="button" onClick={() => onNavigate('lands')}>
-            عرض الخريطة الكاملة <Icon name="chevron" size={14} />
+
+          <button
+            onClick={() => handleNav('companies')}
+            className="w-full mt-3 py-2.5 rounded-2xl bg-slate-800/80 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700/80 font-bold text-xs transition flex items-center justify-center gap-2 cursor-pointer"
+          >
+            <Plus className="w-4 h-4 text-amber-400" />
+            <span>تأسيس شركة جديدة والتوسع في قطاعات أخرى</span>
           </button>
         </div>
 
-        <div className="empire-lands-layout">
-          {/* Featured Owned Land or Acquisition CTA */}
-          {profile.lands.length > 0 ? (
-            (() => {
-              const ownedLand = profile.lands[0];
-              return (
-                <div className="empire-land-featured">
-                  <div className="empire-land-image-wrap">
-                    <span className="empire-land-owned-badge">أرضك الإمبراطورية</span>
-                    <div className="empire-land-overlay-info">
-                      <h3>{ownedLand.label}</h3>
-                      <p>{ownedLand.areaSquareMeters.toLocaleString()} م² · قطاع {ownedLand.landType ?? 'صناعي'} <Icon name="target" size={14} /></p>
-                    </div>
-                  </div>
+        {/* RIGHT COLUMN: Recent Financial Movements & Ledger */}
+        <div className="bg-slate-900/95 border border-slate-800 rounded-3xl p-5 sm:p-6 shadow-xl flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between pb-3 mb-4 border-b border-slate-800">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
+                  <FileText className="w-5 h-5" />
                 </div>
-              );
-            })()
-          ) : (
-            <div className="empire-land-featured p-6 text-center flex flex-col items-center justify-center bg-slate-900/70 rounded-2xl border border-dashed border-slate-700">
-              <span className="text-3xl mb-2">🗺️</span>
-              <h4 className="font-bold text-white text-sm mb-1">لا تملك أراضٍ مسجلة بعد</h4>
-              <p className="text-xs text-slate-400 mb-3">
-                المصانع والشركات تحتاج إلى مساحات مرخصة للبناء والتوسع.
-              </p>
-              <button className="empire-btn-buy" type="button" onClick={() => onNavigate('lands')}>
-                المزايدة على الأراضي 🛒
+                <div>
+                  <h3 className="font-extrabold text-sm sm:text-base text-white">
+                    آخر المعاملات النقدية
+                  </h3>
+                  <small className="text-xs text-slate-400">
+                    حركة الإيرادات والمصروفات المسجلة
+                  </small>
+                </div>
+              </div>
+
+              <button
+                onClick={() => {
+                  playSound('click');
+                  setIsFinanceModalOpen(true);
+                }}
+                className="text-xs text-emerald-400 hover:text-emerald-300 font-bold flex items-center gap-1 transition"
+              >
+                <span>التقرير التفصيلي</span>
+                <ChevronLeft className="w-4 h-4" />
               </button>
             </div>
-          )}
 
-          {/* Available Lands List */}
-          <div className="empire-lands-available">
-            <span className="empire-sub-label">الأراضي المتاحة للشراء</span>
-            <div className="empire-lands-grid">
-              <div className="empire-land-card">
-                <ItemImage type="land" landType="agricultural" name="أرض زراعية" size="sm" />
-                <div className="empire-land-details">
-                  <h4>أرض زراعية خصبة</h4>
-                  <small>600 م² · ضفاف النيل</small>
-                  <button className="empire-btn-buy" type="button" onClick={() => onNavigate('lands')}>
-                    اشتر الأرض 🛒
-                  </button>
-                </div>
-              </div>
+            {/* Transactions List */}
+            <div className="space-y-2.5">
+              {recentTransactions.map((tx: any) => {
+                const isRevenue = tx.category === 'revenue';
+                return (
+                  <div
+                    key={tx.id}
+                    className="p-3 rounded-2xl bg-slate-950/60 border border-slate-800/80 flex items-center justify-between hover:border-slate-700 transition"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${
+                        isRevenue ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'
+                      }`}>
+                        {isRevenue ? <ArrowDownLeft className="w-4 h-4" /> : <ArrowUpRight className="w-4 h-4" />}
+                      </div>
+                      <div>
+                        <strong className="text-xs text-white block">
+                          {tx.note || 'عملية مالية'}
+                        </strong>
+                        <span className="text-[10px] text-slate-500">
+                          {new Date(tx.occurredAt).toLocaleDateString('ar-EG')}
+                        </span>
+                      </div>
+                    </div>
 
-              <div className="empire-land-card">
-                <ItemImage type="land" landType="commercial" name="أرض تجارية" size="sm" />
-                <div className="empire-land-details">
-                  <h4>أرض تجارية متميزة</h4>
-                  <small>450 م² · وسط العاصمة</small>
-                  <button className="empire-btn-buy" type="button" onClick={() => onNavigate('lands')}>
-                    اشتر الأرض 🛒
-                  </button>
-                </div>
-              </div>
+                    <strong className={`font-mono text-xs font-bold ${
+                      isRevenue ? 'text-emerald-400' : 'text-rose-400'
+                    }`}>
+                      {isRevenue ? '+' : '-'} {Number(tx.amount).toLocaleString()} {country.currency.code}
+                    </strong>
+                  </div>
+                );
+              })}
             </div>
+          </div>
+
+          <div className="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs">
+            <span className="text-slate-400">
+              الأراضي المسجلة: <strong className="text-white">{landsCount} قطعة</strong>
+            </span>
+            <button
+              onClick={() => handleNav('lands')}
+              className="text-amber-400 hover:text-amber-300 font-bold flex items-center gap-1"
+            >
+              <span>معاينة الأراضي</span>
+              <ChevronLeft className="w-3.5 h-3.5" />
+            </button>
           </div>
         </div>
-      </section>
-
-      {/* ================= BOTTOM ROW: MANAGEMENT, ANALYTICS & LEADERBOARD ================= */}
-      <div className="empire-bottom-row">
-        {/* PANEL 1: STAFF & MANAGEMENT */}
-        <section className="empire-card empire-staff-panel">
-          <div className="empire-card-header">
-            <div>
-              <h2>الإدارة والرواتب</h2>
-              <small>أدر القوة التشغيلية لأثر أكبر</small>
-            </div>
-          </div>
-
-          {/* Staff Manager Card */}
-          <div className="empire-staff-card">
-            <div className="empire-staff-avatar">👷‍♂️</div>
-            <div className="empire-staff-info">
-              <h4>مدير المصنع</h4>
-              <small>مصنع المواد الغذائية</small>
-              <span className="empire-salary-tag">1,000 {country.currency.code} / يوم</span>
-            </div>
-            <button className="empire-btn-sm-gold" type="button" onClick={() => onNavigate('staff')}>
-              ترقية
-            </button>
-          </div>
-
-          {/* Recent Operations Log */}
-          <div className="empire-operations-log">
-            <h4>أحدث العمليات</h4>
-            {recentOperations.map((op) => (
-              <div className="empire-log-item" key={op.id}>
-                <div className={`empire-log-icon empire-log-icon--${op.type}`}>
-                  <Icon name={op.icon} size={16} />
-                </div>
-                <div className="empire-log-info">
-                  <strong>{op.title}</strong>
-                  <small>{op.subtitle}</small>
-                </div>
-                <span className={`empire-log-amount empire-log-amount--${op.type}`}>{op.amount}</span>
-              </div>
-            ))}
-          </div>
-
-          <button className="empire-btn-teal-wide" type="button" onClick={() => onNavigate('staff')}>
-            وظف موظفاً جديداً
-          </button>
-        </section>
-
-        {/* PANEL 2: FINANCIAL CHARTS & PREVIEW */}
-        <section className="empire-card empire-charts-panel">
-          <div className="empire-card-header">
-            <div>
-              <h2>الأداء المالي</h2>
-              <small>تقرير الأرباح والمصروفات</small>
-            </div>
-          </div>
-
-          {/* Financial Totals */}
-          <div className="empire-finance-summary">
-            <div className="empire-finance-box empire-finance-box--green">
-              <small>صافي الربح</small>
-              <strong>250K</strong>
-            </div>
-            <div className="empire-finance-box empire-finance-box--red">
-              <small>المصروفات</small>
-              <strong>230K</strong>
-            </div>
-            <div className="empire-finance-box empire-finance-box--blue">
-              <small>الإيرادات</small>
-              <strong>480K</strong>
-            </div>
-          </div>
-
-          {/* Mock Financial Bar Charts */}
-          <div className="empire-chart-box">
-            <span className="empire-chart-title">الأداء الأسبوعي</span>
-            <div className="empire-bars">
-              <div className="empire-bar-group"><span className="bar green" style={{ height: '60%' }} /><span className="bar red" style={{ height: '30%' }} /></div>
-              <div className="empire-bar-group"><span className="bar green" style={{ height: '80%' }} /><span className="bar red" style={{ height: '40%' }} /></div>
-              <div className="empire-bar-group"><span className="bar green" style={{ height: '45%' }} /><span className="bar red" style={{ height: '50%' }} /></div>
-              <div className="empire-bar-group"><span className="bar green" style={{ height: '90%' }} /><span className="bar red" style={{ height: '35%' }} /></div>
-              <div className="empire-bar-group"><span className="bar green" style={{ height: '70%' }} /><span className="bar red" style={{ height: '25%' }} /></div>
-            </div>
-          </div>
-
-          <div className="empire-chart-box">
-            <span className="empire-chart-title">الأداء اليومي</span>
-            <div className="empire-bars empire-bars--daily">
-              <div className="bar-single green" style={{ height: '40%' }} />
-              <div className="bar-single green" style={{ height: '65%' }} />
-              <div className="bar-single green" style={{ height: '85%' }} />
-              <div className="bar-single green" style={{ height: '50%' }} />
-              <div className="bar-single green" style={{ height: '75%' }} />
-            </div>
-          </div>
-        </section>
-
-        {/* PANEL 3: GLOBAL LEADERBOARD */}
-        <section className="empire-card empire-leaderboard-panel">
-          <div className="empire-card-header">
-            <div>
-              <h2>المتصدرون</h2>
-              <small>أقوى قادة الأعمال في العالم العربي</small>
-            </div>
-            <button className="empire-btn-sm-outline" type="button" onClick={() => onNavigate('reports')}>
-              الموسم الحالي 🏆
-            </button>
-          </div>
-
-          {/* Top 3 Podium */}
-          <div className="empire-podium">
-            {/* 2nd Place */}
-            <div className="empire-podium-spot empire-podium--2">
-              <div className="empire-podium-avatar">{leaderboardTop3[1].avatar}</div>
-              <strong>{leaderboardTop3[1].name}</strong>
-              <small>{leaderboardTop3[1].score}</small>
-              <div className="empire-podium-block">2</div>
-            </div>
-
-            {/* 1st Place */}
-            <div className="empire-podium-spot empire-podium--1">
-              <div className="empire-podium-crown">👑</div>
-              <div className="empire-podium-avatar empire-podium-avatar--gold">{leaderboardTop3[0].avatar}</div>
-              <strong>{leaderboardTop3[0].name}</strong>
-              <small>{leaderboardTop3[0].score}</small>
-              <div className="empire-podium-block empire-podium-block--gold">1</div>
-            </div>
-
-            {/* 3rd Place */}
-            <div className="empire-podium-spot empire-podium--3">
-              <div className="empire-podium-avatar">{leaderboardTop3[2].avatar}</div>
-              <strong>{leaderboardTop3[2].name}</strong>
-              <small>{leaderboardTop3[2].score}</small>
-              <div className="empire-podium-block">3</div>
-            </div>
-          </div>
-
-          {/* Ranks 4 to 10 */}
-          <div className="empire-leaderboard-list">
-            {leaderboardRanks.map((player) => (
-              <div className={`empire-lb-row ${player.isPlayer ? 'is-player' : ''}`} key={player.rank}>
-                <span className="empire-lb-rank">{player.rank}</span>
-                <span className="empire-lb-name">{player.name}</span>
-                <strong className="empire-lb-score">{player.score}</strong>
-              </div>
-            ))}
-          </div>
-
-          <button className="empire-btn-teal-wide" type="button" onClick={() => onNavigate('reports')}>
-            تفاصيل الموسم 📊
-          </button>
-        </section>
       </div>
 
-      {/* Story Campaign Modal */}
-      {campaignOpen && (
-        <StoryCampaignHub
-          profile={profile}
-          country={country}
-          onClose={() => setCampaignOpen(false)}
-          onClaimReward={(diamonds, gold, money, reputation) => {
-            if (diamonds > 0) profile.diamonds = (profile.diamonds ?? 0) + diamonds;
-            if (gold > 0) profile.goldGrams = (profile.goldGrams ?? 0) + gold;
-            if (money > 0) profile.bankBalance += money;
-            if (reputation) profile.reputation = Math.min(100, Math.max(0, (profile.reputation ?? 50) + reputation));
-            const currentChapterId = (profile as unknown as { campaignChapterId?: number }).campaignChapterId ?? 1;
-            (profile as unknown as { campaignChapterId?: number }).campaignChapterId = currentChapterId + 1;
-          }}
-        />
-      )}
+      {/* 5. Modals for Leaderboard & Financial Reports */}
+      <LeaderboardModal
+        isOpen={isLeaderboardOpen}
+        onClose={() => setIsLeaderboardOpen(false)}
+        profile={profile}
+        country={country}
+      />
+
+      <FinanceReportModal
+        isOpen={isFinanceModalOpen}
+        onClose={() => setIsFinanceModalOpen(false)}
+        profile={profile}
+        country={country}
+        onNavigate={handleNav}
+      />
     </div>
   );
 }

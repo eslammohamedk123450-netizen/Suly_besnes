@@ -1,5 +1,6 @@
 import type { SectionId } from '../domain/navigation';
 import type { PlayerProfile } from '../domain/player';
+import type { AuctionListing } from '../domain/futureSystems';
 import { calculateTotalAssets } from '../domain/player';
 import { AUCTION_CATALOG, findIndustry, findMaterial, findInvestment, PRODUCT_CATALOG, RECIPE_CATALOG, TASK_CATALOG } from './catalog';
 import { getAuctionListings, isAuctionOpen } from './auctions';
@@ -101,7 +102,7 @@ export interface EmpirePoints {
   expansion: number;
 }
 
-export function selectAvailableAuctions(profile: PlayerProfile): typeof AUCTION_CATALOG {
+export function selectAvailableAuctions(profile: PlayerProfile): AuctionListing[] {
   return getAuctionListings(profile).filter((listing) => isAuctionOpen(profile, listing));
 }
 

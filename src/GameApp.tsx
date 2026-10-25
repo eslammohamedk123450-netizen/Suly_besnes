@@ -43,6 +43,7 @@ import { loadExpansionState } from './game/expansionEngine';
 import { DailyLuckySpinModal } from './components/DailyLuckySpinModal';
 import { CelebrationModal, type CelebrationData } from './components/CelebrationModal';
 import { MobileBottomNav } from './components/MobileBottomNav';
+import { getLuckySpinState } from './game/luckyWheelService';
 
 function getPendingSyncCount(accountId: string): number {
   return loadQueuedGameCommands(accountId).length + (loadPendingInitialProfile(accountId) ? 1 : 0);
@@ -188,9 +189,14 @@ export default function App() {
     saveGame(updated, account?.id);
   };
 
-  const handleLuckySpinReward = (reward: { type: 'cash' | 'gold' | 'diamonds' | 'speed_card'; amount: number; label: string }) => {
+  const handleLuckySpinReward = (reward: { type: 'cash' | 'gold' | 'diamonds' | 'speed_card'; amount: number; label: string; wasFree?: boolean }) => {
     if (!profile) return;
     let next: any = { ...profile, lastSpinDay: profile.day };
+    if (reward.wasFree) {
+      next.lastSpinTimestamp = Date.now();
+    } else {
+      next.diamonds = Math.max(0, (next.diamonds ?? 0) - 2);
+    }
     if (reward.type === 'cash') {
       next.bankBalance = (next.bankBalance ?? 0) + reward.amount;
     } else if (reward.type === 'gold') {
@@ -206,7 +212,7 @@ export default function App() {
     }
     setProfile(next);
     saveGame(next, account?.id);
-    showNotice(`🎉 مبروك! ربحت ${reward.label} من عجلة الحظ اليومية!`, 'success', 'مكافأة عجلة الحظ');
+    showNotice(`🎉 مبروك! ربحت ${reward.label} من عجلة الحظ!`, 'success', 'مكافأة عجلة الحظ');
   };
 
   async function claimDailyLogin(nextAccount: LocalAccount) {
@@ -937,7 +943,17 @@ export default function App() {
               }}
             />
           ) : activeSection === 'profile' ? (
-            <ProfilePage profile={profile} country={country} accountId={account.id} isGuest={Boolean(account.isGuest)} isSynced={!account.isGuest && syncState === 'synced' && pendingCommandCount === 0} onLinkAccount={() => setLinkingAccount(true)} onResetWorld={handleResetToCountrySelection} />
+            <ProfilePage
+              profile={profile}
+              country={country}
+              accountId={account.id}
+              isGuest={Boolean(account.isGuest)}
+              isSynced={!account.isGuest && syncState === 'synced' && pendingCommandCount === 0}
+              userEmail={account?.email || 'samopmohamed7@gmail.com'}
+              onLinkAccount={() => setLinkingAccount(true)}
+              onLogout={handleLogout}
+              onResetWorld={handleResetToCountrySelection}
+            />
           ) : (
             <SectionPage section={getSection(activeSection)} profile={profile} country={country} focus={sectionFocus} notificationTheme={notificationTheme} isGuest={Boolean(account.isGuest)} onNotificationThemeChange={setNotificationTheme} onHome={() => navigate('home')} onNavigate={(section) => navigate(section)} onAction={handleGameResult} onCommand={handleGameCommand} onRedeemed={handleRedeemed} onRefreshProfile={refreshAuthoritativeProfile} onLinkAccount={() => setLinkingAccount(true)} onLogout={handleLogout} onShowGuide={() => setPendingGuide(activeSection)} />
           )}
@@ -964,6 +980,7 @@ export default function App() {
         profile={profile}
         country={country}
         onNavigate={navigate}
+        onOpenLuckyWheel={() => setIsLuckyWheelOpen(true)}
         onCollectActualProfit={(amount: number) => {
           if (!profile) return;
           const nextBalance = profile.bankBalance + amount;
@@ -1057,7 +1074,7 @@ export default function App() {
         activeSection={activeSection}
         onNavigate={navigate}
         onOpenLuckyWheel={() => setIsLuckyWheelOpen(true)}
-        isFreeSpinAvailable={((profile as any).lastSpinDay ?? -1) !== profile.day}
+        isFreeSpinAvailable={getLuckySpinState(profile.lastSpinTimestamp).isFree}
       />
 
       <footer className="app-footer pb-14 md:pb-3"><span>إمبراطورية الأعمال</span><span>محاكاة محلية · الأسعار والأحداث لأغراض اللعبة</span></footer>

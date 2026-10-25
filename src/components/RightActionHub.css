@@ -1,19 +1,96 @@
-/* Right-Docked Floating Action Hub (Executive Luxury Theme) */
-.right-hub-handle {
+/* Right-Docked Floating Action Hub & Companion Lucky Wheel (Executive Luxury Theme) */
+.right-floating-dock-group {
   position: fixed;
   right: 0;
-  bottom: 160px;
+  bottom: 155px;
   z-index: 998;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  pointer-events: auto;
+}
+
+.right-wheel-handle {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  width: 48px;
+  min-height: 64px;
+  padding: 6px 4px;
+  background: linear-gradient(135deg, #2a1503 0%, #170c02 100%);
+  border: 1.5px solid rgba(245, 158, 11, 0.7);
+  border-right: none;
+  border-radius: 16px 0 0 16px;
+  box-shadow: -4px 8px 25px rgba(0, 0, 0, 0.65), 0 0 20px rgba(245, 158, 11, 0.35);
+  color: #fbbf24;
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  direction: rtl;
+}
+
+.right-wheel-handle:hover {
+  width: 56px;
+  background: linear-gradient(135deg, #3d1f04 0%, #1f1002 100%);
+  border-color: rgba(245, 158, 11, 1);
+  box-shadow: -6px 12px 30px rgba(0, 0, 0, 0.75), 0 0 25px rgba(245, 158, 11, 0.5);
+  transform: translateX(-2px);
+}
+
+.right-wheel-handle-icon {
+  font-size: 1.35rem;
+  line-height: 1;
+  display: inline-block;
+  animation: wheelSlowSpin 8s linear infinite;
+}
+
+@keyframes wheelSlowSpin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.right-wheel-badge {
+  font-size: 0.6rem;
+  font-weight: 900;
+  padding: 1.5px 4px;
+  border-radius: 999px;
+  white-space: nowrap;
+  letter-spacing: -0.2px;
+}
+
+.right-wheel-badge--free {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.6);
+  animation: pulseFree 1.5s infinite;
+}
+
+@keyframes pulseFree {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.08); opacity: 0.9; }
+}
+
+.right-wheel-badge--timer {
+  background: rgba(15, 23, 42, 0.9);
+  color: #fef08a;
+  border: 1px solid rgba(245, 158, 11, 0.5);
+  font-family: monospace;
+}
+
+.right-hub-handle {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 4px;
-  width: 46px;
-  min-height: 68px;
-  padding: 8px 4px;
+  width: 48px;
+  min-height: 64px;
+  padding: 6px 4px;
   background: linear-gradient(135deg, #10243d 0%, #071322 100%);
-  border: 1px solid rgba(234, 179, 8, 0.45);
+  border: 1.5px solid rgba(234, 179, 8, 0.5);
   border-right: none;
   border-radius: 16px 0 0 16px;
   box-shadow: -4px 8px 25px rgba(0, 0, 0, 0.55), 0 0 18px rgba(234, 179, 8, 0.25);
@@ -22,6 +99,7 @@
   transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
   direction: rtl;
 }
+
 
 .right-hub-handle:hover {
   width: 54px;
