@@ -425,9 +425,12 @@
   .app-frame .page-subtitle { max-width: 46vw; font-size: 8px; }
   .page-help-button { min-height: 32px; gap: 4px; padding-inline: 7px; font-size: 8px; }
   .page-help-button svg { width: 14px; height: 14px; }
-  .app-frame .mobile-bottom-nav { min-height: calc(63px + env(safe-area-inset-bottom)); padding: 5px 5px calc(5px + env(safe-area-inset-bottom)); }
-  .app-frame .mobile-nav-item { gap: 3px; }
-  .app-frame .mobile-nav-item span { font-size: 9px; }
+  .app-frame .mobile-bottom-nav { min-height: calc(63px + env(safe-area-inset-bottom)); padding: 6px 6px calc(6px + env(safe-area-inset-bottom)); background: rgba(8, 22, 38, .97); border-top: 1px solid rgba(151, 185, 211, .18); box-shadow: 0 -8px 26px rgba(0,0,0,.35); backdrop-filter: blur(18px); }
+  .app-frame .mobile-nav-item { gap: 4px; color: #8da5b8; transition: all .16s ease; border-radius: 11px; }
+  .app-frame .mobile-nav-item:hover { color: #f6c453; }
+  .app-frame .mobile-nav-item span { font-size: 9px; font-weight: 800; }
+  .app-frame .mobile-nav-item.is-active { color: #f6c453; background: rgba(246, 196, 83, .12); }
+  .app-frame .mobile-nav-item.is-active svg { color: #f6c453; filter: drop-shadow(0 0 6px rgba(246, 196, 83, .45)); }
   .app-frame .mission-dock { right: 8px; bottom: calc(74px + env(safe-area-inset-bottom)); }
   .app-frame .mission-dock-toggle { width: 48px; min-height: 54px; }
   .app-frame .mission-dock-panel { max-height: 68vh; overflow: auto; }

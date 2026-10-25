@@ -53,7 +53,7 @@ export const GAME_SECTIONS: readonly SectionItem[] = [
   { id: 'companies', label: 'الشركات', shortLabel: 'الشركات', subtitle: 'إدارة أعمالك وقطاعاتك', icon: 'company' },
   { id: 'investments', label: 'الاستثمارات والبورصة', shortLabel: 'الاستثمار', subtitle: 'أسواق المال والطرح العام IPO', icon: 'investment' },
   { id: 'bank', label: 'البنك والتمويل', shortLabel: 'البنك', subtitle: 'ودائع وقروض بضمان', icon: 'bank' },
-  { id: 'staff', label: 'الإدارة والرواتب', shortLabel: 'الموظفون', subtitle: 'مديرون ومحاسبون ومحامون', icon: 'company' },
+  { id: 'staff', label: 'الإدارة والرواتب', shortLabel: 'الموظفون', subtitle: 'مديرون ومحاسبون ومحامون', icon: 'users' },
   { id: 'obligations', label: 'الالتزامات', shortLabel: 'الالتزامات', subtitle: 'ما يجب دفعه ومتى', icon: 'report' },
   { id: 'lands', label: 'الأراضي', shortLabel: 'الأراضي', subtitle: 'أصولك العقارية ومواقعك', icon: 'land' },
   { id: 'production', label: 'المصانع والإنتاج', shortLabel: 'الإنتاج', subtitle: 'مصانعك وسلاسل الإنتاج', icon: 'factory' },
