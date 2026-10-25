@@ -5,7 +5,7 @@ import type { GameCommand } from '../game/engine';
 import type { NotificationTheme } from '../storage/userPreferences';
 import type { SectionId, SectionItem } from '../domain/navigation';
 import { formatMoney, formatNumber } from '../domain/formatters';
-import { acceptContract, buyDirectCompany, buyDirectLand, buyGlobalMaterial, buyGold, buyGoldWithDiamonds, buySpeedCard, cancelProductionOrder, claimTask, createDeposit, createInvestment, deliverContract, foundCompany, getDepositExpectedInterest, getDepositMaturityRange, getStaffUpgradeCost, hasMaturedDepositTranche, hireStaff, mergeDeposits, negotiateContract, payStaffSalary, placeBid, repayLoan, runProduction, sellAsset, sellCompany, sellGold, sellLand, sellProduct, serviceCompany, staffExperience, staffLevel, takeLoan, terminateStaff, upgradeCompany, upgradeLand, upgradeStaff, upgradeWarehouse, useDaySpeedCard, useProductionSpeedCard, withdrawDeposit, type GameResult } from '../game/engine';
+import { acceptContract, autoSupplyAndProduce, buyDirectCompany, buyDirectLand, buyGlobalMaterial, buyGold, buyGoldWithDiamonds, buySpeedCard, cancelProductionOrder, claimTask, createDeposit, createInvestment, deliverContract, foundCompany, getDepositExpectedInterest, getDepositMaturityRange, getStaffUpgradeCost, hasMaturedDepositTranche, hireStaff, mergeDeposits, negotiateContract, payStaffSalary, placeBid, repayLoan, runProduction, sellAsset, sellCompany, sellGold, sellLand, sellProduct, serviceCompany, staffExperience, staffLevel, takeLoan, terminateStaff, upgradeCompany, upgradeLand, upgradeStaff, upgradeWarehouse, useDaySpeedCard, useProductionSpeedCard, withdrawDeposit, type GameResult } from '../game/engine';
 import type { StaffRole } from '../domain/futureSystems';
 import { AUCTION_CATALOG, DIRECT_COMPANY_CATALOG, DIRECT_LAND_CATALOG, GOLD_PRICE_PER_GRAM, INDUSTRY_CATALOG, INVESTMENT_CATALOG, MATERIAL_CATALOG, PRODUCT_CATALOG, RECIPE_CATALOG } from '../game/catalog';
 import { getMarketQuote } from '../game/market';
@@ -649,6 +649,22 @@ export function SectionPage({ section, profile, country, focus, notificationThem
     const marketForecast = recipe ? getMarketQuote(profile, recipe.productId, profile.day + estimatedDuration) : null;
     const estimatedOutput = recipe ? Math.max(recipe.outputQuantity, Math.round(selectedBatches * recipe.outputQuantity * getSynergyProductionMultiplier(profile))) : 0;
     const estimatedUnitCost = recipe ? ((recipe.inputs.reduce((sum, input) => sum + input.quantity * (profile.inventory.find((lot) => lot.materialOrProductId === input.materialId)?.unitCost ?? 0), 0) + selectedBatches * recipe.energyCost + Math.round((selectedCompany?.operatingCostPerDay ?? 0) * 0.15 * getOperatingCostProgression(profile.day))) / Math.max(1, estimatedOutput)) : 0;
+    const missingInputs = recipe ? recipe.inputs.map((input) => {
+      const lot = profile.inventory.find((item) => item.materialOrProductId === input.materialId);
+      const needed = input.quantity * selectedBatches;
+      const owned = lot?.quantity ?? 0;
+      const missing = Math.max(0, needed - owned);
+      const material = MATERIAL_CATALOG.find((item) => item.id === input.materialId);
+      const unitPrice = material?.pricePerUnit ?? 0;
+      const cost = missing * unitPrice;
+      return { ...input, material, owned, needed, missing, cost };
+    }) : [];
+    const totalMissingCost = missingInputs.reduce((sum, item) => sum + item.cost, 0);
+    const hasMissingInputs = missingInputs.some((item) => item.missing > 0);
+    const energyCost = recipe ? selectedBatches * recipe.energyCost : 0;
+    const maintenanceCost = selectedCompany ? Math.round((selectedCompany.operatingCostPerDay ?? 0) * 0.15 * getOperatingCostProgression(profile.day)) : 0;
+    const totalFundsForAutoSupply = totalMissingCost + energyCost + maintenanceCost;
+    const canAffordAutoSupply = profile.bankBalance >= totalFundsForAutoSupply;
     const visibleProductionOrders = profile.productionOrders.filter((order) => {
       if (!showProductionHistory && order.status !== 'active') return false;
       return productionStatusFilter === 'all' || order.status === productionStatusFilter;
@@ -668,10 +684,60 @@ export function SectionPage({ section, profile, country, focus, notificationThem
           description="ابدأ أمرًا يحجز المواد والطاقة، ثم يستلم المنتج عند اكتماله في يوم لاحق."
         >
           {profile.companies.length === 0 ? <EconomyEmpty title="لا توجد مصانع عاملة" message="أسس شركة أولًا؛ يتضمن ترخيصها خط إنتاج للقطاع الذي اخترته." /> : <div className="economy-layout">
-            {companyTransferPending && <div className="economy-alert"><Icon name="clock" size={16} /> يجري إنهاء عقود نقل الملكية؛ يبدأ تشغيل هذه الشركة في اليوم {formatNumber(selectedCompany?.operationalFromDay ?? profile.day)}.</div>}<form className="economy-form" onSubmit={(event: FormEvent<HTMLFormElement>) => { event.preventDefault(); if (selectedCompany) runCommand({ name: 'run_production', args: { companyId: selectedCompany.id, batches: Number(productionBatches) } }, (current) => runProduction(current, selectedCompany.id, Number(productionBatches))); }}>
+            {companyTransferPending && <div className="economy-alert"><Icon name="clock" size={16} /> يجري إنهاء عقود نقل الملكية؛ يبدأ تشغيل هذه الشركة في اليوم {formatNumber(selectedCompany?.operationalFromDay ?? profile.day)}.</div>}
+            <form className="economy-form" onSubmit={(event: FormEvent<HTMLFormElement>) => { event.preventDefault(); if (selectedCompany) runCommand({ name: 'run_production', args: { companyId: selectedCompany.id, batches: Number(productionBatches) } }, (current) => runProduction(current, selectedCompany.id, Number(productionBatches))); }}>
               <div className="economy-field"><label htmlFor="factory-select">الشركة / المصنع</label><select id="factory-select" value={selectedCompany?.id ?? ''} onChange={(event) => setCompanyId(event.target.value)}>{profile.companies.map((company) => <option key={company.id} value={company.id}>{company.name} · {INDUSTRY_CATALOG.find((item) => item.id === company.industryId)?.name}</option>)}</select></div>
               <div className="economy-field"><label htmlFor="production-batches">دفعات الإنتاج</label><input id="production-batches" type="number" min="1" max="100" step="1" value={productionBatches} onChange={(event) => setProductionBatches(event.target.value)} /></div>
-              <button className="button button-primary" type="submit" disabled={!recipe || companyTransferPending}><Icon name="play" size={16} /> بدء أمر الإنتاج</button>
+              
+              <div className="flex flex-col sm:flex-row gap-2 mt-2">
+                <button className="button button-primary flex-1" type="submit" disabled={!recipe || companyTransferPending || hasMissingInputs}>
+                  <Icon name="play" size={16} /> بدء أمر الإنتاج
+                </button>
+              </div>
+
+              {hasMissingInputs && (
+                <div className="mt-3 p-3.5 rounded-xl border border-amber-500/30 bg-amber-950/20 text-right space-y-2.5">
+                  <div className="flex items-center justify-between text-amber-300 font-bold text-xs sm:text-sm">
+                    <span className="flex items-center gap-1.5">
+                      <span>⚠️</span>
+                      <span>تنقصك بعض الخامات لتشغيل {formatNumber(selectedBatches)} دفعات:</span>
+                    </span>
+                    <span className="text-emerald-400 font-mono text-xs">{formatMoney(totalMissingCost, country)}</span>
+                  </div>
+                  <div className="text-xs space-y-1">
+                    {missingInputs.filter((item) => item.missing > 0).map((item) => (
+                      <div key={item.materialId} className="flex justify-between items-center bg-black/30 px-2.5 py-1 rounded-lg border border-white/5">
+                        <span className="text-slate-300">{item.material?.name}: متوفر {formatNumber(item.owned)} / مطلوب {formatNumber(item.needed)} (ينقص <strong>{formatNumber(item.missing)}</strong> {item.material?.unit})</span>
+                        <span className="font-semibold text-emerald-400">+{formatMoney(item.cost, country)}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="pt-1 flex flex-col sm:flex-row gap-2 items-center justify-between">
+                    <div className="text-[11px] text-slate-400">
+                      إجمالي تكلفة الشراء المباشر: <strong className="text-emerald-400 font-bold">{formatMoney(totalMissingCost, country)}</strong>
+                    </div>
+                    <button
+                      type="button"
+                      className="w-full sm:w-auto px-4 py-2 bg-gradient-to-r from-amber-500 to-emerald-600 hover:from-amber-400 hover:to-emerald-500 text-white text-xs font-bold rounded-lg shadow-md transition flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                      disabled={!canAffordAutoSupply || companyTransferPending || !recipe || !selectedCompany}
+                      onClick={() => {
+                        if (selectedCompany) {
+                          runCommand(
+                            { name: 'auto_supply_and_produce', args: { companyId: selectedCompany.id, batches: selectedBatches } },
+                            (current) => autoSupplyAndProduce(current, selectedCompany.id, selectedBatches)
+                          );
+                        }
+                      }}
+                    >
+                      <Icon name="lightning" size={15} />
+                      <span>شراء الخامات فوراً والتشغيل ({formatMoney(totalMissingCost, country)})</span>
+                    </button>
+                  </div>
+                  {!canAffordAutoSupply && (
+                    <p className="text-[11px] text-rose-400">رصيدك البنكي لا يكفي لشراء الخامات وتكاليف التشغيل (مطلوب {formatMoney(totalFundsForAutoSupply, country)}).</p>
+                  )}
+                </div>
+              )}
             </form>
             {recipe && selectedCompany ? <div className="economy-card economy-card--soft"><div className="economy-card-head"><div className="economy-card-title"><span className="economy-card-icon icon-production-amber"><Icon name="factory" size={18} /></span><span><strong>{recipe.productName}</strong><small>{formatNumber(estimatedOutput)} {recipe.outputUnit} متوقعة · {formatNumber(estimatedDuration)} يوم</small></span></div><span className="economy-pill economy-pill--gold">{formatNumber(selectedCompany.energyUnits ?? 0)} طاقة</span></div><div className="economy-card-body"><p className="economy-card-description">متطلبات الدفعة: {recipe.inputs.map((input) => `${input.quantity} ${MATERIAL_CATALOG.find((material) => material.id === input.materialId)?.unit ?? ''} ${MATERIAL_CATALOG.find((material) => material.id === input.materialId)?.name ?? input.materialId}`).join('، ')}. هذه معاينة قبل حجز السيولة والمخزون.</p><div className="economy-meta">{recipe.inputs.map((input) => { const material = MATERIAL_CATALOG.find((item) => item.id === input.materialId); const lot = profile.inventory.find((item) => item.materialOrProductId === input.materialId); return <span key={input.materialId}>{material?.name}: {formatNumber(lot?.quantity ?? 0)} / {input.quantity} لكل دفعة</span>; })}</div><div className="economy-meta"><span>تكلفة الوحدة المتوقعة {formatMoney(estimatedUnitCost, country)}</span><span>الإيراد المتوقع {formatMoney(Math.round(estimatedOutput * (marketForecast?.currentPrice ?? 0)), country)}</span><span>السيولة بعد الحجز تقريبًا {formatMoney(Math.max(0, profile.bankBalance - selectedBatches * recipe.energyCost), country)}</span><span>الطلب المتوقع عند التسليم {formatNumber(marketForecast?.demandUnits ?? 0)} {recipe.outputUnit}</span><span>الجودة {formatNumber(Math.max(70, Math.min(100, 86 + (hasManager ? 10 : 0) - ((selectedCompany.maintenanceCondition ?? 100) < 60 ? 10 : 0))))}%</span></div></div></div> : <EconomyEmpty title="لا توجد وصفة متاحة" message="لا تتوفر وصفة إنتاج لهذا القطاع حاليًا." />}
           </div>}

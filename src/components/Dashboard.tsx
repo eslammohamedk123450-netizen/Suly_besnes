@@ -20,6 +20,7 @@ interface DashboardProps {
   onClaimReward?: (cash: number, diamonds: number, questId: string) => void;
   onRequestEmergencyLoan?: () => void;
   onUpdateProfile?: (updater: (prev: PlayerProfile) => PlayerProfile) => void;
+  onOpenLuckyWheel?: () => void;
 }
 
 export function Dashboard({ 
@@ -30,17 +31,25 @@ export function Dashboard({
   onClaimReward,
   onRequestEmergencyLoan,
   onUpdateProfile,
+  onOpenLuckyWheel,
 }: DashboardProps) {
   const [campaignOpen, setCampaignOpen] = useState(false);
   const operations = selectOperationsSnapshot(profile, country.economy.operatingCostMultiplier ?? 1);
   const companyCount = profile.companies.length;
 
-  // Recent Operations for display matching the UI design
-  const recentOperations = [
-    { id: '1', title: 'شراء مواد خام', subtitle: 'ألمونيوم', amount: '- 90K', type: 'expense', icon: 'warehouse' as const },
-    { id: '2', title: 'بيع منتجات', subtitle: 'أغذية', amount: '+ 160K', type: 'revenue', icon: 'briefcase' as const },
-    { id: '3', title: 'تشغيل مصنع', subtitle: 'مواد بفرعين', amount: '- 70K', type: 'expense', icon: 'factory' as const },
-  ];
+  // Real operations from player's finance ledger
+  const recentOperations = (profile.financeLedger && profile.financeLedger.length > 0)
+    ? [...profile.financeLedger].reverse().slice(0, 4).map((entry) => ({
+        id: entry.id,
+        title: entry.title,
+        subtitle: `اليوم الإمبراطوري ${entry.day}`,
+        amount: `${entry.type === 'expense' || entry.type === 'liability' ? '-' : '+'} ${entry.amount.toLocaleString()} ${country.currency.code}`,
+        type: (entry.type === 'expense' || entry.type === 'liability' ? 'expense' : 'revenue') as 'expense' | 'revenue',
+        icon: (entry.type === 'expense' ? 'factory' : 'briefcase') as any,
+      }))
+    : [
+        { id: '1', title: 'خطة إنقاذ المصنع المنهار', subtitle: `اليوم ${profile.day}`, amount: `+ ${(profile.bankBalance || 0).toLocaleString()} ${country.currency.code}`, type: 'revenue' as const, icon: 'briefcase' as const },
+      ];
 
   // Leaderboard data as shown in design image
   const leaderboardTop3 = [
@@ -63,6 +72,37 @@ export function Dashboard({
     <div className="empire-dashboard-grid">
       {/* Live Breaking Market News Banner */}
       <MarketNewsTicker day={profile.day} onOpenCampaign={() => setCampaignOpen(true)} />
+
+      {/* Daily Lucky Spin Interactive Banner */}
+      {onOpenLuckyWheel && (
+        <div 
+          onClick={onOpenLuckyWheel}
+          className="p-3 sm:p-4 rounded-2xl bg-gradient-to-r from-amber-950/40 via-amber-900/30 to-yellow-950/40 border border-amber-500/40 flex items-center justify-between gap-3 cursor-pointer hover:border-amber-400/70 transition shadow-lg shadow-amber-950/30 my-2"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-amber-500 to-yellow-400 text-slate-950 flex items-center justify-center font-black text-xl shadow-md shadow-amber-500/30 shrink-0">
+              🎡
+            </div>
+            <div>
+              <h4 className="font-extrabold text-sm text-white flex items-center gap-1.5">
+                عجلة الحظ والاستثمار اليومية
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                  متاحة مجاناً!
+                </span>
+              </h4>
+              <p className="text-xs text-amber-200/80">
+                دوّر العجلة واربح سيولة طارئة، سبائك ذهب، أو ماسات لدعم إمبراطوريتك
+              </p>
+            </div>
+          </div>
+          <button 
+            type="button" 
+            className="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-400 hover:from-amber-400 hover:to-yellow-300 text-slate-950 font-bold text-xs shrink-0 shadow-md transition"
+          >
+            تدوير 🎯
+          </button>
+        </div>
+      )}
 
       {/* سيناريو قصة كفاح: إنقاذ المصنع المنهار (The Struggle & Turnaround Hub) */}
       <StruggleStoryHub
@@ -159,88 +199,99 @@ export function Dashboard({
               <span className="empire-pill-count">{companyCount} / 10 شركات</span>
             </div>
 
-            {/* Featured Active Company Card */}
-            <div className="empire-company-featured">
-              <div className="empire-company-head">
-                <div className="empire-company-logo">🌾</div>
-                <div className="empire-company-title">
-                  <h3>شركة النيل للأغذية</h3>
-                  <small>جودة غنية.. لغد أفضل</small>
-                </div>
-                <span className="empire-level-badge">المستوى 8</span>
-              </div>
-              <div className="empire-company-stats">
-                <div>
-                  <small>الأرباح اليومية</small>
-                  <strong>420,900</strong>
-                </div>
-                <div>
-                  <small>حجم المبيعات</small>
-                  <strong>290</strong>
-                </div>
-                <div>
-                  <small>مستوى الشركة</small>
-                  <strong>8</strong>
-                </div>
-              </div>
-              <div className="empire-company-progress">
-                <div className="empire-progress-track">
-                  <span style={{ width: '65%' }} />
-                </div>
-                <small>65%</small>
-              </div>
-              <div className="empire-company-actions">
-                <button className="empire-btn-outline" type="button" onClick={() => onNavigate('production')}>
-                  تطوير ⚡
-                </button>
-                <button className="empire-btn-dark" type="button" onClick={() => onNavigate('companies')}>
-                  إدارة الشركة ⚙️
-                </button>
-              </div>
-            </div>
+            {/* Real Player Companies List */}
+            {profile.companies.length > 0 ? (
+              <>
+                {/* Featured Active Company Card */}
+                {(() => {
+                  const featured = profile.companies[0];
+                  const condition = featured.maintenanceCondition ?? 100;
+                  const level = featured.upgradeLevel ?? 1;
+                  const cost = featured.operatingCostPerDay ?? 15000;
+                  return (
+                    <div className="empire-company-featured">
+                      <div className="empire-company-head">
+                        <div className="empire-company-logo">
+                          {featured.industryId.includes('food') ? '🌾' : featured.industryId.includes('energy') ? '⚡' : featured.industryId.includes('petro') ? '🛢️' : '🏭'}
+                        </div>
+                        <div className="empire-company-title">
+                          <h3>{featured.name}</h3>
+                          <small>قطاع {featured.industryId} · كفاءة {condition}%</small>
+                        </div>
+                        <span className="empire-level-badge">المستوى {level}</span>
+                      </div>
+                      <div className="empire-company-stats">
+                        <div>
+                          <small>تكلفة التشغيل</small>
+                          <strong>{cost.toLocaleString()} {country.currency.code}</strong>
+                        </div>
+                        <div>
+                          <small>كفاءة الماكينات</small>
+                          <strong className={condition < 50 ? 'text-rose-400' : 'text-emerald-400'}>{condition}%</strong>
+                        </div>
+                        <div>
+                          <small>مستوى التطوير</small>
+                          <strong>{level} / 5</strong>
+                        </div>
+                      </div>
+                      <div className="empire-company-progress">
+                        <div className="empire-progress-track">
+                          <span style={{ width: `${Math.min(100, (level / 5) * 100)}%` }} />
+                        </div>
+                        <small>{Math.round((level / 5) * 100)}%</small>
+                      </div>
+                      <div className="empire-company-actions">
+                        <button className="empire-btn-outline" type="button" onClick={() => onNavigate('production')}>
+                          تشغيل الإنتاج ⚡
+                        </button>
+                        <button className="empire-btn-dark" type="button" onClick={() => onNavigate('companies')}>
+                          إدارة وصيانة ⚙️
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })()}
 
-            {/* Sub-Companies Grid */}
-            <div className="empire-companies-grid">
-              {/* Company 1 */}
-              <div className="empire-company-sub">
-                <div className="empire-sub-head">
-                  <div className="empire-sub-icon">⚡</div>
-                  <div>
-                    <h4>شركة الطاقة</h4>
-                    <small>طاقة اليوم لمستقبل أسيان</small>
+                {/* Sub-Companies Grid if more than 1 company */}
+                {profile.companies.length > 1 && (
+                  <div className="empire-companies-grid">
+                    {profile.companies.slice(1, 3).map((subCo) => (
+                      <div className="empire-company-sub" key={subCo.id}>
+                        <div className="empire-sub-head">
+                          <div className="empire-sub-icon">
+                            {subCo.industryId.includes('food') ? '🌾' : subCo.industryId.includes('energy') ? '⚡' : subCo.industryId.includes('transport') ? '🚢' : '🏭'}
+                          </div>
+                          <div>
+                            <h4>{subCo.name}</h4>
+                            <small>المستوى {subCo.upgradeLevel ?? 1} · كفاءة {subCo.maintenanceCondition ?? 100}%</small>
+                          </div>
+                        </div>
+                        <div className="empire-sub-metrics">
+                          <div><span>التشغيل</span><strong>{(subCo.operatingCostPerDay ?? 10000).toLocaleString()}</strong></div>
+                          <div><span>الكفاءة</span><strong>{subCo.maintenanceCondition ?? 100}%</strong></div>
+                          <div><span>المستوى</span><strong>{subCo.upgradeLevel ?? 1}</strong></div>
+                        </div>
+                        <div className="empire-sub-actions">
+                          <button className="empire-btn-sm-teal" type="button" onClick={() => onNavigate('production')}>إنتاج ⚡</button>
+                          <button className="empire-btn-sm-dark" type="button" onClick={() => onNavigate('companies')}>إدارة ⚙️</button>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                </div>
-                <div className="empire-sub-metrics">
-                  <div><span>الأرباح</span><strong>310,900</strong></div>
-                  <div><span>المبيعات</span><strong>190</strong></div>
-                  <div><span>المستوى</span><strong>6</strong></div>
-                </div>
-                <div className="empire-sub-actions">
-                  <button className="empire-btn-sm-teal" type="button" onClick={() => onNavigate('production')}>تطوير ⚡</button>
-                  <button className="empire-btn-sm-dark" type="button" onClick={() => onNavigate('companies')}>إدارة ⚙️</button>
-                </div>
+                )}
+              </>
+            ) : (
+              <div className="p-5 text-center bg-slate-900/60 rounded-2xl border border-dashed border-slate-700 my-3">
+                <span className="text-3xl block mb-2">🏭</span>
+                <h4 className="font-bold text-white text-sm mb-1">لا توجد شركات مؤسسة بعد</h4>
+                <p className="text-xs text-slate-400 mb-4">
+                  ابدأ بتأسيس أول مصنع أو شركة صناعية لبدء دوران عجلة الإنتاج والأرباح.
+                </p>
+                <button className="empire-btn-teal px-4 py-2 text-xs font-bold" type="button" onClick={() => onNavigate('companies')}>
+                  تأسيس شركتك الأولى الآن 🚀
+                </button>
               </div>
-
-              {/* Company 2 */}
-              <div className="empire-company-sub">
-                <div className="empire-sub-head">
-                  <div className="empire-sub-icon">🚢</div>
-                  <div>
-                    <h4>شركة الممرات</h4>
-                    <small>تربط العالم بالشرق</small>
-                  </div>
-                </div>
-                <div className="empire-sub-metrics">
-                  <div><span>الأرباح</span><strong>270,000</strong></div>
-                  <div><span>المبيعات</span><strong>160</strong></div>
-                  <div><span>المستوى</span><strong>5</strong></div>
-                </div>
-                <div className="empire-sub-actions">
-                  <button className="empire-btn-sm-teal" type="button" onClick={() => onNavigate('production')}>تطوير ⚡</button>
-                  <button className="empire-btn-sm-dark" type="button" onClick={() => onNavigate('companies')}>إدارة ⚙️</button>
-                </div>
-              </div>
-            </div>
+            )}
 
             {/* Add Company CTA */}
             <button className="empire-btn-add-company" type="button" onClick={() => onNavigate('companies')}>
@@ -263,16 +314,34 @@ export function Dashboard({
         </div>
 
         <div className="empire-lands-layout">
-          {/* Featured Owned Land */}
-          <div className="empire-land-featured">
-            <div className="empire-land-image-wrap">
-              <span className="empire-land-owned-badge">مملوكة لك</span>
-              <div className="empire-land-overlay-info">
-                <h3>أرض النخيل</h3>
-                <p>520 م² · جاهزة للبناء <Icon name="target" size={14} /></p>
-              </div>
+          {/* Featured Owned Land or Acquisition CTA */}
+          {profile.lands.length > 0 ? (
+            (() => {
+              const ownedLand = profile.lands[0];
+              return (
+                <div className="empire-land-featured">
+                  <div className="empire-land-image-wrap">
+                    <span className="empire-land-owned-badge">أرضك الإمبراطورية</span>
+                    <div className="empire-land-overlay-info">
+                      <h3>{ownedLand.label}</h3>
+                      <p>{ownedLand.areaSquareMeters.toLocaleString()} م² · قطاع {ownedLand.landType ?? 'صناعي'} <Icon name="target" size={14} /></p>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()
+          ) : (
+            <div className="empire-land-featured p-6 text-center flex flex-col items-center justify-center bg-slate-900/70 rounded-2xl border border-dashed border-slate-700">
+              <span className="text-3xl mb-2">🗺️</span>
+              <h4 className="font-bold text-white text-sm mb-1">لا تملك أراضٍ مسجلة بعد</h4>
+              <p className="text-xs text-slate-400 mb-3">
+                المصانع والشركات تحتاج إلى مساحات مرخصة للبناء والتوسع.
+              </p>
+              <button className="empire-btn-buy" type="button" onClick={() => onNavigate('lands')}>
+                المزايدة على الأراضي 🛒
+              </button>
             </div>
-          </div>
+          )}
 
           {/* Available Lands List */}
           <div className="empire-lands-available">

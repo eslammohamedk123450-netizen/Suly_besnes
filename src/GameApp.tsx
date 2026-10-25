@@ -36,6 +36,9 @@ import { RightActionHub } from './components/RightActionHub';
 import { StoryEventPopup, GAME_STORY_EVENTS, type StoryEventAlert } from './components/StoryEventPopup';
 import { DynamicEconomyEvents } from './components/DynamicEconomyEvents';
 import { loadExpansionState } from './game/expansionEngine';
+import { DailyLuckySpinModal } from './components/DailyLuckySpinModal';
+import { CelebrationModal, type CelebrationData } from './components/CelebrationModal';
+import { MobileBottomNav } from './components/MobileBottomNav';
 
 function getPendingSyncCount(accountId: string): number {
   return loadQueuedGameCommands(accountId).length + (loadPendingInitialProfile(accountId) ? 1 : 0);
@@ -69,8 +72,32 @@ export default function App() {
   const [recoveryError, setRecoveryError] = useState('');
   const [activeStoryEvent, setActiveStoryEvent] = useState<StoryEventAlert | null>(null);
   const [expansion, setExpansion] = useState(() => profile ? loadExpansionState(profile) : null);
+  const [isLuckyWheelOpen, setIsLuckyWheelOpen] = useState(false);
+  const [celebrationData, setCelebrationData] = useState<CelebrationData | null>(null);
   const syncLock = useRef(false);
   const remoteCommandAttempts = useRef(new Map<string, Promise<RemoteGameCommandAttempt>>());
+
+  const handleLuckySpinReward = (reward: { type: 'cash' | 'gold' | 'diamonds' | 'speed_card'; amount: number; label: string }) => {
+    if (!profile) return;
+    let next: any = { ...profile, lastSpinDay: profile.day };
+    if (reward.type === 'cash') {
+      next.bankBalance = (next.bankBalance ?? 0) + reward.amount;
+    } else if (reward.type === 'gold') {
+      next.goldGrams = Number(((next.goldGrams ?? 0) + reward.amount).toFixed(2));
+    } else if (reward.type === 'diamonds') {
+      next.diamonds = (next.diamonds ?? 0) + reward.amount;
+    } else if (reward.type === 'speed_card') {
+      const existingCards = next.speedCards ? [...next.speedCards] : [];
+      const idx = existingCards.findIndex((c: any) => c.kind === 'production-instant');
+      if (idx >= 0) existingCards[idx].quantity += 1;
+      else existingCards.push({ kind: 'production-instant', quantity: 1 });
+      next.speedCards = existingCards;
+    }
+    setProfile(next);
+    saveGame(next, account?.id);
+    setNotice(`🎉 مبروك! ربحت ${reward.label} من عجلة الحظ اليومية!`);
+    setNoticeTone('success');
+  };
 
   async function claimDailyLogin(nextAccount: LocalAccount) {
     if (nextAccount.isGuest) return;
@@ -747,6 +774,7 @@ export default function App() {
               country={country} 
               onNavigate={navigate} 
               onCommand={handleGameCommand}
+              onOpenLuckyWheel={() => setIsLuckyWheelOpen(true)}
               onUpdateProfile={(updater) => {
                 setProfile((prev) => {
                   if (!prev) return prev;
@@ -831,7 +859,30 @@ export default function App() {
           }}
         />
       )}
-      <footer className="app-footer"><span>إمبراطورية الأعمال</span><span>محاكاة محلية · الأسعار والأحداث لأغراض اللعبة</span></footer>
+
+      {/* Interactive Daily Lucky Wheel */}
+      <DailyLuckySpinModal
+        isOpen={isLuckyWheelOpen}
+        onClose={() => setIsLuckyWheelOpen(false)}
+        profile={profile}
+        onRewardWon={handleLuckySpinReward}
+      />
+
+      {/* Major Milestone Celebration Modal */}
+      <CelebrationModal
+        data={celebrationData}
+        onClose={() => setCelebrationData(null)}
+      />
+
+      {/* Streamlined Mobile Bottom Navigation */}
+      <MobileBottomNav
+        activeSection={activeSection}
+        onNavigate={navigate}
+        onOpenLuckyWheel={() => setIsLuckyWheelOpen(true)}
+        isFreeSpinAvailable={((profile as any).lastSpinDay ?? -1) !== profile.day}
+      />
+
+      <footer className="app-footer pb-14 md:pb-3"><span>إمبراطورية الأعمال</span><span>محاكاة محلية · الأسعار والأحداث لأغراض اللعبة</span></footer>
     </div>
   );
 }

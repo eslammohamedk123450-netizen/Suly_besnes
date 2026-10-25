@@ -606,6 +606,90 @@ export function runProduction(profile: PlayerProfile, companyId: string, batches
   return success(syncTasks(nextProfile), `بدأ أمر إنتاج ${recipe.productName} ويكتمل في اليوم ${order.completesOnDay}.`, { orderId: order.id, companyId, productId: recipe.productId, batches, outputQuantity, completesOnDay: order.completesOnDay });
 }
 
+export function autoSupplyAndProduce(profile: PlayerProfile, companyId: string, batches: number): GameResult<ProductionOutcome> {
+  const countryError = ensureEgypt(profile);
+  if (countryError) return countryError;
+  if (!isPositiveInteger(batches)) return failure(profile, 'invalid-input', 'عدد دفعات الإنتاج يجب أن يكون عددًا صحيحًا موجبًا.');
+  const company = profile.companies.find((item) => item.id === companyId);
+  if (!company) return failure(profile, 'not-found', 'الشركة غير موجودة.');
+  if ((company.operationalFromDay ?? 1) > profile.day) return failure(profile, 'condition-not-met', `يجري إنهاء عقود نقل الملكية؛ يبدأ تشغيل الشركة في اليوم ${company.operationalFromDay}.`);
+  const recipe = findRecipeForIndustry(company.industryId);
+  if (!recipe) return failure(profile, 'not-found', 'لا توجد وصفة لهذا القطاع.');
+
+  let missingCost = 0;
+  const purchases: { materialId: string; quantity: number; unitPrice: number; cost: number; name: string }[] = [];
+  for (const input of recipe.inputs) {
+    const lot = profile.inventory.find((item) => item.materialOrProductId === input.materialId);
+    const needed = input.quantity * batches;
+    const owned = lot?.quantity ?? 0;
+    if (owned < needed) {
+      const missing = needed - owned;
+      const mat = findMaterial(input.materialId);
+      const unitPrice = mat?.pricePerUnit ?? 100;
+      const cost = missing * unitPrice;
+      missingCost += cost;
+      purchases.push({ materialId: input.materialId, quantity: missing, unitPrice, cost, name: mat?.name ?? input.materialId });
+    }
+  }
+
+  const energyCost = batches * recipe.energyCost;
+  const maintenanceCost = Math.round((company.operatingCostPerDay ?? 0) * 0.15 * getOperatingCostProgression(profile.day));
+  const totalFundsNeeded = missingCost + energyCost + maintenanceCost;
+
+  if (profile.bankBalance < totalFundsNeeded) {
+    return failure(profile, 'insufficient-funds', `تحتاج إلى ${totalFundsNeeded.toLocaleString('ar-EG')} ج.م لتأمين الخامات المطلوبة والطاقة والصيانة.`);
+  }
+
+  if (purchases.length > 0) {
+    const level = normalizeWarehouseLevel(profile.warehouseLevel);
+    const warehouseCapacity = getWarehouseCapacity(level);
+    const warehouseUsage = getWarehouseUsage(profile.inventory, profile.productionOrders);
+    const totalNewMaterials = purchases.reduce((sum, p) => sum + p.quantity, 0);
+    if (warehouseUsage.materials + totalNewMaterials > warehouseCapacity.materials) {
+      return failure(profile, 'storage-limit', `سعة تخزين المواد الخام في المخزن لا تكفي لاستيعاب الخامات الناقصة (${totalNewMaterials} وحدة).`);
+    }
+  }
+
+  let updatedInventory = [...profile.inventory];
+  const ledgerEntries: FinanceLedgerEntry[] = [];
+  for (const p of purchases) {
+    const existing = updatedInventory.find((lot) => lot.materialOrProductId === p.materialId);
+    if (existing) {
+      const newQuantity = existing.quantity + p.quantity;
+      const newUnitCost = (existing.quantity * existing.unitCost + p.cost) / newQuantity;
+      updatedInventory = updatedInventory.map((lot) => lot.materialOrProductId === p.materialId ? { ...lot, quantity: newQuantity, unitCost: newUnitCost } : lot);
+    } else {
+      updatedInventory.push({
+        id: nextId(profile, 'inventory', updatedInventory.length),
+        materialOrProductId: p.materialId,
+        quantity: p.quantity,
+        unit: findMaterial(p.materialId)?.unit ?? 'وحدة',
+        unitCost: p.unitPrice,
+      });
+    }
+    ledgerEntries.push(ledgerEntry(profile, 'expense', p.cost, `شراء خامات تشغيل فورية: ${p.name} (${p.quantity} وحدة)`, ledgerEntries.length));
+  }
+
+  const suppliedProfile = purchases.length > 0
+    ? addLedger(
+        { ...profile, inventory: updatedInventory },
+        ledgerEntries,
+        profile.bankBalance - missingCost,
+      )
+    : profile;
+
+  const productionResult = runProduction(suppliedProfile, companyId, batches);
+  if (!productionResult.ok) return productionResult;
+
+  const supplyMsg = purchases.length > 0
+    ? `تم تأمين الخامات الناقصة بقيمة ${missingCost.toLocaleString('ar-EG')} ج.م و`
+    : '';
+  return {
+    ...productionResult,
+    message: `${supplyMsg}${productionResult.message}`,
+  };
+}
+
 export function serviceCompany(profile: PlayerProfile, companyId: string): GameResult<{ companyId: string; cost: number }> {
   const company = profile.companies.find((item) => item.id === companyId);
   if (!company) return failure(profile, 'not-found', 'الشركة غير موجودة.');
@@ -1322,6 +1406,7 @@ export type GameCommand =
   | { name: 'found_company'; args: { industryId: IndustryId; landId: string; name: string; paymentMethod?: PurchasePaymentMethod } }
   | { name: 'upgrade_company'; args: { companyId: string; paymentMethod?: PurchasePaymentMethod } }
   | { name: 'run_production'; args: { companyId: string; batches: number } }
+  | { name: 'auto_supply_and_produce'; args: { companyId: string; batches: number } }
   | { name: 'service_company'; args: { companyId: string } }
   | { name: 'cancel_production'; args: { orderId: string } }
   | { name: 'use_speed_card'; args: { orderId: string; kind: SpeedCardKind } }
@@ -1369,6 +1454,7 @@ export function executeGameCommand(profile: PlayerProfile, command: GameCommand)
     case 'found_company': return foundCompany(profile, command.args.industryId, command.args.landId, command.args.name, command.args.paymentMethod);
     case 'upgrade_company': return upgradeCompany(profile, command.args.companyId, command.args.paymentMethod);
     case 'run_production': return runProduction(profile, command.args.companyId, command.args.batches);
+    case 'auto_supply_and_produce': return autoSupplyAndProduce(profile, command.args.companyId, command.args.batches);
     case 'service_company': return serviceCompany(profile, command.args.companyId);
     case 'cancel_production': return cancelProductionOrder(profile, command.args.orderId);
     case 'use_speed_card': return useProductionSpeedCard(profile, command.args.orderId, command.args.kind);

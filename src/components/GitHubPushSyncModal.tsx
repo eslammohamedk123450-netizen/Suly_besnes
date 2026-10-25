@@ -127,6 +127,21 @@ export const GitHubPushSyncModal: React.FC<GitHubPushSyncModalProps> = ({
             </p>
           </div>
 
+          {/* Quick Alternative: Direct ZIP Download */}
+          <div className="p-3.5 rounded-xl bg-slate-950/80 border border-indigo-500/30 flex items-center justify-between gap-3">
+            <div>
+              <span className="text-xs font-bold text-white block">تحميل الحزمة الكاملة (ZIP) 📦</span>
+              <span className="text-[10px] text-slate-400">حزمة كاملة جاهزة بجميع الملفات والتعديلات (6.6 MB)</span>
+            </div>
+            <a
+              href="/suly_besnes_update.zip"
+              download="suly_besnes_update.zip"
+              className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs flex items-center gap-1.5 shrink-0 transition"
+            >
+              <span>تحميل ZIP</span>
+            </a>
+          </div>
+
           {statusMsg && (
             <div
               className={`p-3 rounded-xl border text-xs flex items-center gap-2 ${
