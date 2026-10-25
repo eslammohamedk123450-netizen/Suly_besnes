@@ -38,14 +38,14 @@ export function Dashboard({
   const companyCount = profile.companies.length;
 
   // Real operations from player's finance ledger
-  const recentOperations = (profile.financeLedger && profile.financeLedger.length > 0)
-    ? [...profile.financeLedger].reverse().slice(0, 4).map((entry) => ({
+  const recentOperations = profile.ledger.length > 0
+    ? [...profile.ledger].reverse().slice(0, 4).map((entry) => ({
         id: entry.id,
-        title: entry.title,
-        subtitle: `اليوم الإمبراطوري ${entry.day}`,
-        amount: `${entry.type === 'expense' || entry.type === 'liability' ? '-' : '+'} ${entry.amount.toLocaleString()} ${country.currency.code}`,
-        type: (entry.type === 'expense' || entry.type === 'liability' ? 'expense' : 'revenue') as 'expense' | 'revenue',
-        icon: (entry.type === 'expense' ? 'factory' : 'briefcase') as any,
+        title: entry.note,
+        subtitle: new Date(entry.occurredAt).toLocaleDateString('ar-EG'),
+        amount: `${entry.category === 'expense' || entry.category === 'liability' ? '-' : '+'} ${entry.amount.toLocaleString()} ${country.currency.code}`,
+        type: (entry.category === 'expense' || entry.category === 'liability' ? 'expense' : 'revenue') as 'expense' | 'revenue',
+        icon: (entry.category === 'expense' ? 'factory' : 'briefcase') as any,
       }))
     : [
         { id: '1', title: 'خطة إنقاذ المصنع المنهار', subtitle: `اليوم ${profile.day}`, amount: `+ ${(profile.bankBalance || 0).toLocaleString()} ${country.currency.code}`, type: 'revenue' as const, icon: 'briefcase' as const },
