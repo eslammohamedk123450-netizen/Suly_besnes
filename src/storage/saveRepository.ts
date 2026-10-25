@@ -335,6 +335,13 @@ function migrateProfile(value: unknown): PlayerProfile | null {
     contracts: Array.isArray(value.contracts) && value.contracts.every(isBusinessContract) ? value.contracts : [],
     achievements: Array.isArray(value.achievements) && value.achievements.every(isAchievement) ? value.achievements : [],
     onboarding: isOnboardingProgress(value.onboarding) ? value.onboarding : { introCompleted: true, chapter: 1, seenGuides: [] },
+    avatarId: typeof value.avatarId === 'string' && value.avatarId ? value.avatarId : 'avatar_free_male_1',
+    unlockedAvatarIds: Array.isArray(value.unlockedAvatarIds) && value.unlockedAvatarIds.length > 0
+      ? Array.from(new Set(['avatar_free_male_1', 'avatar_free_male_2', 'avatar_free_female_1', 'avatar_free_female_2', ...value.unlockedAvatarIds.filter(isNonEmptyString)]))
+      : ['avatar_free_male_1', 'avatar_free_male_2', 'avatar_free_female_1', 'avatar_free_female_2'],
+    bio: typeof value.bio === 'string' && value.bio.trim().length > 0 ? value.bio : 'ابنِ إمبراطوريتك الاستثمارية بعزيمة لا تلين ورؤية لا تعرف المستحيل.',
+    renameCountThisWeek: typeof value.renameCountThisWeek === 'number' && Number.isInteger(value.renameCountThisWeek) ? value.renameCountThisWeek : 0,
+    lastRenameWeekTimestamp: typeof value.lastRenameWeekTimestamp === 'number' ? value.lastRenameWeekTimestamp : Date.now(),
   }, typeof value.accountCode === 'string' ? value.accountCode : value.id as string);
 }
 

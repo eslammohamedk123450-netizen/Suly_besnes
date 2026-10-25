@@ -111,6 +111,11 @@ export interface PlayerProfile {
   onboarding: OnboardingProgress;
   lastSpinTimestamp?: number;
   lastSpinDay?: number;
+  avatarId?: string;
+  unlockedAvatarIds?: string[];
+  bio?: string;
+  renameCountThisWeek?: number;
+  lastRenameWeekTimestamp?: number;
 }
 
 function createId(): string {
@@ -284,6 +289,11 @@ export function createNewPlayer(
     achievements: [],
     onboarding: { introCompleted: false, chapter: 1, seenGuides: [] },
     season: { seasonId: 'expansion-season-1', startedOnDay: 1, endsOnDay: 30, points: 0, claimedChallengeKeys: [] },
+    avatarId: 'avatar_free_male_1',
+    unlockedAvatarIds: ['avatar_free_male_1', 'avatar_free_male_2', 'avatar_free_female_1', 'avatar_free_female_2'],
+    bio: 'ابنِ إمبراطوريتك الاستثمارية بعزيمة لا تلين ورؤية لا تعرف المستحيل.',
+    renameCountThisWeek: 0,
+    lastRenameWeekTimestamp: Date.now(),
   };
 }
 

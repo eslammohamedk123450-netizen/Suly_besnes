@@ -47,6 +47,7 @@ import { DailyLuckySpinModal } from './components/DailyLuckySpinModal';
 import { CelebrationModal, type CelebrationData } from './components/CelebrationModal';
 import { MobileBottomNav } from './components/MobileBottomNav';
 import { getLuckySpinState } from './game/luckyWheelService';
+import { AvatarWardrobeModal } from './components/AvatarWardrobeModal';
 
 function getPendingSyncCount(accountId: string): number {
   return loadQueuedGameCommands(accountId).length + (loadPendingInitialProfile(accountId) ? 1 : 0);
@@ -82,6 +83,7 @@ export default function App() {
   const [expansion, setExpansion] = useState(() => profile ? loadExpansionState(profile) : null);
   const [isLuckyWheelOpen, setIsLuckyWheelOpen] = useState(false);
   const [isTutorialOpen, setIsTutorialOpen] = useState(false);
+  const [isAvatarWardrobeOpen, setIsAvatarWardrobeOpen] = useState(false);
   const [isWalkthroughActive, setIsWalkthroughActive] = useState(() => !isWalkthroughCompleted());
   const [walkthroughStepIndex, setWalkthroughStepIndex] = useState(0);
   const [celebrationData, setCelebrationData] = useState<CelebrationData | null>(null);
@@ -891,44 +893,23 @@ export default function App() {
 
   return (
     <div className="app-frame">
-      <header className="app-header">
-        <button className="header-brand-button" type="button" onClick={() => navigate('home')} aria-label="العودة إلى الرئيسية"><Brand compact /></button>
-          <div className="header-actions">
-          <GameDayTimer profile={profile} onDaysElapsed={handleDaysElapsed} />
-          <div className="header-location"><span>{country.flag}</span><span>{country.name}</span><small>{country.currency.code}</small></div>
-          <span className="header-divider" />
-          <button
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs transition shadow-md shadow-amber-500/20 active:scale-95"
-            type="button"
-            onClick={() => {
-              setWalkthroughStepIndex(0);
-              setIsWalkthroughActive(true);
-            }}
-            title="بدء الجولة الإرشادية الإلزامية وتجميد الشاشة"
-          >
-            <Icon name="crown" size={14} />
-            <span>الجولة الإرشادية 🎯</span>
-          </button>
-          <button
-            className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-bold transition shadow-sm"
-            type="button"
-            onClick={() => setIsTutorialOpen(true)}
-            title="الاطلاع على سيناريو القصة كاملاً"
-          >
-            <Icon name="tasks" size={14} />
-            <span className="hidden sm:inline">سيناريو القصة 📜</span>
-          </button>
-          <button className="player-level player-level--button" type="button" onClick={() => navigate('profile')} aria-label="فتح الملف الشخصي"><span className="avatar-initial">{profile.name.trim().charAt(0) || 'م'}</span><span><strong>{profile.name}</strong><small>المستوى {playerProgress?.level ?? profile.level}</small></span></button>
-          
-          {/* Notification Bell with Red Badge & Periodic Vibration */}
-          <NotificationBell
-            unreadCount={unreadNotificationsCount}
-            onClick={() => setIsNotificationModalOpen(true)}
-            forceVibrate={forceBellVibrate}
-          />
-        </div>
-      </header>
-      <ResourceBar profile={profile} country={country} onNavigate={navigate} syncState={!account || account.isGuest ? 'local' : syncState} pendingCommandCount={pendingCommandCount} />
+      <ResourceBar
+        profile={profile}
+        country={country}
+        onNavigate={navigate}
+        syncState={!account || account.isGuest ? 'local' : syncState}
+        pendingCommandCount={pendingCommandCount}
+        onDaysElapsed={handleDaysElapsed}
+        onOpenWardrobe={() => setIsAvatarWardrobeOpen(true)}
+        onOpenWalkthrough={() => {
+          setWalkthroughStepIndex(0);
+          setIsWalkthroughActive(true);
+        }}
+        onOpenTutorial={() => setIsTutorialOpen(true)}
+        unreadNotificationsCount={unreadNotificationsCount}
+        onOpenNotifications={() => setIsNotificationModalOpen(true)}
+        forceBellVibrate={forceBellVibrate}
+      />
 
       <div className="app-layout w-full max-w-7xl mx-auto px-2 sm:px-4 lg:px-6">
         <aside className="side-nav hidden lg:flex" aria-label="أقسام اللعبة">
@@ -1019,7 +1000,16 @@ export default function App() {
               onLogout={handleLogout}
               onResetWorld={handleResetToCountrySelection}
               onAccountDeleted={handleAccountDeleted}
-                  onRestartWalkthrough={() => { setWalkthroughStepIndex(0); setIsWalkthroughActive(true); }}
+              onRestartWalkthrough={() => { setWalkthroughStepIndex(0); setIsWalkthroughActive(true); }}
+              onOpenWardrobe={() => setIsAvatarWardrobeOpen(true)}
+              onUpdateProfile={(updater) => {
+                setProfile((prev) => {
+                  if (!prev) return prev;
+                  const next = updater(prev);
+                  saveGame(next, account?.id);
+                  return next;
+                });
+              }}
             />
           ) : (
             <SectionPage
@@ -1155,6 +1145,7 @@ export default function App() {
       {isWalkthroughActive && (
         <SpotlightWalkthrough
           currentStepIndex={walkthroughStepIndex}
+          profile={profile}
           currentSection={activeSection}
           onNavigate={(sec) => navigate(sec)}
           onStepComplete={() => {
@@ -1167,7 +1158,7 @@ export default function App() {
               playSound("levelUp");
               setCelebrationData({
                 title: "أكملت الجولة الإرشادية بنجاح! 👑",
-                subtitle: "تهانينا! لقد أتقنت أساسيات الإدارة وتعرفت على كيفية شراء العروض، وصيانة المعدات، ودفع الرواتب والالتزامات، وتشغيل المصانع بنجاح.",
+                subtitle: "تهانينا! لقد أتقنت أساسيات الإدارة وتعرفت على كيفية صيانة المعدات ورفع كفاءة المصانع، ودفع الرواتب والالتزامات، وتملك الأراضي الاستثمارية بنجاح.",
                 rewardText: "10,000 كاش + 5 ماسات مكافأة إتمام الشرح",
               });
             }
@@ -1191,6 +1182,44 @@ export default function App() {
             }}
           />
         </div>
+      )}
+
+      {/* Executive Avatar Wardrobe Modal */}
+      {profile && (
+        <AvatarWardrobeModal
+          profile={profile}
+          isOpen={isAvatarWardrobeOpen}
+          onClose={() => setIsAvatarWardrobeOpen(false)}
+          onSelectAvatar={(avatarId) => {
+            setProfile((prev) => {
+              if (!prev) return prev;
+              const next = { ...prev, avatarId };
+              saveGame(next, account?.id);
+              return next;
+            });
+            showNotice('تم اعتماد صورة الشخصية بنجاح! 👑', 'success', 'تغيير الصورة الرمزية');
+          }}
+          onUnlockAvatar={(avatar) => {
+            if (!profile) return false;
+            if ((profile.diamonds ?? 0) < avatar.priceDiamonds) {
+              showNotice(`رصيدك الحالي غير كافٍ لاقتناء هذه الشخصية. تحتاج إلى ${avatar.priceDiamonds} 💎`, 'danger', 'رصيد غير كافٍ');
+              return false;
+            }
+            const nextDiamonds = (profile.diamonds ?? 0) - avatar.priceDiamonds;
+            const nextUnlocked = Array.from(new Set([...(profile.unlockedAvatarIds || []), avatar.id]));
+            const nextProfile: PlayerProfile = {
+              ...profile,
+              diamonds: nextDiamonds,
+              unlockedAvatarIds: nextUnlocked,
+              avatarId: avatar.id,
+            };
+            setProfile(nextProfile);
+            saveGame(nextProfile, account?.id);
+            showNotice(`🎉 مبروك! تم اقتناء شخصية "${avatar.name}" بنجاح بـ ${avatar.priceDiamonds} 💎 وتفعيلها كصورتك المعتمدة.`, 'success', 'اقتناء شخصية فاخرة');
+            return true;
+          }}
+          onOpenStore={() => navigate('store')}
+        />
       )}
 
       <footer className="app-footer pb-14 md:pb-3"><span>إمبراطورية الأعمال</span><span>محاكاة محلية · الأسعار والأحداث لأغراض اللعبة</span></footer>

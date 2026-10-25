@@ -1,6 +1,6 @@
 {
   "name": "إمبراطورية الأعمال | Business Empire",
-  "description": "محاكاة أعمال عربية: ابدأ باختيار الدولة وابنِ إمبراطوريتك خطوة بخطوة.",
+  "description": "محاكاة أعمال عربية: ابدأ باختيار الدولة وابنِ إمبراطوريتك خطوة بخطوة مع شريط أرصدة علوي دائم وتخصيص هوية المستثمر الفاخرة.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

@@ -1,11 +1,30 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import type { SectionId } from '../domain/navigation';
+import type { PlayerProfile } from '../domain/player';
 import { WALKTHROUGH_STEPS, type WalkthroughStep } from '../game/walkthroughState';
 import { playSound } from '../game/soundEffects';
-import { Sparkles, ArrowRight, FastForward, Wrench, DollarSign, Store, LandPlot, Factory, Trophy } from 'lucide-react';
+import {
+  Sparkles,
+  ArrowRight,
+  FastForward,
+  Wrench,
+  DollarSign,
+  LandPlot,
+  Factory,
+  Trophy,
+  CheckCircle2,
+  Eye,
+  Minimize2,
+  Maximize2,
+  Compass,
+  Store,
+  ChevronDown,
+  ChevronUp
+} from 'lucide-react';
 
 interface SpotlightWalkthroughProps {
   currentStepIndex: number;
+  profile: PlayerProfile;
   onStepComplete: () => void;
   onSkip: () => void;
   onNavigate: (section: SectionId) => void;
@@ -20,16 +39,17 @@ interface TargetRect {
 }
 
 const CATEGORY_ICONS: Record<WalkthroughStep['category'], React.ReactNode> = {
-  store: <Store className="w-5 h-5 text-amber-400" />,
   maintenance: <Wrench className="w-5 h-5 text-amber-400" />,
-  obligations: <DollarSign className="w-5 h-5 text-amber-400" />,
-  lands: <LandPlot className="w-5 h-5 text-amber-400" />,
+  obligations: <DollarSign className="w-5 h-5 text-emerald-400" />,
+  lands: <LandPlot className="w-5 h-5 text-sky-400" />,
   production: <Factory className="w-5 h-5 text-amber-400" />,
-  tasks: <Trophy className="w-5 h-5 text-amber-400" />,
+  tasks: <Trophy className="w-5 h-5 text-yellow-400" />,
+  store: <Store className="w-5 h-5 text-cyan-400" />,
 };
 
 export function SpotlightWalkthrough({
   currentStepIndex,
+  profile,
   onStepComplete,
   onSkip,
   onNavigate,
@@ -38,10 +58,35 @@ export function SpotlightWalkthrough({
   const currentStep = WALKTHROUGH_STEPS[currentStepIndex];
   const [targetRect, setTargetRect] = useState<TargetRect | null>(null);
   const [isElementVisible, setIsElementVisible] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [hasActionSucceeded, setHasActionSucceeded] = useState(false);
   const targetElementRef = useRef<HTMLElement | null>(null);
+  const lastStepIndexRef = useRef(currentStepIndex);
 
-  // Auto-navigate to the right section if not already there
+  // Reset completion state when step changes
   useEffect(() => {
+    if (lastStepIndexRef.current !== currentStepIndex) {
+      lastStepIndexRef.current = currentStepIndex;
+      setHasActionSucceeded(false);
+      setIsCollapsed(false);
+    }
+  }, [currentStepIndex]);
+
+  // Check if current step condition is satisfied
+  useEffect(() => {
+    if (!currentStep) return;
+    if (!hasActionSucceeded && currentStep.isComplete?.(profile)) {
+      setHasActionSucceeded(true);
+      try {
+        playSound('success');
+      } catch {
+        // Audio safe
+      }
+    }
+  }, [profile, currentStep, hasActionSucceeded]);
+
+  // Navigate to target section if player is elsewhere and hasn't completed
+  const handleGoToTarget = useCallback(() => {
     if (!currentStep) return;
     if (currentSection !== currentStep.sectionId) {
       onNavigate(currentStep.sectionId);
@@ -54,11 +99,11 @@ export function SpotlightWalkthrough({
     try {
       playSound(currentStep.soundEffect);
     } catch {
-      // Audio autoplay safe guard
+      // Audio safe
     }
-  }, [currentStep]);
+  }, [currentStepIndex]);
 
-  // Track target element position and keep in view
+  // Track target element position without blocking interaction
   const updatePosition = useCallback(() => {
     if (!currentStep) return;
     const el = document.querySelector<HTMLElement>(currentStep.targetSelector);
@@ -73,12 +118,6 @@ export function SpotlightWalkthrough({
           height: rect.height,
         });
         setIsElementVisible(true);
-
-        // Scroll into view if offscreen or hidden behind headers
-        const isOffscreen = rect.top < 85 || rect.bottom > window.innerHeight - 95;
-        if (isOffscreen) {
-          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }
         return;
       }
     }
@@ -87,7 +126,7 @@ export function SpotlightWalkthrough({
 
   useEffect(() => {
     updatePosition();
-    const interval = setInterval(updatePosition, 300);
+    const interval = setInterval(updatePosition, 350);
 
     window.addEventListener('resize', updatePosition);
     window.addEventListener('scroll', updatePosition, true);
@@ -99,156 +138,211 @@ export function SpotlightWalkthrough({
     };
   }, [updatePosition]);
 
-  // Handle direct click on the highlighted target element
-  const handleTargetClick = () => {
-    playSound('success');
-    if (targetElementRef.current) {
-      targetElementRef.current.click();
-    }
-    setTimeout(() => {
-      onStepComplete();
-    }, 320);
-  };
-
   if (!currentStep) return null;
 
   const totalSteps = WALKTHROUGH_STEPS.length;
-  // If target element is in top half of screen, place dialog near bottom; otherwise near top
-  const isTargetInTopHalf = targetRect ? targetRect.top < window.innerHeight / 2 : false;
+  const isTargetInSection = currentSection === currentStep.sectionId;
 
   return (
     <div
-      className="fixed inset-0 z-[9990] pointer-events-auto select-none overflow-hidden"
+      className="fixed inset-0 z-[9990] pointer-events-none select-none overflow-hidden"
       dir="rtl"
-      aria-label="مرشد الشرح الإلزامي"
+      aria-label="المرشد التفاعلي للاستكشاف والمهام"
     >
-      {/* Darkened backdrop overlay with cutout around target element */}
-      {targetRect && isElementVisible ? (
-        <>
-          {/* Top dark block */}
-          <div
-            className="fixed left-0 right-0 top-0 bg-slate-950/85 backdrop-blur-[2px] transition-all duration-200"
-            style={{ height: `${Math.max(0, targetRect.top - 8)}px` }}
-          />
-          {/* Bottom dark block */}
-          <div
-            className="fixed left-0 right-0 bottom-0 bg-slate-950/85 backdrop-blur-[2px] transition-all duration-200"
-            style={{
-              top: `${Math.min(window.innerHeight, targetRect.top + targetRect.height + 8)}px`,
-            }}
-          />
-          {/* Left dark block */}
-          <div
-            className="fixed left-0 bg-slate-950/85 backdrop-blur-[2px] transition-all duration-200"
-            style={{
-              top: `${Math.max(0, targetRect.top - 8)}px`,
-              height: `${targetRect.height + 16}px`,
-              width: `${Math.max(0, targetRect.left - 8)}px`,
-            }}
-          />
-          {/* Right dark block */}
-          <div
-            className="fixed right-0 bg-slate-950/85 backdrop-blur-[2px] transition-all duration-200"
-            style={{
-              top: `${Math.max(0, targetRect.top - 8)}px`,
-              height: `${targetRect.height + 16}px`,
-              left: `${Math.min(window.innerWidth, targetRect.left + targetRect.width + 8)}px`,
-            }}
-          />
-
-          {/* Glowing spotlight frame around target element */}
-          <div
-            onClick={handleTargetClick}
-            className="fixed cursor-pointer z-[9995] rounded-xl ring-4 ring-amber-400 shadow-[0_0_35px_rgba(251,191,36,0.85)] animate-pulse transition-all duration-150 hover:scale-[1.02]"
-            style={{
-              top: `${Math.max(4, targetRect.top - 8)}px`,
-              left: `${Math.max(4, targetRect.left - 8)}px`,
-              width: `${targetRect.width + 16}px`,
-              height: `${targetRect.height + 16}px`,
-            }}
-            title="اضغط هنا لتنفيذ الأمر والمتابعة"
-          >
-            {/* Pulsing indicator tag */}
-            <div className="absolute -top-9 left-1/2 -translate-x-1/2 bg-amber-400 text-slate-950 font-black text-xs px-2.5 py-0.5 rounded-full shadow-lg flex items-center gap-1 whitespace-nowrap animate-bounce pointer-events-none">
-              <span>🎯 اضغط هنا</span>
-            </div>
-          </div>
-        </>
-      ) : (
-        /* Full backdrop if element still rendering or animating */
-        <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-[2px]" />
-      )}
-
-      {/* Floating Guided Coachmark Dialog Card - Fully mobile-optimized */}
-      <div
-        className={`fixed z-[9999] pointer-events-auto transition-all duration-300 w-[calc(100vw-24px)] max-w-md left-3 right-3 mx-auto ${
-          isTargetInTopHalf ? 'bottom-20' : 'top-16 sm:top-20'
-        }`}
-      >
-        <div className="bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 border-2 border-amber-400/90 rounded-2xl p-4 sm:p-5 shadow-2xl shadow-amber-500/25 space-y-3 text-right relative overflow-hidden">
-          {/* Glowing ambient light */}
-          <div className="absolute -top-12 -right-12 w-32 h-32 bg-amber-500/20 rounded-full blur-2xl pointer-events-none" />
-
-          {/* Header Row */}
-          <div className="flex items-center justify-between border-b border-slate-800/80 pb-2 relative z-10">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-amber-400/10 border border-amber-400/30 flex items-center justify-center text-amber-400 shrink-0">
-                {CATEGORY_ICONS[currentStep.category]}
-              </div>
-              <div>
-                <strong className="text-white text-xs sm:text-sm font-bold block">
-                  الشرح الإلزامي · {currentStep.title}
-                </strong>
-                <span className="text-amber-400/90 text-[11px] font-semibold">
-                  الخطوة {currentStepIndex + 1} من {totalSteps}
-                </span>
-              </div>
-            </div>
-
-            {/* Skip Option for Veterans */}
-            <button
-              type="button"
-              onClick={onSkip}
-              className="text-slate-400 hover:text-slate-200 text-xs flex items-center gap-1 px-2.5 py-1 rounded-lg hover:bg-slate-800/80 transition-colors border border-transparent hover:border-slate-700"
-              title="تخطي الجولة والبدء فوراً"
-            >
-              <span>تخطي</span>
-              <FastForward className="w-3.5 h-3.5" />
-            </button>
-          </div>
-
-          {/* Primary Speech Bubble - Explicit Instruction */}
-          <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs sm:text-sm leading-relaxed font-bold relative z-10">
-            <span className="text-amber-400 text-base ml-1">📢</span>
-            {currentStep.message}
-          </div>
-
-          {/* Subtext description */}
-          {currentStep.subMessage && (
-            <p className="text-slate-300 text-xs leading-relaxed px-1 relative z-10">
-              {currentStep.subMessage}
-            </p>
-          )}
-
-          {/* Action Callout & Advancement Button */}
-          <div className="pt-1 flex items-center justify-between gap-3 relative z-10">
-            <div className="flex items-center gap-1.5 text-amber-300 text-xs font-semibold">
-              <Sparkles className="w-4 h-4 text-amber-400 shrink-0 animate-spin" />
-              <span>{currentStep.actionPrompt}</span>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => {
-                handleTargetClick();
-              }}
-              className="px-3.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs shadow-md shadow-amber-500/20 flex items-center gap-1.5 transition-transform hover:scale-[1.03] active:scale-95 cursor-pointer"
-            >
-              <span>متابعة</span>
-              <ArrowRight className="w-3.5 h-3.5 rotate-180" />
-            </button>
+      {/* 1. Subtle, non-blocking highlight ring around target button if visible in current section */}
+      {isTargetInSection && targetRect && isElementVisible && !hasActionSucceeded && (
+        <div
+          className="fixed pointer-events-none z-[9992] rounded-xl ring-4 ring-amber-400 shadow-[0_0_35px_rgba(251,191,36,0.7)] animate-pulse transition-all duration-200"
+          style={{
+            top: `${Math.max(4, targetRect.top - 6)}px`,
+            left: `${Math.max(4, targetRect.left - 6)}px`,
+            width: `${targetRect.width + 12}px`,
+            height: `${targetRect.height + 12}px`,
+          }}
+        >
+          {/* Animated pointer callout tag */}
+          <div className="absolute -top-9 left-1/2 -translate-x-1/2 bg-gradient-to-r from-amber-500 to-yellow-400 text-slate-950 font-black text-xs px-3 py-1 rounded-full shadow-xl flex items-center gap-1.5 whitespace-nowrap animate-bounce border border-slate-950">
+            <span>🎯 اضغط هنا للمتابعة</span>
           </div>
         </div>
+      )}
+
+      {/* 2. Floating Interactive Mission Guide Card */}
+      <div className="fixed bottom-3 sm:bottom-6 left-3 right-3 sm:left-auto sm:right-6 sm:w-[480px] pointer-events-auto z-[9995] transition-all duration-300">
+        {isCollapsed ? (
+          /* Minimized Compact Pill for Full Unobstructed Exploration */
+          <div
+            onClick={() => setIsCollapsed(false)}
+            className="p-3 rounded-2xl bg-slate-900/95 border-2 border-amber-500/60 shadow-2xl flex items-center justify-between gap-3 backdrop-blur-md cursor-pointer hover:border-amber-400 transition group"
+            title="انقر لتكبير بطاقة الإرشاد"
+          >
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center font-bold">
+                <Compass className="w-4 h-4 animate-spin" />
+              </div>
+              <div className="text-right">
+                <div className="text-xs font-black text-white flex items-center gap-1.5">
+                  <span>وضع الاستكشاف المعرفي</span>
+                  <span className="text-[10px] px-2 py-0.2 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                    الخطوة {currentStepIndex + 1}/{totalSteps}
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-400 line-clamp-1">{currentStep.title}</p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              className="p-1.5 rounded-lg bg-slate-800 text-slate-300 hover:text-white"
+              aria-label="تكبير البطاقة"
+            >
+              <Maximize2 className="w-4 h-4" />
+            </button>
+          </div>
+        ) : (
+          /* Full Rich Discovery Guide Card */
+          <div className="bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 border-2 border-amber-500/80 rounded-3xl p-4 sm:p-5 shadow-2xl shadow-black/80 space-y-3 backdrop-blur-xl relative overflow-hidden">
+            {/* Top Amber Ambient Ray */}
+            <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-600" />
+            <div className="absolute -top-12 -right-12 w-40 h-40 bg-amber-500/15 rounded-full blur-3xl pointer-events-none" />
+
+            {/* Header: Phase Title + Step Counter + Controls */}
+            <div className="flex items-center justify-between border-b border-slate-800/80 pb-2.5 relative z-10">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center shadow-inner">
+                  {CATEGORY_ICONS[currentStep.category]}
+                </div>
+                <div className="text-right">
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-extrabold border border-amber-500/30 inline-block mb-0.5">
+                    {currentStep.phaseBadge}
+                  </span>
+                  <h3 className="text-xs sm:text-sm font-black text-white">
+                    {currentStep.title}
+                  </h3>
+                </div>
+              </div>
+
+              {/* Action Tools: Minimize & Skip */}
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setIsCollapsed(true)}
+                  className="p-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-white transition"
+                  title="تصغير البطاقة لإتاحة مساحة للاستكشاف"
+                >
+                  <Minimize2 className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={onSkip}
+                  className="text-slate-400 hover:text-slate-200 text-xs px-2 py-1 rounded-lg hover:bg-slate-800/80 transition flex items-center gap-1"
+                  title="تخطي الجولة والبدء فوراً"
+                >
+                  <span>تخطي</span>
+                  <FastForward className="w-3 h-3" />
+                </button>
+              </div>
+            </div>
+
+            {/* Content State A: Completed Action / Exploration Space */}
+            {hasActionSucceeded ? (
+              <div className="space-y-3 relative z-10 animate-fade-in">
+                <div className="p-3.5 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-200 text-xs sm:text-sm font-bold leading-relaxed flex items-start gap-2 shadow-inner">
+                  <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
+                  <div>
+                    <strong className="block text-emerald-300 mb-1">{currentStep.successMessage}</strong>
+                    <p className="text-xs text-slate-300 font-normal leading-relaxed">
+                      {currentStep.explorationTip}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between gap-2.5 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setIsCollapsed(true)}
+                    className="flex-1 py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    <Eye className="w-3.5 h-3.5 text-amber-400" />
+                    <span>البقاء لاستكشاف المكان</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      playSound('click');
+                      onStepComplete();
+                    }}
+                    className="flex-1 py-2 px-3 rounded-xl bg-gradient-to-r from-amber-500 via-amber-400 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-slate-950 font-black text-xs shadow-lg shadow-amber-500/25 transition active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    <span>متابعة للمهمة التالية</span>
+                    <ArrowRight className="w-3.5 h-3.5 rotate-180" />
+                  </button>
+                </div>
+              </div>
+            ) : (
+              /* Content State B: Active Guidance & Instruction */
+              <div className="space-y-3 relative z-10">
+                {/* Speech Bubble / Mission Statement */}
+                <div className="p-3.5 rounded-2xl bg-amber-500/15 border border-amber-500/30 text-amber-200 text-xs sm:text-sm font-bold leading-relaxed shadow-inner">
+                  <span className="text-amber-400 ml-1 text-base">📢</span>
+                  {currentStep.message}
+                </div>
+
+                {/* Sub-text explanation */}
+                <p className="text-xs text-slate-300 leading-relaxed px-1">
+                  {currentStep.subMessage}
+                </p>
+
+                {/* Target Navigation & Action Bar */}
+                <div className="flex items-center justify-between gap-2 pt-1 flex-wrap">
+                  {!isTargetInSection ? (
+                    <button
+                      type="button"
+                      onClick={handleGoToTarget}
+                      className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-amber-500 via-amber-400 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-slate-950 font-black text-xs shadow-lg shadow-amber-500/25 transition active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
+                    >
+                      <Compass className="w-4 h-4" />
+                      <span>توجّه إلى القسم المطلوب الآن 🎯</span>
+                    </button>
+                  ) : (
+                    <div className="w-full flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-1.5 text-amber-300 text-xs font-bold">
+                        <Sparkles className="w-4 h-4 text-amber-400 shrink-0 animate-spin" />
+                        <span className="line-clamp-1">{currentStep.actionPrompt}</span>
+                      </div>
+
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => setIsCollapsed(true)}
+                          className="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-bold transition flex items-center gap-1"
+                          title="تصغير والتجول بحرية"
+                        >
+                          <Eye className="w-3.5 h-3.5 text-amber-400" />
+                          <span>استكشاف حر</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (targetElementRef.current) {
+                              targetElementRef.current.click();
+                            }
+                            setHasActionSucceeded(true);
+                          }}
+                          className="px-3.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs transition active:scale-95"
+                          title="تنفيذ الإجراء المطلوب فوراً"
+                        >
+                          تنفيذ ⚡
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

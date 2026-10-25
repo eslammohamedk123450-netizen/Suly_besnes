@@ -53,5 +53,12 @@ export function normalizeAccountFeatures(profile: PlayerProfile, accountSeed?: s
       ? profile.speedCards.filter((card) => card && typeof card.kind === 'string' && safeNonNegative(card.quantity) > 0).map((card) => ({ kind: card.kind, quantity: Math.floor(safeNonNegative(card.quantity)) }))
       : [],
     badges: Array.isArray(profile.badges) ? profile.badges.filter((badge): badge is string => typeof badge === 'string' && badge.trim().length > 0) : [],
+    avatarId: typeof profile.avatarId === 'string' && profile.avatarId ? profile.avatarId : 'avatar_free_male_1',
+    unlockedAvatarIds: Array.isArray(profile.unlockedAvatarIds) && profile.unlockedAvatarIds.length > 0
+      ? Array.from(new Set(['avatar_free_male_1', 'avatar_free_male_2', 'avatar_free_female_1', 'avatar_free_female_2', ...profile.unlockedAvatarIds]))
+      : ['avatar_free_male_1', 'avatar_free_male_2', 'avatar_free_female_1', 'avatar_free_female_2'],
+    bio: typeof profile.bio === 'string' && profile.bio.trim().length > 0 ? profile.bio : 'ابنِ إمبراطوريتك الاستثمارية بعزيمة لا تلين ورؤية لا تعرف المستحيل.',
+    renameCountThisWeek: typeof profile.renameCountThisWeek === 'number' && Number.isInteger(profile.renameCountThisWeek) ? profile.renameCountThisWeek : 0,
+    lastRenameWeekTimestamp: typeof profile.lastRenameWeekTimestamp === 'number' ? profile.lastRenameWeekTimestamp : Date.now(),
   };
 }

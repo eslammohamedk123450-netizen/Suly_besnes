@@ -40,8 +40,13 @@ import {
   Lock,
   FileText,
   Trophy,
-  Medal
+  Medal,
+  Camera,
+  Edit3,
+  Quote
 } from 'lucide-react';
+import { AvatarPortrait } from './AvatarPortrait';
+import { getAvatarById, getPlayerRenameStatus, formatTimeRemaining } from '../domain/avatars';
 import './ProfilePage.css';
 
 interface ProfilePageProps {
@@ -56,6 +61,8 @@ interface ProfilePageProps {
   onResetWorld?: () => void;
   onAccountDeleted?: () => void;
   onRestartWalkthrough?: () => void;
+  onOpenWardrobe?: () => void;
+  onUpdateProfile?: (updater: (prev: PlayerProfile) => PlayerProfile) => void;
 }
 
 async function copyTextWithFallback(text: string): Promise<boolean> {
@@ -100,14 +107,23 @@ export function ProfilePage({
   onLogout,
   onResetWorld, 
   onAccountDeleted,
-  onRestartWalkthrough
+  onRestartWalkthrough,
+  onOpenWardrobe,
+  onUpdateProfile
 }: ProfilePageProps) {
   // Modals state
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
-  
+  const [showRenameModal, setShowRenameModal] = useState(false);
+  const [newNameInput, setNewNameInput] = useState(profile.name);
+  const [renameNotice, setRenameNotice] = useState<string | null>(null);
+
+  const [showBioModal, setShowBioModal] = useState(false);
+  const [bioInput, setBioInput] = useState(profile.bio || 'ابنِ إمبراطوريتك الاستثمارية بعزيمة لا تلين ورؤية لا تعرف المستحيل.');
+  const [bioNotice, setBioNotice] = useState<string | null>(null);
+
   // Settings audio state
   const [soundOn, setSoundOn] = useState(() => isSoundEnabled());
   const [musicOn, setMusicOn] = useState(() => isMusicPlaying());
@@ -124,6 +140,9 @@ export function ProfilePage({
 
   // Copy code feedback
   const [copyMessage, setCopyMessage] = useState<string | null>(null);
+
+  // Rename weekly limit check
+  const renameStatus = getPlayerRenameStatus(profile.renameCountThisWeek, profile.lastRenameWeekTimestamp);
 
   // Badges filter tab
   const [badgeFilter, setBadgeFilter] = useState<'all' | 'earned' | 'locked'>('all');
@@ -363,47 +382,149 @@ export function ProfilePage({
     }
   };
 
+  const handleRenameSubmit = () => {
+    const trimmed = newNameInput.trim();
+    if (!trimmed || trimmed.length < 2) {
+      playSound('error');
+      setRenameNotice('يرجى إدخال اسم استثماري صالح (حرفان على الأقل).');
+      return;
+    }
+    if (trimmed === profile.name) {
+      setShowRenameModal(false);
+      return;
+    }
+    if (!renameStatus.canRename) {
+      playSound('error');
+      setRenameNotice(`استنفدت مرات التعديل (2 من 2) هذا الأسبوع. يمكنك التعديل مجدداً بعد ${formatTimeRemaining(renameStatus.timeUntilResetMs)}.`);
+      return;
+    }
+
+    const now = Date.now();
+    const nextCount = renameStatus.isNewWeek ? 1 : (profile.renameCountThisWeek || 0) + 1;
+    const nextTimestamp = renameStatus.isNewWeek ? now : (profile.lastRenameWeekTimestamp || now);
+
+    if (onUpdateProfile) {
+      onUpdateProfile((prev) => ({
+        ...prev,
+        name: trimmed,
+        renameCountThisWeek: nextCount,
+        lastRenameWeekTimestamp: nextTimestamp,
+      }));
+    }
+    playSound('success');
+    setShowRenameModal(false);
+    setCopyMessage(`تم تعديل الاسم الاستثماري بنجاح إلى "${trimmed}"! ✓`);
+    setTimeout(() => setCopyMessage(null), 3500);
+  };
+
+  const handleBioSubmit = () => {
+    const trimmed = bioInput.trim();
+    if (!trimmed) {
+      setBioNotice('يرجى كتابة شعار أو مقولة استثمارية تعبر عن رؤيتك.');
+      return;
+    }
+    if (onUpdateProfile) {
+      onUpdateProfile((prev) => ({
+        ...prev,
+        bio: trimmed,
+      }));
+    }
+    playSound('success');
+    setShowBioModal(false);
+    setCopyMessage('تم حفظ الشعار والبيان الاستثماري بنجاح! ✓');
+    setTimeout(() => setCopyMessage(null), 3500);
+  };
+
+  const activeAvatar = getAvatarById(profile.avatarId);
 
   return (
     <main className="space-y-6 max-w-5xl mx-auto py-2 pb-14 animate-fade-in" dir="rtl">
-      {/* 1. VIP Executive Hero Card with Settings Icon */}
+      {/* 1. VIP Executive Hero Card with Compact Level, Wardrobe & Bio */}
       <section className="bg-gradient-to-r from-slate-900 via-slate-900 to-amber-950/40 border border-amber-500/40 rounded-3xl p-5 sm:p-7 shadow-2xl relative overflow-hidden">
         <div className="absolute top-0 right-0 w-80 h-80 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
 
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 relative z-10">
-          <div className="flex items-center gap-4">
-            {/* Avatar Ring */}
-            <div className="relative">
-              <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-gradient-to-tr from-amber-600 via-amber-500 to-yellow-400 p-1 shadow-xl shadow-amber-500/25 flex items-center justify-center">
-                <div className="w-full h-full rounded-xl bg-slate-950 flex items-center justify-center text-amber-400 text-2xl sm:text-3xl font-black">
-                  {profile.name.trim().charAt(0) || 'م'}
-                </div>
-              </div>
-              <span className="absolute -bottom-1.5 -right-1 px-2 py-0.5 rounded-full bg-amber-500 text-slate-950 font-black text-[10px] shadow">
-                Lvl {progress.level}
-              </span>
+        <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-5 relative z-10">
+          {/* Identity Left Column */}
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+            {/* Avatar Ring with Quick Wardrobe Trigger */}
+            <div className="relative group cursor-pointer" onClick={() => onOpenWardrobe && onOpenWardrobe()}>
+              <AvatarPortrait
+                avatarId={profile.avatarId}
+                size="2xl"
+                showBorder
+                className="group-hover:scale-105 transition-transform"
+              />
+              <button
+                type="button"
+                className="absolute -bottom-1 -left-1 p-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs shadow-lg border-2 border-slate-950 flex items-center gap-1 transition active:scale-95 cursor-pointer"
+                title="فتح خزانة واختيار صور الشخصيات الفاخرة"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (onOpenWardrobe) onOpenWardrobe();
+                }}
+              >
+                <Camera className="w-3.5 h-3.5" />
+                <span className="text-[10px] hidden sm:inline">تغيير الصورة</span>
+              </button>
             </div>
 
-            <div>
-              <div className="flex items-center gap-2">
+            {/* Investor Name & Compact Level Badge */}
+            <div className="space-y-1.5 text-right">
+              <div className="flex items-center gap-2 flex-wrap">
                 <h1 className="text-xl sm:text-2xl font-black text-white">
                   {profile.name}
                 </h1>
-                <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 font-bold">
+                <span className="text-slate-400 font-bold">•</span>
+                {/* Compact Level Badge */}
+                <span className="text-xs px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 font-extrabold tabular-nums">
+                  مستوى {progress.level}
+                </span>
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700 font-bold">
                   👑 مستثمر معتمد
                 </span>
               </div>
-              <div className="flex items-center gap-2 text-xs text-slate-300 mt-1">
+
+              <div className="flex items-center gap-2 text-xs text-slate-300">
                 <span>{country.flag}</span>
                 <span>{country.name}</span>
                 <span>•</span>
-                <span className="text-amber-400/90 font-medium">قائد إمبراطورية الأعمال</span>
+                <span className="text-amber-400/90 font-medium">{activeAvatar.name} ({activeAvatar.title})</span>
+              </div>
+
+              {/* Fast Identity Action Buttons (Wardrobe & Rename 2/week) */}
+              <div className="flex items-center gap-2 pt-2 flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => onOpenWardrobe && onOpenWardrobe()}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-slate-950 font-black text-xs shadow-md shadow-amber-500/20 transition active:scale-95 cursor-pointer"
+                >
+                  <Crown className="w-3.5 h-3.5" />
+                  <span>خزانة الشخصيات</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    playSound('click');
+                    setNewNameInput(profile.name);
+                    setRenameNotice(null);
+                    setShowRenameModal(true);
+                  }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-slate-200 border border-slate-700 hover:border-amber-500/40 text-xs font-bold transition active:scale-95 cursor-pointer"
+                  title="تعديل الاسم الاستثماري (مرتان أسبوعياً)"
+                >
+                  <Edit3 className="w-3.5 h-3.5 text-amber-400" />
+                  <span>تعديل الاسم</span>
+                  <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-950 text-amber-300 font-mono border border-slate-700">
+                    {renameStatus.remainingRenames}/2 أسبوعياً
+                  </span>
+                </button>
               </div>
             </div>
           </div>
 
           {/* Top Right Action Tools: Settings Icon & Copy ID */}
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2.5 shrink-0 self-end lg:self-start">
             {/* SETTINGS ICON BUTTON */}
             <button
               onClick={() => {
@@ -430,6 +551,32 @@ export function ProfilePage({
               <Copy className="w-4 h-4 text-slate-400" />
             </button>
           </div>
+        </div>
+
+        {/* 3. Investor Bio / الشعار والبيان الاستثماري (Investor Bio) */}
+        <div className="mt-5 p-4 rounded-2xl bg-slate-950/85 border border-amber-500/25 relative">
+          <div className="flex items-center justify-between gap-2 mb-1.5">
+            <div className="flex items-center gap-2 text-amber-400 font-bold text-xs">
+              <Quote className="w-4 h-4" />
+              <span>الشعار والبيان الاستثماري (Investor Bio)</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                playSound('click');
+                setBioInput(profile.bio || 'ابنِ إمبراطوريتك الاستثمارية بعزيمة لا تلين ورؤية لا تعرف المستحيل.');
+                setBioNotice(null);
+                setShowBioModal(true);
+              }}
+              className="flex items-center gap-1 text-[11px] font-bold text-amber-400 hover:text-amber-300 underline cursor-pointer transition"
+            >
+              <Edit3 className="w-3 h-3" />
+              <span>تعديل الشعار</span>
+            </button>
+          </div>
+          <p className="text-xs text-slate-200 italic leading-relaxed">
+            «{profile.bio || 'ابنِ إمبراطوريتك الاستثمارية بعزيمة لا تلين ورؤية لا تعرف المستحيل.'}»
+          </p>
         </div>
 
         {copyMessage && (
@@ -1173,6 +1320,184 @@ export function ProfilePage({
         isOpen={showPrivacyModal}
         onClose={() => setShowPrivacyModal(false)}
       />
+
+      {/* Modal 5: Edit Investor Name (Strict 2/week limit) */}
+      {showRenameModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fade-in" dir="rtl">
+          <div className="bg-slate-900 border border-amber-500/40 rounded-3xl w-full max-w-md p-6 shadow-2xl space-y-4 relative">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center font-black">
+                  <Edit3 className="w-4 h-4" />
+                </div>
+                <h3 className="text-base font-black text-white">تعديل الاسم الاستثماري</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowRenameModal(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Weekly Counter Badge */}
+            <div className="p-3 rounded-2xl bg-slate-950/80 border border-slate-800 flex items-center justify-between">
+              <span className="text-xs text-slate-300 font-bold">الرصيد الأسبوعي للتعديل:</span>
+              <span className={`text-xs px-2.5 py-1 rounded-full font-black border tabular-nums ${
+                renameStatus.canRename
+                  ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                  : 'bg-rose-500/20 text-rose-300 border-rose-500/40'
+              }`}>
+                متبقي {renameStatus.remainingRenames} من 2 هذا الأسبوع
+              </span>
+            </div>
+
+            {!renameStatus.canRename ? (
+              <div className="p-4 rounded-2xl bg-amber-500/15 border border-amber-500/30 text-amber-200 text-xs leading-relaxed space-y-2">
+                <div className="flex items-center gap-2 font-bold text-amber-300">
+                  <AlertTriangle className="w-4 h-4 shrink-0" />
+                  <span>تم بلوغ الحد الأقصى الأسبوعي (مرتان)</span>
+                </div>
+                <p>
+                  لضمان ثبات الهوية الاستثمارية وحماية لوائح المتصدرين والسجلات التجارية، يُسمح بتغيير الاسم مرتين أسبوعياً فقط.
+                </p>
+                <div className="text-[11px] font-mono font-bold text-amber-400 bg-slate-950/60 p-2 rounded-xl text-center">
+                  يتجدد الرصيد بعد: {formatTimeRemaining(renameStatus.timeUntilResetMs)}
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <label className="block text-xs font-bold text-slate-300">
+                  الاسم الاستثماري الجديد:
+                </label>
+                <input
+                  type="text"
+                  maxLength={30}
+                  value={newNameInput}
+                  onChange={(e) => setNewNameInput(e.target.value)}
+                  placeholder="مثال: كريم المنشاوي، نور القابضة..."
+                  className="w-full px-4 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white font-bold text-sm focus:outline-none focus:border-amber-400 transition"
+                  autoFocus
+                />
+                <p className="text-[11px] text-slate-400">
+                  ⚠️ سيتم استهلاك محاولة واحدة من رصيدك الأسبوعي فور التأكيد.
+                </p>
+              </div>
+            )}
+
+            {renameNotice && (
+              <div className="p-2.5 rounded-xl bg-rose-500/20 border border-rose-500/40 text-rose-300 text-xs font-bold">
+                {renameNotice}
+              </div>
+            )}
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
+              <button
+                type="button"
+                onClick={() => setShowRenameModal(false)}
+                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold transition"
+              >
+                إلغاء
+              </button>
+              <button
+                type="button"
+                disabled={!renameStatus.canRename}
+                onClick={handleRenameSubmit}
+                className="px-5 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 disabled:opacity-40 disabled:cursor-not-allowed text-slate-950 font-black text-xs shadow-lg shadow-amber-500/20 transition active:scale-95"
+              >
+                حفظ وتحديث الاسم ✓
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal 6: Edit Investor Bio & Vision */}
+      {showBioModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fade-in" dir="rtl">
+          <div className="bg-slate-900 border border-amber-500/40 rounded-3xl w-full max-w-lg p-6 shadow-2xl space-y-4 relative">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-cyan-500/20 text-cyan-400 flex items-center justify-center font-black">
+                  <Quote className="w-4 h-4" />
+                </div>
+                <h3 className="text-base font-black text-white">تخصيص الشعار والرؤية الاستثمارية</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowBioModal(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-xs text-slate-300 font-bold">
+                <span>بيانك وشعارك الاستثماري (Investor Bio):</span>
+                <span className="text-slate-500 font-mono text-[11px]">{bioInput.length}/160</span>
+              </div>
+              <textarea
+                maxLength={160}
+                rows={3}
+                value={bioInput}
+                onChange={(e) => setBioInput(e.target.value)}
+                placeholder="اكتب شعارك الاستثماري وفلسفتك في قيادة إمبراطوريتك..."
+                className="w-full p-3 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs leading-relaxed focus:outline-none focus:border-amber-400 transition"
+              />
+            </div>
+
+            {/* Quick Inspiration Slogans */}
+            <div className="space-y-1.5">
+              <span className="text-[11px] text-amber-400 font-bold block">
+                💡 شعارات استثمارية ملهمة ومقترحة:
+              </span>
+              <div className="flex flex-col gap-1.5 max-h-36 overflow-y-auto pr-1">
+                {[
+                  'ابنِ إمبراطوريتك الاستثمارية بعزيمة لا تلين ورؤية لا تعرف المستحيل.',
+                  'الفرص تصنعها القرارات الجريئة والتنفيذ المنضبط والسيولة الذكية.',
+                  'في عالم المال والأعمال: من يملك المعلومة والشجاعة يملك المستقبل.',
+                  'إمبراطورية صناعية وتجارية تُبنى حجراً بحجر وعقداً بعد عقد.',
+                  'السيادة الاقتصادية ليست حظاً، بل استراتيجية استثمارية متكاملة.'
+                ].map((slogan, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => setBioInput(slogan)}
+                    className="p-2 rounded-xl bg-slate-950/70 border border-slate-800 hover:border-amber-500/40 text-[11px] text-slate-300 text-right transition hover:text-white"
+                  >
+                    «{slogan}»
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {bioNotice && (
+              <div className="p-2.5 rounded-xl bg-rose-500/20 border border-rose-500/40 text-rose-300 text-xs font-bold">
+                {bioNotice}
+              </div>
+            )}
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
+              <button
+                type="button"
+                onClick={() => setShowBioModal(false)}
+                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold transition"
+              >
+                إلغاء
+              </button>
+              <button
+                type="button"
+                onClick={handleBioSubmit}
+                className="px-5 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-slate-950 font-black text-xs shadow-lg shadow-amber-500/20 transition active:scale-95"
+              >
+                حفظ الشعار الاستثماري ✓
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
