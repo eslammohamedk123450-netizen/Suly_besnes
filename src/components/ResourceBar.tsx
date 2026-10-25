@@ -21,14 +21,6 @@ export function ResourceBar({ profile, country, onNavigate }: ResourceBarProps) 
 
   return (
     <section className="empire-top-header" aria-label="رأس الإمبراطورية والموارد">
-      {/* Title & Slogan */}
-      <div className="empire-header-brand">
-        <div className="empire-brand-title">
-          <Icon name="crown" size={24} className="empire-crown-icon" />
-          <h1>إمبراطورية الأعمال</h1>
-        </div>
-        <p className="empire-brand-slogan">بناء أكبر إمبراطورية في العالم العربي</p>
-      </div>
 
       {/* Profile & Level Bar (Top Left) */}
       <div className="empire-profile-widget" onClick={() => onNavigate('profile')} role="button" tabIndex={0}>
