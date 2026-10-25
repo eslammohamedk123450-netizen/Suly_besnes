@@ -78,6 +78,7 @@ export default function App() {
   const [activeStoryEvent, setActiveStoryEvent] = useState<StoryEventAlert | null>(null);
   const [expansion, setExpansion] = useState(() => profile ? loadExpansionState(profile) : null);
   const [isLuckyWheelOpen, setIsLuckyWheelOpen] = useState(false);
+  const [isTutorialOpen, setIsTutorialOpen] = useState(false);
   const [celebrationData, setCelebrationData] = useState<CelebrationData | null>(null);
   const [isNotificationModalOpen, setIsNotificationModalOpen] = useState(false);
   const [activeToastAlert, setActiveToastAlert] = useState<ToastAlert | null>(null);
@@ -865,7 +866,17 @@ export default function App() {
     );
   }
 
-  if (!profile.onboarding?.introCompleted) return <StoryIntro profile={profile} onComplete={completeIntro} />;
+  if (!profile.onboarding?.introCompleted || isTutorialOpen) {
+    return (
+      <StoryIntro 
+        profile={profile} 
+        onComplete={() => {
+          setIsTutorialOpen(false);
+          completeIntro();
+        }} 
+      />
+    );
+  }
 
   const unlockedSections = new Set(getUnlockedSectionIds(profile));
   const fixedBottomItems: SectionId[] = ['home', 'companies', 'auctions', 'staff', 'profile'];
@@ -879,6 +890,15 @@ export default function App() {
           <GameDayTimer profile={profile} onDaysElapsed={handleDaysElapsed} />
           <div className="header-location"><span>{country.flag}</span><span>{country.name}</span><small>{country.currency.code}</small></div>
           <span className="header-divider" />
+          <button
+            className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/40 text-xs font-bold transition shadow-sm"
+            type="button"
+            onClick={() => setIsTutorialOpen(true)}
+            title="فتح التوجيه الإلزامي وشرح سيناريو القصة كاملاً"
+          >
+            <Icon name="crown" size={14} />
+            <span className="hidden sm:inline">شرح القصة 🧭</span>
+          </button>
           <button className="player-level player-level--button" type="button" onClick={() => navigate('profile')} aria-label="فتح الملف الشخصي"><span className="avatar-initial">{profile.name.trim().charAt(0) || 'م'}</span><span><strong>{profile.name}</strong><small>المستوى {playerProgress?.level ?? profile.level}</small></span></button>
           
           {/* Notification Bell with Red Badge & Periodic Vibration */}
@@ -933,6 +953,7 @@ export default function App() {
               onNavigate={navigate} 
               onCommand={handleGameCommand}
               onOpenLuckyWheel={() => setIsLuckyWheelOpen(true)}
+              onOpenTutorial={() => setIsTutorialOpen(true)}
               onUpdateProfile={(updater) => {
                 setProfile((prev) => {
                   if (!prev) return prev;

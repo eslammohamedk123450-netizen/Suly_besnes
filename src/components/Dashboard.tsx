@@ -42,7 +42,10 @@ import {
   Anchor,
   Rocket,
   Lock,
-  X
+  X,
+  Compass,
+  BookOpen,
+  ArrowLeft
 } from 'lucide-react';
 
 interface DashboardProps {
@@ -54,6 +57,7 @@ interface DashboardProps {
   onRequestEmergencyLoan?: () => void;
   onUpdateProfile?: (updater: (prev: PlayerProfile) => PlayerProfile) => void;
   onOpenLuckyWheel?: () => void;
+  onOpenTutorial?: () => void;
 }
 
 interface CommandItem {
@@ -74,6 +78,7 @@ export function Dashboard({
   onNavigate, 
   onCommand,
   onOpenLuckyWheel,
+  onOpenTutorial,
 }: DashboardProps) {
   const [isLeaderboardOpen, setIsLeaderboardOpen] = useState(false);
   const [isFinanceModalOpen, setIsFinanceModalOpen] = useState(false);
@@ -365,6 +370,56 @@ export function Dashboard({
     return true;
   });
 
+  // Determine immediate story guidance step
+  const guideStep = (() => {
+    const inheritedComp = profile.companies[0];
+    if (inheritedComp && (inheritedComp.maintenanceCondition ?? 100) < 50) {
+      return {
+        stageBadge: 'المرحلة 1 من 4: الصيانة العاجلة',
+        title: 'فحص وصيانة المصنع الموروث 🛠️',
+        description: 'ماكينات المصنع متهالكة بنسبة 25% نتيجة أزمة الإفلاس السابقة. ادخل لقسم الشركات وقم بصيانة الماكينات فوراً لرفع الكفاءة التشغيلية قبل بدء الإنتاج.',
+        buttonText: 'فحص وصيانة المصنع',
+        action: () => onNavigate('companies'),
+      };
+    }
+    const completedOrders = profile.productionOrders.filter((o) => o.status === 'completed').length;
+    if (completedOrders === 0) {
+      return {
+        stageBadge: 'المرحلة 2 من 4: خطوط التصنيع',
+        title: 'شراء المواد الخام وتشغيل أول دفعة إنتاج ⚙️',
+        description: 'المصنع جاهز الآن! توجه إلى خطوط الإنتاج، اشترِ الخامات بالسيولة النقدية المتاحة، وأطلق أول أمر تشغيل لتصنيع السلع الغذائية.',
+        buttonText: 'الانتقال لخطوط الإنتاج',
+        action: () => onNavigate('production'),
+      };
+    }
+    if (profile.sales.length === 0) {
+      return {
+        stageBadge: 'المرحلة 3 من 4: المبيعات والكاش',
+        title: 'بيع أول دفعة منتجات في السوق 📦',
+        description: 'لديك منتجات غذائية جاهزة في المستودع! اعرضها في السوق لتحقيق أول مكسب نقدي وكسب نقاط خبرة XP لبلوغ المستوى 2.',
+        buttonText: 'بيع المنتجات في المخزن',
+        action: () => onNavigate('inventory'),
+      };
+    }
+    const completedContracts = profile.contracts.filter((c) => c.status === 'completed').length;
+    if (completedContracts === 0) {
+      return {
+        stageBadge: 'المرحلة 4 من 4: العقود والائتمان',
+        title: 'إبرام أول عقد تجاري وفك الحظر البنكي 📜',
+        description: 'استعد ثقة كبار التجار! تسليم أول عقد تجاري رسمي سيمنحك سمعة عالية ويرفع مستواك لفك التجميد المصرفي وفتح البنك في المستوى 4.',
+        buttonText: 'استعراض العقود التجارية',
+        action: () => onNavigate('contracts'),
+      };
+    }
+    return {
+      stageBadge: 'مسار التوسع والريادة 🚀',
+      title: 'إمبراطوريتك تتقدم بنجاح! واصل التوسع والمزادات 🏆',
+      description: 'نجحت في خطة الإنقاذ وكسر الحصار المالي! البنك مفتوح الآن للودائع والقروض، ومستواك يؤهلك للمنافسة في المزادات والبورصة.',
+      buttonText: 'دخول المزادات والتوسع',
+      action: () => onNavigate('auctions'),
+    };
+  })();
+
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-12 animate-fade-in" dir="rtl">
       {/* 1. Sleek News & Market Ticker Bar */}
@@ -451,6 +506,55 @@ export function Dashboard({
           <span className="text-[10px] text-slate-400 mt-1 block">
             للتسريع والترقيات والفرص النادرة
           </span>
+        </div>
+      </div>
+
+      {/* 2.5. Interactive Story Rescue & Onboarding Guide Banner */}
+      <div className="bg-gradient-to-r from-slate-900 via-slate-900/95 to-slate-950 border-2 border-amber-500/40 rounded-3xl p-4 sm:p-6 shadow-2xl relative overflow-hidden backdrop-blur-xl">
+        <div className="absolute top-0 right-0 w-64 h-32 bg-amber-500/10 rounded-full blur-3xl -z-10" />
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="space-y-2 text-right">
+            <div className="flex items-center gap-2">
+              <span className="px-2.5 py-0.5 rounded-full bg-amber-500 text-slate-950 text-xs font-black flex items-center gap-1 shadow">
+                <Compass className="w-3.5 h-3.5 fill-slate-950" />
+                خطة الإنقاذ والتوجيه الإلزامي
+              </span>
+              <span className="text-xs text-amber-300 font-extrabold bg-amber-500/15 px-2.5 py-0.5 rounded-full border border-amber-500/30">
+                {guideStep.stageBadge}
+              </span>
+            </div>
+
+            <h3 className="text-base sm:text-lg font-black text-white flex items-center gap-2">
+              <span>{guideStep.title}</span>
+            </h3>
+
+            <p className="text-xs sm:text-sm text-slate-300 max-w-2xl leading-relaxed">
+              {guideStep.description}
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2 flex-shrink-0 self-end md:self-center">
+            {onOpenTutorial && (
+              <button
+                type="button"
+                onClick={onOpenTutorial}
+                className="px-3.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-bold transition flex items-center gap-1.5 shadow"
+                title="إعادة مراجعة التوجيه الإلزامي وسيناريو القصة كاملاً"
+              >
+                <BookOpen className="w-4 h-4 text-amber-400" />
+                <span>شرح القصة والسيناريو 🎓</span>
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={guideStep.action}
+              className="px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 text-slate-950 text-xs sm:text-sm font-black shadow-lg shadow-amber-500/25 transition transform hover:scale-[1.02] flex items-center gap-2"
+            >
+              <span>{guideStep.buttonText}</span>
+              <ArrowLeft className="w-4 h-4" />
+            </button>
+          </div>
         </div>
       </div>
 

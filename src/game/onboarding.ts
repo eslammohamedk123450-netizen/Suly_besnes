@@ -40,6 +40,9 @@ export const SECTION_UNLOCK_CONFIG: Record<SectionId, SectionUnlockRequirement> 
   companies: { sectionId: 'companies', requiredLevel: 1, storyHint: 'تأسيس أول شركة في مسار الإنقاذ (الفصل الأول)', badgeLabel: 'متاح', chapterNumber: 1 },
   auctions: { sectionId: 'auctions', requiredLevel: 1, storyHint: 'المزادات العلنية على الأصول والمصانع المتعثرة', badgeLabel: 'متاح', chapterNumber: 1 },
 
+  // المستوى 1: الأساسيات والرقابة على الالتزامات
+  obligations: { sectionId: 'obligations', requiredLevel: 1, storyHint: 'متابعة الديون والالتزامات وفترة السماح القضائية', badgeLabel: 'متاح للرقابة', chapterNumber: 1 },
+
   // المستوى 2: الإنتاج والتصنيع والمخازن
   production: { sectionId: 'production', requiredLevel: 2, storyHint: 'تشغيل خطوط المصانع وتحويل الخامات إلى منتجات', badgeLabel: 'يفتح في مستوى 2', chapterNumber: 1 },
   inventory: { sectionId: 'inventory', requiredLevel: 2, storyHint: 'المستودعات وسلاسل إمداد المواد الخام', badgeLabel: 'يفتح في مستوى 2', chapterNumber: 1 },
@@ -47,9 +50,8 @@ export const SECTION_UNLOCK_CONFIG: Record<SectionId, SectionUnlockRequirement> 
   // المستوى 3: العقود والعملاء
   contracts: { sectionId: 'contracts', requiredLevel: 3, storyHint: 'عقود التوريد واستعادة ثقة كبار التجار', badgeLabel: 'يفتح في مستوى 3', chapterNumber: 1 },
 
-  // المستوى 4: البنك والتمويل والالتزامات
-  bank: { sectionId: 'bank', requiredLevel: 4, storyHint: 'التسهيلات المصرفية والقروض بضمان والودائع', badgeLabel: 'يفتح في مستوى 4', chapterNumber: 1 },
-  obligations: { sectionId: 'obligations', requiredLevel: 4, storyHint: 'جدولة الالتزامات والمدفوعات البنكية الدورية', badgeLabel: 'يفتح في مستوى 4', chapterNumber: 1 },
+  // المستوى 4: رفع الحظر البنكي واستعادة التسهيلات والودائع
+  bank: { sectionId: 'bank', requiredLevel: 4, storyHint: 'رفع التجميد البنكي واستعادة التسهيلات والقروض والودائع', badgeLabel: 'يفتح في مستوى 4', chapterNumber: 1 },
 
   // المستوى 5: البورصة والتقارير والموظفون (الفصل الثاني)
   investments: { sectionId: 'investments', requiredLevel: 5, storyHint: 'البورصة والتداول في الأسواق المالية والاكتتاب العام', badgeLabel: 'يفتح في مستوى 5', chapterNumber: 2 },
@@ -87,7 +89,7 @@ export function getSectionUnlockBadge(section: SectionId): string {
 }
 
 const EXPERIENCE_PER_LEVEL = 150;
-const INTRO_UNLOCKS: SectionId[] = ['home', 'store', 'profile', 'lands', 'companies', 'settings', 'tasks', 'auctions'];
+const INTRO_UNLOCKS: SectionId[] = ['home', 'store', 'profile', 'lands', 'companies', 'settings', 'tasks', 'auctions', 'obligations'];
 
 /** Experience is derived from durable accomplishments so old saves migrate without data loss. */
 export function getPlayerProgress(profile: PlayerProfile): PlayerProgress {
@@ -130,10 +132,9 @@ export function getUnlockedSectionIds(profile: PlayerProfile): SectionId[] {
     unlocked.add('contracts');
   }
 
-  // Level 4: Bank & Obligations
+  // Level 4: Bank (رفع الحظر البنكي)
   if (completedContracts >= 1 || level >= 4) {
     unlocked.add('bank');
-    unlocked.add('obligations');
   }
 
   // Level 5: Investments, Staff, Reports

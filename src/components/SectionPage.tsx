@@ -255,9 +255,67 @@ export function SectionPage({ section, profile, country, focus, notificationThem
     const categoryLabels = { payable: 'متأخر', salary: 'راتب', loan: 'قسط قرض', operating: 'تشغيل' } as const;
     return <div className="section-page">{heading}{pageShell(
       <>
+        {/* Story Legal Moratorium & Bankruptcy Protection Notice */}
+        <div className="rounded-2xl bg-slate-900/90 border border-amber-500/40 p-4 sm:p-5 text-right mb-4 shadow-xl">
+          <div className="flex items-center gap-2 text-amber-400 font-black text-sm sm:text-base mb-1.5">
+            <Icon name="shield" size={20} />
+            <span>إشعار الحماية القضائية ومهلة السماح للديون الموروثة</span>
+          </div>
+          <p className="text-slate-300 text-xs sm:text-sm leading-relaxed mb-2">
+            وفقاً لسيناريو قصة إفلاس العائلة، أصدرت المحكمة حماية قانونية للمصنع المتبقي مع <strong>مهلة سماح لمدة 7 أيام</strong> على القرض الموروث البالغ <strong>5,250 $</strong>. البنوك جمّدت فتح تسهيلات وقروض جديدة حتى ترفع مستواك إلى <strong>المستوى 4</strong>.
+          </p>
+          <div className="flex flex-wrap gap-2 text-xs">
+            <span className="px-2.5 py-1 rounded-lg bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 font-bold">
+              ✓ لا توجد غرامات تأخير خلال مهلة السماح
+            </span>
+            <span className="px-2.5 py-1 rounded-lg bg-amber-500/15 text-amber-300 border border-amber-500/30 font-bold">
+              ✓ السداد التلقائي يحل في اليوم 7 عند دوران أرباحك
+            </span>
+            <span className="px-2.5 py-1 rounded-lg bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 font-bold">
+              ✓ رصيد الرواتب 0 $ لعدم وجود عمالة مأجورة حالياً
+            </span>
+          </div>
+        </div>
+
         <div className="economy-grid economy-grid--three-mobile"><EconomyStat label="إجمالي الاستحقاقات" value={formatMoney(obligations.totalDue, country)} /><EconomyStat label="متأخر عن السداد" value={formatMoney(obligations.overdueAmount, country)} /><EconomyStat label="الرواتب اليومية" value={formatMoney(obligations.dailyPayroll, country)} /></div>
-        <SectionPanel id="obligations-list" title="خريطة الالتزامات" description="تُسدد الأقساط والتشغيل عند ترحيل اليوم، أما الرواتب فتحتاج قرار دفع يدوي. إذا لم تكفِ السيولة، يظهر الالتزام بوضوح.">
-          {obligations.rows.length === 0 ? <EconomyEmpty title="لا توجد التزامات مسجلة" message="ابدأ التشغيل أو التوظيف أو التمويل حتى تظهر المواعيد والتكاليف هنا." /> : <div className="economy-list">{obligations.rows.map((row) => <article className={`economy-card economy-card--soft${row.overdue ? ' obligation-card--overdue' : ''}`} key={row.id}><div className="economy-card-head"><div className="economy-card-title"><span><strong>{row.label}</strong><small>{categoryLabels[row.category]} · موعد السداد {row.overdue ? 'متأخر' : `اليوم ${formatNumber(row.dueDay)}`}</small></span></div><span className={`economy-pill ${row.overdue ? 'economy-pill--red' : 'economy-pill--gold'}`}>{formatMoney(row.amount, country)}</span></div></article>)}</div>}
+        <SectionPanel id="obligations-list" title="خريطة الالتزامات والديون" description="تُسدد الأقساط والتشغيل عند ترحيل اليوم، كما يمكنك السداد المبكر الطوعي في أي لحظة عند توفر السيولة الكاش.">
+          {obligations.rows.length === 0 ? <EconomyEmpty title="لا توجد التزامات مسجلة" message="ابدأ التشغيل أو التوظيف أو التمويل حتى تظهر المواعيد والتكاليف هنا." /> : (
+            <div className="economy-list">
+              {obligations.rows.map((row) => (
+                <article className={`economy-card economy-card--soft${row.overdue ? ' obligation-card--overdue' : ''}`} key={row.id}>
+                  <div className="economy-card-head">
+                    <div className="economy-card-title">
+                      <span>
+                        <strong>{row.label}</strong>
+                        <small>{categoryLabels[row.category]} · موعد السداد {row.overdue ? 'متأخر' : `اليوم ${formatNumber(row.dueDay)}`}</small>
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className={`economy-pill ${row.overdue ? 'economy-pill--red' : 'economy-pill--gold'}`}>{formatMoney(row.amount, country)}</span>
+                      {row.category === 'loan' && (
+                        <button
+                          type="button"
+                          className="px-3 py-1 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs shadow transition"
+                          onClick={() => runCommand({ name: 'repay_loan', args: { loanId: row.id, installments: 1 } }, (current) => repayLoan(current, row.id, 1))}
+                        >
+                          سداد قسط طوعي
+                        </button>
+                      )}
+                      {row.category === 'salary' && (
+                        <button
+                          type="button"
+                          className="px-3 py-1 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs shadow transition"
+                          onClick={() => runCommand({ name: 'pay_staff_salary', args: { staffId: row.id } }, (current) => payStaffSalary(current, row.id))}
+                        >
+                          دفع الراتب الآن
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
         </SectionPanel>
       </>,
     )}</div>;

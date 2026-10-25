@@ -124,7 +124,7 @@ export function createNewPlayer(
 ): PlayerProfile {
   const createdAt = now.toISOString();
 
-  const initialCash = 15_000;
+  const initialCash = country.startingBalance || 25_000;
   const initialLoanPrincipal = 5_000;
   const initialLoanRepay = 5_250;
   const initialLandValue = 7_000;
@@ -262,7 +262,7 @@ export function createNewPlayer(
         amount: initialCash,
         countryId: country.id,
         occurredAt: createdAt,
-        note: `رصيد الطوارئ المتبقي بخزينة المصنع ($)`,
+        note: `سيولة الطوارئ المسلّمة من مدخرات الوالدة بالخزينة ($)`,
       },
       {
         id: createId(),
@@ -270,7 +270,7 @@ export function createNewPlayer(
         amount: -initialLoanRepay,
         countryId: country.id,
         occurredAt: createdAt,
-        note: `قيد مديونية: قسط ${bankName} المستحق خلال 7 أيام`,
+        note: `قيد مديونية موروثة: مهلة سماح قضائية 7 أيام لقرض ${bankName} (${initialLoanRepay}$)`,
       },
     ],
     events: [],
@@ -282,7 +282,7 @@ export function createNewPlayer(
     reputation: 35,
     contracts: [],
     achievements: [],
-    onboarding: { introCompleted: true, chapter: 1, seenGuides: [] },
+    onboarding: { introCompleted: false, chapter: 1, seenGuides: [] },
     season: { seasonId: 'expansion-season-1', startedOnDay: 1, endsOnDay: 30, points: 0, claimedChallengeKeys: [] },
   };
 }
