@@ -34,6 +34,8 @@ import { clearPendingInitialProfile, loadPendingInitialProfile, queueInitialProf
 import { playSound } from './game/soundEffects';
 import { RightActionHub } from './components/RightActionHub';
 import { StoryEventPopup, GAME_STORY_EVENTS, type StoryEventAlert } from './components/StoryEventPopup';
+import { DynamicEconomyEvents } from './components/DynamicEconomyEvents';
+import { loadExpansionState } from './game/expansionEngine';
 
 function getPendingSyncCount(accountId: string): number {
   return loadQueuedGameCommands(accountId).length + (loadPendingInitialProfile(accountId) ? 1 : 0);
@@ -66,6 +68,7 @@ export default function App() {
   const [passwordRecovery, setPasswordRecovery] = useState(false);
   const [recoveryError, setRecoveryError] = useState('');
   const [activeStoryEvent, setActiveStoryEvent] = useState<StoryEventAlert | null>(null);
+  const [expansion, setExpansion] = useState(() => profile ? loadExpansionState(profile) : null);
   const syncLock = useRef(false);
   const remoteCommandAttempts = useRef(new Map<string, Promise<RemoteGameCommandAttempt>>());
 
@@ -756,6 +759,17 @@ export default function App() {
           country={country}
           onClose={() => setActiveStoryEvent(null)}
           onNavigate={(sec) => navigate(sec)}
+        />
+      )}
+      {expansion && (
+        <DynamicEconomyEvents
+          profile={profile}
+          expansion={expansion}
+          onUpdate={(updatedProf, updatedExp) => {
+            setExpansion(updatedExp);
+            setProfile(updatedProf);
+            saveGame(updatedProf, account?.id);
+          }}
         />
       )}
       <footer className="app-footer"><span>إمبراطورية الأعمال</span><span>محاكاة محلية · الأسعار والأحداث لأغراض اللعبة</span></footer>

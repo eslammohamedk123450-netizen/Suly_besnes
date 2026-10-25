@@ -26,6 +26,10 @@ import { getWarehouseCapacity, getWarehouseItemCapacity, getWarehouseUsage, norm
 import { getGameDayDurationMinutes } from '../game/time';
 import { getDiscountedDiamondPrice, type PurchasePaymentMethod } from '../game/purchasePricing';
 import { StockExchangeTerminal } from './StockExchangeTerminal';
+import { TerritoryConquestMap } from './TerritoryConquestMap';
+import { TechTreeRND } from './TechTreeRND';
+import { CeoLuxurySuite } from './CeoLuxurySuite';
+import { loadExpansionState } from '../game/expansionEngine';
 import { HubSubNav } from './HubSubNav';
 import { ItemImage } from './ItemImage';
 
@@ -66,7 +70,7 @@ function panelIconFor(sectionId: SectionId, title: string): IconName {
   if (normalized.includes('التزام') || normalized.includes('سداد')) return 'shield';
   if (normalized.includes('سوق') || normalized.includes('شراء') || normalized.includes('بيع')) return 'store';
   const fallback: Record<SectionId, IconName> = {
-    home: 'home', auctions: 'gavel', companies: 'company', investments: 'investment', lands: 'land', production: 'factory', inventory: 'warehouse', reports: 'report', tasks: 'tasks', settings: 'settings', profile: 'user', bank: 'bank', staff: 'user', obligations: 'shield', store: 'store', contracts: 'briefcase',
+    home: 'home', auctions: 'gavel', companies: 'company', investments: 'investment', lands: 'land', production: 'factory', inventory: 'warehouse', reports: 'report', tasks: 'tasks', settings: 'settings', profile: 'user', bank: 'bank', staff: 'user', obligations: 'shield', store: 'store', contracts: 'briefcase', territory: 'land', tech_tree: 'factory', luxury: 'user',
   };
   return fallback[sectionId];
 }
@@ -125,6 +129,7 @@ export function SectionPage({ section, profile, country, focus, notificationThem
   const [landSort, setLandSort] = useState<'price' | 'area' | 'type'>('price');
   const [auctionCategoryTab, setAuctionCategoryTab] = useState<'all' | 'land' | 'factory' | 'material'>('land');
   const [activePanelId, setActivePanelId] = useState<string | null>(null);
+  const [expansionState, setExpansionState] = useState(() => loadExpansionState(profile));
 
   useEffect(() => {
     if (compactSectionIds.has(section.id)) setActivePanelId(focus ? '__all__' : null);
@@ -766,6 +771,60 @@ export function SectionPage({ section, profile, country, focus, notificationThem
         </SectionPanel>
       </>,
     )}</div>;
+  }
+
+  if (section.id === 'territory') {
+    return (
+      <div className="section-page">
+        {heading}
+        {pageShell(
+          <TerritoryConquestMap
+            profile={profile}
+            expansion={expansionState}
+            onUpdate={(updatedProf, updatedExp) => {
+              setExpansionState(updatedExp);
+              onAction({ ok: true, profile: updatedProf, message: 'تم تحديث السيطرة الإقليمية', data: undefined });
+            }}
+          />
+        )}
+      </div>
+    );
+  }
+
+  if (section.id === 'tech_tree') {
+    return (
+      <div className="section-page">
+        {heading}
+        {pageShell(
+          <TechTreeRND
+            profile={profile}
+            expansion={expansionState}
+            onUpdate={(updatedProf, updatedExp) => {
+              setExpansionState(updatedExp);
+              onAction({ ok: true, profile: updatedProf, message: 'تم تحديث أبحاث الأتمتة والتكنولوجيا', data: undefined });
+            }}
+          />
+        )}
+      </div>
+    );
+  }
+
+  if (section.id === 'luxury') {
+    return (
+      <div className="section-page">
+        {heading}
+        {pageShell(
+          <CeoLuxurySuite
+            profile={profile}
+            expansion={expansionState}
+            onUpdate={(updatedProf, updatedExp) => {
+              setExpansionState(updatedExp);
+              onAction({ ok: true, profile: updatedProf, message: 'تم تحديث جناح الرفاهية والأصول الفاخرة', data: undefined });
+            }}
+          />
+        )}
+      </div>
+    );
   }
 
   return <div className="section-page">{heading}{pageShell(

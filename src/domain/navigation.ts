@@ -16,7 +16,10 @@ export type SectionId =
   | 'contracts'
   | 'tasks'
   | 'profile'
-  | 'settings';
+  | 'settings'
+  | 'territory'
+  | 'tech_tree'
+  | 'luxury';
 
 export interface SectionItem {
   id: SectionId;
@@ -34,10 +37,13 @@ export interface SectionGroup {
 
 export const GAME_SECTIONS: readonly SectionItem[] = [
   { id: 'home', label: 'الرئيسية', shortLabel: 'الرئيسية', subtitle: 'ملخص إمبراطوريتك', icon: 'home' },
+  { id: 'territory', label: 'السيطرة الإقليمية', shortLabel: 'الخريطة', subtitle: 'خريطة السيطرة والتوسع الجغرافي', icon: 'land' },
+  { id: 'tech_tree', label: 'الأبحاث والأتمتة', shortLabel: 'الأبحاث', subtitle: 'شجرة التكنولوجيا والأتمتة الذكية', icon: 'factory' },
+  { id: 'luxury', label: 'الهيبة والرفاهية', shortLabel: 'الرفاهية', subtitle: 'أصول المدير التنفيذي ونقاط الهيبة', icon: 'user' },
   { id: 'store', label: 'متجر المشتريات', shortLabel: 'المتجر', subtitle: 'الماس والبطاقات والعروض', icon: 'store' },
   { id: 'auctions', label: 'المزادات', shortLabel: 'المزادات', subtitle: 'أراضٍ وأصول وفرص جديدة', icon: 'gavel' },
   { id: 'companies', label: 'الشركات', shortLabel: 'الشركات', subtitle: 'إدارة أعمالك وقطاعاتك', icon: 'company' },
-  { id: 'investments', label: 'الاستثمارات', shortLabel: 'الاستثمار', subtitle: 'خطط لتوسّعك القادم', icon: 'investment' },
+  { id: 'investments', label: 'الاستثمارات والبورصة', shortLabel: 'الاستثمار', subtitle: 'أسواق المال والطرح العام IPO', icon: 'investment' },
   { id: 'bank', label: 'البنك والتمويل', shortLabel: 'البنك', subtitle: 'ودائع وقروض بضمان', icon: 'bank' },
   { id: 'staff', label: 'الإدارة والرواتب', shortLabel: 'الموظفون', subtitle: 'مديرون ومحاسبون ومحامون', icon: 'company' },
   { id: 'obligations', label: 'الالتزامات', shortLabel: 'الالتزامات', subtitle: 'ما يجب دفعه ومتى', icon: 'report' },
@@ -52,9 +58,9 @@ export const GAME_SECTIONS: readonly SectionItem[] = [
 ];
 
 export const SECTION_GROUPS: readonly SectionGroup[] = [
-  { id: 'home_group', label: 'الرئيسية', sections: ['home'] },
+  { id: 'home_group', label: 'الرئيسية التفاعلية', sections: ['home', 'territory', 'tech_tree', 'luxury'] },
   { id: 'business_group', label: 'الأعمال والأصول', sections: ['companies', 'lands', 'production', 'inventory'] },
-  { id: 'market_group', label: 'السوق والمالية', sections: ['auctions', 'investments', 'bank', 'contracts'] },
+  { id: 'market_group', label: 'السوق والمالية والبورصة', sections: ['auctions', 'investments', 'bank', 'contracts'] },
   { id: 'management_group', label: 'الإدارة والتقدم', sections: ['staff', 'tasks', 'reports', 'obligations'] },
   { id: 'profile_group', label: 'الحساب والنظام', sections: ['profile', 'store', 'settings'] },
 ];

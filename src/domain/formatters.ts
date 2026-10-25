@@ -13,3 +13,7 @@ export function formatMoney(value: number, country: CountryDefinition): string {
 export function formatGold(grams: number): string {
   return `${formatNumber(grams)} غ`;
 }
+
+export function formatCurrency(value: number, currencyCode = 'EGP'): string {
+  return `${formatNumber(value)} ج.م`;
+}
