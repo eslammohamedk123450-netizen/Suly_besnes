@@ -84,6 +84,104 @@ export function playSound(effect: SoundEffect) {
 export function setSoundEnabled(nextEnabled: boolean) { 
   enabled = nextEnabled; 
   if (typeof window !== 'undefined') window.localStorage.setItem('business-empire-sfx-enabled', String(nextEnabled)); 
+  if (!nextEnabled && musicActive) {
+    stopAmbientMusic();
+  }
 }
 export function isSoundEnabled() { return enabled; }
 export function setSoundVolume(nextVolume: number) { volume = Math.max(0, Math.min(1, nextVolume)); }
+
+// Ambient Lo-Fi Corporate Background Music Generator
+let musicActive = false;
+let musicInterval: number | null = null;
+let musicGainNode: GainNode | null = null;
+let musicVolume = 0.12;
+
+export function setMusicVolume(vol: number) {
+  musicVolume = Math.max(0, Math.min(1, vol));
+  if (musicGainNode && audioContext) {
+    musicGainNode.gain.setValueAtTime(musicVolume, audioContext.currentTime);
+  }
+}
+
+export function isMusicPlaying(): boolean {
+  return musicActive;
+}
+
+export function toggleAmbientMusic(): boolean {
+  if (musicActive) {
+    stopAmbientMusic();
+    return false;
+  } else {
+    startAmbientMusic();
+    return true;
+  }
+}
+
+export function startAmbientMusic() {
+  if (musicActive) return;
+  const context = getAudioContext();
+  if (!context) return;
+  musicActive = true;
+
+  if (!musicGainNode) {
+    musicGainNode = context.createGain();
+    musicGainNode.gain.setValueAtTime(musicVolume, context.currentTime);
+    musicGainNode.connect(context.destination);
+  }
+
+  // Chords in Hz: Warm corporate lo-fi progression [Am7, Fmaj7, C, G]
+  const chords = [
+    [220.0, 261.63, 329.63, 392.0], // A3, C4, E4, G4
+    [174.61, 220.0, 261.63, 329.63], // F3, A3, C4, E4
+    [261.63, 329.63, 392.0, 523.25], // C4, E4, G4, C5
+    [196.0, 246.94, 293.66, 392.0], // G3, B3, D4, G4
+  ];
+
+  let chordIndex = 0;
+
+  const playNextChord = () => {
+    if (!musicActive || !audioContext || audioContext.state === 'closed') return;
+    const currentNotes = chords[chordIndex % chords.length];
+    chordIndex++;
+
+    const startTime = audioContext.currentTime;
+    const duration = 4.2;
+
+    currentNotes.forEach((freq, i) => {
+      if (!audioContext || !musicGainNode) return;
+      try {
+        const osc = audioContext.createOscillator();
+        const noteGain = audioContext.createGain();
+        const filter = audioContext.createBiquadFilter();
+
+        filter.type = 'lowpass';
+        filter.frequency.setValueAtTime(650, startTime);
+
+        osc.type = i === 0 ? 'triangle' : 'sine';
+        osc.frequency.setValueAtTime(freq, startTime);
+
+        noteGain.gain.setValueAtTime(0.0001, startTime);
+        noteGain.gain.exponentialRampToValueAtTime(0.06 * musicVolume, startTime + 1.2);
+        noteGain.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
+
+        osc.connect(filter).connect(noteGain).connect(musicGainNode);
+        osc.start(startTime);
+        osc.stop(startTime + duration + 0.1);
+      } catch {
+        // Audio node creation safe guard
+      }
+    });
+  };
+
+  playNextChord();
+  musicInterval = window.setInterval(playNextChord, 4200);
+}
+
+export function stopAmbientMusic() {
+  musicActive = false;
+  if (musicInterval !== null) {
+    clearInterval(musicInterval);
+    musicInterval = null;
+  }
+}

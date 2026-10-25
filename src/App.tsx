@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { Capacitor } from '@capacitor/core';
+import { App as CapApp } from '@capacitor/app';
 import GameApp from './GameApp';
 import { GitHubPushSyncModal } from './components/GitHubPushSyncModal';
-import { playSound, isSoundEnabled, setSoundEnabled } from './game/soundEffects';
+import { playSound, isSoundEnabled, setSoundEnabled, toggleAmbientMusic, isMusicPlaying } from './game/soundEffects';
 import { 
   UploadCloud, 
   Volume2, 
@@ -10,7 +12,8 @@ import {
   FolderGit2, 
   ExternalLink,
   Info,
-  X
+  X,
+  Music
 } from 'lucide-react';
 
 export default function App() {
@@ -18,12 +21,42 @@ export default function App() {
   const [isChangelogOpen, setIsChangelogOpen] = useState(false);
   const [isPushing, setIsPushing] = useState(false);
   const [soundOn, setSoundOn] = useState(() => isSoundEnabled());
+  const [musicOn, setMusicOn] = useState(() => isMusicPlaying());
+
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return;
+    let lastBack = 0;
+    const backListener = CapApp.addListener('backButton', () => {
+      if (isPushModalOpen) {
+        setIsPushModalOpen(false);
+        return;
+      }
+      if (isChangelogOpen) {
+        setIsChangelogOpen(false);
+        return;
+      }
+      const now = Date.now();
+      if (now - lastBack < 2500) {
+        void CapApp.exitApp();
+      } else {
+        lastBack = now;
+      }
+    });
+    return () => {
+      void backListener.then((handle) => handle.remove());
+    };
+  }, [isPushModalOpen, isChangelogOpen]);
 
   const handleToggleSound = () => {
     const next = !soundOn;
     setSoundOn(next);
     setSoundEnabled(next);
     if (next) playSound('click');
+  };
+
+  const handleToggleMusic = () => {
+    const next = toggleAmbientMusic();
+    setMusicOn(next);
   };
 
   const handlePushToGitHub = async (token: string): Promise<{ success: boolean; message: string }> => {
@@ -73,7 +106,21 @@ export default function App() {
             title={soundOn ? 'كتم الصوت' : 'تشغيل المؤثرات الصوتية'}
           >
             {soundOn ? <Volume2 className="w-3.5 h-3.5 text-emerald-400" /> : <VolumeX className="w-3.5 h-3.5 text-slate-500" />}
-            <span className="hidden sm:inline text-[11px]">{soundOn ? 'الصوت مفعّل' : 'مكتوم'}</span>
+            <span className="hidden sm:inline text-[11px]">{soundOn ? 'المؤثرات' : 'كتم'}</span>
+          </button>
+
+          {/* Ambient Music toggle button */}
+          <button
+            onClick={handleToggleMusic}
+            className={`p-1.5 sm:px-2.5 sm:py-1.5 rounded-xl border text-xs flex items-center gap-1.5 transition-colors ${
+              musicOn 
+                ? 'bg-purple-950/70 border-purple-500/40 text-purple-300 shadow-sm shadow-purple-500/20' 
+                : 'bg-slate-800 hover:bg-slate-700 text-slate-400 border-slate-700'
+            }`}
+            title={musicOn ? 'إيقاف موسيقى الخلفية' : 'تشغيل موسيقى الخلفية الهادئة (Lo-Fi Ambient)'}
+          >
+            <Music className={`w-3.5 h-3.5 ${musicOn ? 'text-purple-400 animate-pulse' : 'text-slate-500'}`} />
+            <span className="hidden sm:inline text-[11px]">{musicOn ? 'موسيقى هادئة ♫' : 'موسيقى'}</span>
           </button>
 
           {/* Changelog info button */}

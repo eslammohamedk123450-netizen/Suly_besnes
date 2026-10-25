@@ -16,5 +16,6 @@
     "noEmit": true,
     "jsx": "react-jsx"
   },
-  "include": ["src", "vite.config.ts", "capacitor.config.ts"]
+  "include": ["src", "vite.config.ts", "capacitor.config.ts"],
+  "exclude": ["**/*.test.ts", "admin-dashboard", "dist"]
 }

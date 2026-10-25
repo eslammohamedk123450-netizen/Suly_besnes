@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { Capacitor } from '@capacitor/core';
 import type { PlayerProfile } from '../domain/player';
 import type { SpeedCardKind } from '../domain/accountFeatures';
 import { formatNumber } from '../domain/formatters';
@@ -211,6 +212,23 @@ export function DiamondStore({ profile, isGuest, onLinkAccount, onRefreshProfile
               <button type="button" className="suly-buy-btn" onClick={onLinkAccount}>
                 ربط الحساب الآن
               </button>
+            </div>
+          ) : Capacitor.isNativePlatform() ? (
+            <div className="suly-payment-box" style={{ background: 'rgba(15, 23, 42, 0.8)', border: '1px solid #3b82f6', borderRadius: 12, padding: 18, textAlign: 'center' }}>
+              <h4 style={{ color: '#60a5fa', marginBottom: 8, fontSize: '1rem', fontWeight: 'bold' }}>
+                بوابة الشحن المعتمدة لنسخة التطبيق 📱
+              </h4>
+              <p style={{ color: '#cbd5e1', fontSize: '0.85rem', lineHeight: 1.6, margin: '0 0 14px' }}>
+                وفقاً لسياسات التوزيع الرقمي والمتاجر الرسمية، تتوفر خيارات شحن الماسات والتحويلات المباشرة عبر بوابة الويب الرسمية للألعاب.
+              </p>
+              <a
+                href={typeof window !== 'undefined' ? window.location.origin : 'https://suly-business.web.app'}
+                target="_blank"
+                rel="noreferrer"
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '10px 18px', background: '#2563eb', color: '#fff', borderRadius: 10, textDecoration: 'none', fontWeight: 700, fontSize: '0.88rem', boxShadow: '0 4px 12px rgba(37, 99, 235, 0.3)' }}
+              >
+                <span>فتح بوابة الشحن على موقع الويب الرسمي 🌐</span>
+              </a>
             </div>
           ) : (
             <>

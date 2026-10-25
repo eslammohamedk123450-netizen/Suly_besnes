@@ -3,6 +3,7 @@ import react from '@vitejs/plugin-react';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { createHmac, randomBytes, randomUUID, scryptSync, timingSafeEqual, sign } from 'node:crypto';
+import { execSync } from 'node:child_process';
 
 const authPath = join(process.cwd(), '.local', 'admin-auth.json');
 
@@ -43,6 +44,40 @@ function adminCodeApi() {
     server.middlewares.use('/api/admin/issue-code', async (req, res, next) => { if (req.method !== 'POST') return next(); try { const auth = readAuth(); const cookie = String(req.headers.cookie ?? '').match(/(?:^|;\s*)admin_session=([^;]+)/)?.[1] ?? ''; if (!validSession(auth, cookie)) return json(res, 403, { message: 'غير مصرح.' }); const data = await body(req); const cash = data.cash ? Number(data.cash) : 0; const gold = data.gold ? Number(data.gold) : 0; const expiresAt = String(data.expiresAt ?? ''); if ((!Number.isInteger(cash) || cash < 0 || cash > 1_000_000) || (!Number.isFinite(gold) || gold < 0 || gold > 100) || (!cash && !gold) || !Number.isFinite(Date.parse(expiresAt)) || Date.parse(expiresAt) <= Date.now()) throw new Error('تحقق من المال والذهب وتاريخ الانتهاء.'); const keyPath = join(process.cwd(), '.local', 'reward-private.pem'); if (!existsSync(keyPath)) throw new Error('مفتاح الإصدار غير موجود على الخادم.'); const payload = { version: 1, codeId: randomUUID(), issuedAt: new Date().toISOString(), expiresAt, rewards: [...(cash ? [{ type: 'cash', amount: cash }] : []), ...(gold ? [{ type: 'gold', grams: gold }] : [])] }; const encodedPayload = Buffer.from(JSON.stringify(payload)).toString('base64url'); const signature = sign(null, Buffer.from(encodedPayload), readFileSync(keyPath)).toString('base64url'); json(res, 200, { code: `SULY1.${encodedPayload}.${signature}` }); } catch (error) { json(res, 400, { message: error instanceof Error ? error.message : 'تعذر إنشاء الكود.' }); } });
     server.middlewares.use('/api/admin/account-lookup', async (req, res, next) => { if (req.method !== 'POST') return next(); try { const auth = readAuth(); const cookie = String(req.headers.cookie ?? '').match(/(?:^|;\s*)admin_session=([^;]+)/)?.[1] ?? ''; if (!validSession(auth, cookie)) return json(res, 403, { message: 'غير مصرح.' }); const data = await body(req); const accountCode = String(data.accountCode ?? '').trim().toUpperCase(); if (!/^BE-[A-Z0-9]+-[A-Z0-9]+$/.test(accountCode)) return json(res, 400, { message: 'معرّف الحساب غير صالح.' }); const response = await adminSupabaseFetch(`/rest/v1/game_profiles?account_code=eq.${encodeURIComponent(accountCode)}&select=account_code,player_name,game_day,save_data,updated_at`); if (!response.ok) throw new Error('تعذر الاتصال ببيانات الحسابات.'); const rows = await response.json() as Array<{ account_code: string; player_name: string; game_day: number; save_data: Record<string, unknown>; updated_at: string }>; const row = rows[0]; if (!row) return json(res, 404, { message: 'لم يُعثر على حساب بهذا المعرّف.' }); const save = row.save_data ?? {}; return json(res, 200, { accountCode: row.account_code, playerName: row.player_name, gameDay: row.game_day, updatedAt: row.updated_at, bankBalance: Number(save.bankBalance ?? 0), goldGrams: Number(save.goldGrams ?? 0), diamonds: Number(save.diamonds ?? 0), badges: Array.isArray(save.badges) ? save.badges : [], speedCards: Array.isArray(save.speedCards) ? save.speedCards : [] }); } catch (error) { return json(res, 503, { message: error instanceof Error ? error.message : 'تعذر البحث عن الحساب.' }); } });
     server.middlewares.use('/api/admin/account-grant', async (req, res, next) => { if (req.method !== 'POST') return next(); try { const auth = readAuth(); const cookie = String(req.headers.cookie ?? '').match(/(?:^|;\s*)admin_session=([^;]+)/)?.[1] ?? ''; if (!validSession(auth, cookie)) return json(res, 403, { message: 'غير مصرح.' }); const data = await body(req); const accountCode = String(data.accountCode ?? '').trim().toUpperCase(); const cash = data.cash ? Number(data.cash) : 0; const gold = data.gold ? Number(data.gold) : 0; const diamonds = data.diamonds ? Number(data.diamonds) : 0; const badge = String(data.badge ?? '').trim() || null; const speedCardKind = String(data.speedCardKind ?? '').trim() || null; const speedCardQuantity = data.speedCardQuantity ? Number(data.speedCardQuantity) : 0; if (!/^BE-[A-Z0-9]+-[A-Z0-9]+$/.test(accountCode) || !Number.isInteger(cash) || cash < 0 || !Number.isFinite(gold) || gold < 0 || !Number.isInteger(diamonds) || diamonds < 0 || !Number.isInteger(speedCardQuantity) || speedCardQuantity < 0 || (!cash && !gold && !diamonds && !badge && !speedCardQuantity)) return json(res, 400, { message: 'تحقق من المعرّف وقيم المنحة.' }); const response = await adminSupabaseFetch('/rest/v1/rpc/admin_grant_account', { method: 'POST', body: JSON.stringify({ p_account_code: accountCode, p_cash: cash, p_gold: gold, p_diamonds: diamonds, p_badge: badge, p_speed_card_kind: speedCardKind, p_speed_card_quantity: speedCardQuantity, p_granted_by: auth?.identifier ?? 'admin' }) }); if (!response.ok) { const detail = await response.text(); throw new Error(detail.includes('account not found') ? 'لم يُعثر على حساب بهذا المعرّف.' : 'تعذر تسجيل المنحة. تأكد من تطبيق مخطط Supabase الجديد.'); } return json(res, 200, { ok: true, message: 'تم تسجيل المنحة في الحساب وسجل التدقيق.' }); } catch (error) { return json(res, 400, { message: error instanceof Error ? error.message : 'تعذر منح الموارد.' }); } });
+    server.middlewares.use('/api/github-push', async (req, res, next) => {
+      if (req.method !== 'POST') return next();
+      try {
+        const data = await body(req);
+        const rawToken = String(data.token ?? '').trim();
+        if (!rawToken) {
+          return json(res, 400, { success: false, message: 'رمز الدخول الشخصي لـ GitHub (PAT) مطلوب لرفع التحديثات.' });
+        }
+        const token = rawToken.replace(/^["']|["']$/g, '').trim();
+        execSync('git config user.name "Suly Business Dev"', { stdio: 'ignore' });
+        execSync('git config user.email "videocband@gmail.com"', { stdio: 'ignore' });
+        try {
+          execSync('git add -A', { stdio: 'ignore' });
+          execSync('git commit -m "feat: Upgrade Suly_besnes to professional economic simulation (Phase 1-4 Complete)"', { stdio: 'ignore' });
+        } catch {
+          // No unstaged changes
+        }
+        const pushUrl = `https://x-access-token:${encodeURIComponent(token)}@github.com/eslammohamedk123450-netizen/Suly_besnes.git`;
+        execSync(`git push "${pushUrl}" HEAD:main`, {
+          stdio: 'pipe',
+          env: {
+            ...process.env,
+            GIT_TERMINAL_PROMPT: '0',
+          },
+        });
+        json(res, 200, { success: true, message: 'تم رفع جميع التحديثات وقصة الكفاح والميزات الجديدة إلى مستودع GitHub بنجاح!' });
+      } catch (err: unknown) {
+        let msg = err instanceof Error ? err.message : String(err);
+        if (msg.includes('Authentication failed') || msg.includes('Invalid username or token')) {
+          msg = 'رمز GitHub Token غير صالح أو تنقصه صلاحية الكتابة (repo). يرجى التأكد من اختيار Classic Token وتفعيل صلاحية repo.';
+        }
+        json(res, 500, { success: false, message: `فشل الرفع إلى GitHub: ${msg}` });
+      }
+    });
   } };
 }
 

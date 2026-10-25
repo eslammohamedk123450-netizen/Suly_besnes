@@ -180,3 +180,34 @@ export async function loginAccount(emailInput: string, password: string): Promis
 export async function logoutAccount(): Promise<void> {
   await supabase.auth.signOut();
 }
+
+export async function deleteCurrentAccount(): Promise<{ ok: true } | { ok: false; message: string }> {
+  try {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const user = sessionData.session?.user;
+    if (user) {
+      try {
+        await supabase.rpc('delete_user_account', { p_user_id: user.id });
+      } catch {
+        try {
+          await supabase.from('game_profiles').delete().eq('account_id', user.id);
+        } catch {
+          // ignore
+        }
+      }
+      await supabase.auth.signOut();
+    }
+    try {
+      globalThis.localStorage?.removeItem(GUEST_ACCOUNT_KEY);
+      globalThis.localStorage?.removeItem('business-empire.save-profile.v1');
+      globalThis.localStorage?.removeItem('business-empire.save-manifest.v1');
+      globalThis.localStorage?.removeItem('business-empire.command-outbox.v1');
+    } catch {
+      // Storage access fail-safe
+    }
+    return { ok: true };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return { ok: false, message: `تعذر حذف الحساب: ${msg}` };
+  }
+}

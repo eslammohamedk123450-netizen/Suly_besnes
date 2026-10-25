@@ -5,6 +5,8 @@ import { accountCodeFromSeed } from '../domain/accountFeatures';
 import { formatGold, formatMoney, formatNumber } from '../domain/formatters';
 import { getPlayerProgress } from '../game/onboarding';
 import { selectEmpirePulse } from '../game/selectors';
+import { deleteCurrentAccount } from '../storage/authRepository';
+import { PrivacyPolicyModal } from './PrivacyPolicyModal';
 import { Icon } from './Icon';
 import './ProfilePage.css';
 
@@ -16,6 +18,7 @@ interface ProfilePageProps {
   isSynced: boolean;
   onLinkAccount: () => void;
   onResetWorld?: () => void;
+  onAccountDeleted?: () => void;
 }
 
 async function copyTextWithFallback(text: string): Promise<boolean> {
@@ -49,8 +52,32 @@ async function copyTextWithFallback(text: string): Promise<boolean> {
   }
 }
 
-export function ProfilePage({ profile, country, accountId, isGuest, isSynced, onLinkAccount, onResetWorld }: ProfilePageProps) {
+export function ProfilePage({ profile, country, accountId, isGuest, isSynced, onLinkAccount, onResetWorld, onAccountDeleted }: ProfilePageProps) {
   const [copyMessage, setCopyMessage] = useState<{ text: string; success: boolean } | null>(null);
+  const [showPrivacyModal, setShowPrivacyModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
+
+  async function handleDeleteAccount() {
+    setIsDeleting(true);
+    setDeleteError('');
+    const res = await deleteCurrentAccount();
+    setIsDeleting(false);
+    if (!res.ok) {
+      setDeleteError(res.message);
+      return;
+    }
+    setShowDeleteModal(false);
+    if (onAccountDeleted) {
+      onAccountDeleted();
+    } else if (onResetWorld) {
+      onResetWorld();
+    } else {
+      window.location.reload();
+    }
+  }
+
   const progress = getPlayerProgress(profile);
   const accountCode = accountCodeFromSeed(accountId);
   const badgeCatalog = selectEmpirePulse(profile).badges;
@@ -290,6 +317,92 @@ export function ProfilePage({ profile, country, accountId, isGuest, isSynced, on
           </p>
         )}
       </section>
+
+      {/* 5. Google Play Compliance: Safety & Account Deletion */}
+      <section className="lux-card" style={{ borderColor: 'rgba(239, 68, 68, 0.25)', background: 'linear-gradient(180deg, rgba(15, 23, 42, 0.6) 0%, rgba(30, 41, 59, 0.4) 100%)' }}>
+        <div className="lux-section-title" style={{ marginBottom: 12 }}>
+          <Icon name="shield" size={18} />
+          <span>الأمان وسياسة الخصوصية وإدارة الحساب</span>
+        </div>
+        <p style={{ fontSize: '0.85rem', color: '#94a3b8', lineHeight: 1.6, margin: '0 0 16px' }}>
+          بياناتك الشخصية وتقدمك محمي بنظام أمان مشفر. يمكنك في أي وقت مراجعة سياسة الخصوصية الرسمية أو حذف حسابك وبياناتك بالكامل من خوادمنا.
+        </p>
+        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
+          <button
+            type="button"
+            className="lux-btn-link-account"
+            style={{ background: '#334155', color: '#f8fafc', padding: '10px 18px', borderRadius: 10, fontSize: '0.85rem', fontWeight: 600, border: '1px solid #475569' }}
+            onClick={() => setShowPrivacyModal(true)}
+          >
+            🛡️ سياسة الخصوصية وشروط الاستخدام
+          </button>
+          <button
+            type="button"
+            className="lux-btn-link-account"
+            style={{ background: 'rgba(239, 68, 68, 0.15)', color: '#f87171', border: '1px solid rgba(239, 68, 68, 0.4)', padding: '10px 18px', borderRadius: 10, fontSize: '0.85rem', fontWeight: 600 }}
+            onClick={() => setShowDeleteModal(true)}
+          >
+            🗑️ حذف الحساب والبيانات نهائياً
+          </button>
+        </div>
+      </section>
+
+      {/* Privacy Policy Modal */}
+      <PrivacyPolicyModal
+        isOpen={showPrivacyModal}
+        onClose={() => setShowPrivacyModal(false)}
+      />
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm" dir="rtl" style={{ position: 'fixed', top: 0, right: 0, bottom: 0, left: 0, background: 'rgba(0,0,0,0.85)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+          <div style={{ background: '#0f172a', border: '1px solid rgba(239, 68, 68, 0.4)', borderRadius: 16, maxWidth: 480, width: '100%', padding: 24, color: '#f8fafc', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+              <div style={{ width: 44, height: 44, borderRadius: 12, background: 'rgba(239, 68, 68, 0.2)', border: '1px solid rgba(239, 68, 68, 0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#f87171', fontSize: 22 }}>
+                ⚠️
+              </div>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 700, color: '#fff' }}>تأكيد حذف الحساب نهائياً</h3>
+                <span style={{ fontSize: '0.78rem', color: '#f87171' }}>إجراء دائم لا يمكن التراجع عنه</span>
+              </div>
+            </div>
+
+            <p style={{ fontSize: '0.9rem', color: '#cbd5e1', lineHeight: 1.6, margin: '0 0 20px' }}>
+              هل أنت متأكد تماماً من رغبتك في حذف حسابك؟
+              <br />
+              <strong>سيتم مسح كافة الشركات، الأراضي، الأرصدة النقدية، الذهب، والوسامات بشكل فوري ودائم من السحابة والجهاز.</strong>
+            </p>
+
+            {deleteError && (
+              <div style={{ padding: '10px 14px', background: 'rgba(239, 68, 68, 0.2)', border: '1px solid #ef4444', borderRadius: 8, color: '#fca5a5', fontSize: '0.85rem', marginBottom: 16 }}>
+                {deleteError}
+              </div>
+            )}
+
+            <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end', marginTop: 24 }}>
+              <button
+                type="button"
+                disabled={isDeleting}
+                onClick={() => {
+                  setShowDeleteModal(false);
+                  setDeleteError('');
+                }}
+                style={{ padding: '10px 18px', background: '#1e293b', border: '1px solid #334155', color: '#cbd5e1', borderRadius: 10, fontSize: '0.88rem', fontWeight: 600, cursor: 'pointer' }}
+              >
+                إلغاء التراجع
+              </button>
+              <button
+                type="button"
+                disabled={isDeleting}
+                onClick={() => void handleDeleteAccount()}
+                style={{ padding: '10px 20px', background: '#dc2626', border: '1px solid #ef4444', color: '#fff', borderRadius: 10, fontSize: '0.88rem', fontWeight: 700, cursor: isDeleting ? 'not-allowed' : 'pointer' }}
+              >
+                {isDeleting ? 'جارٍ الحذف…' : 'نعم، احذف حسابي نهائياً'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
