@@ -34,7 +34,11 @@ import {
   Clock, 
   Target, 
   Award,
-  Sparkles
+  Sparkles,
+  Eye,
+  EyeOff,
+  Lock,
+  FileText
 } from 'lucide-react';
 import './ProfilePage.css';
 
@@ -88,7 +92,7 @@ export function ProfilePage({
   accountId, 
   isGuest, 
   isSynced, 
-  userEmail = 'samopmohamed7@gmail.com',
+  userEmail = '',
   onLinkAccount, 
   onLogout,
   onResetWorld, 
@@ -104,10 +108,13 @@ export function ProfilePage({
   const [soundOn, setSoundOn] = useState(() => isSoundEnabled());
   const [musicOn, setMusicOn] = useState(() => isMusicPlaying());
 
-  // Delete account strict form state
+  // Delete account form state
   const [typedEmail, setTypedEmail] = useState('');
+  const [typedPassword, setTypedPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [deleteReason, setDeleteReason] = useState('');
   const [confirmedCheckbox, setConfirmedCheckbox] = useState(false);
+  const [policyAgreedCheckbox, setPolicyAgreedCheckbox] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState('');
 
@@ -123,10 +130,20 @@ export function ProfilePage({
     Math.max(0, (progress.experienceInLevel / progress.experienceForNextLevel) * 100),
   );
 
-  const normalizedUserEmail = userEmail || 'samopmohamed7@gmail.com';
-  const isEmailMatching = typedEmail.trim().toLowerCase() === normalizedUserEmail.trim().toLowerCase();
-  const isReasonValid = deleteReason.trim().length >= 5;
-  const canConfirmDelete = isEmailMatching && isReasonValid && confirmedCheckbox && !isDeleting;
+  const isReasonValid = deleteReason.trim().length >= 3;
+  const isEmailMatching = isGuest || (
+    typedEmail.trim().length > 0 &&
+    (!userEmail || typedEmail.trim().toLowerCase() === userEmail.trim().toLowerCase())
+  );
+  const isPasswordValid = isGuest || typedPassword.length >= 6;
+  const canConfirmDelete = (
+    isReasonValid &&
+    confirmedCheckbox &&
+    policyAgreedCheckbox &&
+    isPasswordValid &&
+    (isGuest || typedEmail.trim().length > 0) &&
+    !isDeleting
+  );
 
   const handleToggleSound = () => {
     const next = !soundOn;
@@ -157,19 +174,43 @@ export function ProfilePage({
     }
   };
 
+  const handleOpenDeleteModal = () => {
+    playSound('click');
+    setTypedEmail('');
+    setTypedPassword('');
+    setShowPassword(false);
+    setDeleteReason('');
+    setConfirmedCheckbox(false);
+    setPolicyAgreedCheckbox(false);
+    setDeleteError('');
+    setShowDeleteModal(true);
+  };
+
   const handleDeleteAccountStrict = async () => {
     if (!canConfirmDelete) return;
+
+    if (!isGuest && userEmail && typedEmail.trim().toLowerCase() !== userEmail.trim().toLowerCase()) {
+      setDeleteError('البريد الإلكتروني المكتوب لا يتطابق مع الحساب المسجل.');
+      return;
+    }
+
     playSound('click');
     setIsDeleting(true);
     setDeleteError('');
 
     try {
-      const res = await deleteCurrentAccount();
+      const res = await deleteCurrentAccount({
+        isGuest,
+        email: isGuest ? undefined : typedEmail.trim().toLowerCase(),
+        password: isGuest ? undefined : typedPassword,
+      });
+
       setIsDeleting(false);
       if (!res.ok) {
         setDeleteError(res.message || 'تعذر حذف الحساب.');
         return;
       }
+
       setShowDeleteModal(false);
       if (onAccountDeleted) {
         onAccountDeleted();
@@ -183,6 +224,7 @@ export function ProfilePage({
       setDeleteError(err instanceof Error ? err.message : 'حدث خطأ أثناء محاولة الحذف.');
     }
   };
+
 
   return (
     <main className="space-y-6 max-w-5xl mx-auto py-2 pb-14 animate-fade-in" dir="rtl">
@@ -260,33 +302,64 @@ export function ProfilePage({
         )}
       </section>
 
-      {/* 2. Google / Email Connection Banner (المتصل بالجميل) */}
+      {/* 2. Google / Email Connection Banner */}
       <section className="bg-slate-900/90 border border-slate-800 rounded-3xl p-5 sm:p-6 shadow-xl relative overflow-hidden">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3.5">
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-blue-600 via-sky-500 to-indigo-600 text-white flex items-center justify-center shadow-lg shadow-blue-500/20 text-xl font-bold">
+            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg text-xl font-bold ${
+              isGuest 
+                ? 'bg-slate-800 text-amber-400 border border-slate-700' 
+                : 'bg-gradient-to-tr from-blue-600 via-sky-500 to-indigo-600 text-white shadow-blue-500/20'
+            }`}>
               <Mail className="w-6 h-6" />
             </div>
             <div>
               <div className="flex items-center gap-2">
                 <span className="text-xs font-bold text-slate-400">حالة الاتصال بالسحابة:</span>
-                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-400 bg-emerald-950/60 border border-emerald-500/40 px-2.5 py-0.5 rounded-full">
+                <span className={`inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-0.5 rounded-full ${
+                  isGuest 
+                    ? 'text-amber-400 bg-amber-950/60 border border-amber-500/40' 
+                    : 'text-emerald-400 bg-emerald-950/60 border border-emerald-500/40'
+                }`}>
                   <ShieldCheck className="w-3.5 h-3.5" />
-                  متصل ومُزامن
+                  {isGuest ? 'حساب ضيف (غير مرتبط)' : 'متصل ومُزامن'}
                 </span>
               </div>
               <div className="text-sm sm:text-base font-extrabold text-white mt-0.5 flex items-center gap-2 flex-wrap">
-                <span>متصل بحساب Google (الجميل):</span>
-                <span className="font-mono text-cyan-300 bg-cyan-950/60 px-2.5 py-1 rounded-xl border border-cyan-500/30">
-                  {normalizedUserEmail}
-                </span>
+                {isGuest ? (
+                  <>
+                    <span>نوع الحساب الحالي:</span>
+                    <span className="text-amber-300 bg-amber-950/60 px-2.5 py-1 rounded-xl border border-amber-500/30 text-xs sm:text-sm font-bold">
+                      حساب ضيف محلي (غير مسجل ببريد)
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <span>البريد الإلكتروني المسجل:</span>
+                    <span className="font-mono text-cyan-300 bg-cyan-950/60 px-2.5 py-1 rounded-xl border border-cyan-500/30 text-xs sm:text-sm">
+                      {userEmail || 'حساب سحابي متصل'}
+                    </span>
+                  </>
+                )}
               </div>
             </div>
           </div>
 
           <div className="text-left text-xs text-slate-400 shrink-0">
-            <span className="block text-[11px] text-slate-500">حفظ تلقائي سحابي مشفر</span>
-            <span className="font-semibold text-emerald-400">✓ خوادم الحفظ النشطة</span>
+            {isGuest ? (
+              <button
+                type="button"
+                onClick={onLinkAccount}
+                className="px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs transition shadow-md cursor-pointer"
+              >
+                ربط بحساب سحابي ☁️
+              </button>
+            ) : (
+              <>
+                <span className="block text-[11px] text-slate-500">حفظ تلقائي سحابي مشفر</span>
+                <span className="font-semibold text-emerald-400">✓ خوادم الحفظ النشطة</span>
+              </>
+            )}
           </div>
         </div>
       </section>
@@ -368,13 +441,19 @@ export function ProfilePage({
                 </div>
                 <div>
                   <h3 className="font-extrabold text-sm sm:text-base text-white">
-                    تسجيل الخروج من الجلسة
+                    {isGuest ? 'إنهاء جلسة الضيف' : 'تسجيل الخروج من الحساب'}
                   </h3>
-                  <small className="text-[11px] text-slate-400">إنهاء الجلسة الحالية بأمان</small>
+                  <small className="text-[11px] text-slate-400">
+                    {isGuest ? 'حفظ محلي فقط على هذا الجهاز' : 'إنهاء الجلسة الحالية بأمان'}
+                  </small>
                 </div>
               </div>
               <p className="text-xs text-slate-400 leading-relaxed mb-4">
-                بيانات إمبراطوريتك وتقدمك محفوظة بالسحابة باسم <strong className="text-slate-200 font-mono">{normalizedUserEmail}</strong>. يمكنك العودة وتسجيل الدخول في أي وقت.
+                {isGuest ? (
+                  <>أنت تلعب حالياً كـ <strong className="text-amber-400">ضيف محلي</strong> (البيانات محفوظة على هذا الجهاز فقط). يمكنك تسجيل الخروج لبدء جلسة جديدة أو ربط حسابك لحفظ تقدمك بالسحابة.</>
+                ) : (
+                  <>بيانات إمبراطوريتك وتقدمك محفوظة بالسحابة. يمكنك العودة وتسجيل الدخول في أي وقت لمتابعة إمبراطوريتك.</>
+                )}
               </p>
             </div>
 
@@ -387,7 +466,7 @@ export function ProfilePage({
               className="w-full py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white font-bold text-xs sm:text-sm border border-slate-700 transition flex items-center justify-center gap-2 cursor-pointer shadow-sm"
             >
               <LogOut className="w-4 h-4 text-amber-400" />
-              <span>تسجيل الخروج من الحساب</span>
+              <span>{isGuest ? 'إنهاء جلسة الضيف الحالية' : 'تسجيل الخروج من الحساب'}</span>
             </button>
           </div>
 
@@ -400,30 +479,29 @@ export function ProfilePage({
                 </div>
                 <div>
                   <h3 className="font-extrabold text-sm sm:text-base text-white">
-                    منطقة الخطر: حذف الحساب
+                    {isGuest ? 'منطقة الخطر: حذف حساب الضيف' : 'منطقة الخطر: حذف الحساب'}
                   </h3>
-                  <small className="text-[11px] text-rose-400">إجراء نهائي لمحو البيانات والأصول</small>
+                  <small className="text-[11px] text-rose-400">
+                    {isGuest ? 'محو بيانات اللعبة المحلية والبدء من جديد' : 'إجراء نهائي لمحو البيانات والأصول من السحابة'}
+                  </small>
                 </div>
               </div>
               <p className="text-xs text-slate-400 leading-relaxed mb-4">
-                حذف الحساب سيمحو جميع الشركات، الأراضي، الأرصدة، والمعرفات نهائياً بلا رجعة من خوادمنا. يتطلب تأكيداً مشدداً وكتابة سبب الحذف.
+                {isGuest ? (
+                  <>حذف حساب الضيف سيمحو جميع الشركات والأموال وتقدم اللعبة من هذا الجهاز نهائياً. يتطلب تأكيد الموافقة على الشروط والسياسة قبل الحذف.</>
+                ) : (
+                  <>حذف الحساب سيمحو جميع الشركات والأصول والمعرفات نهائياً من السحابة. يتطلب كتابة البريد وكلمة المرور والموافقة على الشروط والسياسة.</>
+                )}
               </p>
             </div>
 
             <button
               type="button"
-              onClick={() => {
-                playSound('click');
-                setTypedEmail('');
-                setDeleteReason('');
-                setConfirmedCheckbox(false);
-                setDeleteError('');
-                setShowDeleteModal(true);
-              }}
+              onClick={handleOpenDeleteModal}
               className="w-full py-3 px-4 rounded-xl bg-rose-950/50 hover:bg-rose-900/60 text-rose-300 hover:text-rose-200 font-bold text-xs sm:text-sm border border-rose-500/40 transition flex items-center justify-center gap-2 cursor-pointer shadow-sm"
             >
               <Trash2 className="w-4 h-4 text-rose-400" />
-              <span>حذف الحساب والبيانات نهائياً</span>
+              <span>{isGuest ? 'حذف حساب الضيف والبدء من جديد' : 'حذف الحساب والبيانات نهائياً'}</span>
             </button>
           </div>
         </div>
@@ -563,15 +641,29 @@ export function ProfilePage({
                 <LogOut className="w-6 h-6" />
               </div>
               <div>
-                <h3 className="font-extrabold text-base text-white">تأكيد تسجيل الخروج</h3>
-                <span className="text-xs text-slate-400">ستظل إمبراطوريتك محفوظة بالسحابة</span>
+                <h3 className="font-extrabold text-base text-white">
+                  {isGuest ? 'تأكيد إنهاء جلسة الضيف' : 'تأكيد تسجيل الخروج'}
+                </h3>
+                <span className="text-xs text-slate-400">
+                  {isGuest ? 'جلسة محلية على هذا الجهاز' : 'ستظل إمبراطوريتك محفوظة بالسحابة'}
+                </span>
               </div>
             </div>
 
             <p className="text-xs text-slate-300 leading-relaxed mb-5">
-              هل أنت متأكد من رغبتك في تسجيل الخروج الآن؟
-              <br />
-              حسابك مرتبط بـ <strong className="text-amber-300 font-mono">{normalizedUserEmail}</strong>، ويمكنك العودة في أي وقت ومتابعة بناء إمبراطوريتك.
+              {isGuest ? (
+                <>هل أنت متأكد من رغبتك في إنهاء جلسة الضيف الحالية؟ يمكنك ربط حسابك لحفظ تقدمك بالسحابة، أو بدء إمبراطورية جديدة في أي وقت.</>
+              ) : (
+                <>
+                  هل أنت متأكد من رغبتك في تسجيل الخروج الآن؟
+                  <br />
+                  {userEmail ? (
+                    <>حسابك مرتبط بـ <strong className="text-amber-300 font-mono">{userEmail}</strong>، ويمكنك العودة في أي وقت ومتابعة بناء إمبراطوريتك.</>
+                  ) : (
+                    <>يمكنك العودة في أي وقت وتسجيل الدخول لمتابعة بناء إمبراطوريتك.</>
+                  )}
+                </>
+              )}
             </p>
 
             <div className="flex items-center justify-end gap-2.5">
@@ -595,7 +687,7 @@ export function ProfilePage({
       )}
 
       {/* ========================================================================= */}
-      {/* MODAL 3: STRICT DELETE ACCOUNT CONFIRMATION MODAL                         */}
+      {/* MODAL 3: DELETE ACCOUNT CONFIRMATION MODAL                                */}
       {/* ========================================================================= */}
       {showDeleteModal && (
         <div 
@@ -613,51 +705,101 @@ export function ProfilePage({
               </div>
               <div>
                 <h3 className="font-black text-base sm:text-lg text-rose-400">
-                  تأكيد أمان مشدد: حذف الحساب نهائياً
+                  {isGuest ? 'حذف حساب الضيف وإعادة ضبط اللعبة' : 'تأكيد أمان مشدد: حذف الحساب نهائياً'}
                 </h3>
                 <span className="text-[11px] text-slate-400">
-                  يرجى قراءة التعليمات بعناية وكتابة البيانات المطلوبة
+                  {isGuest 
+                    ? 'محو بيانات اللعبة المحلية والموافقة على الشروط والسياسة للبدء من الصفر'
+                    : 'يرجى كتابة بيانات حسابك والموافقة على الشروط والسياسة لإتمام الحذف'}
                 </span>
               </div>
             </div>
 
+            {/* Warning Message Box */}
             <div className="p-3.5 rounded-2xl bg-rose-950/40 border border-rose-500/30 text-rose-200 text-xs leading-relaxed mb-4">
-              <strong>⚠️ تنبيه نهائي:</strong> سيتم محو جميع أصولك النقدية، سبائك الذهب، الشركات، الأراضي، وجميع إنجازاتك من السحابة دون أي إمكانية للاسترداد.
+              {isGuest ? (
+                <>
+                  <strong>⚠️ تنبيه لحساب الضيف:</strong> أنت تلعب بحساب محلي غير مسجل بسحابة. سيتم محو جميع أموالك، الشركات، والممتلكات من ذاكرة هذا الجهاز نهائياً ولن تتمكن من استعادتها.
+                </>
+              ) : (
+                <>
+                  <strong>⚠️ تنبيه نهائي:</strong> سيتم محو جميع أصولك النقدية، سبائك الذهب، الشركات، الأراضي، وجميع إنجازاتك من السحابة دون أي إمكانية للاسترداد.
+                </>
+              )}
             </div>
 
             {/* Validation Fields */}
             <div className="space-y-4">
-              {/* Field 1: Enter Email */}
-              <div>
-                <label className="block text-xs font-bold text-slate-300 mb-1">
-                  1. اكتب بريدك الإلكتروني للتأكيد:
-                </label>
-                <div className="text-[11px] text-slate-400 mb-1.5">
-                  البريد المطلوب مطابقته: <code className="text-cyan-300 font-mono select-all">{normalizedUserEmail}</code>
-                </div>
-                <input
-                  type="email"
-                  dir="ltr"
-                  placeholder={normalizedUserEmail}
-                  value={typedEmail}
-                  onChange={(e) => setTypedEmail(e.target.value)}
-                  className={`w-full bg-slate-950 border rounded-xl px-3.5 py-2.5 text-xs font-mono text-white focus:outline-none transition ${
-                    typedEmail.length > 0
-                      ? isEmailMatching ? 'border-emerald-500 text-emerald-300' : 'border-rose-500'
-                      : 'border-slate-800'
-                  }`}
-                />
-                {typedEmail.length > 0 && !isEmailMatching && (
-                  <span className="text-[10px] text-rose-400 block mt-1">
-                    البريد المكتوب غير متطابق. يرجى كتابة البريد بدقة.
-                  </span>
-                )}
-              </div>
+              {/* REGISTERED USER: Requires manual Email and Password */}
+              {!isGuest && (
+                <>
+                  {/* Field 1: Enter Email Manually - NO SUGGESTION OR PREFILLED TEXT */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-200 mb-1.5 flex items-center justify-between">
+                      <span>1. اكتب بريدك الإلكتروني المسجل:</span>
+                      <span className="text-[10px] text-slate-400 font-normal">اكتبه بنفسك للتأكيد</span>
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="email"
+                        dir="ltr"
+                        placeholder="name@example.com"
+                        value={typedEmail}
+                        onChange={(e) => setTypedEmail(e.target.value)}
+                        className={`w-full bg-slate-950 border rounded-xl px-3.5 py-2.5 text-xs font-mono text-white focus:outline-none transition ${
+                          typedEmail.length > 0
+                            ? isEmailMatching ? 'border-emerald-500 text-emerald-300' : 'border-slate-700'
+                            : 'border-slate-800'
+                        }`}
+                      />
+                    </div>
+                  </div>
 
-              {/* Field 2: Reason for Deletion */}
+                  {/* Field 2: Enter Password to confirm identity */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-200 mb-1.5 flex items-center justify-between">
+                      <span>2. اكتب كلمة مرور حسابك لتأكيد الملكية:</span>
+                      <span className="text-[10px] text-slate-400 font-normal">مطلوبة لمنع الحذف العشوائي</span>
+                    </label>
+                    <div className="relative">
+                      <input
+                        type={showPassword ? 'text' : 'password'}
+                        dir="ltr"
+                        placeholder="اكتب كلمة المرور الخاصة بحسابك"
+                        value={typedPassword}
+                        onChange={(e) => setTypedPassword(e.target.value)}
+                        className="w-full bg-slate-950 border border-slate-800 focus:border-amber-500 rounded-xl px-3.5 py-2.5 pl-10 text-xs text-white focus:outline-none transition font-mono"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition p-1 cursor-pointer"
+                        title={showPassword ? 'إخفاء كلمة المرور' : 'إظهار كلمة المرور'}
+                      >
+                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {/* GUEST USER INFO BADGE */}
+              {isGuest && (
+                <div className="p-3 rounded-xl bg-slate-950/70 border border-slate-800 text-slate-300 text-xs flex items-center gap-2.5">
+                  <span className="text-base">👤</span>
+                  <div>
+                    <strong className="text-white block mb-0.5">حساب ضيف (غير مسجل ببريد)</strong>
+                    <span className="text-[11px] text-slate-400">
+                      لا يتطلب كتابة بريد أو كلمة مرور، ويلزم فقط الموافقة على الشروط والسياسة أدناه.
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {/* Deletion Reason (Required for both) */}
               <div>
-                <label className="block text-xs font-bold text-slate-300 mb-1">
-                  2. سبب طلب حذف الحساب (مطلوب):
+                <label className="block text-xs font-bold text-slate-200 mb-1.5">
+                  {isGuest ? '1. سبب حذف حساب الضيف والبدء من جديد (مطلوب):' : '3. سبب طلب حذف الحساب (مطلوب):'}
                 </label>
                 <textarea
                   rows={2}
@@ -668,37 +810,66 @@ export function ProfilePage({
                 />
                 {deleteReason.length > 0 && !isReasonValid && (
                   <span className="text-[10px] text-amber-400 block mt-0.5">
-                    يرجى كتابة سبب واضح (5 أحرف على الأقل).
+                    يرجى كتابة سبب واضح (3 أحرف على الأقل).
                   </span>
                 )}
               </div>
 
-              {/* Field 3: Checkbox */}
-              <label className="flex items-start gap-2.5 p-3 rounded-xl bg-slate-950/60 border border-slate-800 cursor-pointer">
+              {/* Approval Checkbox 1: Acknowledge irreversible wipe */}
+              <label className="flex items-start gap-2.5 p-3 rounded-xl bg-slate-950/60 border border-slate-800 hover:border-slate-700 cursor-pointer transition">
                 <input
                   type="checkbox"
                   checked={confirmedCheckbox}
                   onChange={(e) => setConfirmedCheckbox(e.target.checked)}
-                  className="mt-0.5 rounded border-slate-700 text-rose-600 focus:ring-rose-500"
+                  className="mt-0.5 rounded border-slate-700 text-rose-600 focus:ring-rose-500 cursor-pointer"
                 />
                 <span className="text-xs text-slate-300 leading-normal select-none">
-                  أقر بكامل إرادتي ومسؤوليتي برغبتي في مسح هذا الحساب وجميع ممتلكاته نهائياً من السحابة وبلا رجعة.
+                  {isGuest 
+                    ? 'أقر برغبتي في مسح بيانات حساب الضيف وجميع ممتلكاتي من هذا الجهاز وبدء إمبراطورية جديدة بلا رجعة.'
+                    : 'أقر بكامل إرادتي ومسؤوليتي برغبتي في مسح هذا الحساب وجميع ممتلكاته نهائياً من السحابة وبلا رجعة.'}
                 </span>
               </label>
 
+              {/* Approval Checkbox 2: Terms and Privacy Policy ("لازم يجيبون موافقات علي شروط والسياسه") */}
+              <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800 hover:border-slate-700 transition space-y-2">
+                <label className="flex items-start gap-2.5 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={policyAgreedCheckbox}
+                    onChange={(e) => setPolicyAgreedCheckbox(e.target.checked)}
+                    className="mt-0.5 rounded border-slate-700 text-rose-600 focus:ring-rose-500 cursor-pointer"
+                  />
+                  <span className="text-xs text-slate-300 leading-normal select-none">
+                    أوافق على شروط الاستخدام وسياسة الخصوصية الخاصة باللعبة وأقر بأن إجراء الحذف نهائي ومسؤوليتي التامة.
+                  </span>
+                </label>
+                <div className="pr-6 pt-0.5">
+                  <button
+                    type="button"
+                    onClick={() => setShowPrivacyModal(true)}
+                    className="text-amber-400 hover:text-amber-300 underline text-xs font-bold inline-flex items-center gap-1 cursor-pointer transition"
+                  >
+                    <span>📜 قراءة شروط الخدمة وسياسة الخصوصية</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Error Banner */}
               {deleteError && (
-                <div className="p-3 rounded-xl bg-rose-500/20 border border-rose-500/40 text-rose-300 text-xs">
-                  {deleteError}
+                <div className="p-3.5 rounded-xl bg-rose-500/20 border border-rose-500/40 text-rose-300 text-xs leading-relaxed animate-fade-in flex items-start gap-2">
+                  <AlertTriangle className="w-4 h-4 shrink-0 text-rose-400 mt-0.5" />
+                  <span>{deleteError}</span>
                 </div>
               )}
             </div>
 
+            {/* Action Buttons */}
             <div className="flex items-center justify-end gap-2.5 mt-6 pt-4 border-t border-slate-800">
               <button
                 type="button"
                 disabled={isDeleting}
                 onClick={() => setShowDeleteModal(false)}
-                className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs transition"
+                className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs transition cursor-pointer"
               >
                 تراجع وإلغاء
               </button>
@@ -708,7 +879,9 @@ export function ProfilePage({
                 onClick={handleDeleteAccountStrict}
                 className="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 disabled:opacity-30 disabled:cursor-not-allowed text-white font-black text-xs shadow-lg shadow-rose-950/40 transition cursor-pointer"
               >
-                {isDeleting ? 'جارٍ محو الحساب...' : 'تأكيد وحذف الحساب نهائياً 🗑️'}
+                {isDeleting 
+                  ? (isGuest ? 'جارٍ محو بيانات الضيف...' : 'جارٍ التحقق ومحو الحساب...')
+                  : (isGuest ? 'تأكيد وحذف حساب الضيف والبدء من جديد 🗑️' : 'تأكيد وحذف الحساب نهائياً 🗑️')}
               </button>
             </div>
           </div>

@@ -567,6 +567,17 @@ export default function App() {
     setNoticeTone('success');
   }
 
+  function handleAccountDeleted() {
+    setProfile(null);
+    setPlayerName('');
+    setSelectedCountryId(COUNTRIES[0].id);
+    const freshGuest = createGuestAccount();
+    setAccount(freshGuest);
+    setNotice('تم مسح الحساب والبيانات بنجاح. مرحباً بك في بداية جديدة لإمبراطوريتك!');
+    setNoticeTone('success');
+    navigate('home');
+  }
+
   async function handleLinkedAccount(nextAccount: LocalAccount) {
     if (!account?.isGuest) {
       setLinkingAccount(false);
@@ -947,10 +958,11 @@ export default function App() {
               accountId={account.id}
               isGuest={Boolean(account.isGuest)}
               isSynced={!account.isGuest && syncState === 'synced' && pendingCommandCount === 0}
-              userEmail={account?.email || 'samopmohamed7@gmail.com'}
+              userEmail={account?.isGuest ? '' : (account?.email || '')}
               onLinkAccount={() => setLinkingAccount(true)}
               onLogout={handleLogout}
               onResetWorld={handleResetToCountrySelection}
+              onAccountDeleted={handleAccountDeleted}
             />
           ) : (
             <SectionPage section={getSection(activeSection)} profile={profile} country={country} focus={sectionFocus} notificationTheme={notificationTheme} isGuest={Boolean(account.isGuest)} onNotificationThemeChange={setNotificationTheme} onHome={() => navigate('home')} onNavigate={(section) => navigate(section)} onAction={handleGameResult} onCommand={handleGameCommand} onRedeemed={handleRedeemed} onRefreshProfile={refreshAuthoritativeProfile} onLinkAccount={() => setLinkingAccount(true)} onLogout={handleLogout} onShowGuide={() => setPendingGuide(activeSection)} />
