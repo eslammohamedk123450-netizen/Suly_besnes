@@ -821,7 +821,7 @@ export default function App() {
     }
     setActiveSection(section);
     setSectionFocus(focus);
-    if (section !== 'home' && section !== 'profile' && !profile.onboarding.seenGuides.includes(section)) { setPendingGuide(section); playSound('unlock'); }
+    if (!isWalkthroughActive && section !== 'home' && section !== 'profile' && !profile.onboarding.seenGuides.includes(section)) { setPendingGuide(section); playSound('unlock'); }
     setMobileMenuOpen(false);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
@@ -917,8 +917,8 @@ export default function App() {
       </header>
       <ResourceBar profile={profile} country={country} onNavigate={navigate} syncState={!account || account.isGuest ? 'local' : syncState} pendingCommandCount={pendingCommandCount} />
 
-      <div className="app-layout">
-        <aside className="side-nav" aria-label="أقسام اللعبة">
+      <div className="app-layout w-full max-w-7xl mx-auto px-2 sm:px-4 lg:px-6">
+        <aside className="side-nav hidden lg:flex" aria-label="أقسام اللعبة">
           <div className="side-nav-caption">إدارة الإمبراطورية</div>
           {SECTION_GROUPS.map((group) => (
             <div className="nav-group" key={group.id}>
@@ -951,7 +951,7 @@ export default function App() {
           <div className="side-nav-note"><Icon name="shield" size={16} /><span>{!account || account.isGuest ? <>حفظ<br />على هذا الجهاز</> : syncState === 'offline' ? <>اللعب مستمر<br />بانتظار الاتصال</> : syncState === 'blocked' ? <>حماية التقدم<br />مراجعة الحفظ</> : syncState === 'syncing' ? <>جارٍ حفظ<br />خطواتك</> : <>حفظ آمن<br />ومحدّث</>}</span></div>
         </aside>
 
-        <main className="main-content">
+        <main className="main-content flex-1 w-full min-w-0 pb-24 md:pb-8">
           {activeSection === 'home' ? (
             <Dashboard 
               profile={profile} 
