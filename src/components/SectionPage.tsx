@@ -25,6 +25,7 @@ import { getGlobalMarketOffers, negotiateGlobalMarketOffer } from '../game/globa
 import { getWarehouseCapacity, getWarehouseItemCapacity, getWarehouseUsage, normalizeWarehouseLevel, WAREHOUSE_UPGRADE_REQUIREMENTS } from '../game/warehouse';
 import { getGameDayDurationMinutes } from '../game/time';
 import { getDiscountedDiamondPrice, type PurchasePaymentMethod } from '../game/purchasePricing';
+import { StockExchangeTerminal } from './StockExchangeTerminal';
 import { HubSubNav } from './HubSubNav';
 import { ItemImage } from './ItemImage';
 
@@ -680,49 +681,19 @@ export function SectionPage({ section, profile, country, focus, notificationThem
   }
 
   if (section.id === 'investments') {
-    const activeInvestments = selectActiveInvestments(profile);
-    const sales = selectSalesSummary(profile);
-    const goldQuantity = Number(goldAmount);
-    const goldBuyEstimate = Math.round(goldQuantity * GOLD_PRICE_PER_GRAM);
-    const goldSellEstimate = Math.round(goldQuantity * GOLD_PRICE_PER_GRAM * 0.97);
-    const goldHoldingMarketValue = Math.round(profile.goldGrams * GOLD_PRICE_PER_GRAM);
-    const goldHoldingSellEstimate = Math.round(profile.goldGrams * GOLD_PRICE_PER_GRAM * 0.97);
-    return <div className="section-page">{heading}{pageShell(
-      <>
-        <div className="economy-grid economy-grid--three-mobile"><EconomyStat label="استثمارات نشطة" value={formatNumber(activeInvestments.length)} /><EconomyStat label="إجمالي المبيعات" value={formatMoney(sales.grossRevenue, country)} /><EconomyStat label="صافي بعد الضريبة" value={formatMoney(sales.netRevenue, country)} /></div>
-        <SectionPanel title="تداول الذهب" description="احتياطي داخل اللعبة فقط؛ السعر ثابت ومحاكى ولا يتصل بأسعار السوق أو بجهة مالية.">
-          <div className="economy-grid economy-grid--three-mobile">
-            <EconomyStat label="الذهب المملوك" value={`${formatNumber(profile.goldGrams)} غ`} />
-            <EconomyStat label="سعر اللعبة للغرام" value={formatMoney(GOLD_PRICE_PER_GRAM, country)} />
-            <EconomyStat label="قيمة الاحتياطي بالسعر المحاكى" value={formatMoney(goldHoldingMarketValue, country)} />
-          </div>
-          <div className="economy-meta"><span>القيمة الدفترية للذهب {formatMoney(profile.goldCostBasis, country)}</span><span>المتحصل المتوقع عند بيع الاحتياطي الآن بعد فرق 3%: {formatMoney(goldHoldingSellEstimate, country)}</span></div>
-          <div className="economy-card-body">
-            <div className="economy-form-row">
-              <div className="economy-field"><label htmlFor="gold-quantity">الكمية (غرام، بخطوة 0.1)</label><input id="gold-quantity" type="number" min="0.1" step="0.1" value={goldAmount} onChange={(event) => setGoldAmount(event.target.value)} /></div>
-              <div className="economy-field"><label>شراء تقديري</label><input value={formatMoney(goldBuyEstimate, country)} readOnly /></div>
-              <div className="economy-field"><label>بيع تقديري بعد فرق 3%</label><input value={formatMoney(goldSellEstimate, country)} readOnly /></div>
-            </div>
-            <div className="economy-form-actions">
-              <PurchaseOptions country={country} cashPrice={goldBuyEstimate} diamondPrice={Number.isInteger(goldQuantity * 0.5) ? goldQuantity * 0.5 : 0} bankBalance={profile.bankBalance} diamondsBalance={profile.diamonds} disabled={!Number.isFinite(goldQuantity) || goldQuantity <= 0} cashLabel="شراء الذهب نقدًا" diamondLabel="شراء الذهب بالماس" note="سعر الصرف: ١٠٠ غرام = ٥٠ ماسة، مقابل ٦٬٠٠٠ ج.م لكل غرام نقدًا." onPurchase={(paymentMethod) => paymentMethod === 'diamonds' ? runCommand({ name: 'buy_gold_with_diamonds', args: { grams: goldQuantity } }, (current) => buyGoldWithDiamonds(current, goldQuantity)) : runCommand({ name: 'buy_gold', args: { grams: goldQuantity } }, (current) => buyGold(current, goldQuantity))} />
-              <button className="button button-secondary" type="button" disabled={!Number.isFinite(goldQuantity) || goldQuantity <= 0 || goldQuantity > profile.goldGrams} onClick={() => runCommand({ name: 'sell_gold', args: { grams: goldQuantity } }, (current) => sellGold(current, goldQuantity))}>بيع كمية</button>
-            </div>
-          </div>
-        </SectionPanel>
-        <SectionPanel title="أدوات الاستثمار داخل اللعبة" description="تُحجز المبالغ حتى موعد الاستحقاق. كل العوائد والمخاطر افتراضية ولا تمثل منتجًا ماليًا حقيقيًا.">
-          <div className="economy-list">{INVESTMENT_CATALOG.map((investment) => {
-            const amount = investmentAmounts[investment.id] ?? String(investment.minimumAmount);
-            return <article className="economy-card" key={investment.id}><div className="economy-card-head"><div className="economy-card-title"><span className="economy-card-icon"><Icon name="investment" size={18} /></span><span><strong>{investment.name}</strong><small>{formatNumber(investment.durationDays)} أيام · عائد متوقع {Math.round(getInvestmentPayoutRate(investment.returnRate, investment.durationDays) * 100)}%</small></span></div><span className={`economy-pill ${investment.riskRate > 0 ? 'economy-pill--gold' : 'economy-pill--green'}`}>{investment.riskRate > 0 ? `مخاطرة ${Math.round(investment.riskRate * 100)}%` : 'مخاطر منخفضة'}</span></div><div className="economy-card-body"><form className="economy-form" onSubmit={(event: FormEvent<HTMLFormElement>) => { event.preventDefault(); runCommand({ name: 'create_investment', args: { investmentId: investment.id, amount: Number(amount) } }, (current) => createInvestment(current, investment.id, Number(amount))); }}><div className="economy-form-row"><div className="economy-field"><label htmlFor={`invest-${investment.id}`}>مبلغ الاستثمار</label><input id={`invest-${investment.id}`} type="number" min={investment.minimumAmount} max={investment.maximumAmount} step="1000" value={amount} onChange={(event) => setInvestmentAmounts((previous) => ({ ...previous, [investment.id]: event.target.value }))} /></div><div className="economy-field"><label>المتاح في البنك</label><input value={formatMoney(profile.bankBalance, country)} readOnly /></div></div><div className="economy-meta"><span>الحد {formatMoney(investment.minimumAmount, country)}</span><span>الحد الأعلى {formatMoney(investment.maximumAmount, country)}</span></div><button className="button button-primary" type="submit" disabled={Number(amount) < investment.minimumAmount || Number(amount) > investment.maximumAmount || Number(amount) > profile.bankBalance}>إنشاء استثمار</button></form></div></article>;
-          })}</div>
-        </SectionPanel>
-        <SectionPanel title="محفظتك" description="يُعاد رأس المال والعائد عند استحقاق الاستثمار بعد مرور الأيام.">
-          {profile.investments.length === 0 ? <EconomyEmpty title="لا توجد استثمارات مسجلة" message="اختر أداة من الأعلى لتبدأ بتنويع رأس المال." /> : <div className="economy-list">{profile.investments.slice().reverse().map((investment) => {
-            const definition = INVESTMENT_CATALOG.find((item) => item.id === investment.investmentTypeId);
-            return <article className="economy-card economy-card--soft" key={investment.id}><div className="economy-card-head"><div className="economy-card-title"><span className="economy-card-icon"><Icon name="investment" size={18} /></span><span><strong>{definition?.name ?? investment.investmentTypeId}</strong><small>{formatMoney(investment.principal, country)} · يستحق يوم {formatNumber(investment.maturityDay)}</small></span></div><span className={`economy-pill ${investment.status === 'active' ? 'economy-pill--gold' : 'economy-pill--green'}`}>{investment.status === 'active' ? 'نشط' : investment.status === 'paid' ? 'تمت التسوية' : 'تسوية بخسارة'}</span></div>{investment.settledAmount !== undefined && <div className="economy-card-body"><div className="economy-meta"><span>قيمة التسوية {formatMoney(investment.settledAmount, country)}</span></div></div>}</article>;
-          })}</div>}
-        </SectionPanel>
-      </>,
-    )}</div>;
+    return (
+      <div className="section-page">
+        {heading}
+        {pageShell(
+          <StockExchangeTerminal
+            profile={profile}
+            country={country}
+            onCommand={onCommand}
+            onAction={onAction}
+          />
+        )}
+      </div>
+    );
   }
 
   if (section.id === 'reports') {
