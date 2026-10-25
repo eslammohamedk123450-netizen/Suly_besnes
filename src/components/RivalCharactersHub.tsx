@@ -75,7 +75,7 @@ export const RivalCharactersHub: React.FC<RivalCharactersHubProps> = ({
   const [replyMessage, setReplyMessage] = useState('');
   const [replyFeedback, setReplyFeedback] = useState<string | null>(null);
 
-  const playerNetWorth = (profile.cash ?? 0) + 
+  const playerNetWorth = (profile.bankBalance ?? 0) + 
     ((profile.lands?.length ?? 0) * 450000) + 
     ((profile.companies?.length ?? 0) * 600000);
 

@@ -126,7 +126,7 @@ export const SmartOnboardingQuests: React.FC<SmartOnboardingQuestsProps> = ({
     onClaimReward(quest.cashReward, quest.diamondReward, quest.id);
   };
 
-  const isLowBalance = (profile.cash ?? 0) < 65000 && (profile.day ?? 1) <= 15;
+  const isLowBalance = (profile.bankBalance ?? 0) < 65000 && (profile.day ?? 1) <= 15;
 
   return (
     <div className="space-y-3" dir="rtl">
@@ -140,7 +140,7 @@ export const SmartOnboardingQuests: React.FC<SmartOnboardingQuestsProps> = ({
                 تسهيل ائتماني طارئ من «بنك مصر للأعمال»
               </h4>
               <p className="text-xs text-amber-200/90 mt-0.5">
-                رصيدك الحالي ({formatMoney(profile.cash, profile.countryId)}) قارب على النفاد! اسحب 250,000 ج.م لحماية مصانعك من التوقف.
+                رصيدك الحالي ({formatMoney(profile.bankBalance, profile.countryId)}) قارب على النفاد! اسحب 250,000 ج.م لحماية مصانعك من التوقف.
               </p>
             </div>
           </div>
