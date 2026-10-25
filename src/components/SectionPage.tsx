@@ -6,7 +6,7 @@ import type { NotificationTheme } from '../storage/userPreferences';
 import type { SectionId, SectionItem } from '../domain/navigation';
 import { formatMoney, formatNumber } from '../domain/formatters';
 import { acceptContract, autoSupplyAndProduce, buyDirectCompany, buyDirectLand, buyGlobalMaterial, buyGold, buyGoldWithDiamonds, buySpeedCard, cancelProductionOrder, claimTask, createDeposit, createInvestment, deliverContract, foundCompany, getDepositExpectedInterest, getDepositMaturityRange, getStaffUpgradeCost, hasMaturedDepositTranche, hireStaff, mergeDeposits, negotiateContract, payStaffSalary, placeBid, repayLoan, runProduction, sellAsset, sellCompany, sellGold, sellLand, sellProduct, serviceCompany, staffExperience, staffLevel, takeLoan, terminateStaff, upgradeCompany, upgradeLand, upgradeStaff, upgradeWarehouse, useDaySpeedCard, useProductionSpeedCard, withdrawDeposit, type GameResult } from '../game/engine';
-import type { StaffRole } from '../domain/futureSystems';
+import type { StaffRole, AuctionListing } from '../domain/futureSystems';
 import { AUCTION_CATALOG, DIRECT_COMPANY_CATALOG, DIRECT_LAND_CATALOG, getDirectLandsForCountry, getDirectCompaniesForCountry, GOLD_PRICE_PER_GRAM, INDUSTRY_CATALOG, INVESTMENT_CATALOG, MATERIAL_CATALOG, PRODUCT_CATALOG, RECIPE_CATALOG } from '../game/catalog';
 import { getMarketQuote } from '../game/market';
 import { formatAuctionCountdown, getAuctionCloseAt } from '../game/auctions';
@@ -39,6 +39,8 @@ import { HubSubNav } from './HubSubNav';
 import { ItemImage } from './ItemImage';
 import { BankTerminal } from './BankTerminal';
 import { getPlayerProgress, getSectionRequiredLevel, getSectionUnlockHint, isSectionUnlocked } from '../game/onboarding';
+import { ListAssetAuctionModal } from './DynamicAuctionModal';
+import { generateLiveAuctions, RIVAL_INVESTORS } from '../game/dynamicAuctions';
 
 interface SectionPageProps {
   section: SectionItem;
@@ -57,6 +59,7 @@ interface SectionPageProps {
   onLinkAccount: () => void;
   onLogout: () => void;
   onShowGuide: () => void;
+  onProfileUpdate?: (updated: PlayerProfile) => void;
 }
 
 const landTypeNames = { industrial: 'صناعية', agricultural: 'زراعية', commercial: 'تجارية' } as const;
@@ -101,7 +104,7 @@ function economicEventDetails(event: PlayerProfile['events'][number], currentDay
   return details;
 }
 
-export function SectionPage({ section, profile, country, focus, notificationTheme, isGuest, onNotificationThemeChange, onHome, onNavigate, onAction, onCommand, onRedeemed, onRefreshProfile, onLinkAccount, onLogout, onShowGuide }: SectionPageProps) {
+export function SectionPage({ section, profile, country, focus, notificationTheme, isGuest, onNotificationThemeChange, onHome, onNavigate, onAction, onCommand, onRedeemed, onRefreshProfile, onLinkAccount, onLogout, onShowGuide, onProfileUpdate }: SectionPageProps) {
   const playerProgress = getPlayerProgress(profile);
   const [bidAmounts, setBidAmounts] = useState<Record<string, string>>({});
   const [companyName, setCompanyName] = useState('شركة جديدة');
@@ -136,7 +139,8 @@ export function SectionPage({ section, profile, country, focus, notificationThem
   const [landView, setLandView] = useState<'owned' | 'offers'>('owned');
   const [landTypeFilter, setLandTypeFilter] = useState<'all' | 'industrial' | 'agricultural' | 'commercial'>('all');
   const [landSort, setLandSort] = useState<'price' | 'area' | 'type'>('price');
-  const [auctionCategoryTab, setAuctionCategoryTab] = useState<'all' | 'land' | 'factory' | 'material'>('land');
+  const [auctionCategoryTab, setAuctionCategoryTab] = useState<'all' | 'land' | 'factory' | 'material'>('all');
+  const [isListAssetModalOpen, setIsListAssetModalOpen] = useState(false);
   const [activePanelId, setActivePanelId] = useState<string | null>(null);
   const [expansionState, setExpansionState] = useState(() => loadExpansionState(profile));
   const [megaExpState, setMegaExpState] = useState(() => loadMegaExpansionState(profile));
@@ -387,28 +391,76 @@ export function SectionPage({ section, profile, country, focus, notificationThem
   }
 
   if (section.id === 'auctions') {
-    const listings = selectAvailableAuctions(profile);
-    const selectedAuction = selectedAuctionId ? listings.find((listing) => listing.id === selectedAuctionId) : undefined;
+    const catalogListings = selectAvailableAuctions(profile);
+    const liveDistressedItems = generateLiveAuctions(profile);
+
+    // Merge listings so any clicked dynamic item can open in AuctionRoom
+    const dynamicConvertedListings: AuctionListing[] = liveDistressedItems.map((item) => ({
+      id: item.id,
+      countryId: profile.countryId,
+      lotType: item.lotType,
+      label: item.title,
+      landType: item.landType || 'industrial',
+      areaSquareMeters: item.areaSquareMeters || 3000,
+      minimumBid: item.currentBid,
+      bidIncrement: item.bidIncrement,
+      closesAt: new Date(item.closesAtMs).toISOString(),
+      status: 'open' as const,
+      energyCapacityBonus: item.energyCapacityBonus,
+      materialId: item.materialId,
+      quantity: item.quantity,
+    }));
+
+    const allListings = [...catalogListings, ...dynamicConvertedListings];
+    const selectedAuction = selectedAuctionId ? allListings.find((listing) => listing.id === selectedAuctionId) : undefined;
     
     // Filter listings based on auctionCategoryTab state
-    const filteredListings = listings.filter((listing) => {
+    const filteredCatalog = catalogListings.filter((listing) => {
       if (auctionCategoryTab === 'land') return listing.lotType === 'land';
       if (auctionCategoryTab === 'factory') return listing.lotType === 'factory';
       if (auctionCategoryTab === 'material') return listing.lotType === 'raw-material';
       return true;
     });
 
+    const filteredLive = liveDistressedItems.filter((item) => {
+      if (auctionCategoryTab === 'land') return item.lotType === 'land';
+      if (auctionCategoryTab === 'factory') return item.lotType === 'factory';
+      if (auctionCategoryTab === 'material') return item.lotType === 'raw-material';
+      return true;
+    });
+
     return (
-      <div className="section-page auctions-view-page">
-        {/* Auctions Hero Banner */}
+      <div className="section-page auctions-view-page" dir="rtl">
+        {/* Auctions Hero Banner with 'List Asset in Auction' Button */}
         <div className="auctions-hero-banner">
-          <div className="auctions-hero-gavel">🔨</div>
-          <h1>المزادات</h1>
-          <p>فرص جديدة لتوسيع إمبراطوريتك.</p>
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 w-full">
+            <div className="flex items-center gap-3">
+              <div className="auctions-hero-gavel">🔨</div>
+              <div>
+                <h1>سوق المزادات الحية الذكية</h1>
+                <p>تنافس مع كبرى الصناديق والمستثمرين على الأصول النادرة · أراضٍ متعثرة وتوسعات مصانع</p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsListAssetModalOpen(true)}
+              className="px-5 py-3 rounded-2xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 text-slate-950 font-black text-xs sm:text-sm shadow-xl shadow-amber-500/25 transition transform hover:scale-[1.02] flex items-center gap-2 shrink-0 cursor-pointer"
+            >
+              <Icon name="gavel" size={16} />
+              <span>طرح أصل في المزاد 🏛️</span>
+            </button>
+          </div>
         </div>
 
         {/* Category Segment Tabs */}
         <div className="auctions-category-tabs" role="tablist">
+          <button
+            type="button"
+            className={`auction-tab-btn ${auctionCategoryTab === 'all' ? 'is-active' : ''}`}
+            onClick={() => setAuctionCategoryTab('all')}
+          >
+            الكل
+          </button>
           <button
             type="button"
             className={`auction-tab-btn ${auctionCategoryTab === 'land' ? 'is-active' : ''}`}
@@ -436,116 +488,77 @@ export function SectionPage({ section, profile, country, focus, notificationThem
         <div className="auctions-fair-banner">
           <div className="fair-banner-icon">⚖️</div>
           <div className="fair-banner-text">
-            <h3>مزايدة عادلة وواضحة</h3>
-            <p>جميع المزادات شفافة وبأفضل الفرص للجميع.</p>
+            <h3>مزايدة عادلة وشفافة بمشاركة 30 صندوق ومستثمر إقليمي</h3>
+            <p>جميع الصفقات معتمدة قضائياً وبضمان تحصيل وتسجيل رسمي فوري للأصول.</p>
           </div>
           <div className="fair-banner-gavel">🔨</div>
         </div>
 
         {/* Auction Items Cards List */}
         <div className="auctions-items-list">
-          {/* Static Mock Items matching the design image + Dynamic items */}
-          <article className="auction-item-card">
-            <ItemImage type="land" landType="agricultural" name="أرض زراعية" size="md" className="auction-card-thumb-wrap" />
-            <div className="auction-card-body">
-              <div className="auction-card-top">
-                <h3>أرض زراعية</h3>
-                <span className="auction-location">📍 المنطقة الشرقية</span>
-              </div>
-              <p className="auction-desc">موقع متميز مناسب للمحاصيل الزراعية.</p>
-              <div className="auction-card-footer">
-                <div className="auction-meta-info">
-                  <div>
-                    <small>أقل مزايدة</small>
-                    <strong>💰 1,200,000 {country.currency.code}</strong>
+          {/* 1. Dynamic Live Distressed Auctions with Authorities & Rival Bidders */}
+          {filteredLive.map((item) => {
+            const remainingMins = Math.max(1, Math.round((item.closesAtMs - Date.now()) / 60000));
+            const hours = Math.floor(remainingMins / 60);
+            const mins = remainingMins % 60;
+            const timeLabel = hours > 0 ? `${hours}س ${mins}د` : `${mins}د`;
+
+            return (
+              <article className="auction-item-card" key={item.id}>
+                {item.lotType === 'land' ? (
+                  <ItemImage type="land" landType={item.landType || 'industrial'} name={item.title} size="md" className="auction-card-thumb-wrap" />
+                ) : item.lotType === 'factory' ? (
+                  <ItemImage type="industry" id="electricity" name={item.title} size="md" className="auction-card-thumb-wrap" />
+                ) : (
+                  <ItemImage type="material" id={item.materialId || 'steel'} name={item.title} size="md" className="auction-card-thumb-wrap" />
+                )}
+
+                <div className="auction-card-body">
+                  <div className="auction-card-top">
+                    <div>
+                      <span className="inline-block text-[10px] font-bold text-amber-400 bg-amber-500/15 px-2 py-0.5 rounded-full border border-amber-500/30 mb-1">
+                        جهة الطرح: {item.authority}
+                      </span>
+                      <h3>{item.title}</h3>
+                    </div>
+                    <span className="auction-location">📍 {item.location}</span>
                   </div>
-                  <div>
-                    <small>الوقت المتبقي</small>
-                    <strong className="auction-time-text">⏰ 2س 15د</strong>
+
+                  <p className="auction-desc">{item.description}</p>
+
+                  <div className="bg-slate-950/70 p-2 rounded-xl border border-slate-800 text-[11px] flex items-center justify-between mb-2">
+                    <span className="text-slate-400">العرض المتصدر حالياً:</span>
+                    <span className="font-bold text-slate-200">
+                      {item.leadingInvestor.name} <span className="text-[10px] text-amber-400">({item.leadingInvestor.type})</span>
+                    </span>
+                  </div>
+
+                  <div className="auction-card-footer">
+                    <div className="auction-meta-info">
+                      <div>
+                        <small>العرض الحالي</small>
+                        <strong className="text-emerald-400 font-mono">💰 {formatMoney(item.currentBid, country)}</strong>
+                      </div>
+                      <div>
+                        <small>الوقت المتبقي</small>
+                        <strong className="auction-time-text">⏰ {timeLabel}</strong>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      className="auction-enter-btn"
+                      onClick={() => setSelectedAuctionId(item.id)}
+                    >
+                      ادخل المزاد 🔨
+                    </button>
                   </div>
                 </div>
-                <button
-                  type="button"
-                  className="auction-enter-btn"
-                  onClick={() => {
-                    const found = listings.find((item) => item.lotType === 'land') ?? listings[0];
-                    if (found) setSelectedAuctionId(found.id);
-                  }}
-                >
-                  ادخل المزاد 🔨
-                </button>
-              </div>
-            </div>
-          </article>
+              </article>
+            );
+          })}
 
-          <article className="auction-item-card">
-            <ItemImage type="industry" id="electricity" name="مصنع طاقة" size="md" className="auction-card-thumb-wrap" />
-            <div className="auction-card-body">
-              <div className="auction-card-top">
-                <h3>مصنع طاقة</h3>
-                <span className="auction-location">📍 المنطقة الشمالية</span>
-              </div>
-              <p className="auction-desc">محطة طاقة حديثة جاهزة للتشغيل.</p>
-              <div className="auction-card-footer">
-                <div className="auction-meta-info">
-                  <div>
-                    <small>أقل مزايدة</small>
-                    <strong>💰 3,500,000 {country.currency.code}</strong>
-                  </div>
-                  <div>
-                    <small>الوقت المتبقي</small>
-                    <strong className="auction-time-text">⏰ 5س 40د</strong>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  className="auction-enter-btn"
-                  onClick={() => {
-                    const found = listings.find((item) => item.lotType === 'factory') ?? listings[0];
-                    if (found) setSelectedAuctionId(found.id);
-                  }}
-                >
-                  ادخل المزاد 🔨
-                </button>
-              </div>
-            </div>
-          </article>
-
-          <article className="auction-item-card">
-            <ItemImage type="material" id="steel" name="شحنة فولاذ" size="md" className="auction-card-thumb-wrap" />
-            <div className="auction-card-body">
-              <div className="auction-card-top">
-                <h3>شحنة فولاذ</h3>
-                <span className="auction-location">📍 ميناء العاصمة</span>
-              </div>
-              <p className="auction-desc">كمية كبيرة عالية الجودة.</p>
-              <div className="auction-card-footer">
-                <div className="auction-meta-info">
-                  <div>
-                    <small>أقل مزايدة</small>
-                    <strong>💰 850,000 {country.currency.code}</strong>
-                  </div>
-                  <div>
-                    <small>الوقت المتبقي</small>
-                    <strong className="auction-time-text">⏰ 1س 30د</strong>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  className="auction-enter-btn"
-                  onClick={() => {
-                    const found = listings.find((item) => item.lotType === 'raw-material') ?? listings[0];
-                    if (found) setSelectedAuctionId(found.id);
-                  }}
-                >
-                  ادخل المزاد 🔨
-                </button>
-              </div>
-            </div>
-          </article>
-
-          {/* Dynamic Listings */}
-          {filteredListings.map((listing) => {
+          {/* 2. Catalog Listings */}
+          {filteredCatalog.map((listing) => {
             const material = MATERIAL_CATALOG.find((item) => item.id === listing.materialId);
             const closeAt = getAuctionCloseAt(profile, listing);
             const lotSummary = listing.lotType === 'land'
@@ -563,7 +576,12 @@ export function SectionPage({ section, profile, country, focus, notificationThem
                 </div>
                 <div className="auction-card-body">
                   <div className="auction-card-top">
-                    <h3>{listing.label}</h3>
+                    <div>
+                      <span className="inline-block text-[10px] font-bold text-amber-400 bg-amber-500/15 px-2 py-0.5 rounded-full border border-amber-500/30 mb-1">
+                        جهة الطرح: تصفية قضائية معلنة
+                      </span>
+                      <h3>{listing.label}</h3>
+                    </div>
                     <span className="auction-location">📍 {listing.lotType === 'land' ? 'منطقة توسعة' : 'مركز لوجستي'}</span>
                   </div>
                   <p className="auction-desc">{lotSummary}</p>
@@ -601,6 +619,39 @@ export function SectionPage({ section, profile, country, focus, notificationThem
             initialBid={Number(bidAmounts[selectedAuction.id]) || undefined}
             onClose={() => setSelectedAuctionId(null)}
             onBid={(amount, targetCompanyId) => {
+              // Check if it's dynamic auction or catalog
+              const dynamicItem = liveDistressedItems.find((x) => x.id === selectedAuction.id);
+              if (dynamicItem) {
+                if (profile.bankBalance < amount) {
+                  return { ok: false, reason: 'insufficient-funds', message: 'السيولة غير كافية لإتمام الشراء', profile };
+                }
+
+                let updatedProfile = { ...profile, bankBalance: profile.bankBalance - amount };
+                if (dynamicItem.lotType === 'land') {
+                  const newLand = {
+                    id: `won-land-${Date.now()}`,
+                    label: dynamicItem.title,
+                    areaSquareMeters: dynamicItem.areaSquareMeters || 3000,
+                    purchasePrice: amount,
+                    acquiredAt: new Date().toISOString(),
+                    acquiredOnDay: profile.day,
+                    availableForCompanyOnDay: profile.day + 1,
+                    landType: dynamicItem.landType || 'industrial',
+                  };
+                  updatedProfile.lands = [...updatedProfile.lands, newLand];
+                } else if (dynamicItem.lotType === 'factory' && targetCompanyId) {
+                  updatedProfile.companies = updatedProfile.companies.map((c) =>
+                    c.id === targetCompanyId
+                      ? { ...c, energyCapacity: (c.energyCapacity ?? 100) + (dynamicItem.energyCapacityBonus ?? 100) }
+                      : c,
+                  );
+                }
+
+                if (onProfileUpdate) onProfileUpdate(updatedProfile);
+                setSelectedAuctionId(null);
+                return { ok: true, data: null, message: `مبروك! تم الفوز بالمزاد وترسية [${dynamicItem.title}] لصالحك.`, profile: updatedProfile };
+              }
+
               const result = placeBid(profile, selectedAuction.id, amount, targetCompanyId);
               onAction(result);
               if (result.ok) setSelectedAuctionId(null);
@@ -608,6 +659,20 @@ export function SectionPage({ section, profile, country, focus, notificationThem
             }}
           />
         )}
+
+        {/* Player List Asset in Auction Modal */}
+        <ListAssetAuctionModal
+          profile={profile}
+          country={country}
+          isOpen={isListAssetModalOpen}
+          onClose={() => setIsListAssetModalOpen(false)}
+          onAssetSold={(updatedProfile, message) => {
+            if (onProfileUpdate) {
+              onProfileUpdate(updatedProfile);
+            }
+            onAction({ ok: true, data: null, message, profile: updatedProfile });
+          }}
+        />
       </div>
     );
   }
@@ -905,6 +970,11 @@ export function SectionPage({ section, profile, country, focus, notificationThem
           country={country}
           onCommand={onCommand}
           onAction={onAction}
+          onProfileUpdate={(updated) => {
+            if (onProfileUpdate) {
+              onProfileUpdate(updated);
+            }
+          }}
         />
       </div>
     );

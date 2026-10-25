@@ -83,7 +83,7 @@ export function Dashboard({
   const [isLeaderboardOpen, setIsLeaderboardOpen] = useState(false);
   const [isFinanceModalOpen, setIsFinanceModalOpen] = useState(false);
   const [spinState, setSpinState] = useState(() => getLuckySpinState(profile.lastSpinTimestamp));
-  const [opsFilter, setOpsFilter] = useState<'all' | 'core' | 'expansion'>('all');
+  const [opsFilter, setOpsFilter] = useState<'all' | 'available' | 'core' | 'expansion'>('all');
   const [lockedGateModal, setLockedGateModal] = useState<{
     title: string;
     sectionId: SectionId;
@@ -364,7 +364,10 @@ export function Dashboard({
     },
   ];
 
+  const availableCount = commandItems.filter((item) => item.isUnlocked).length;
+
   const filteredItems = commandItems.filter((item) => {
+    if (opsFilter === 'available') return item.isUnlocked;
     if (opsFilter === 'core') return item.category === 'core' || item.category === 'special';
     if (opsFilter === 'expansion') return item.category === 'expansion';
     return true;
@@ -581,6 +584,12 @@ export function Dashboard({
                 الكل ({commandItems.length})
               </button>
               <button
+                onClick={() => setOpsFilter('available')}
+                className={`px-2.5 py-1 rounded-lg transition ${opsFilter === 'available' ? 'bg-amber-500 text-slate-950 font-black shadow' : 'text-slate-400 hover:text-white'}`}
+              >
+                المتاح ({availableCount})
+              </button>
+              <button
                 onClick={() => setOpsFilter('core')}
                 className={`px-2.5 py-1 rounded-lg transition ${opsFilter === 'core' ? 'bg-amber-500 text-slate-950 font-black shadow' : 'text-slate-400 hover:text-white'}`}
               >
@@ -666,7 +675,11 @@ export function Dashboard({
                 </span>
 
                 {/* Explicit Lock Level Badge as requested by the user */}
-                {!item.isUnlocked ? (
+                {opsFilter === 'available' ? (
+                  <span className="text-[9px] text-emerald-400 font-bold mt-1 bg-emerald-500/10 px-1.5 py-0.5 rounded-md border border-emerald-500/30">
+                    نشط ومتاح ✓
+                  </span>
+                ) : !item.isUnlocked ? (
                   <span className="text-[9px] font-black text-amber-300 bg-amber-950/90 px-1.5 py-0.5 rounded-md border border-amber-500/40 mt-1 flex items-center gap-0.5 shadow-sm whitespace-nowrap">
                     <Lock className="w-2.5 h-2.5 text-amber-400 shrink-0" />
                     <span>يفتح في مستوى {item.requiredLevel}</span>

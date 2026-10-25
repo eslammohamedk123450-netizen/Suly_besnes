@@ -23,6 +23,7 @@ import type { PlayerProfile } from './domain/player';
 import { formatMoney } from './domain/formatters';
 import type { FinanceLedgerEntry } from './domain/futureSystems';
 import { advanceDay, sellProduct, type GameCommand, type GameResult } from './game/engine';
+import { loadStockMarketState, disburseHybridDividends } from './game/stockMarket';
 import { loadSavedGame, saveGame } from './storage/saveRepository';
 import { loadNotificationTheme, saveNotificationTheme } from './storage/userPreferences';
 import { createGuestAccount, handlePasswordRecoveryCallback, loadCurrentAccount, logoutAccount, type LocalAccount } from './storage/authRepository';
@@ -800,10 +801,22 @@ export default function App() {
       latestDayMessage = result.message;
     }
     if (completedDays === 0) return;
+
+    // Process Hybrid Dividends for stocks if player holds any
+    const stockState = loadStockMarketState(current.id);
+    const isSeasonalMilestone = current.day % 5 === 0;
+    const dividendRes = disburseHybridDividends(current, stockState, isSeasonalMilestone);
+    if (dividendRes.payout > 0) {
+      current = dividendRes.updatedProfile;
+    }
+
     const saved = saveGame(current, account?.id);
     setProfile(current);
     const elapsedLabel = `${completedDays} ${completedDays === 1 ? 'يوم' : 'أيام'}`;
-    const summary = completedDays > 1 ? `تم ترحيل ${elapsedLabel}. آخر ملخص: ${latestDayMessage}` : latestDayMessage;
+    let summary = completedDays > 1 ? `تم ترحيل ${elapsedLabel}. آخر ملخص: ${latestDayMessage}` : latestDayMessage;
+    if (dividendRes.payout > 0) {
+      summary += ` | أرباح الأسهم المودعة: +${formatMoney(dividendRes.payout, country)}`;
+    }
     setNotice(saved.ok ? summary : `${summary} تعذر تثبيت الحفظ على هذا الجهاز.`);
     setNoticeTone(saved.ok ? 'success' : 'error');
 
@@ -1009,7 +1022,28 @@ export default function App() {
                   onRestartWalkthrough={() => { setWalkthroughStepIndex(0); setIsWalkthroughActive(true); }}
             />
           ) : (
-            <SectionPage section={getSection(activeSection)} profile={profile} country={country} focus={sectionFocus} notificationTheme={notificationTheme} isGuest={Boolean(account.isGuest)} onNotificationThemeChange={setNotificationTheme} onHome={() => navigate('home')} onNavigate={(section) => navigate(section)} onAction={handleGameResult} onCommand={handleGameCommand} onRedeemed={handleRedeemed} onRefreshProfile={refreshAuthoritativeProfile} onLinkAccount={() => setLinkingAccount(true)} onLogout={handleLogout} onShowGuide={() => setPendingGuide(activeSection)} />
+            <SectionPage
+              section={getSection(activeSection)}
+              profile={profile}
+              country={country}
+              focus={sectionFocus}
+              notificationTheme={notificationTheme}
+              isGuest={Boolean(account.isGuest)}
+              onNotificationThemeChange={setNotificationTheme}
+              onHome={() => navigate('home')}
+              onNavigate={(section) => navigate(section)}
+              onAction={handleGameResult}
+              onCommand={handleGameCommand}
+              onRedeemed={handleRedeemed}
+              onRefreshProfile={refreshAuthoritativeProfile}
+              onLinkAccount={() => setLinkingAccount(true)}
+              onLogout={handleLogout}
+              onShowGuide={() => setPendingGuide(activeSection)}
+              onProfileUpdate={(updated) => {
+                setProfile(updated);
+                saveGame(updated, account?.id);
+              }}
+            />
           )}
         </main>
       </div>
