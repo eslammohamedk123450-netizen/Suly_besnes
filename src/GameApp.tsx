@@ -156,21 +156,28 @@ export default function App() {
     let cancelled = false;
     async function initializeAccount() {
       try {
-        const current = await loadCurrentAccount();
+        let current = await loadCurrentAccount();
         if (cancelled) return;
-        setAccount(current);
-        const local = current ? loadSavedGame(current.id) ?? loadPendingInitialProfile(current.id)?.profile ?? null : null;
-        if (local) {
-          setProfile(normalizeAccountFeatures(local, current?.id));
-          setAuthLoading(false);
-        }
+
+        // Auto-create guest session if none exists so player can play immediately
         if (!current) {
-          setAuthLoading(false);
-          return;
+          current = createGuestAccount();
         }
+        setAccount(current);
+
+        let local = loadSavedGame(current.id) ?? loadPendingInitialProfile(current.id)?.profile ?? null;
+        
+        // Auto-create the initial struggle world if no save exists yet
+        if (!local) {
+          const egyptCountry = COUNTRIES[0];
+          local = normalizeAccountFeatures(createNewPlayer(egyptCountry, 'إسلام محمد'), current.id);
+          saveGame(local, current.id);
+        }
+
+        setProfile(normalizeAccountFeatures(local, current.id));
+        setAuthLoading(false);
+
         if (current.isGuest) {
-          setProfile(local ? normalizeAccountFeatures(local, current.id) : null);
-          setAuthLoading(false);
           void claimDailyLogin(current);
           return;
         }
@@ -735,7 +742,47 @@ export default function App() {
 
         <main className="main-content">
           {activeSection === 'home' ? (
-            <Dashboard profile={profile} country={country} onNavigate={navigate} onCommand={handleGameCommand} />
+            <Dashboard 
+              profile={profile} 
+              country={country} 
+              onNavigate={navigate} 
+              onCommand={handleGameCommand}
+              onUpdateProfile={(updater) => {
+                setProfile((prev) => {
+                  if (!prev) return prev;
+                  const next = updater(prev);
+                  saveGame(next, account?.id);
+                  return next;
+                });
+              }}
+              onClaimReward={(cash, diamonds) => {
+                setProfile((prev) => {
+                  if (!prev) return prev;
+                  const next = {
+                    ...prev,
+                    bankBalance: prev.bankBalance + cash,
+                    diamonds: prev.diamonds + diamonds,
+                  };
+                  saveGame(next, account?.id);
+                  setNotice(`تم استلام المكافأة: +${cash.toLocaleString()} ج.م و +${diamonds} ألماسة! 🎁`);
+                  setNoticeTone('success');
+                  return next;
+                });
+              }}
+              onRequestEmergencyLoan={() => {
+                setProfile((prev) => {
+                  if (!prev) return prev;
+                  const next = {
+                    ...prev,
+                    bankBalance: prev.bankBalance + 250000,
+                  };
+                  saveGame(next, account?.id);
+                  setNotice('تم إيداع تسهيل ائتماني طارئ بقيمة 250,000 ج.م من بنك مصر للأعمال! 🏦');
+                  setNoticeTone('success');
+                  return next;
+                });
+              }}
+            />
           ) : activeSection === 'profile' ? (
             <ProfilePage profile={profile} country={country} accountId={account.id} isGuest={Boolean(account.isGuest)} isSynced={!account.isGuest && syncState === 'synced' && pendingCommandCount === 0} onLinkAccount={() => setLinkingAccount(true)} onResetWorld={handleResetToCountrySelection} />
           ) : (
