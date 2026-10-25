@@ -324,9 +324,9 @@ export const GitHubHubModal: React.FC<GitHubHubModalProps> = ({
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex items-center gap-1.5">
                         {repo.private ? (
-                          <Lock className="w-3.5 h-3.5 text-amber-400 shrink-0" title="مستودع خاص" />
+                          <span title="مستودع خاص"><Lock className="w-3.5 h-3.5 text-amber-400 shrink-0" /></span>
                         ) : (
-                          <Globe className="w-3.5 h-3.5 text-slate-400 shrink-0" title="مستودع عام" />
+                          <span title="مستودع عام"><Globe className="w-3.5 h-3.5 text-slate-400 shrink-0" /></span>
                         )}
                         <span className={`text-xs font-bold font-mono ${isSelected ? 'text-emerald-300' : 'text-white'}`}>
                           {repo.name}

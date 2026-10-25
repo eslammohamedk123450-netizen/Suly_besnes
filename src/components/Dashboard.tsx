@@ -71,7 +71,7 @@ export function Dashboard({
         onUpdateProfile={onUpdateProfile ?? ((updater) => {
           onCommand(
             { name: 'redeem_reward_code', args: { code: 'STORY-UPDATE' } } as any,
-            (curr) => ({ success: true, profile: updater(curr) })
+            (curr) => ({ ok: true, profile: updater(curr), message: 'تم تحديث قصة الكفاح', data: null })
           );
         })}
       />
@@ -83,13 +83,23 @@ export function Dashboard({
         onClaimReward={onClaimReward ?? ((cash, diamonds) => {
           onCommand(
             { name: 'redeem_reward_code', args: { code: 'QUEST-CLAIM' } } as any,
-            (curr) => ({ success: true, profile: { ...curr, cash: (curr.cash ?? 0) + cash, diamonds: (curr.diamonds ?? 0) + diamonds } })
+            (curr) => ({ 
+              ok: true, 
+              profile: { ...curr, bankBalance: (curr.bankBalance ?? 0) + cash, diamonds: (curr.diamonds ?? 0) + diamonds },
+              message: 'تم استلام مكافأة المهمة',
+              data: null
+            })
           );
         })}
         onRequestEmergencyLoan={onRequestEmergencyLoan ?? (() => {
           onCommand(
             { name: 'redeem_reward_code', args: { code: 'EMERGENCY-LOAN' } } as any,
-            (curr) => ({ success: true, profile: { ...curr, cash: (curr.cash ?? 0) + 250000 } })
+            (curr) => ({ 
+              ok: true, 
+              profile: { ...curr, bankBalance: (curr.bankBalance ?? 0) + 250000 },
+              message: 'تم إيداع التسهيل الائتماني',
+              data: null
+            })
           );
         })}
       />

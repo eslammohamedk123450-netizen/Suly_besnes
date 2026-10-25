@@ -52,13 +52,11 @@ export const QUEST_STEPS: QuestStep[] = [
     title: 'تأمين المواد الخام للإنتاج',
     desc: 'ادخل إلى سوق الخامات واشترِ المواد الأساسية التي يحتاجها مصنعك لبدء التصنيع.',
     icon: '📦',
-    targetSection: 'materials',
+    targetSection: 'inventory',
     cashReward: 50000,
     diamondReward: 5,
     isCompleted: (p) => {
-      const mats = p.warehouse?.materials;
-      if (!mats) return false;
-      return Object.values(mats).some((qty) => (Number(qty) || 0) > 0);
+      return (p.inventory?.length ?? 0) > 0;
     },
   },
   {
@@ -71,9 +69,7 @@ export const QUEST_STEPS: QuestStep[] = [
     cashReward: 120000,
     diamondReward: 15,
     isCompleted: (p) => {
-      const prods = p.warehouse?.products;
-      if (!prods) return false;
-      return Object.values(prods).some((qty) => (Number(qty) || 0) > 0);
+      return (p.productionOrders?.length ?? 0) > 0;
     },
   },
   {
@@ -82,12 +78,11 @@ export const QUEST_STEPS: QuestStep[] = [
     title: 'بيع أول شحنة وتحقيق الأرباح',
     desc: 'اعرض منتجاتك في السوق المحلي وجني أول إيراد نقدي لتبدأ أرباح إمبراطوريتك بالتدفق!',
     icon: '💰',
-    targetSection: 'market',
+    targetSection: 'store',
     cashReward: 180000,
     diamondReward: 25,
     isCompleted: (p) => {
-      // Completed if player has made at least one sales transaction or advanced several days with revenue
-      return (p.ledger?.totalSalesRevenue ?? 0) > 0 || (p.stats?.totalProductsSold ?? 0) > 0;
+      return (p.sales?.length ?? 0) > 0 || (p.finances?.totalRevenue ?? 0) > 0 || p.ledger.some((l) => l.category === 'revenue' && l.amount > 120000);
     },
   },
 ];

@@ -24,8 +24,8 @@ export const StruggleStoryHub: React.FC<StruggleStoryHubProps> = ({
 
   const maintenance = initialCompany?.maintenanceCondition ?? 25;
   const isRepaired = maintenance >= 75;
-  const hasRawMaterials = (profile.inventory?.length ?? 0) > 0 || profile.ledger.some((e) => e.title.includes('خامات'));
-  const hasSoldProducts = profile.ledger.some((e) => e.title.includes('بيع') || e.title.includes('شحنة'));
+  const hasRawMaterials = (profile.inventory?.length ?? 0) > 0 || profile.ledger.some((e) => e.note?.includes('خامات'));
+  const hasSoldProducts = profile.ledger.some((e) => e.note?.includes('بيع') || e.note?.includes('شحنة'));
   const isLoanPaid = !bankLoan || bankLoan.status === 'paid';
 
   const daysRemaining = Math.max(0, 7 - (profile.day ?? 1));
@@ -52,11 +52,11 @@ export const StruggleStoryHub: React.FC<StruggleStoryHubProps> = ({
           ...prev.ledger,
           {
             id: `repair-${Date.now()}`,
-            day: prev.day,
-            title: 'تكلفة طقم الصيانة العاجلة والفلاتر وتزييت الماكينات',
             category: 'expense',
             amount: -25000,
-            createdAt: new Date().toISOString(),
+            countryId: prev.countryId,
+            occurredAt: new Date().toISOString(),
+            note: 'تكلفة طقم الصيانة العاجلة والفلاتر وتزييت الماكينات',
           },
         ],
       };
@@ -82,30 +82,30 @@ export const StruggleStoryHub: React.FC<StruggleStoryHubProps> = ({
           ...(prev.inventory ?? []),
           {
             id: `mat-flour-${Date.now()}`,
-            itemId: 'flour_wheat',
-            itemName: 'دقيق فاخر للحلويات والمخبوزات',
+            materialOrProductId: 'mat-flour',
             quantity: 500,
+            unit: 'كجم',
             unitCost: 40,
-            storageType: 'warehouse',
+            qualityScore: 90,
           },
           {
             id: `mat-sugar-${Date.now()}`,
-            itemId: 'sugar_refined',
-            itemName: 'سكر صناعي معبأ',
+            materialOrProductId: 'mat-sugar',
             quantity: 300,
+            unit: 'كجم',
             unitCost: 50,
-            storageType: 'warehouse',
+            qualityScore: 90,
           },
         ],
         ledger: [
           ...prev.ledger,
           {
             id: `mat-bundle-${Date.now()}`,
-            day: prev.day,
-            title: 'شراء دفعة خامات الطوارئ (دقيق وسكر وتعبئة)',
             category: 'expense',
             amount: -35000,
-            createdAt: new Date().toISOString(),
+            countryId: prev.countryId,
+            occurredAt: new Date().toISOString(),
+            note: 'شراء دفعة خامات الطوارئ (دقيق وسكر وتعبئة)',
           },
         ],
       };
@@ -134,11 +134,11 @@ export const StruggleStoryHub: React.FC<StruggleStoryHubProps> = ({
           ...prev.ledger,
           {
             id: `sale-first-batch-${Date.now()}`,
-            day: prev.day,
-            title: 'توريد أول شحنة بسكويت غذائي إلى أسواق الجملة كاش',
             category: 'revenue',
             amount: 175000,
-            createdAt: new Date().toISOString(),
+            countryId: prev.countryId,
+            occurredAt: new Date().toISOString(),
+            note: 'توريد أول شحنة بسكويت غذائي إلى أسواق الجملة كاش',
           },
         ],
       };
@@ -175,11 +175,11 @@ export const StruggleStoryHub: React.FC<StruggleStoryHubProps> = ({
           ...prev.ledger,
           {
             id: `pay-loan-${Date.now()}`,
-            day: prev.day,
-            title: 'سداد قسط البنك الأهلي التجاري بالكامل ورفع الحجز',
             category: 'expense',
             amount: -debtAmount,
-            createdAt: new Date().toISOString(),
+            countryId: prev.countryId,
+            occurredAt: new Date().toISOString(),
+            note: 'سداد قسط البنك الأهلي التجاري بالكامل ورفع الحجز',
           },
         ],
       };
