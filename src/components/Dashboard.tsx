@@ -8,15 +8,29 @@ import { selectOperationsSnapshot } from '../game/selectors';
 import { type GameCommand, type GameResult } from '../game/engine';
 import { MarketNewsTicker } from './MarketNewsTicker';
 import { StoryCampaignHub } from './StoryCampaignHub';
+import { SmartOnboardingQuests } from './SmartOnboardingQuests';
+import { RivalCharactersHub } from './RivalCharactersHub';
+import { StruggleStoryHub } from './StruggleStoryHub';
 
 interface DashboardProps {
   profile: PlayerProfile;
   country: CountryDefinition;
   onNavigate: (section: SectionId, target?: string) => void;
   onCommand: (command: GameCommand, fallback: (current: PlayerProfile) => GameResult<unknown>) => void;
+  onClaimReward?: (cash: number, diamonds: number, questId: string) => void;
+  onRequestEmergencyLoan?: () => void;
+  onUpdateProfile?: (updater: (prev: PlayerProfile) => PlayerProfile) => void;
 }
 
-export function Dashboard({ profile, country, onNavigate }: DashboardProps) {
+export function Dashboard({ 
+  profile, 
+  country, 
+  onNavigate, 
+  onCommand,
+  onClaimReward,
+  onRequestEmergencyLoan,
+  onUpdateProfile,
+}: DashboardProps) {
   const [campaignOpen, setCampaignOpen] = useState(false);
   const operations = selectOperationsSnapshot(profile, country.economy.operatingCostMultiplier ?? 1);
   const companyCount = profile.companies.length;
@@ -49,6 +63,39 @@ export function Dashboard({ profile, country, onNavigate }: DashboardProps) {
     <div className="empire-dashboard-grid">
       {/* Live Breaking Market News Banner */}
       <MarketNewsTicker day={profile.day} onOpenCampaign={() => setCampaignOpen(true)} />
+
+      {/* سيناريو قصة كفاح: إنقاذ المصنع المنهار (The Struggle & Turnaround Hub) */}
+      <StruggleStoryHub
+        profile={profile}
+        onNavigate={onNavigate}
+        onUpdateProfile={onUpdateProfile ?? ((updater) => {
+          onCommand(
+            { name: 'redeem_reward_code', args: { code: 'STORY-UPDATE' } } as any,
+            (curr) => ({ success: true, profile: updater(curr) })
+          );
+        })}
+      />
+
+      {/* Smart Guided Onboarding Quests & Emergency Loan (التعديل الجديد: دليل المبتدئ والتسهيل الائتماني) */}
+      <SmartOnboardingQuests
+        profile={profile}
+        onNavigate={onNavigate}
+        onClaimReward={onClaimReward ?? ((cash, diamonds) => {
+          onCommand(
+            { name: 'redeem_reward_code', args: { code: 'QUEST-CLAIM' } } as any,
+            (curr) => ({ success: true, profile: { ...curr, cash: (curr.cash ?? 0) + cash, diamonds: (curr.diamonds ?? 0) + diamonds } })
+          );
+        })}
+        onRequestEmergencyLoan={onRequestEmergencyLoan ?? (() => {
+          onCommand(
+            { name: 'redeem_reward_code', args: { code: 'EMERGENCY-LOAN' } } as any,
+            (curr) => ({ success: true, profile: { ...curr, cash: (curr.cash ?? 0) + 250000 } })
+          );
+        })}
+      />
+
+      {/* Rival Characters Hub (التعديل الجديد: شخصيات المنافسين التفاعلية) */}
+      <RivalCharactersHub profile={profile} />
 
       {/* ================= TOP ROW: STORY CARD + COMPANIES OVERVIEW ================= */}
       <div className="empire-top-row">

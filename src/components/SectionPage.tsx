@@ -575,7 +575,38 @@ export function SectionPage({ section, profile, country, focus, notificationThem
         <div className="economy-layout">
           <SectionPanel title="تأسيس شركة" description="اختر قطاعًا، واسمًا، وأرضًا مناسبة. تُخصم رسوم التأسيس والترخيص عند نجاح العملية.">
             {profile.lands.length === 0 ? <div className="economy-list"><EconomyEmpty title="تحتاج إلى أرض أولًا" message="اشترِ أرضًا من المزادات؛ بعدها يمكنك تأسيس شركة وتشغيل مصنعها." /><button className="button button-primary" type="button" onClick={onHome}>عرض ملخص الإمبراطورية</button></div> : <div className="economy-form">
-              <div className="economy-field"><label htmlFor="industry-select">القطاع الاقتصادي</label><select id="industry-select" value={industry.id} onChange={(event) => setIndustryId(event.target.value as IndustryId)}>{INDUSTRY_CATALOG.map((item) => <option value={item.id} key={item.id}>{item.name} · {formatMoney((country.economy.companySetupFee ?? item.setupFee) + (country.economy.licenseFeesByIndustry[item.id] ?? item.licenseFee), country)}</option>)}</select></div>
+              <div className="economy-field">
+                <label htmlFor="industry-select">القطاع الاقتصادي (اختر النشاط المناسب لرأس مالك)</label>
+                <select id="industry-select" value={industry.id} onChange={(event) => setIndustryId(event.target.value as IndustryId)}>
+                  {INDUSTRY_CATALOG.map((item) => {
+                    const totalFee = (country.economy.companySetupFee ?? item.setupFee) + (country.economy.licenseFeesByIndustry[item.id] ?? item.licenseFee);
+                    const isBeginner = item.id === 'food' || item.id === 'detergents';
+                    const isHeavy = item.id === 'petroleum' || item.id === 'electricity' || item.id === 'gas';
+                    const tag = isBeginner ? ' ⭐ [موصى به للمبتدئين]' : isHeavy ? ' ⚠️ [مكلف ورأس مال عالٍ]' : '';
+                    return (
+                      <option value={item.id} key={item.id}>
+                        {item.name} {tag} · {formatMoney(totalFee, country)}
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
+              
+              {/* Early-game strategy tip */}
+              <div className="p-3 rounded-xl bg-slate-900 border border-slate-700 text-xs text-slate-300 space-y-1 my-2">
+                <div className="flex items-center gap-1.5 font-bold text-emerald-400">
+                  <span>💡</span>
+                  <span>نصيحة المستشار الاقتصادي:</span>
+                </div>
+                <p className="text-[11px] text-slate-300 leading-relaxed">
+                  {industry.id === 'food' || industry.id === 'detergents' 
+                    ? 'قطاع ممتاز كبداية! تكاليف ترخيصه منخفضة وتدوير خاماته سريع، مما يتيح لك تحقيق أرباح سريعة وآمنة لحماية رأس مالك.'
+                    : industry.id === 'petroleum' || industry.id === 'electricity' || industry.id === 'gas'
+                    ? 'تحذير: هذا قطاع عملاق يستهلك مئات الآلاف في التراخيص والتشغيل اليومي. يُنصح بتأسيسه بعد جمع ثروة لا تقل عن 5 ملايين جنيه.'
+                    : 'قطاع صناعي واستثماري متوازن يتطلب متابعة دورية لسوق الخامات ومخزون المستودع.'}
+                </p>
+              </div>
+
               <div className="economy-field"><label htmlFor="company-name">اسم الشركة</label><input id="company-name" value={companyName} maxLength={36} onChange={(event) => setCompanyName(event.target.value)} /></div>
               <div className="economy-field"><label htmlFor="land-select">الأرض المناسبة ({landTypeNames[industry.requiredLandType]})</label><select id="land-select" value={selectedLandId} onChange={(event) => setLandId(event.target.value)} disabled={eligibleLands.length === 0}><option value="">اختر أرضًا</option>{eligibleLands.map((land) => <option key={land.id} value={land.id}>{land.label} · {formatNumber(land.areaSquareMeters)} م²</option>)}</select></div>
               <div className="economy-meta"><span>رسوم تأسيس {formatMoney(setupFee, country)}</span><span>ترخيص {formatMoney(licenseFee, country)}</span><span>تشغيل يومي {formatMoney(industry.dailyOperatingCost, country)}</span></div>

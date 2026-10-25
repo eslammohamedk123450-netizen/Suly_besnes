@@ -121,47 +121,121 @@ export function createNewPlayer(
   now: Date = new Date(),
 ): PlayerProfile {
   const createdAt = now.toISOString();
+
+  // Initial collapsing land (أرض مصنع العاشر من رمضان)
+  const inheritedLand: PlayerLand = {
+    id: 'inherited-factory-land',
+    label: 'أرض مصنع العاشر القديم (ميراث مهدد)',
+    areaSquareMeters: 1200,
+    purchasePrice: 350000,
+    acquiredAt: createdAt,
+    acquiredOnDay: 1,
+    availableForCompanyOnDay: 1,
+    landType: 'industrial',
+    upgradeLevel: 1,
+  };
+
+  // Initial collapsing company (مصنع سولي للأغذية المنهار - ماكينات معطلة)
+  const inheritedCompany: PlayerCompany = {
+    id: 'inherited-food-company',
+    name: 'مصنع سولي للأغذية (قيد الإنقاذ)',
+    industryId: 'food',
+    countryId: country.id,
+    foundedAt: createdAt,
+    foundedOnDay: 1,
+    operationalFromDay: 1,
+    landId: 'inherited-factory-land',
+    licenseIds: ['lic-food-inherited'],
+    energyUnits: 25,
+    energyCapacity: 50,
+    operatingCostPerDay: 3500,
+    maintenanceCondition: 25, // 25% condition - broken machines needing repair!
+    upgradeLevel: 1,
+  };
+
+  // Initial urgent bank loan due on Day 7
+  const initialBankLoan: LoanRecord = {
+    id: 'loan-emergency-bank-misr',
+    collateralType: 'company',
+    collateralId: 'inherited-food-company',
+    principal: 50000,
+    totalRepayment: 52500,
+    annualRate: 0.12,
+    startedOnDay: 1,
+    termDays: 7,
+    nextPaymentDay: 7,
+    installmentAmount: 52500,
+    remainingBalance: 52500,
+    status: 'active',
+  };
+
   return {
     id: createId(),
     accountCode: '',
-    name: playerName.trim() || 'المستثمر الجديد',
+    name: playerName.trim() || 'المستثمر الصاعد',
     level: 1,
     countryId: country.id,
     createdAt,
-    bankBalance: country.startingBalance,
+    bankBalance: 120000, // 120,000 EGP emergency cash for turnaround
     payables: 0,
     goldGrams: 0,
     goldCostBasis: 0,
-    diamonds: 0,
+    diamonds: 10,
     speedCards: [],
-    badges: [],
+    badges: ['طوق النجاة'],
     assets: [],
-    lands: [],
-    companies: [],
+    lands: [inheritedLand],
+    companies: [inheritedCompany],
     finances: { netProfit: 0, totalRevenue: 0, totalExpenses: 0 },
     day: 1,
     warehouseLevel: 1,
     activeDaySpeedMultiplier: 1,
     inventory: [],
-    licenses: [],
+    licenses: [
+      {
+        id: 'lic-food-inherited',
+        industryId: 'food',
+        countryId: country.id,
+        name: 'ترخيص تصنيع مواد غذائية مهدد بالسحب',
+        purchasedAt: createdAt,
+        cost: 45000,
+      },
+    ],
     investments: [],
-    banking: { deposits: [], loans: [] },
+    banking: { deposits: [], loans: [initialBankLoan] },
     staff: [],
     productionOrders: [],
     auctionHistory: [],
     redeemedCodeIds: [],
     sales: [],
-    ledger: [],
+    ledger: [
+      {
+        id: createId(),
+        day: 1,
+        title: 'رصيد الطوارئ المتبقي بخزينة المصنع المنهار',
+        category: 'revenue',
+        amount: 120000,
+        createdAt,
+      },
+      {
+        id: createId(),
+        day: 1,
+        title: 'قيد مديونية: قسط البنك المستحق خلال 7 أيام',
+        category: 'expense',
+        amount: -52500,
+        createdAt,
+      },
+    ],
     events: [],
     tasks: [],
     completedTaskIds: [],
     readNotificationIds: [],
     dismissedNotificationIds: [],
     unreadProductionOrderIds: [],
-    reputation: 50,
+    reputation: 35,
     contracts: [],
     achievements: [],
-    onboarding: { introCompleted: false, chapter: 0, seenGuides: [] },
+    onboarding: { introCompleted: true, chapter: 1, seenGuides: [] },
     season: { seasonId: 'expansion-season-1', startedOnDay: 1, endsOnDay: 30, points: 0, claimedChallengeKeys: [] },
   };
 }
