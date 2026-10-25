@@ -15,6 +15,7 @@ interface ProfilePageProps {
   isGuest: boolean;
   isSynced: boolean;
   onLinkAccount: () => void;
+  onResetWorld?: () => void;
 }
 
 async function copyTextWithFallback(text: string): Promise<boolean> {
@@ -48,7 +49,7 @@ async function copyTextWithFallback(text: string): Promise<boolean> {
   }
 }
 
-export function ProfilePage({ profile, country, accountId, isGuest, isSynced, onLinkAccount }: ProfilePageProps) {
+export function ProfilePage({ profile, country, accountId, isGuest, isSynced, onLinkAccount, onResetWorld }: ProfilePageProps) {
   const [copyMessage, setCopyMessage] = useState<{ text: string; success: boolean } | null>(null);
   const progress = getPlayerProgress(profile);
   const accountCode = accountCodeFromSeed(accountId);
@@ -121,14 +122,21 @@ export function ProfilePage({ profile, country, accountId, isGuest, isSynced, on
         {isGuest ? (
           <div className="lux-sync-banner lux-sync-banner--guest">
             <div>
-              <strong>جلسة ضيف محلي</strong>
+              <strong>جلسة ضيف محلي ({country.name})</strong>
               <p style={{ margin: '2px 0 0', fontSize: '0.8rem', opacity: 0.9 }}>
-                تقدمك محفوظ محلياً على هذا الجهاز. يمكنك إنشاء حساب لربطه والمنافسة عالمياً.
+                تقدمك محفوظ محلياً. يمكنك اختيار دولة واسم جديدين أو ربط الحساب.
               </p>
             </div>
-            <button type="button" className="lux-btn-link-account" onClick={onLinkAccount}>
-              ترقية لحساب متصل ⚡
-            </button>
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              {onResetWorld && (
+                <button type="button" className="lux-btn-link-account" style={{ background: '#2563eb' }} onClick={onResetWorld}>
+                  تغيير الدولة والاسم 🌍
+                </button>
+              )}
+              <button type="button" className="lux-btn-link-account" onClick={onLinkAccount}>
+                ترقية لحساب متصل ⚡
+              </button>
+            </div>
           </div>
         ) : !isSynced ? (
           <div className="lux-sync-banner lux-sync-banner--pending">

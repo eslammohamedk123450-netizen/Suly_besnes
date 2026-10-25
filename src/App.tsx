@@ -54,7 +54,7 @@ export default function App() {
   const [profile, setProfile] = useState<PlayerProfile | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [selectedCountryId, setSelectedCountryId] = useState<CountryId>(() => profile?.countryId ?? COUNTRIES[0].id);
-  const [playerName, setPlayerName] = useState(() => profile?.name ?? 'أحمد المستثمر');
+  const [playerName, setPlayerName] = useState(() => profile?.name ?? '');
   const [activeSection, setActiveSection] = useState<SectionId>('home');
   const [sectionFocus, setSectionFocus] = useState<string | undefined>();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -399,9 +399,21 @@ export default function App() {
     const guest = createGuestAccount();
     setAccount(guest);
     const guestProfile = loadSavedGame(guest.id);
+    if (!guestProfile) {
+      setPlayerName('');
+      setSelectedCountryId(COUNTRIES[0].id);
+    }
     setProfile(guestProfile ? normalizeAccountFeatures(guestProfile, guest.id) : null);
     setLinkingAccount(false);
-    setNotice('بدأت جلسة ضيف. تقدمك محفوظ محليًا على هذا الجهاز فقط.');
+    setNotice(guestProfile ? 'أهلاً بك مجدداً في جلسة الضيف.' : 'جلسة ضيف جديدة. اختر اسمك ودولتك للبدء.');
+    setNoticeTone('success');
+  }
+
+  function handleResetToCountrySelection() {
+    setProfile(null);
+    setPlayerName('');
+    setSelectedCountryId(COUNTRIES[0].id);
+    setNotice('اختر دولتك واسمك الجديد للبدء.');
     setNoticeTone('success');
   }
 
@@ -725,7 +737,7 @@ export default function App() {
           {activeSection === 'home' ? (
             <Dashboard profile={profile} country={country} onNavigate={navigate} onCommand={handleGameCommand} />
           ) : activeSection === 'profile' ? (
-            <ProfilePage profile={profile} country={country} accountId={account.id} isGuest={Boolean(account.isGuest)} isSynced={!account.isGuest && syncState === 'synced' && pendingCommandCount === 0} onLinkAccount={() => setLinkingAccount(true)} />
+            <ProfilePage profile={profile} country={country} accountId={account.id} isGuest={Boolean(account.isGuest)} isSynced={!account.isGuest && syncState === 'synced' && pendingCommandCount === 0} onLinkAccount={() => setLinkingAccount(true)} onResetWorld={handleResetToCountrySelection} />
           ) : (
             <SectionPage section={getSection(activeSection)} profile={profile} country={country} focus={sectionFocus} notificationTheme={notificationTheme} isGuest={Boolean(account.isGuest)} onNotificationThemeChange={setNotificationTheme} onHome={() => navigate('home')} onNavigate={(section) => navigate(section)} onAction={handleGameResult} onCommand={handleGameCommand} onRedeemed={handleRedeemed} onRefreshProfile={refreshAuthoritativeProfile} onLinkAccount={() => setLinkingAccount(true)} onLogout={handleLogout} onShowGuide={() => setPendingGuide(activeSection)} />
           )}
