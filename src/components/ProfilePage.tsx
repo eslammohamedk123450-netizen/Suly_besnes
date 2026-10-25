@@ -18,6 +18,7 @@ import {
   setMusicVolume,
   playSound 
 } from '../game/soundEffects';
+import { loadPrestigeData, GLOBAL_CAPITALS } from '../game/prestigeEngine';
 import { 
   Settings, 
   Volume2, 
@@ -154,6 +155,7 @@ export function ProfilePage({
   const [badgeFilter, setBadgeFilter] = useState<'all' | 'earned' | 'locked'>('all');
 
   const progress = getPlayerProgress(profile);
+  const prestige = loadPrestigeData(profile.id);
   const accountCode = accountCodeFromSeed(accountId);
   const badgeCatalog = selectEmpirePulse(profile).badges;
   const earnedBadges = badgeCatalog.filter((badge) => badge.earned);
@@ -495,6 +497,11 @@ export function ProfilePage({
                 <span className="text-xs px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 font-extrabold tabular-nums">
                   مستوى {progress.level}
                 </span>
+                {prestige.prestigeLevel > 0 && (
+                  <span className="text-xs px-2.5 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/40 font-extrabold flex items-center gap-1">
+                    👑 هيبة {prestige.prestigeLevel} ({GLOBAL_CAPITALS.find((c) => c.id === prestige.currentCapitalId)?.name || 'عالمي'})
+                  </span>
+                )}
                 <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700 font-bold">
                   👑 مستثمر معتمد
                 </span>

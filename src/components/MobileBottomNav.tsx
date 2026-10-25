@@ -3,6 +3,7 @@ import type { SectionId } from '../domain/navigation';
 import type { PlayerProfile } from '../domain/player';
 import { Home, Factory, ShoppingCart, Landmark, Sparkles, Lock } from 'lucide-react';
 import { playSound } from '../game/soundEffects';
+import { triggerHaptic } from '../services/nativeMobileService';
 import { isSectionUnlocked, getSectionRequiredLevel } from '../game/onboarding';
 
 interface MobileBottomNavProps {
@@ -21,6 +22,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
   profile,
 }) => {
   const handleNav = (section: SectionId) => {
+    triggerHaptic('light');
     playSound('click');
     onNavigate(section);
   };

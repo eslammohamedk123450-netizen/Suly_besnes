@@ -45,8 +45,13 @@ import {
   X,
   Compass,
   BookOpen,
-  ArrowLeft
+  ArrowLeft,
+  Swords,
+  Globe2,
+  Clock,
 } from 'lucide-react';
+import { getCurrentCentralBankShock } from '../game/centralBankEngine';
+import { loadPrestigeData } from '../game/prestigeEngine';
 
 interface DashboardProps {
   profile: PlayerProfile;
@@ -58,6 +63,9 @@ interface DashboardProps {
   onUpdateProfile?: (updater: (prev: PlayerProfile) => PlayerProfile) => void;
   onOpenLuckyWheel?: () => void;
   onOpenTutorial?: () => void;
+  onOpenMorningReport?: () => void;
+  onOpenCentralBank?: () => void;
+  onOpenPrestige?: () => void;
 }
 
 interface CommandItem {
@@ -79,6 +87,9 @@ export function Dashboard({
   onCommand,
   onOpenLuckyWheel,
   onOpenTutorial,
+  onOpenMorningReport,
+  onOpenCentralBank,
+  onOpenPrestige,
 }: DashboardProps) {
   const [isLeaderboardOpen, setIsLeaderboardOpen] = useState(false);
   const [isFinanceModalOpen, setIsFinanceModalOpen] = useState(false);
@@ -486,6 +497,129 @@ export function Dashboard({
         </div>
       </div>
 
+      {/* 2.2. Offline Mobile Strategic Hub (Phases 1 - 5 Core Modules) */}
+      <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-4 sm:p-5 shadow-2xl backdrop-blur-md space-y-3">
+        <div className="flex items-center justify-between pb-2.5 border-b border-slate-800/80">
+          <div className="flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
+            <h3 className="font-extrabold text-sm sm:text-base text-white">
+              محاور تطوير إمبراطورية الأعمال (Offline Mobile)
+            </h3>
+            <span className="text-[11px] font-extrabold px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40">
+              أوفلاين بالكامل
+            </span>
+          </div>
+          <span className="text-[11px] text-slate-400 hidden sm:inline">
+            أرباح الغياب • صدمات البنك المركزي • حروب الكارتيل • الهيبة والتوسع
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+          {/* Phase 1: Smart Offline Idle Report */}
+          <button
+            type="button"
+            onClick={() => onOpenMorningReport?.()}
+            className="p-3.5 rounded-2xl bg-slate-950/70 border border-amber-500/30 hover:border-amber-400/80 hover:bg-slate-950 transition text-right flex flex-col justify-between group active:scale-95"
+          >
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-xl">🌅</span>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-500/20 text-amber-300">
+                  المرحلة 1
+                </span>
+              </div>
+              <h4 className="text-xs font-black text-white group-hover:text-amber-300 transition">
+                تقرير الصباح لغياب المدير
+              </h4>
+              <p className="text-[11px] text-slate-400 mt-1 line-clamp-2">
+                حساب سلع المصانع وتوزيعات الأسهم أثناء غيابك عن اللعبة.
+              </p>
+            </div>
+            <div className="mt-2 pt-2 border-t border-slate-800/60 flex items-center justify-between text-[11px] font-bold text-amber-400">
+              <span>معاينة الأرباح الآن</span>
+              <ChevronLeft className="w-3.5 h-3.5 group-hover:-translate-x-1 transition" />
+            </div>
+          </button>
+
+          {/* Phase 3: Central Bank & Macroeconomic Shocks */}
+          <button
+            type="button"
+            onClick={() => onOpenCentralBank?.()}
+            className="p-3.5 rounded-2xl bg-slate-950/70 border border-emerald-500/30 hover:border-emerald-400/80 hover:bg-slate-950 transition text-right flex flex-col justify-between group active:scale-95"
+          >
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-xl">🏛️</span>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300">
+                  المرحلة 3
+                </span>
+              </div>
+              <h4 className="text-xs font-black text-white group-hover:text-emerald-300 transition">
+                بيان البنك المركزي العاجل
+              </h4>
+              <p className="text-[11px] text-slate-400 mt-1 line-clamp-2">
+                قرارات الفائدة والتضخم وصدمات العرض والطلب وتقلبات البورصة.
+              </p>
+            </div>
+            <div className="mt-2 pt-2 border-t border-slate-800/60 flex items-center justify-between text-[11px] font-bold text-emerald-400">
+              <span>نشرة الفائدة والأسعار</span>
+              <ChevronLeft className="w-3.5 h-3.5 group-hover:-translate-x-1 transition" />
+            </div>
+          </button>
+
+          {/* Phase 4: Regional Syndicate Wars */}
+          <button
+            type="button"
+            onClick={() => handleNav('territory')}
+            className="p-3.5 rounded-2xl bg-slate-950/70 border border-indigo-500/30 hover:border-indigo-400/80 hover:bg-slate-950 transition text-right flex flex-col justify-between group active:scale-95"
+          >
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-xl">⚔️</span>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300">
+                  المرحلة 4
+                </span>
+              </div>
+              <h4 className="text-xs font-black text-white group-hover:text-indigo-300 transition">
+                حروب الكارتيل والسيطرة
+              </h4>
+              <p className="text-[11px] text-slate-400 mt-1 line-clamp-2">
+                حرب الأسعار والمراكز اللوجستية لبلوغ 60% احتكار في المحافظات.
+              </p>
+            </div>
+            <div className="mt-2 pt-2 border-t border-slate-800/60 flex items-center justify-between text-[11px] font-bold text-indigo-400">
+              <span>خريطة الأقاليم</span>
+              <ChevronLeft className="w-3.5 h-3.5 group-hover:-translate-x-1 transition" />
+            </div>
+          </button>
+
+          {/* Phase 5: Prestige System & International Expansion */}
+          <button
+            type="button"
+            onClick={() => onOpenPrestige?.()}
+            className="p-3.5 rounded-2xl bg-slate-950/70 border border-purple-500/30 hover:border-purple-400/80 hover:bg-slate-950 transition text-right flex flex-col justify-between group active:scale-95"
+          >
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-xl">👑</span>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-purple-500/20 text-purple-300">
+                  المرحلة 5
+                </span>
+              </div>
+              <h4 className="text-xs font-black text-white group-hover:text-purple-300 transition">
+                نظام الهيبة والتوسع الدولي
+              </h4>
+              <p className="text-[11px] text-slate-400 mt-1 line-clamp-2">
+                تأسيس صندوق سيادي عابر للقارات (الرياض، دبي، لندن، نيويورك).
+              </p>
+            </div>
+            <div className="mt-2 pt-2 border-t border-slate-800/60 flex items-center justify-between text-[11px] font-bold text-purple-400">
+              <span>الصندوق والامتيازات</span>
+              <ChevronLeft className="w-3.5 h-3.5 group-hover:-translate-x-1 transition" />
+            </div>
+          </button>
+        </div>
+      </div>
       {/* 3. Executive Command Operations Bar with explicit unlock levels & lock badges */}
       <div className="bg-slate-900/95 border border-slate-800 rounded-3xl p-4 sm:p-6 shadow-2xl backdrop-blur-md">
         <div className="flex flex-wrap items-center justify-between gap-3 mb-4 pb-3 border-b border-slate-800/80">

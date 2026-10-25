@@ -48,6 +48,11 @@ import { CelebrationModal, type CelebrationData } from './components/Celebration
 import { MobileBottomNav } from './components/MobileBottomNav';
 import { getLuckySpinState } from './game/luckyWheelService';
 import { AvatarWardrobeModal } from './components/AvatarWardrobeModal';
+import { calculateOfflineIdleProgress, applyOfflineReportToProfile, recordOfflineHeartbeat, type OfflineIdleReport } from './game/offlineIdleEngine';
+import { MorningAbsenceReportModal } from './components/MorningAbsenceReportModal';
+import { CentralBankModal } from './components/CentralBankModal';
+import { PrestigeExpansionModal } from './components/PrestigeExpansionModal';
+import { triggerHaptic } from './services/nativeMobileService';
 
 function getPendingSyncCount(accountId: string): number {
   return loadQueuedGameCommands(accountId).length + (loadPendingInitialProfile(accountId) ? 1 : 0);
@@ -91,6 +96,10 @@ export default function App() {
   const [activeToastAlert, setActiveToastAlert] = useState<ToastAlert | null>(null);
   const [forceBellVibrate, setForceBellVibrate] = useState(false);
   const [customNotifications, setCustomNotifications] = useState<GameNotification[]>([]);
+  const [isMorningReportOpen, setIsMorningReportOpen] = useState(false);
+  const [offlineReport, setOfflineReport] = useState<OfflineIdleReport | null>(null);
+  const [isCentralBankModalOpen, setIsCentralBankModalOpen] = useState(false);
+  const [isPrestigeModalOpen, setIsPrestigeModalOpen] = useState(false);
   const syncLock = useRef(false);
   const remoteCommandAttempts = useRef(new Map<string, Promise<RemoteGameCommandAttempt>>());
 
@@ -325,8 +334,21 @@ export default function App() {
           saveGame(local, current.id);
         }
 
-        setProfile(normalizeAccountFeatures(local, current.id));
+        const loadedProfile = normalizeAccountFeatures(local, current.id);
+        setProfile(loadedProfile);
         setAuthLoading(false);
+
+        // Smart Offline Idle Engine: calculate goods and dividends during absence
+        try {
+          const idleRep = calculateOfflineIdleProgress(loadedProfile);
+          if (idleRep && (idleRep.elapsedSeconds >= 120 || idleRep.isTampered)) {
+            setOfflineReport(idleRep);
+            setIsMorningReportOpen(true);
+          }
+        } catch (e) {
+          console.error('Idle progress error', e);
+        }
+        recordOfflineHeartbeat(current.id);
 
         if (current.isGuest) {
           void claimDailyLogin(current);
@@ -954,6 +976,22 @@ export default function App() {
               onCommand={handleGameCommand}
               onOpenLuckyWheel={() => setIsLuckyWheelOpen(true)}
               onOpenTutorial={() => setIsTutorialOpen(true)}
+              onOpenMorningReport={() => {
+                triggerHaptic('light');
+                const rep = offlineReport || calculateOfflineIdleProgress(profile, 8 * 3600);
+                if (rep) {
+                  setOfflineReport(rep);
+                  setIsMorningReportOpen(true);
+                }
+              }}
+              onOpenCentralBank={() => {
+                triggerHaptic('light');
+                setIsCentralBankModalOpen(true);
+              }}
+              onOpenPrestige={() => {
+                triggerHaptic('light');
+                setIsPrestigeModalOpen(true);
+              }}
               onUpdateProfile={(updater) => {
                 setProfile((prev) => {
                   if (!prev) return prev;
@@ -1219,6 +1257,53 @@ export default function App() {
             return true;
           }}
           onOpenStore={() => navigate('store')}
+        />
+      )}
+
+      {/* 1. Morning Absence Report Modal (Smart Offline Idle Engine) */}
+      {offlineReport && (
+        <MorningAbsenceReportModal
+          isOpen={isMorningReportOpen}
+          report={offlineReport}
+          onClaim={() => {
+            if (!profile) return;
+            const updated = applyOfflineReportToProfile(profile, offlineReport);
+            setProfile(updated);
+            saveGame(updated, account?.id);
+            setIsMorningReportOpen(false);
+            setOfflineReport(null);
+            showNotice('تم استلام أرباح وسلع فترة الغياب بنجاح! 🌅', 'success', 'تقرير غياب المدير');
+          }}
+          onClose={() => setIsMorningReportOpen(false)}
+        />
+      )}
+
+      {/* 2. Central Bank Decrees & Macroeconomic Shocks Modal */}
+      {profile && (
+        <CentralBankModal
+          isOpen={isCentralBankModalOpen}
+          onClose={() => setIsCentralBankModalOpen(false)}
+          profile={profile}
+          onNavigate={(sec) => navigate(sec)}
+        />
+      )}
+
+      {/* 3. Prestige & Global Sovereign Expansion Modal */}
+      {profile && (
+        <PrestigeExpansionModal
+          isOpen={isPrestigeModalOpen}
+          onClose={() => setIsPrestigeModalOpen(false)}
+          profile={profile}
+          onExpansionSuccess={(updated) => {
+            setProfile(updated);
+            saveGame(updated, account?.id);
+            playSound('levelUp');
+            setCelebrationData({
+              title: 'تأسس الصندوق السيادي بنجاح! 👑',
+              subtitle: 'انطلقت إمبراطوريتك نحو العواصم العالمية مع الاحتفاظ بكافة امتيازات وأوسمة الهيبة الدائمة.',
+              rewardText: 'توسّع دولي مع نقاط هيبة ورصيد انطلاق جديد',
+            });
+          }}
         />
       )}
 
