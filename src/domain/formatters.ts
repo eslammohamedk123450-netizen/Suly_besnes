@@ -14,6 +14,6 @@ export function formatGold(grams: number): string {
   return `${formatNumber(grams)} غ`;
 }
 
-export function formatCurrency(value: number, currencyCode = 'EGP'): string {
-  return `${formatNumber(value)} ج.م`;
+export function formatCurrency(value: number, currencySymbol = 'ج.م'): string {
+  return `${currencySymbol} ${formatNumber(value)}`;
 }
