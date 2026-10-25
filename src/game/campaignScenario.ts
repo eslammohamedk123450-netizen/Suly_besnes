@@ -37,7 +37,7 @@ export const CAMPAIGN_CHAPTERS: CampaignChapter[] = [
     characterTitle: 'كبير مستشاري عائلة النيل',
     dialogueText:
       'مرحباً بك يا بني! لقد عشتُ أرافق جدك رحمة الله عليه وهو يؤسس أولى صوامع النيل. تداعت الأعمال بسبب منافسة "مجمع الأهرام" الاحتكاري، ولكنك الآن أملنا الأخير لإعادة المجد وصنع إمبراطورية أسطورية!',
-    objectiveText: 'أسس أول شركة وشراء أرض زراعية وحقق أرباحاً بقيمة 100,000 ج.م',
+    objectiveText: 'أسس أول شركة وشراء أرض زراعية وحقق أرباحاً بقيمة 100,000 $',
     requiredLevel: 1,
     requiredCompanies: 1,
     requiredProfit: 100_000,
@@ -69,7 +69,7 @@ export const CAMPAIGN_CHAPTERS: CampaignChapter[] = [
     characterTitle: 'خبير الطاقة والصناعة',
     dialogueText:
       'أهلاً بمديرنا! أسعار الطاقة العالمية في ارتفاع مفاجئ بسبب الأحداث السوقية. المنافسون في "تحالف الدلتا" يرفعون تكاليف التشغيل علينا. نحتاج لتوسيع مصانعنا وبناء محطة طاقة خاصة لتأمين إمبراطوريتك!',
-    objectiveText: 'امتلك 2 شركات على الأقل ووصل لمستوى 5 مع تحقيق أرباح 500,000 ج.م',
+    objectiveText: 'امتلك 2 شركات على الأقل ووصل لمستوى 5 مع تحقيق أرباح 500,000 $',
     requiredLevel: 5,
     requiredCompanies: 2,
     requiredProfit: 500_000,
@@ -100,7 +100,7 @@ export const CAMPAIGN_CHAPTERS: CampaignChapter[] = [
     characterTitle: 'مدير اللوجستيات والموانئ',
     dialogueText:
       'الإمبراطورية أصبحت حديث السوق! شركات المنافسين تحاول حظر شحناتنا في ميناء العاصمة. إذا نجحنا في تأسيس خط شحن وتوقيع أول عقد تجاري عالمي، سنصبح المورد الأول بالشرق الأوسط!',
-    objectiveText: 'تصل للمستوى 10 وامتلك 3 شركات مع تحقيق صافي أرباح 2,000,000 ج.م',
+    objectiveText: 'تصل للمستوى 10 وامتلك 3 شركات مع تحقيق صافي أرباح 2,000,000 $',
     requiredLevel: 10,
     requiredCompanies: 3,
     requiredProfit: 2_000_000,
@@ -111,7 +111,7 @@ export const CAMPAIGN_CHAPTERS: CampaignChapter[] = [
       {
         id: 'c3_choice_1',
         text: 'تأسيس أسطول شحن بحري محلي وكسر الاحتكار',
-        effectDescription: 'زيادة السمعة بـ +15 ومكافأة 100,000 ج.م',
+        effectDescription: 'زيادة السمعة بـ +15 ومكافأة 100,000 $',
         reputationDelta: 15,
         rewardMoney: 100000,
       },
@@ -132,7 +132,7 @@ export const CAMPAIGN_CHAPTERS: CampaignChapter[] = [
     characterTitle: 'رئيس تحالف رجال الأعمال',
     dialogueText:
       'يا لها من إمبراطورية عظمى! لقد تجاوزت كل الجبابرة والمنافسين. العرش الاقتصادي الآن بين يديك. حان الوقت لطرح أسهم شركتك والاكتتاب العام بالبورصة والسيطرة الكاملة على الأسواق!',
-    objectiveText: 'تصل للمستوى 15 وترأس قائمة المتصدرين مع أرباح تجاوزت 10,000,000 ج.م',
+    objectiveText: 'تصل للمستوى 15 وترأس قائمة المتصدرين مع أرباح تجاوزت 10,000,000 $',
     requiredLevel: 15,
     requiredCompanies: 4,
     requiredProfit: 10_000_000,
@@ -143,7 +143,7 @@ export const CAMPAIGN_CHAPTERS: CampaignChapter[] = [
       {
         id: 'c4_choice_1',
         text: 'الاستحواذ الشامل على أسهم الشركات المنافسة',
-        effectDescription: 'سيطرة تامة ومكافأة 500,000 ج.م',
+        effectDescription: 'سيطرة تامة ومكافأة 500,000 $',
         rewardMoney: 500000,
       },
       {

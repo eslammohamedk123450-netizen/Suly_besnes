@@ -20,14 +20,14 @@ interface Prize {
 }
 
 const PRIZES: Prize[] = [
-  { id: 0, label: '50,000 ج.م', type: 'cash', amount: 50000, icon: '💵', color: '#10b981' },
+  { id: 0, label: '50,000 $', type: 'cash', amount: 50000, icon: '💵', color: '#10b981' },
   { id: 1, label: '5 ماسات', type: 'diamonds', amount: 5, icon: '💎', color: '#06b6d4' },
   { id: 2, label: '0.5 غرام ذهب', type: 'gold', amount: 0.5, icon: '🥇', color: '#f59e0b' },
   { id: 3, label: 'تسريع فوري', type: 'speed_card', amount: 1, icon: '⚡', color: '#8b5cf6' },
-  { id: 4, label: '120,000 ج.م', type: 'cash', amount: 120000, icon: '💰', color: '#10b981' },
+  { id: 4, label: '120,000 $', type: 'cash', amount: 120000, icon: '💰', color: '#10b981' },
   { id: 5, label: '10 ماسات', type: 'diamonds', amount: 10, icon: '💎', color: '#38bdf8' },
   { id: 6, label: '1.0 غرام ذهب', type: 'gold', amount: 1.0, icon: '👑', color: '#eab308' },
-  { id: 7, label: '25,000 ج.م', type: 'cash', amount: 25000, icon: '💵', color: '#34d399' },
+  { id: 7, label: '25,000 $', type: 'cash', amount: 25000, icon: '💵', color: '#34d399' },
 ];
 
 export const DailyLuckySpinModal: React.FC<DailyLuckySpinModalProps> = ({

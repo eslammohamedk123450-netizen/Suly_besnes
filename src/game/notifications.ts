@@ -12,7 +12,7 @@ export interface GameNotification {
   count?: number;
   target?: string;
 }
-function money(value: number): string { return `${Math.round(value).toLocaleString('ar-EG')} ج.م`; }
+function money(value: number): string { return `${Math.round(value).toLocaleString('ar-EG')} $`; }
 function plural(count: number, one: string, two: string, many: string): string { return count === 1 ? one : count === 2 ? two : many; }
 
 export function selectNotifications(profile: PlayerProfile): GameNotification[] {

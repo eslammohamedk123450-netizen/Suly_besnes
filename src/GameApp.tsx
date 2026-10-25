@@ -16,7 +16,8 @@ import { GAME_SECTIONS, getSection, SECTION_GROUPS, type SectionId } from './dom
 import { createNewPlayer } from './domain/player';
 import type { PlayerProfile } from './domain/player';
 import { formatMoney } from './domain/formatters';
-import { advanceDay, type GameCommand, type GameResult } from './game/engine';
+import type { FinanceLedgerEntry } from './domain/futureSystems';
+import { advanceDay, sellProduct, type GameCommand, type GameResult } from './game/engine';
 import { loadSavedGame, saveGame } from './storage/saveRepository';
 import { loadNotificationTheme, saveNotificationTheme } from './storage/userPreferences';
 import { createGuestAccount, handlePasswordRecoveryCallback, loadCurrentAccount, logoutAccount, type LocalAccount } from './storage/authRepository';
@@ -792,7 +793,7 @@ export default function App() {
                     diamonds: prev.diamonds + diamonds,
                   };
                   saveGame(next, account?.id);
-                  setNotice(`تم استلام المكافأة: +${cash.toLocaleString()} ج.م و +${diamonds} ألماسة! 🎁`);
+                  setNotice(`تم استلام المكافأة: +${cash.toLocaleString()} $ و +${diamonds} ألماسة! 🎁`);
                   setNoticeTone('success');
                   return next;
                 });
@@ -805,7 +806,7 @@ export default function App() {
                     bankBalance: prev.bankBalance + 250000,
                   };
                   saveGame(next, account?.id);
-                  setNotice('تم إيداع تسهيل ائتماني طارئ بقيمة 250,000 ج.م من بنك مصر للأعمال! 🏦');
+                  setNotice('تم إيداع تسهيل ائتماني طارئ بقيمة 250,000 $ من بنك مصر للأعمال! 🏦');
                   setNoticeTone('success');
                   return next;
                 });
@@ -835,7 +836,45 @@ export default function App() {
         </nav>
       </div>}
 
-      <RightActionHub profile={profile} country={country} onNavigate={navigate} onCollectProfit={() => void handleDaysElapsed(1)} />
+      <RightActionHub
+        profile={profile}
+        country={country}
+        onNavigate={navigate}
+        onCollectActualProfit={(amount: number) => {
+          if (!profile) return;
+          const nextBalance = profile.bankBalance + amount;
+          const newEntry: FinanceLedgerEntry = {
+            id: `ledger-actual-profit-${profile.day}-${Date.now()}`,
+            category: 'revenue',
+            amount,
+            countryId: profile.countryId,
+            occurredAt: new Date().toISOString(),
+            note: `الجمع الفعلي لأرباح الشركات والمنشآت (${profile.companies.length} شركات)`,
+          };
+          const nextFinances = {
+            ...profile.finances,
+            netProfit: (profile.finances?.netProfit ?? 0) + amount,
+            totalRevenue: (profile.finances?.totalRevenue ?? 0) + amount,
+          };
+          const nextProfile: PlayerProfile = {
+            ...profile,
+            bankBalance: nextBalance,
+            finances: nextFinances,
+            ledger: [newEntry, ...(profile.ledger ?? [])],
+          };
+          saveGame(nextProfile, account?.id);
+          setProfile(nextProfile);
+          setNotice(`تم تحصيل الأرباح الفعلية بنجاح! تم إيداع +${formatMoney(amount, country)} في حسابك البنكي.`);
+          setNoticeTone('success');
+        }}
+        onSellProduct={(productId: string, quantity: number) => {
+          void handleGameCommand(
+            { name: 'sell_product', args: { productId, quantity } },
+            (curr) => sellProduct(curr, productId, quantity),
+          );
+        }}
+        onAdvanceDay={() => void handleDaysElapsed(1)}
+      />
 
       {notice && <NoticeToast message={notice} tone={noticeTone} theme={notificationTheme} onDismiss={() => setNotice('')} />}
       {pendingGuide && <SystemGuideModal section={pendingGuide} onClose={() => { if (!profile) return; const seenGuides = profile.onboarding.seenGuides.includes(pendingGuide) ? profile.onboarding.seenGuides : [...profile.onboarding.seenGuides, pendingGuide]; const nextProfile = { ...profile, onboarding: { ...profile.onboarding, chapter: chapterFor(profile), seenGuides } }; saveGame(nextProfile, account?.id); if (account && !account.isGuest) setSyncState('local'); setProfile(nextProfile); setPendingGuide(null); }} />}

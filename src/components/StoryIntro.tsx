@@ -78,7 +78,7 @@ export function StoryIntro({ profile, onComplete }: StoryIntroProps) {
         </div>
 
         <p className="story-intro-note">
-          <Icon name="shield" size={15} /> رأس المال البدائي: {country.currency.symbol} {country.startingBalance.toLocaleString('ar-EG')} (يعادل 1,000,000 ج.م بسعر الصرف الحقيقي)
+          <Icon name="shield" size={15} /> رأس المال البدائي: {country.currency.symbol} {country.startingBalance.toLocaleString('ar-EG')} (يعادل 1,000,000 $ بسعر الصرف الحقيقي)
         </p>
       </section>
     </main>

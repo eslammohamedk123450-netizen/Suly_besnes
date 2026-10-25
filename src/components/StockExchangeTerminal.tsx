@@ -252,7 +252,7 @@ export function StockExchangeTerminal({ profile, country, onCommand, onAction, o
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs bg-slate-900 p-4 rounded-lg">
                 <div>
-                  رسوم الاكتتاب والتسجيل: <span className="font-bold text-rose-400">500,000 ج.م</span>
+                  رسوم الاكتتاب والتسجيل: <span className="font-bold text-rose-400">500,000 $</span>
                 </div>
                 <div>
                   السيولة التقديرية المكتسبة: <span className="font-bold text-emerald-400">+{formatCurrency(ipoOfferPercent * 500000, 'EGP')}</span>
@@ -578,7 +578,7 @@ export function StockExchangeTerminal({ profile, country, onCommand, onAction, o
                   </div>
 
                   <div className="stock-field-group">
-                    <label htmlFor="invest-amount-input">مبلغ الاستثمار (ج.م)</label>
+                    <label htmlFor="invest-amount-input">مبلغ الاستثمار ($)</label>
                     <input
                       id="invest-amount-input"
                       type="number"

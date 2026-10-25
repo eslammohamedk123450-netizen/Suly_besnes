@@ -34,7 +34,7 @@ export const StruggleStoryHub: React.FC<StruggleStoryHubProps> = ({
   const handleRepairFactory = () => {
     if ((profile.bankBalance ?? 0) < 25000) {
       playSound('error');
-      setStoryToast('عفواً: رصيد الخزينة غير كافٍ للصيانة (تحتاج 25,000 ج.م).');
+      setStoryToast('عفواً: رصيد الخزينة غير كافٍ للصيانة (تحتاج 25,000 $).');
       return;
     }
 
@@ -69,7 +69,7 @@ export const StruggleStoryHub: React.FC<StruggleStoryHubProps> = ({
   const handleBuyMaterialsBundle = () => {
     if ((profile.bankBalance ?? 0) < 35000) {
       playSound('error');
-      setStoryToast('عفواً: رصيد الخزينة غير كافٍ لشراء الخامات (تحتاج 35,000 ج.م).');
+      setStoryToast('عفواً: رصيد الخزينة غير كافٍ لشراء الخامات (تحتاج 35,000 $).');
       return;
     }
 
@@ -144,7 +144,7 @@ export const StruggleStoryHub: React.FC<StruggleStoryHubProps> = ({
       };
     });
 
-    setStoryToast('تم تشغيل خط الإنتاج وبيع الشحنة كاش لتجار الجملة! أرباحك: +175,000 ج.م!');
+    setStoryToast('تم تشغيل خط الإنتاج وبيع الشحنة كاش لتجار الجملة! أرباحك: +175,000 $!');
   };
 
   // Quick Action 4: Pay Off Urgent Bank Debt
@@ -219,7 +219,7 @@ export const StruggleStoryHub: React.FC<StruggleStoryHubProps> = ({
           <div className="bg-rose-950/60 border border-rose-500/40 p-2.5 rounded-xl flex items-center gap-2.5 self-stretch md:self-auto">
             <span className="text-xl animate-bounce">⏱️</span>
             <div>
-              <span className="text-[10px] text-rose-300 font-bold block">مهلة قسط البنك (52,500 ج.م)</span>
+              <span className="text-[10px] text-rose-300 font-bold block">مهلة قسط البنك (52,500 $)</span>
               <span className="text-xs font-black text-white font-mono">
                 متبقي {daysRemaining} أيام داخل اللعبة (اليوم 7)
               </span>
@@ -256,7 +256,7 @@ export const StruggleStoryHub: React.FC<StruggleStoryHubProps> = ({
         <div className="bg-slate-950/80 p-3 rounded-xl border border-slate-800">
           <span className="text-[10px] text-slate-400 block">حالة قسط البنك</span>
           <span className={`text-sm font-bold font-mono mt-1 block ${isLoanPaid ? 'text-emerald-400' : 'text-amber-400'}`}>
-            {isLoanPaid ? 'مسدد بالكامل ✓' : '52,500 ج.م مستحق'}
+            {isLoanPaid ? 'مسدد بالكامل ✓' : '52,500 $ مستحق'}
           </span>
           <span className="text-[10px] text-slate-400 mt-1 block">
             {isLoanPaid ? 'الحجز ملغي' : 'مهدد بالحجز'}
@@ -330,7 +330,7 @@ export const StruggleStoryHub: React.FC<StruggleStoryHubProps> = ({
                   <p className="text-[11px] text-slate-400 mt-1">
                     فلاتر جديدة وتزييت الماكينات لإعادة تشغيل خط إنتاج الأغذية ليعود بكفاءة 90%.
                   </p>
-                  <span className="text-[10px] text-amber-400 font-mono mt-1 block">التكلفة: 25,000 ج.م</span>
+                  <span className="text-[10px] text-amber-400 font-mono mt-1 block">التكلفة: 25,000 $</span>
                 </div>
                 {isRepaired ? (
                   <span className="text-xs font-bold text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded-lg">
@@ -360,7 +360,7 @@ export const StruggleStoryHub: React.FC<StruggleStoryHubProps> = ({
                   <p className="text-[11px] text-slate-400 mt-1">
                     شراء شاحنة دقيق وسكر صناعي ومواد تعبئة تكفي لتشغيل أول دفعة بسكويت.
                   </p>
-                  <span className="text-[10px] text-amber-400 font-mono mt-1 block">التكلفة: 35,000 ج.م</span>
+                  <span className="text-[10px] text-amber-400 font-mono mt-1 block">التكلفة: 35,000 $</span>
                 </div>
                 {hasRawMaterials ? (
                   <span className="text-xs font-bold text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded-lg">
@@ -390,7 +390,7 @@ export const StruggleStoryHub: React.FC<StruggleStoryHubProps> = ({
                   <p className="text-[11px] text-slate-400 mt-1">
                     تشغيل خط الإنتاج وتوريد أول شحنة بسكويت غذائي لتجار الجملة كاش لجمع سيولة البنك.
                   </p>
-                  <span className="text-[10px] text-emerald-400 font-mono mt-1 block">العائد المتوقع: +175,000 ج.م</span>
+                  <span className="text-[10px] text-emerald-400 font-mono mt-1 block">العائد المتوقع: +175,000 $</span>
                 </div>
                 {hasSoldProducts ? (
                   <span className="text-xs font-bold text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded-lg">
@@ -418,9 +418,9 @@ export const StruggleStoryHub: React.FC<StruggleStoryHubProps> = ({
                     <h4 className="text-xs font-bold text-white">الخطوة 4: سداد قسط البنك الأهلي</h4>
                   </div>
                   <p className="text-[11px] text-slate-400 mt-1">
-                    سداد 52,500 ج.م للبنك قبل انتهاء مهلة اليوم السابع لرفع الحجز واستعادة السجل النظيف.
+                    سداد 52,500 $ للبنك قبل انتهاء مهلة اليوم السابع لرفع الحجز واستعادة السجل النظيف.
                   </p>
-                  <span className="text-[10px] text-rose-300 font-mono mt-1 block">المبلغ المطلوب: 52,500 ج.م</span>
+                  <span className="text-[10px] text-rose-300 font-mono mt-1 block">المبلغ المطلوب: 52,500 $</span>
                 </div>
                 {isLoanPaid ? (
                   <span className="text-xs font-bold text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded-lg">

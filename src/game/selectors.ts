@@ -163,7 +163,7 @@ export function selectOperationsSnapshot(profile: PlayerProfile, operatingCostMu
   }).length;
   let nextStep: OperationsNextStep;
   if (profile.payables > 0) {
-    nextStep = { section: 'obligations', title: 'سدّد الالتزامات الحرجة', description: `لديك ${Math.round(profile.payables).toLocaleString('ar-EG')} ج.م مسجلة كالتزامات. راجع الأولويات قبل التوسع حتى لا تتوقف الطاقة.`, actionLabel: 'فتح الالتزامات', tone: 'gold' };
+    nextStep = { section: 'obligations', title: 'سدّد الالتزامات الحرجة', description: `لديك ${Math.round(profile.payables).toLocaleString('ar-EG')} $ مسجلة كالتزامات. راجع الأولويات قبل التوسع حتى لا تتوقف الطاقة.`, actionLabel: 'فتح الالتزامات', tone: 'gold' };
   } else if (activeContracts > 0) {
     nextStep = { section: 'contracts', title: 'سلّم عقدك قبل الموعد', description: `لديك ${activeContracts} عقد نشط. راجع المخزون وأكمل التوريد يدويًا حتى تحافظ على سمعتك التجارية.`, actionLabel: 'فتح العقود', tone: 'green' };
   } else if (profile.lands.length === 0) {

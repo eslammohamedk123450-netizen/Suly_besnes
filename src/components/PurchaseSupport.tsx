@@ -6,7 +6,7 @@ export function PurchaseSupport() {
   return (
     <div className="purchase-support">
       <div className="purchase-support-heading">
-        <span className="purchase-support-mark">ج.م</span>
+        <span className="purchase-support-mark">$</span>
         <div>
           <strong>شراء مكافآت اللعبة</strong>
           <p>الدفع يتم يدويًا عبر Vodafone Cash، ثم أرسل إيصال التحويل للدعم للحصول على كودك.</p>

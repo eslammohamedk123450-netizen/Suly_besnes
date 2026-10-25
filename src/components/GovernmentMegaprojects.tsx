@@ -78,7 +78,7 @@ export const GovernmentMegaprojects: React.FC<Props> = ({ profile, expansion, on
         >
           {polState.influenceLevel >= 10
             ? 'المستوى الأقصى'
-            : `رفع النفوذ بـ ${(polState.influenceLevel * 500000).toLocaleString('ar-EG')} ج.م`}
+            : `رفع النفوذ بـ ${(polState.influenceLevel * 500000).toLocaleString('ar-EG')} $`}
         </button>
       </div>
 
@@ -122,7 +122,7 @@ export const GovernmentMegaprojects: React.FC<Props> = ({ profile, expansion, on
                 <div className="tender-stats">
                   <div className="tstat">
                     <span>ميزانية المشروع الإجمالية</span>
-                    <strong className="budget-text">💰 {tender.totalBudget.toLocaleString('ar-EG')} ج.م</strong>
+                    <strong className="budget-text">💰 {tender.totalBudget.toLocaleString('ar-EG')} $</strong>
                   </div>
                   <div className="tstat">
                     <span>عدد مراحل التسليم</span>
@@ -130,7 +130,7 @@ export const GovernmentMegaprojects: React.FC<Props> = ({ profile, expansion, on
                   </div>
                   <div className="tstat">
                     <span>المستخلص لكل مرحلة</span>
-                    <strong>💵 {tender.payoutPerMilestone.toLocaleString('ar-EG')} ج.م</strong>
+                    <strong>💵 {tender.payoutPerMilestone.toLocaleString('ar-EG')} $</strong>
                   </div>
                   <div className="tstat">
                     <span>النفوذ المطلوبة</span>
@@ -143,7 +143,7 @@ export const GovernmentMegaprojects: React.FC<Props> = ({ profile, expansion, on
                 <div className="tender-card-foot">
                   <div className="deposit-info">
                     <span>تأمين المناقصة (5%):</span>
-                    <strong>{depositCost.toLocaleString('ar-EG')} ج.م</strong>
+                    <strong>{depositCost.toLocaleString('ar-EG')} $</strong>
                   </div>
 
                   {isWon ? (
@@ -195,7 +195,7 @@ export const GovernmentMegaprojects: React.FC<Props> = ({ profile, expansion, on
 
                     <div className="ap-body">
                       <span>إجمالي المستخلصات المحصلة من المشروع:</span>
-                      <strong>💵 {tender.payoutPerMilestone.toLocaleString('ar-EG')} ج.م لكل مرحلة</strong>
+                      <strong>💵 {tender.payoutPerMilestone.toLocaleString('ar-EG')} $ لكل مرحلة</strong>
                     </div>
 
                     <button

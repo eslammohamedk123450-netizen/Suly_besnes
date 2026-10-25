@@ -102,7 +102,7 @@ export const MaritimeTradeRoutes: React.FC<Props> = ({ profile, expansion, onUpd
                   </div>
                   <div className="vstat">
                     <span>أرباح الرحلة الأساسية</span>
-                    <strong className="profit-text">💰 {vessel.baseProfitPerVoyage.toLocaleString('ar-EG')} ج.م</strong>
+                    <strong className="profit-text">💰 {vessel.baseProfitPerVoyage.toLocaleString('ar-EG')} $</strong>
                   </div>
                 </div>
 
@@ -116,7 +116,7 @@ export const MaritimeTradeRoutes: React.FC<Props> = ({ profile, expansion, onUpd
                     disabled={!canAfford}
                     onClick={() => handleBuyShip(vessel.id)}
                   >
-                    {canAfford ? `شراء بـ ${vessel.price.toLocaleString('ar-EG')} ج.م` : 'السيولة لا تكفي'}
+                    {canAfford ? `شراء بـ ${vessel.price.toLocaleString('ar-EG')} $` : 'السيولة لا تكفي'}
                   </button>
                 </div>
               </div>
@@ -214,7 +214,7 @@ export const MaritimeTradeRoutes: React.FC<Props> = ({ profile, expansion, onUpd
 
                     <div className="voyage-profit">
                       <span>الأرباح المتوقعة</span>
-                      <strong>💰 {voyage.expectedProfit.toLocaleString('ar-EG')} ج.م</strong>
+                      <strong>💰 {voyage.expectedProfit.toLocaleString('ar-EG')} $</strong>
                     </div>
 
                     <div className="voyage-action">

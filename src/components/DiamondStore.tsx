@@ -57,7 +57,7 @@ export function DiamondStore({ profile, isGuest, onLinkAccount, onRefreshProfile
     : existingPendingOrder;
   
   const whatsappText = selected && activeOrder
-    ? `مرحبًا، أرسلت قيمة طلب شحن الماس رقم ${activeOrder.orderNumber}. الباقة: ${selected.label}، ${selected.diamonds} ماسة بقيمة ${selected.priceEgp} ج.م. سأرفق إيصال التحويل.`
+    ? `مرحبًا، أرسلت قيمة طلب شحن الماس رقم ${activeOrder.orderNumber}. الباقة: ${selected.label}، ${selected.diamonds} ماسة بقيمة ${selected.priceEgp} $. سأرفق إيصال التحويل.`
     : 'مرحبًا، أريد الاستفسار عن شحن الماس للعبة إمبراطورية الأعمال.';
 
   async function refreshOrders() {
@@ -172,7 +172,7 @@ export function DiamondStore({ profile, isGuest, onLinkAccount, onRefreshProfile
 
               {/* Price Tag */}
               <div className="suly-price-tag">
-                {formatNumber(item.priceEgp)} ج.م
+                {formatNumber(item.priceEgp)} $
               </div>
 
               {/* Buy Golden Pill Button */}
@@ -203,7 +203,7 @@ export function DiamondStore({ profile, isGuest, onLinkAccount, onRefreshProfile
               <strong>باقة {selected.label}</strong>
               <small>{selected.diamonds} ماسة ({selected.note})</small>
             </div>
-            <span className="suly-checkout-price">{selected.priceEgp} ج.م</span>
+            <span className="suly-checkout-price">{selected.priceEgp} $</span>
           </div>
 
           {isGuest ? (
@@ -233,7 +233,7 @@ export function DiamondStore({ profile, isGuest, onLinkAccount, onRefreshProfile
           ) : (
             <>
               <div className="suly-payment-box">
-                <p>للشحن عبر <strong>Vodafone Cash</strong> أرسل المبلغ <strong>({selected.priceEgp} ج.م)</strong> إلى الرقم:</p>
+                <p>للشحن عبر <strong>Vodafone Cash</strong> أرسل المبلغ <strong>({selected.priceEgp} $)</strong> إلى الرقم:</p>
                 <button type="button" className="suly-vodafone-pill" onClick={() => void copyNumber()}>
                   <span>رقم فودافون كاش</span>
                   <strong dir="ltr">{VODAFONE_CASH_NUMBER}</strong>
@@ -327,7 +327,7 @@ export function DiamondStore({ profile, isGuest, onLinkAccount, onRefreshProfile
                 <div className="suly-order-item" key={o.orderId}>
                   <div>
                     <strong dir="ltr">{o.orderNumber}</strong>
-                    <small>{o.packageName} · {o.amountEgp ?? o.amountUsd} ج.م</small>
+                    <small>{o.packageName} · {o.amountEgp ?? o.amountUsd} $</small>
                   </div>
                   <span className={`suly-status-pill suly-status--${o.status}`}>{STATUS_LABELS[o.status]}</span>
                 </div>

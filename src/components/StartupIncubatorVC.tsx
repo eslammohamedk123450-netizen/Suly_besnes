@@ -46,7 +46,7 @@ export const StartupIncubatorVC: React.FC<Props> = ({ profile, expansion, onUpda
       <div className="vc-stats-bar">
         <div className="vc-stat-box">
           <span>إجمالي أرباح الخروج والتصفية</span>
-          <strong className="green-text">💰 {vcState.totalExitsProfit.toLocaleString('ar-EG')} ج.م</strong>
+          <strong className="green-text">💰 {vcState.totalExitsProfit.toLocaleString('ar-EG')} $</strong>
         </div>
         <div className="vc-stat-box">
           <span>عدد استثمارات المحفظة</span>
@@ -104,11 +104,11 @@ export const StartupIncubatorVC: React.FC<Props> = ({ profile, expansion, onUpda
                 <div className="startup-stats">
                   <div className="sstat">
                     <span>التقييم الحالي للشركة</span>
-                    <strong>💎 {startup.currentValuation.toLocaleString('ar-EG')} ج.م</strong>
+                    <strong>💎 {startup.currentValuation.toLocaleString('ar-EG')} $</strong>
                   </div>
                   <div className="sstat">
                     <span>حجم التمويل المطلوب</span>
-                    <strong>💰 {startup.investmentCost.toLocaleString('ar-EG')} ج.م</strong>
+                    <strong>💰 {startup.investmentCost.toLocaleString('ar-EG')} $</strong>
                   </div>
                   <div className="sstat">
                     <span>الحصة المقابلة للملكية</span>
@@ -169,11 +169,11 @@ export const StartupIncubatorVC: React.FC<Props> = ({ profile, expansion, onUpda
                     <div className="port-body">
                       <div>
                         <span>الاستثمار الأولي:</span>
-                        <strong>{startup.investmentCost.toLocaleString('ar-EG')} ج.م</strong>
+                        <strong>{startup.investmentCost.toLocaleString('ar-EG')} $</strong>
                       </div>
                       <div>
                         <span>قيمة الخروج والاستحواذ:</span>
-                        <strong className="green-text">+{exitPayout.toLocaleString('ar-EG')} ج.م ({startup.exitMultiple}x)</strong>
+                        <strong className="green-text">+{exitPayout.toLocaleString('ar-EG')} $ ({startup.exitMultiple}x)</strong>
                       </div>
                     </div>
 
