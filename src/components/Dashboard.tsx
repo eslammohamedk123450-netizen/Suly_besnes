@@ -182,6 +182,30 @@ export function Dashboard({
       isUnlocked: isSectionUnlocked(profile, 'auctions'),
       hint: 'المزايدة على الأصول المتعثرة والصفقات الاستثمارية النادرة.',
     },
+    // 5.1 المهام اليومية (المستوى 1)
+    {
+      id: 'tasks',
+      title: 'المهام اليومية',
+      category: 'core',
+      sectionId: 'tasks',
+      icon: <Trophy className="w-5 h-5 sm:w-6 sm:h-6 text-white" />,
+      gradient: 'bg-gradient-to-tr from-yellow-600 to-amber-500',
+      requiredLevel: 1,
+      isUnlocked: true,
+      hint: 'مهام القصة والإنجازات اليومية لجني الكاش والماس.',
+    },
+    // 5.2 الالتزامات والرواتب (المستوى 1)
+    {
+      id: 'obligations',
+      title: 'الالتزامات والرواتب',
+      category: 'core',
+      sectionId: 'obligations',
+      icon: <Shield className="w-5 h-5 sm:w-6 sm:h-6 text-white" />,
+      gradient: 'bg-gradient-to-tr from-rose-600 to-orange-500',
+      requiredLevel: 1,
+      isUnlocked: true,
+      hint: 'سداد رواتب العمال وأقساط القروض لتفادي التجميد البنكي.',
+    },
     // 6. المتجر (المستوى 1)
     {
       id: 'store',
@@ -373,56 +397,6 @@ export function Dashboard({
     return true;
   });
 
-  // Determine immediate story guidance step
-  const guideStep = (() => {
-    const inheritedComp = profile.companies[0];
-    if (inheritedComp && (inheritedComp.maintenanceCondition ?? 100) < 50) {
-      return {
-        stageBadge: 'المرحلة 1 من 4: الصيانة العاجلة',
-        title: 'فحص وصيانة المصنع الموروث 🛠️',
-        description: 'ماكينات المصنع متهالكة بنسبة 25% نتيجة أزمة الإفلاس السابقة. ادخل لقسم الشركات وقم بصيانة الماكينات فوراً لرفع الكفاءة التشغيلية قبل بدء الإنتاج.',
-        buttonText: 'فحص وصيانة المصنع',
-        action: () => onNavigate('companies'),
-      };
-    }
-    const completedOrders = profile.productionOrders.filter((o) => o.status === 'completed').length;
-    if (completedOrders === 0) {
-      return {
-        stageBadge: 'المرحلة 2 من 4: خطوط التصنيع',
-        title: 'شراء المواد الخام وتشغيل أول دفعة إنتاج ⚙️',
-        description: 'المصنع جاهز الآن! توجه إلى خطوط الإنتاج، اشترِ الخامات بالسيولة النقدية المتاحة، وأطلق أول أمر تشغيل لتصنيع السلع الغذائية.',
-        buttonText: 'الانتقال لخطوط الإنتاج',
-        action: () => onNavigate('production'),
-      };
-    }
-    if (profile.sales.length === 0) {
-      return {
-        stageBadge: 'المرحلة 3 من 4: المبيعات والكاش',
-        title: 'بيع أول دفعة منتجات في السوق 📦',
-        description: 'لديك منتجات غذائية جاهزة في المستودع! اعرضها في السوق لتحقيق أول مكسب نقدي وكسب نقاط خبرة XP لبلوغ المستوى 2.',
-        buttonText: 'بيع المنتجات في المخزن',
-        action: () => onNavigate('inventory'),
-      };
-    }
-    const completedContracts = profile.contracts.filter((c) => c.status === 'completed').length;
-    if (completedContracts === 0) {
-      return {
-        stageBadge: 'المرحلة 4 من 4: العقود والائتمان',
-        title: 'إبرام أول عقد تجاري وفك الحظر البنكي 📜',
-        description: 'استعد ثقة كبار التجار! تسليم أول عقد تجاري رسمي سيمنحك سمعة عالية ويرفع مستواك لفك التجميد المصرفي وفتح البنك في المستوى 4.',
-        buttonText: 'استعراض العقود التجارية',
-        action: () => onNavigate('contracts'),
-      };
-    }
-    return {
-      stageBadge: 'مسار التوسع والريادة 🚀',
-      title: 'إمبراطوريتك تتقدم بنجاح! واصل التوسع والمزادات 🏆',
-      description: 'نجحت في خطة الإنقاذ وكسر الحصار المالي! البنك مفتوح الآن للودائع والقروض، ومستواك يؤهلك للمنافسة في المزادات والبورصة.',
-      buttonText: 'دخول المزادات والتوسع',
-      action: () => onNavigate('auctions'),
-    };
-  })();
-
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-12 animate-fade-in" dir="rtl">
       {/* 1. Sleek News & Market Ticker Bar */}
@@ -512,55 +486,6 @@ export function Dashboard({
         </div>
       </div>
 
-      {/* 2.5. Interactive Story Rescue & Onboarding Guide Banner */}
-      <div className="bg-gradient-to-r from-slate-900 via-slate-900/95 to-slate-950 border-2 border-amber-500/40 rounded-3xl p-4 sm:p-6 shadow-2xl relative overflow-hidden backdrop-blur-xl">
-        <div className="absolute top-0 right-0 w-64 h-32 bg-amber-500/10 rounded-full blur-3xl -z-10" />
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="space-y-2 text-right">
-            <div className="flex items-center gap-2">
-              <span className="px-2.5 py-0.5 rounded-full bg-amber-500 text-slate-950 text-xs font-black flex items-center gap-1 shadow">
-                <Compass className="w-3.5 h-3.5 fill-slate-950" />
-                خطة الإنقاذ والتوجيه الإلزامي
-              </span>
-              <span className="text-xs text-amber-300 font-extrabold bg-amber-500/15 px-2.5 py-0.5 rounded-full border border-amber-500/30">
-                {guideStep.stageBadge}
-              </span>
-            </div>
-
-            <h3 className="text-base sm:text-lg font-black text-white flex items-center gap-2">
-              <span>{guideStep.title}</span>
-            </h3>
-
-            <p className="text-xs sm:text-sm text-slate-300 max-w-2xl leading-relaxed">
-              {guideStep.description}
-            </p>
-          </div>
-
-          <div className="flex items-center gap-2 flex-shrink-0 self-end md:self-center">
-            {onOpenTutorial && (
-              <button
-                type="button"
-                onClick={onOpenTutorial}
-                className="px-3.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-bold transition flex items-center gap-1.5 shadow"
-                title="إعادة مراجعة التوجيه الإلزامي وسيناريو القصة كاملاً"
-              >
-                <BookOpen className="w-4 h-4 text-amber-400" />
-                <span>شرح القصة والسيناريو 🎓</span>
-              </button>
-            )}
-
-            <button
-              type="button"
-              onClick={guideStep.action}
-              className="px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 text-slate-950 text-xs sm:text-sm font-black shadow-lg shadow-amber-500/25 transition transform hover:scale-[1.02] flex items-center gap-2"
-            >
-              <span>{guideStep.buttonText}</span>
-              <ArrowLeft className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-      </div>
-
       {/* 3. Executive Command Operations Bar with explicit unlock levels & lock badges */}
       <div className="bg-slate-900/95 border border-slate-800 rounded-3xl p-4 sm:p-6 shadow-2xl backdrop-blur-md">
         <div className="flex flex-wrap items-center justify-between gap-3 mb-4 pb-3 border-b border-slate-800/80">
@@ -639,6 +564,7 @@ export function Dashboard({
                     handleNav(item.sectionId);
                   }
                 }}
+                data-guide-nav={item.sectionId}
                 className={`flex flex-col items-center justify-between p-2 rounded-2xl transition group cursor-pointer shadow-md relative min-h-[105px] ${
                   item.isUnlocked
                     ? 'bg-slate-950/70 border border-slate-800 hover:border-amber-400 hover:bg-slate-900 active:scale-95'

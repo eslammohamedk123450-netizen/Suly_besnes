@@ -38,6 +38,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
       {/* 1. Home */}
       <button
         onClick={() => handleNav('home')}
+        data-guide-nav="home"
         className={`flex flex-col items-center gap-1 py-1 px-2.5 rounded-xl transition ${
           activeSection === 'home'
             ? 'text-amber-400 font-bold'
@@ -51,6 +52,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
       {/* 2. Factories / Production */}
       <button
         onClick={() => handleNav('production')}
+        data-guide-nav="production"
         className={`flex flex-col items-center gap-1 py-1 px-2 rounded-xl transition relative ${
           activeSection === 'production' || activeSection === 'companies'
             ? 'text-emerald-400 font-bold'

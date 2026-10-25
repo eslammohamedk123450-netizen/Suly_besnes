@@ -24,5 +24,5 @@
     "allowImportingTsExtensions": true,
     "noEmit": true
   },
-  "exclude": ["dist", "admin-dashboard", "supabase", "**/*.test.ts", "**/*.test.tsx"]
+  "exclude": ["dist", "temp_repo", "supabase", "**/*.test.ts"]
 }

@@ -62,6 +62,7 @@ export function HubSubNav({ currentSection, profile, onNavigate }: HubSubNavProp
               type="button"
               role="tab"
               aria-selected={isActive}
+              data-guide-nav={sectionId}
               className={`hub-pill ${isActive ? 'is-active' : ''} ${isLocked ? 'opacity-75' : ''}`}
               onClick={() => onNavigate(sectionId)}
               title={isLocked ? `🔒 يفتح في مستوى ${reqLevel}` : undefined}
