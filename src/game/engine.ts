@@ -230,9 +230,9 @@ function conditionMet(profile: PlayerProfile, condition: (typeof TASK_CATALOG)[n
 }
 
 function ensureEgypt(profile: PlayerProfile): GameResult<never> | null {
-  return profile.countryId === 'egypt' && findCountry(profile.countryId)
+  return findCountry(profile.countryId)
     ? null
-    : failure(profile, 'wrong-country', 'هذه الجولة متاحة لمصر فقط.');
+    : failure(profile, 'wrong-country', 'الدولة المختارة غير صالحة.');
 }
 
 export function placeBid(profile: PlayerProfile, listingId: string, amount: number, targetCompanyId?: string): GameResult<AuctionOutcome> {
@@ -332,16 +332,18 @@ export function buyDirectLand(profile: PlayerProfile, listingId: string, payment
   const listing = DIRECT_LAND_CATALOG.find((entry) => entry.id === listingId);
   if (!listing) return failure(profile, 'not-found', 'عرض الأرض غير موجود.');
   if (profile.lands.some((land) => land.id === listing.id)) return failure(profile, 'already-owned', 'تم شراء هذه الأرض بالفعل.');
-  const payment = resolvePurchaseDebit(profile, listing.price, paymentMethod);
+  const rate = findCountry(profile.countryId)?.economy.exchangeRateToEgp || 1;
+  const scaledPrice = Math.max(1, Math.round(listing.price / rate));
+  const payment = resolvePurchaseDebit(profile, scaledPrice, paymentMethod);
   if ('message' in payment) return failure(profile, 'insufficient-funds', payment.message);
-  const land: PlayerLand = { id: listing.id, label: listing.label, areaSquareMeters: listing.areaSquareMeters, purchasePrice: listing.price, acquiredAt: timestampFor(profile), acquiredOnDay: profile.day, availableForCompanyOnDay: profile.day + 1, landType: listing.landType };
+  const land: PlayerLand = { id: listing.id, label: listing.label, areaSquareMeters: listing.areaSquareMeters, purchasePrice: scaledPrice, acquiredAt: timestampFor(profile), acquiredOnDay: profile.day, availableForCompanyOnDay: profile.day + 1, landType: listing.landType };
   const nextProfile = addLedger(
     { ...profile, lands: [...profile.lands, land] },
-    [ledgerEntry(profile, 'asset', listing.price, `شراء أرض مباشر: ${listing.label}`, 0)],
+    [ledgerEntry(profile, 'asset', scaledPrice, `شراء أرض مباشر: ${listing.label}`, 0)],
     payment.bankBalance,
     { diamonds: payment.diamonds },
   );
-  return success(syncTasks(nextProfile), `تم شراء ${listing.label} ${paymentMethod === 'diamonds' ? `مقابل ${payment.diamondsSpent} ماسة` : 'نقدًا'}. بدأ إنهاء عقود نقل الملكية؛ ستكون الأرض متاحة بعد يوم داخل اللعبة، في اليوم ${profile.day + 1}. تحلَّ بالصبر.`, { landId: land.id, price: listing.price, diamondsSpent: payment.diamondsSpent });
+  return success(syncTasks(nextProfile), `تم شراء ${listing.label} ${paymentMethod === 'diamonds' ? `مقابل ${payment.diamondsSpent} ماسة` : 'نقدًا'}. بدأ إنهاء عقود نقل الملكية؛ ستكون الأرض متاحة بعد يوم داخل اللعبة، في اليوم ${profile.day + 1}. تحلَّ بالصبر.`, { landId: land.id, price: scaledPrice, diamondsSpent: payment.diamondsSpent });
 }
 
 export function buyDirectCompany(profile: PlayerProfile, listingId: string, paymentMethod: PurchasePaymentMethod = 'cash'): GameResult<{ companyId: string; landId: string; price: number; diamondsSpent: number }> {
@@ -351,20 +353,22 @@ export function buyDirectCompany(profile: PlayerProfile, listingId: string, paym
   const industry = listing ? findIndustry(listing.industryId) : undefined;
   if (!listing || !industry) return failure(profile, 'not-found', 'عرض الشركة غير موجود.');
   if (profile.companies.some((company) => company.id === listing.id)) return failure(profile, 'already-owned', 'تم شراء هذه الشركة بالفعل.');
-  const payment = resolvePurchaseDebit(profile, listing.price, paymentMethod);
+  const rate = findCountry(profile.countryId)?.economy.exchangeRateToEgp || 1;
+  const scaledPrice = Math.max(1, Math.round(listing.price / rate));
+  const payment = resolvePurchaseDebit(profile, scaledPrice, paymentMethod);
   if ('message' in payment) return failure(profile, 'insufficient-funds', payment.message);
   const landId = `${listing.id}-land`;
   const licenseId = `${listing.id}-license`;
-  const land: PlayerLand = { id: landId, label: `${listing.name} · أرض الشركة`, areaSquareMeters: listing.areaSquareMeters, purchasePrice: Math.floor(listing.price * 0.45), acquiredAt: timestampFor(profile), acquiredOnDay: profile.day, availableForCompanyOnDay: profile.day + 1, landType: listing.landType };
+  const land: PlayerLand = { id: landId, label: `${listing.name} · أرض الشركة`, areaSquareMeters: listing.areaSquareMeters, purchasePrice: Math.floor(scaledPrice * 0.45), acquiredAt: timestampFor(profile), acquiredOnDay: profile.day, availableForCompanyOnDay: profile.day + 1, landType: listing.landType };
   const company: PlayerCompany = { id: listing.id, name: listing.name, industryId: listing.industryId, countryId: profile.countryId, foundedAt: timestampFor(profile), operationalFromDay: profile.day + 1, landId, licenseIds: [licenseId], energyUnits: industry.energyCapacity, energyCapacity: industry.energyCapacity, operatingCostPerDay: industry.dailyOperatingCost };
-  const license = { id: licenseId, countryId: profile.countryId, industryId: listing.industryId, feePaid: Math.floor(listing.price * 0.15), issuedAt: timestampFor(profile) };
+  const license = { id: licenseId, countryId: profile.countryId, industryId: listing.industryId, feePaid: Math.floor(scaledPrice * 0.15), issuedAt: timestampFor(profile) };
   const nextProfile = addLedger(
     { ...profile, lands: [...profile.lands, land], companies: [...profile.companies, company], licenses: [...profile.licenses, license] },
-    [ledgerEntry(profile, 'asset', listing.price, `شراء شركة مباشر: ${listing.name}`, 0)],
+    [ledgerEntry(profile, 'asset', scaledPrice, `شراء شركة مباشر: ${listing.name}`, 0)],
     payment.bankBalance,
     { diamonds: payment.diamonds },
   );
-  return success(syncTasks(nextProfile), `تم شراء ${listing.name} ${paymentMethod === 'diamonds' ? `مقابل ${payment.diamondsSpent} ماسة` : 'نقدًا'}. يجري إنهاء عقود نقل الملكية، ويبدأ التشغيل بعد يوم داخل اللعبة في اليوم ${profile.day + 1}. تحلَّ بالصبر.`, { companyId: company.id, landId, price: listing.price, diamondsSpent: payment.diamondsSpent });
+  return success(syncTasks(nextProfile), `تم شراء ${listing.name} ${paymentMethod === 'diamonds' ? `مقابل ${payment.diamondsSpent} ماسة` : 'نقدًا'}. يجري إنهاء عقود نقل الملكية، ويبدأ التشغيل بعد يوم داخل اللعبة في اليوم ${profile.day + 1}. تحلَّ بالصبر.`, { companyId: company.id, landId, price: scaledPrice, diamondsSpent: payment.diamondsSpent });
 }
 
 export function sellLand(profile: PlayerProfile, landId: string): GameResult<{ landId: string; payout: number }> {

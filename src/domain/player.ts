@@ -122,12 +122,46 @@ export function createNewPlayer(
 ): PlayerProfile {
   const createdAt = now.toISOString();
 
-  // Initial collapsing land (أرض مصنع العاشر من رمضان)
+  const rate = country.economy.exchangeRateToEgp || 1;
+  const initialCash = Math.max(1000, Math.round(120_000 / rate));
+  const initialLoanPrincipal = Math.max(500, Math.round(50_000 / rate));
+  const initialLoanRepay = Math.round(initialLoanPrincipal * 1.05);
+  const initialLandValue = Math.round(350_000 / rate);
+  const initialOperatingCost = Math.max(50, Math.round(3500 / rate));
+
+  const countryLandNames: Record<string, string> = {
+    egypt: 'أرض مصنع العاشر القديم (ميراث مهدد)',
+    saudi: 'أرض المدينة الصناعية الثانية بالرياض (ميراث مهدد)',
+    uae: 'أرض منطقة جبل علي الصناعية بدبي (ميراث مهدد)',
+    usa: 'أرض كوينز الصناعية بنيويورك (ميراث مهدد)',
+    kuwait: 'أرض منطقة الشويخ الصناعية (ميراث مهدد)',
+    qatar: 'أرض المنطقة الصناعية بالدوحة (ميراث مهدد)',
+    uk: 'أرض مجمع مانشستر الصناعي (ميراث مهدد)',
+    germany: 'أرض فرانكفورت الصناعية (ميراث مهدد)',
+    japan: 'أرض مجمع يوكوهاما للأتمتة (ميراث مهدد)',
+  };
+
+  const countryBankNames: Record<string, string> = {
+    egypt: 'بنك مصر',
+    saudi: 'مصرف الراجحي',
+    uae: 'بنك الإمارات دبي الوطني',
+    usa: 'جي بي مورغان تشيس',
+    kuwait: 'بنك الكويت الوطني',
+    qatar: 'بنك قطر الوطني QNB',
+    uk: 'بنك باركليز',
+    germany: 'دويتشه بنك',
+    japan: 'ميتسوبيشي يو إف جيه',
+  };
+
+  const landLabel = countryLandNames[country.id] || `أرض المنطقة الصناعية - ${country.name}`;
+  const bankName = countryBankNames[country.id] || 'البنك التجاري الوطني';
+
+  // Initial collapsing land
   const inheritedLand: PlayerLand = {
     id: 'inherited-factory-land',
-    label: 'أرض مصنع العاشر القديم (ميراث مهدد)',
+    label: landLabel,
     areaSquareMeters: 1200,
-    purchasePrice: 350000,
+    purchasePrice: initialLandValue,
     acquiredAt: createdAt,
     acquiredOnDay: 1,
     availableForCompanyOnDay: 1,
@@ -135,10 +169,10 @@ export function createNewPlayer(
     upgradeLevel: 1,
   };
 
-  // Initial collapsing company (مصنع سولي للأغذية المنهار - ماكينات معطلة)
+  // Initial collapsing company
   const inheritedCompany: PlayerCompany = {
     id: 'inherited-food-company',
-    name: 'مصنع سولي للأغذية (قيد الإنقاذ)',
+    name: `مصنع سولي للأغذية (${country.name})`,
     industryId: 'food',
     countryId: country.id,
     foundedAt: createdAt,
@@ -148,24 +182,24 @@ export function createNewPlayer(
     licenseIds: ['lic-food-inherited'],
     energyUnits: 25,
     energyCapacity: 50,
-    operatingCostPerDay: 3500,
+    operatingCostPerDay: initialOperatingCost,
     maintenanceCondition: 25, // 25% condition - broken machines needing repair!
     upgradeLevel: 1,
   };
 
   // Initial urgent bank loan due on Day 7
   const initialBankLoan: LoanRecord = {
-    id: 'loan-emergency-bank-misr',
+    id: `loan-emergency-${country.id}`,
     collateralType: 'company',
     collateralId: 'inherited-food-company',
-    principal: 50000,
-    totalRepayment: 52500,
+    principal: initialLoanPrincipal,
+    totalRepayment: initialLoanRepay,
     annualRate: 0.12,
     startedOnDay: 1,
     termDays: 7,
     nextPaymentDay: 7,
-    installmentAmount: 52500,
-    remainingBalance: 52500,
+    installmentAmount: initialLoanRepay,
+    remainingBalance: initialLoanRepay,
     status: 'active',
   };
 
@@ -176,11 +210,11 @@ export function createNewPlayer(
     level: 1,
     countryId: country.id,
     createdAt,
-    bankBalance: 120000, // 120,000 EGP emergency cash for turnaround
+    bankBalance: initialCash,
     payables: 0,
     goldGrams: 0,
     goldCostBasis: 0,
-    diamonds: 10,
+    diamonds: 15,
     speedCards: [],
     badges: ['طوق النجاة'],
     assets: [],
@@ -196,7 +230,7 @@ export function createNewPlayer(
         id: 'lic-food-inherited',
         industryId: 'food',
         countryId: country.id,
-        feePaid: 45000,
+        feePaid: Math.round(45000 / rate),
         issuedAt: createdAt,
       },
     ],
@@ -211,18 +245,18 @@ export function createNewPlayer(
       {
         id: createId(),
         category: 'revenue',
-        amount: 120000,
+        amount: initialCash,
         countryId: country.id,
         occurredAt: createdAt,
-        note: 'رصيد الطوارئ المتبقي بخزينة المصنع المنهار',
+        note: `رصيد الطوارئ المتبقي بخزينة المصنع (${country.currency.code})`,
       },
       {
         id: createId(),
         category: 'liability',
-        amount: -52500,
+        amount: -initialLoanRepay,
         countryId: country.id,
         occurredAt: createdAt,
-        note: 'قيد مديونية: قسط البنك المستحق خلال 7 أيام',
+        note: `قيد مديونية: قسط ${bankName} المستحق خلال 7 أيام`,
       },
     ],
     events: [],

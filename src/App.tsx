@@ -2,24 +2,20 @@ import React, { useEffect, useState } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { App as CapApp } from '@capacitor/app';
 import GameApp from './GameApp';
-import { GitHubPushSyncModal } from './components/GitHubPushSyncModal';
 import { playSound, isSoundEnabled, setSoundEnabled, toggleAmbientMusic, isMusicPlaying } from './game/soundEffects';
 import { 
-  UploadCloud, 
   Volume2, 
   VolumeX, 
   Sparkles, 
-  FolderGit2, 
-  ExternalLink,
-  Info,
+  Music,
   X,
-  Music
+  Trophy,
+  Crown,
+  HelpCircle
 } from 'lucide-react';
 
 export default function App() {
-  const [isPushModalOpen, setIsPushModalOpen] = useState(false);
-  const [isChangelogOpen, setIsChangelogOpen] = useState(false);
-  const [isPushing, setIsPushing] = useState(false);
+  const [isGuideOpen, setIsGuideOpen] = useState(false);
   const [soundOn, setSoundOn] = useState(() => isSoundEnabled());
   const [musicOn, setMusicOn] = useState(() => isMusicPlaying());
 
@@ -27,12 +23,8 @@ export default function App() {
     if (!Capacitor.isNativePlatform()) return;
     let lastBack = 0;
     const backListener = CapApp.addListener('backButton', () => {
-      if (isPushModalOpen) {
-        setIsPushModalOpen(false);
-        return;
-      }
-      if (isChangelogOpen) {
-        setIsChangelogOpen(false);
+      if (isGuideOpen) {
+        setIsGuideOpen(false);
         return;
       }
       const now = Date.now();
@@ -45,7 +37,7 @@ export default function App() {
     return () => {
       void backListener.then((handle) => handle.remove());
     };
-  }, [isPushModalOpen, isChangelogOpen]);
+  }, [isGuideOpen]);
 
   const handleToggleSound = () => {
     const next = !soundOn;
@@ -59,162 +51,136 @@ export default function App() {
     setMusicOn(next);
   };
 
-  const handlePushToGitHub = async (token: string): Promise<{ success: boolean; message: string }> => {
-    setIsPushing(true);
-    try {
-      const res = await fetch('/api/github-push', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token }),
-      });
-      const data = await res.json();
-      return data;
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      return { success: false, message: `خطأ اتصال: ${msg}` };
-    } finally {
-      setIsPushing(false);
-    }
-  };
-
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans" dir="rtl">
-      {/* Top Enhancement & GitHub Sync Bar */}
-      <header className="bg-slate-900/90 border-b border-emerald-500/30 px-3 sm:px-6 py-2.5 backdrop-blur-md sticky top-0 z-50 flex items-center justify-between gap-2 shadow-lg">
+      {/* Top Header - Pure Premium Game Interface */}
+      <header className="bg-slate-900/95 border-b border-amber-500/30 px-3 sm:px-6 py-2.5 backdrop-blur-md sticky top-0 z-50 flex items-center justify-between gap-3 shadow-xl">
         <div className="flex items-center gap-2.5">
-          <div className="flex items-center gap-2">
-            <span className="text-xl">🏭</span>
-            <div>
-              <span className="text-xs sm:text-sm font-extrabold text-white flex items-center gap-1.5">
-                إمبراطورية الأعمال: <span className="text-emerald-400">قصة كفاح</span>
-                <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 hidden sm:inline-block">
-                  إنقاذ المصنع المنهار
-                </span>
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-amber-600 via-amber-500 to-yellow-400 flex items-center justify-center text-slate-950 font-black shadow-md shadow-amber-500/20">
+            <Crown className="w-5 h-5 text-slate-950" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs sm:text-sm font-black tracking-wide text-white">
+                إمبراطورية الأعمال
               </span>
-              <p className="text-[10px] text-slate-400 hidden md:block">
-                مصنع العاشر من رمضان · ديون البنك · توجيه عم إبراهيم · التوسع التدريجي
-              </p>
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 font-bold hidden sm:inline-block">
+                نسخة المحاكاة الاقتصادية
+              </span>
             </div>
+            <p className="text-[10px] text-slate-400 hidden md:block">
+              ابنِ شركاتك، تفاوض في البورصة والمزادات، وحقق المركز الأول عالمياً
+            </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          {/* Audio toggle button */}
+        <div className="flex items-center gap-1.5 sm:gap-2">
+          {/* Sound FX Toggle */}
           <button
             onClick={handleToggleSound}
-            className="p-1.5 sm:px-2.5 sm:py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs flex items-center gap-1.5 transition-colors"
-            title={soundOn ? 'كتم الصوت' : 'تشغيل المؤثرات الصوتية'}
+            className={`p-2 rounded-xl border text-xs flex items-center gap-1.5 transition-all ${
+              soundOn
+                ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-300 hover:bg-emerald-900/40'
+                : 'bg-slate-800/80 border-slate-700 text-slate-400 hover:bg-slate-800'
+            }`}
+            title={soundOn ? 'كتم المؤثرات الصوتية' : 'تشغيل المؤثرات الصوتية'}
           >
-            {soundOn ? <Volume2 className="w-3.5 h-3.5 text-emerald-400" /> : <VolumeX className="w-3.5 h-3.5 text-slate-500" />}
-            <span className="hidden sm:inline text-[11px]">{soundOn ? 'المؤثرات' : 'كتم'}</span>
+            {soundOn ? <Volume2 className="w-4 h-4 text-emerald-400" /> : <VolumeX className="w-4 h-4 text-slate-500" />}
+            <span className="hidden sm:inline text-[11px] font-semibold">{soundOn ? 'المؤثرات' : 'صامت'}</span>
           </button>
 
-          {/* Ambient Music toggle button */}
+          {/* Ambient Music Toggle */}
           <button
             onClick={handleToggleMusic}
-            className={`p-1.5 sm:px-2.5 sm:py-1.5 rounded-xl border text-xs flex items-center gap-1.5 transition-colors ${
+            className={`p-2 rounded-xl border text-xs flex items-center gap-1.5 transition-all ${
               musicOn 
-                ? 'bg-purple-950/70 border-purple-500/40 text-purple-300 shadow-sm shadow-purple-500/20' 
-                : 'bg-slate-800 hover:bg-slate-700 text-slate-400 border-slate-700'
+                ? 'bg-purple-950/60 border-purple-500/50 text-purple-200 shadow-sm shadow-purple-500/20' 
+                : 'bg-slate-800/80 hover:bg-slate-800 text-slate-400 border-slate-700'
             }`}
-            title={musicOn ? 'إيقاف موسيقى الخلفية' : 'تشغيل موسيقى الخلفية الهادئة (Lo-Fi Ambient)'}
+            title={musicOn ? 'إيقاف موسيقى الخلفية' : 'تشغيل الموسيقى التصويرية الهادئة'}
           >
-            <Music className={`w-3.5 h-3.5 ${musicOn ? 'text-purple-400 animate-pulse' : 'text-slate-500'}`} />
-            <span className="hidden sm:inline text-[11px]">{musicOn ? 'موسيقى هادئة ♫' : 'موسيقى'}</span>
+            <Music className={`w-4 h-4 ${musicOn ? 'text-purple-400 animate-pulse' : 'text-slate-500'}`} />
+            <span className="hidden sm:inline text-[11px] font-semibold">{musicOn ? 'موسيقى ♫' : 'موسيقى'}</span>
           </button>
 
-          {/* Changelog info button */}
+          {/* Game Guide / Info Button */}
           <button
-            onClick={() => setIsChangelogOpen(true)}
-            className="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-500/30 text-xs flex items-center gap-1.5 transition-colors"
+            onClick={() => setIsGuideOpen(true)}
+            className="px-2.5 py-2 rounded-xl bg-slate-800/80 hover:bg-slate-800 text-amber-300 border border-amber-500/30 text-xs flex items-center gap-1.5 transition-colors shadow-sm"
+            title="دليل الإمبراطورية وقواعد النجاح"
           >
-            <Sparkles className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline text-[11px]">التعديلات المنفذة</span>
-          </button>
-
-          {/* GitHub Push button */}
-          <button
-            onClick={() => setIsPushModalOpen(true)}
-            className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-md shadow-emerald-950/40 transition-transform active:scale-95"
-          >
-            <UploadCloud className="w-3.5 h-3.5" />
-            <span>تصدير إلى GitHub</span>
+            <HelpCircle className="w-4 h-4 text-amber-400" />
+            <span className="hidden sm:inline text-[11px] font-bold">دليل اللعبة</span>
           </button>
         </div>
       </header>
 
       {/* Main Game App Container */}
-      <div className="flex-1">
+      <main className="flex-1">
         <GameApp />
-      </div>
+      </main>
 
-      {/* GitHub Push Modal */}
-      <GitHubPushSyncModal
-        isOpen={isPushModalOpen}
-        onClose={() => setIsPushModalOpen(false)}
-        onPushToGitHub={handlePushToGitHub}
-        isPushing={isPushing}
-      />
-
-      {/* Changelog Modal */}
-      {isChangelogOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in" dir="rtl">
-          <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-lg p-5 shadow-2xl space-y-4">
+      {/* Empire Guide Modal */}
+      {isGuideOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fade-in" dir="rtl">
+          <div className="bg-slate-900 border border-amber-500/40 rounded-2xl w-full max-w-lg p-5 shadow-2xl space-y-4">
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <div className="flex items-center gap-2 text-white font-bold text-sm">
-                <Sparkles className="w-4 h-4 text-amber-400" />
-                <span>التعديلات المنفذة بناءً على سيناريو قصة الكفاح</span>
+                <Sparkles className="w-5 h-5 text-amber-400" />
+                <span>دليل وقواعد إمبراطورية الأعمال</span>
               </div>
               <button
-                onClick={() => setIsChangelogOpen(false)}
-                className="p-1 rounded-lg hover:bg-slate-800 text-slate-400"
+                onClick={() => setIsGuideOpen(false)}
+                className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-colors"
+                aria-label="إغلاق"
               >
-                <X className="w-4 h-4" />
+                <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="space-y-2.5 text-xs text-slate-300 leading-relaxed max-h-96 overflow-y-auto pr-1">
-              <div className="p-3 rounded-xl bg-slate-950 border border-slate-800">
-                <h4 className="font-bold text-emerald-400">1. سيناريو الشركة المنهارة (البداية من الأزمة):</h4>
-                <p className="text-[11px] text-slate-400 mt-1">
-                  تبدأ اللعبة واللاعب يملك مصنع العاشر من رمضان للأغذية المنهار بماكينات معطلة (كفاءة 25%)، رصيد طوارئ 120,000 ج.م فقط، وقسط بنكي مستحق خلال 7 أيام!
+            <div className="space-y-3 text-xs text-slate-300 leading-relaxed max-h-[65vh] overflow-y-auto pr-1">
+              <div className="p-3.5 rounded-xl bg-slate-950/80 border border-amber-500/20">
+                <h4 className="font-bold text-amber-400 text-sm flex items-center gap-1.5">
+                  <span>🏢</span> 1. مسار الفصول والنمو المتدرج:
+                </h4>
+                <p className="text-[11px] text-slate-300 mt-1.5">
+                  تبدأ اللعبة في <strong>الفصل الأول (خطة الإنقاذ)</strong> بمواجهة أول أزمة تشغيلية للمصنع المتعثر، وبمجرد سداد قسط البنك وصيانة الماكينات وتصدير أول شحنة، تنتقل فوراً إلى <strong>الفصل الثاني (التوسع الإمبراطوري)</strong> لشراء الأراضي والموانئ وتأسيس التكتلات.
                 </p>
               </div>
 
-              <div className="p-3 rounded-xl bg-slate-950 border border-slate-800">
-                <h4 className="font-bold text-emerald-400">2. خطة الطوارئ الإرشادية (Struggle Hub):</h4>
-                <p className="text-[11px] text-slate-400 mt-1">
-                  أزرار وإرشادات فورية: صيانة الماكينات (+85%)، شراء خامات الطوارئ، تشغيل الإنتاج، بيع أول شحنة، وسداد قسط البنك لرفع الحجز.
+              <div className="p-3.5 rounded-xl bg-slate-950/80 border border-slate-800">
+                <h4 className="font-bold text-emerald-400 text-sm flex items-center gap-1.5">
+                  <span>🌍</span> 2. دعم جميع الدول والعملات:
+                </h4>
+                <p className="text-[11px] text-slate-300 mt-1.5">
+                  يمكنك اختيار أي دولة من الدول التسع المدعومة (السعودية، الإمارات، قطر، الكويت، أمريكا، بريطانيا، ألمانيا، اليابان، ومصر). جميع أسعار الكتالوج والأراضي والمخزون يتم احتسابها بدقة وفق سعر صرف العملة المحلية.
                 </p>
               </div>
 
-              <div className="p-3 rounded-xl bg-slate-950 border border-slate-800">
-                <h4 className="font-bold text-emerald-400">3. شخصيات الحكاية التفاعلية:</h4>
-                <p className="text-[11px] text-slate-400 mt-1">
-                  «عم إبراهيم» كبير الفنيين يوجهك بخبرته، المحاسب فتحي يحسب السيولة، وطارق الألفي المنافس الشامت الذي يتحداك.
+              <div className="p-3.5 rounded-xl bg-slate-950/80 border border-slate-800">
+                <h4 className="font-bold text-blue-400 text-sm flex items-center gap-1.5">
+                  <span>📊</span> 3. دورة الإنتاج والسوق الحر:
+                </h4>
+                <p className="text-[11px] text-slate-300 mt-1.5">
+                  المصانع تتطلب مواد خام وطاقة لتشغيل دفعات الإنتاج. يتم تسعير المنتجات في السوق بناءً على حجم الطلب اليومي ومستوى جودة الإنتاج وسجل سمعتك التجارية.
                 </p>
               </div>
 
-              <div className="p-3 rounded-xl bg-slate-950 border border-slate-800">
-                <h4 className="font-bold text-emerald-400">4. المؤثرات الصوتية التوليدية (Web Audio SFX):</h4>
-                <p className="text-[11px] text-slate-400 mt-1">
-                  أصوات رنين النقود (Cash Chime)، صوت مطرقة المزاد، صافرة المصنع، ونغمة النصر وسداد القرض.
-                </p>
-              </div>
-
-              <div className="p-3 rounded-xl bg-slate-950 border border-slate-800">
-                <h4 className="font-bold text-emerald-400">5. زر تصدير الكود إلى GitHub (Push):</h4>
-                <p className="text-[11px] text-slate-400 mt-1">
-                  إمكانية دفع كامل التعديلات والملفات إلى مستودع <code className="text-white">eslammohamedk123450-netizen/Suly_besnes</code> مباشرة عبر الـ Token.
+              <div className="p-3.5 rounded-xl bg-slate-950/80 border border-slate-800">
+                <h4 className="font-bold text-yellow-400 text-sm flex items-center gap-1.5">
+                  <span>🥇</span> 4. المتصدرون والتنافس العالمي:
+                </h4>
+                <p className="text-[11px] text-slate-300 mt-1.5">
+                  تُحتسب نقاط إمبراطوريتك من مجموع أصولك النقدية والذهبية، قيمة الأراضي والشركات، والمخزون التجاري. تنافس يومياً مع أعتى رجال الأعمال لتتصدر المنصة الذهبية.
                 </p>
               </div>
             </div>
 
             <button
-              onClick={() => setIsChangelogOpen(false)}
-              className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs"
+              onClick={() => setIsGuideOpen(false)}
+              className="w-full py-2.5 rounded-xl bg-gradient-to-r from-amber-600 to-yellow-600 hover:from-amber-500 hover:to-yellow-500 text-slate-950 font-black text-xs shadow-lg shadow-amber-950/40 transition-transform active:scale-95"
             >
-              فهمت، متابعة اللعب الآن 🎮
+              انطلق لبناء إمبراطوريتك الآن 👑
             </button>
           </div>
         </div>

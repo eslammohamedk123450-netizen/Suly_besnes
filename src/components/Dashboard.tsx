@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { CountryDefinition } from '../domain/countries';
-import type { PlayerProfile } from '../domain/player';
+import { type PlayerProfile, calculateTotalAssets } from '../domain/player';
 import type { SectionId } from '../domain/navigation';
 import { Icon } from './Icon';
 import { ItemImage } from './ItemImage';
@@ -51,22 +51,45 @@ export function Dashboard({
         { id: '1', title: 'خطة إنقاذ المصنع المنهار', subtitle: `اليوم ${profile.day}`, amount: `+ ${(profile.bankBalance || 0).toLocaleString()} ${country.currency.code}`, type: 'revenue' as const, icon: 'briefcase' as const },
       ];
 
-  // Leaderboard data as shown in design image
-  const leaderboardTop3 = [
-    { rank: 1, name: 'صالح ثونة', score: '2,940,915', avatar: '👳‍♂️', badge: '🥇' },
-    { rank: 2, name: 'داوود الهزاع', score: '2,470,600', avatar: '👨‍💼', badge: '🥈' },
-    { rank: 3, name: 'تقى الشمري', score: '1,965,410', avatar: '👩‍💼', badge: '🥉' },
+  // Dynamic real leaderboard sorted by assets/score
+  const playerTotalAssets = calculateTotalAssets(profile);
+  const rivalCompetitors = [
+    { name: 'صالح ثونة', score: 3_500_000, avatar: '👳‍♂️', isPlayer: false },
+    { name: 'داوود الهزاع', score: 2_850_000, avatar: '👨‍💼', isPlayer: false },
+    { name: 'تقى الشمري', score: 2_150_000, avatar: '👩‍💼', isPlayer: false },
+    { name: 'فارس الماجد', score: 1_650_000, avatar: '🧑‍💼', isPlayer: false },
+    { name: 'سالم الرويس', score: 1_250_000, avatar: '🧔', isPlayer: false },
+    { name: 'ياسر المستثمر', score: 950_000, avatar: '👨‍💻', isPlayer: false },
+    { name: 'ليلى القاسمي', score: 720_000, avatar: '🧕', isPlayer: false },
+    { name: 'مريم التنمية', score: 550_000, avatar: '👩‍💼', isPlayer: false },
+    { name: 'جابر الابتكار', score: 380_000, avatar: '👨‍🔬', isPlayer: false },
+    { name: 'سارة المستقبل', score: 220_000, avatar: '👩‍🎓', isPlayer: false },
   ];
 
-  const leaderboardRanks = [
-    { rank: 4, name: 'سالمو الروية', score: '2,846,915' },
-    { rank: 5, name: 'فارس الماجد', score: '2,415,660' },
-    { rank: 6, name: 'ليلى القاسمي', score: '1,083,430' },
-    { rank: 7, name: 'ياسر المستثمر', score: '1,630,220' },
-    { rank: 8, name: 'مريم التنمية', score: '1,541,775' },
-    { rank: 9, name: 'جابر الابتكار', score: '1,246,320' },
-    { rank: 10, name: 'سارة المستقبل', score: '997,542' },
-  ];
+  const allCompetitors = [
+    ...rivalCompetitors,
+    {
+      name: `${profile.name || 'المستثمر الصاعد'} (أنت)`,
+      score: playerTotalAssets,
+      avatar: '👑',
+      isPlayer: true,
+    },
+  ].sort((a, b) => b.score - a.score);
+
+  const leaderboardTop3 = allCompetitors.slice(0, 3).map((item, idx) => ({
+    rank: idx + 1,
+    name: item.name,
+    score: item.score.toLocaleString(),
+    avatar: item.avatar,
+    isPlayer: item.isPlayer,
+  }));
+
+  const leaderboardRanks = allCompetitors.slice(3, 10).map((item, idx) => ({
+    rank: idx + 4,
+    name: item.name,
+    score: item.score.toLocaleString(),
+    isPlayer: item.isPlayer,
+  }));
 
   return (
     <div className="empire-dashboard-grid">
@@ -511,7 +534,7 @@ export function Dashboard({
           {/* Ranks 4 to 10 */}
           <div className="empire-leaderboard-list">
             {leaderboardRanks.map((player) => (
-              <div className={`empire-lb-row ${player.rank === 6 ? 'is-player' : ''}`} key={player.rank}>
+              <div className={`empire-lb-row ${player.isPlayer ? 'is-player' : ''}`} key={player.rank}>
                 <span className="empire-lb-rank">{player.rank}</span>
                 <span className="empire-lb-name">{player.name}</span>
                 <strong className="empire-lb-score">{player.score}</strong>
