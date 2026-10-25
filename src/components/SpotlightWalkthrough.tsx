@@ -6,19 +6,14 @@ import { playSound } from '../game/soundEffects';
 import {
   Sparkles,
   ArrowLeft,
-  FastForward,
-  Wrench,
-  DollarSign,
-  LandPlot,
-  Factory,
-  Trophy,
   CheckCircle2,
   Maximize2,
   Minimize2,
   Compass,
-  Store,
   LocateFixed,
-  HelpCircle
+  AlertTriangle,
+  Flame,
+  Check
 } from 'lucide-react';
 
 interface SpotlightWalkthroughProps {
@@ -36,15 +31,6 @@ interface TargetRect {
   width: number;
   height: number;
 }
-
-const CATEGORY_ICONS: Record<WalkthroughStep['category'], React.ReactNode> = {
-  maintenance: <Wrench className="w-5 h-5 text-amber-400" />,
-  obligations: <DollarSign className="w-5 h-5 text-emerald-400" />,
-  lands: <LandPlot className="w-5 h-5 text-sky-400" />,
-  production: <Factory className="w-5 h-5 text-amber-400" />,
-  tasks: <Trophy className="w-5 h-5 text-yellow-400" />,
-  store: <Store className="w-5 h-5 text-cyan-400" />,
-};
 
 export function SpotlightWalkthrough({
   currentStepIndex,
@@ -65,7 +51,7 @@ export function SpotlightWalkthrough({
   const lastStepIndexRef = useRef(currentStepIndex);
   const hasScrolledRef = useRef(false);
 
-  // Reset completion state when step changes
+  // Reset completion state on step change
   useEffect(() => {
     if (lastStepIndexRef.current !== currentStepIndex) {
       lastStepIndexRef.current = currentStepIndex;
@@ -76,7 +62,7 @@ export function SpotlightWalkthrough({
     }
   }, [currentStepIndex]);
 
-  // Check if current step condition is satisfied naturally by the user
+  // Check if current step condition is satisfied naturally by user interaction
   useEffect(() => {
     if (!currentStep) return;
     if (!hasActionSucceeded && currentStep.isComplete?.(profile)) {
@@ -86,8 +72,7 @@ export function SpotlightWalkthrough({
       } catch {
         // Audio safe
       }
-      // Start auto advance timer of 4 seconds so user can read or proceed manually
-      setAutoAdvanceTimer(4);
+      setAutoAdvanceTimer(3);
     }
   }, [profile, currentStep, hasActionSucceeded]);
 
@@ -143,8 +128,8 @@ export function SpotlightWalkthrough({
           });
           setIsElementVisible(true);
 
-          // Auto-scroll once into view smoothly
-          if (!hasScrolledRef.current && (rect.top < 80 || rect.bottom > window.innerHeight - 80)) {
+          // Smooth scroll into center if not in viewport
+          if (!hasScrolledRef.current && (rect.top < 100 || rect.bottom > window.innerHeight - 100)) {
             hasScrolledRef.current = true;
             el.scrollIntoView({ behavior: 'smooth', block: 'center' });
           }
@@ -186,11 +171,10 @@ export function SpotlightWalkthrough({
     };
   }, [updatePosition]);
 
-  // Scroll to element manually if requested by user
+  // Focus and scroll to target element manually
   const scrollToTargetElement = () => {
     if (targetElementRef.current) {
       targetElementRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      // Pulse animation trigger
       targetElementRef.current.classList.add('ring-4', 'ring-amber-400');
       setTimeout(() => {
         targetElementRef.current?.classList.remove('ring-4', 'ring-amber-400');
@@ -204,124 +188,187 @@ export function SpotlightWalkthrough({
 
   const totalSteps = WALKTHROUGH_STEPS.length;
   const isTargetInSection = currentSection === currentStep.sectionId;
+  const activeRect = isTargetInSection ? targetRect : navTargetRect;
 
   return (
     <div
       className="fixed inset-0 z-[9990] pointer-events-none select-none overflow-hidden"
       dir="rtl"
-      aria-label="المرشد التفاعلي للتوجيه الميداني"
+      aria-label="المرشد التفاعلي للتوجيه الميداني خطوة بخطوة"
     >
-      {/* 1. In-section Spotlight: Dark backdrop cutout + Animated Glowing Frame around exact target button */}
-      {isTargetInSection && targetRect && isElementVisible && (
+      {/* 1. SCREEN DIMMING OVERLAY WITH APERTURE CUTOUT (تعتيم الشاشة قليلاً مع تفريغ بؤرة الزر المستهدف) */}
+      <svg
+        className="fixed inset-0 w-full h-full pointer-events-none transition-opacity duration-300 z-[9991]"
+        style={{ width: '100vw', height: '100vh' }}
+      >
+        <defs>
+          <mask id="walkthrough-aperture-mask">
+            {/* White area = dimmed backdrop */}
+            <rect x="0" y="0" width="100%" height="100%" fill="white" />
+            {/* Black area = clear hole/cutout over the button */}
+            {activeRect && (
+              <rect
+                x={Math.max(2, activeRect.left - 6)}
+                y={Math.max(2, activeRect.top - 6)}
+                width={activeRect.width + 12}
+                height={activeRect.height + 12}
+                rx="16"
+                ry="16"
+                fill="black"
+              />
+            )}
+          </mask>
+        </defs>
+        {/* Dimming background plane: 55% dark slate */}
+        <rect
+          x="0"
+          y="0"
+          width="100%"
+          height="100%"
+          fill="#020617"
+          opacity="0.55"
+          mask="url(#walkthrough-aperture-mask)"
+        />
+      </svg>
+
+      {/* 2. GLOWING NEON ARROW + PULSING TARGET BEACON (سهم مضيء بتوهج نيون حقيقي ونابض) */}
+      {activeRect && (
         <div
           className={`fixed pointer-events-none z-[9992] rounded-2xl transition-all duration-300 ${
             hasActionSucceeded
-              ? 'ring-4 ring-emerald-400 shadow-[0_0_0_9999px_rgba(2,6,23,0.75),0_0_35px_rgba(52,211,153,0.9)]'
-              : 'ring-4 ring-amber-400 shadow-[0_0_0_9999px_rgba(2,6,23,0.78),0_0_35px_rgba(251,191,36,0.9)] animate-pulse'
+              ? 'ring-4 ring-emerald-400 shadow-[0_0_35px_rgba(52,211,153,0.9),0_0_70px_rgba(16,185,129,0.5)]'
+              : 'ring-4 ring-amber-400 shadow-[0_0_35px_rgba(251,191,36,0.95),0_0_80px_rgba(245,158,11,0.6)] animate-pulse'
           }`}
           style={{
-            top: `${Math.max(4, targetRect.top - 6)}px`,
-            left: `${Math.max(4, targetRect.left - 6)}px`,
-            width: `${targetRect.width + 12}px`,
-            height: `${targetRect.height + 12}px`,
+            top: `${Math.max(2, activeRect.top - 6)}px`,
+            left: `${Math.max(2, activeRect.left - 6)}px`,
+            width: `${activeRect.width + 12}px`,
+            height: `${activeRect.height + 12}px`,
           }}
         >
-          {/* Animated Bouncing Pointer Callout Badge */}
+          {/* THE LUMINOUS GLOWING NEON ARROW (سهم مضيء متحرك يشير مباشرة على الزر) */}
           {!hasActionSucceeded && (
             <div
-              className={`absolute left-1/2 -translate-x-1/2 flex flex-col items-center gap-1 z-[9994] whitespace-nowrap animate-bounce pointer-events-none ${
-                targetRect.top > 90 ? '-top-12' : 'top-full mt-2'
+              className={`absolute left-1/2 -translate-x-1/2 flex flex-col items-center pointer-events-none z-[9994] transition-all ${
+                activeRect.top > 120 ? '-top-20' : 'top-full mt-3'
               }`}
             >
-              <div className="bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 text-slate-950 font-black text-xs px-3.5 py-1.5 rounded-full shadow-2xl border-2 border-slate-950 flex items-center gap-1.5">
-                <span className="text-base">{targetRect.top > 90 ? '👇' : '👆'}</span>
-                <span>اضغط هنا بالضبط: {currentStep.targetButtonLabel}</span>
-              </div>
+              {/* If arrow points downwards (button is below arrow) */}
+              {activeRect.top > 120 ? (
+                <div className="flex flex-col items-center animate-bounce">
+                  {/* Glowing Floating Directive Tag */}
+                  <div className="bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 text-slate-950 font-black text-xs px-3.5 py-1 rounded-full shadow-[0_0_20px_rgba(251,191,36,0.9)] border-2 border-slate-950 flex items-center gap-1.5 whitespace-nowrap mb-1">
+                    <Sparkles className="w-3.5 h-3.5 fill-slate-950 animate-spin" />
+                    <span>
+                      {isTargetInSection
+                        ? `اضغط بنفسك هنا: ${currentStep.targetButtonLabel}`
+                        : `اضغط للدخول إلى قسم «${currentStep.navSectionLabel}»`}
+                    </span>
+                  </div>
+
+                  {/* SVG Neon Arrow Downwards */}
+                  <svg
+                    className="w-10 h-10 filter drop-shadow-[0_0_15px_rgba(251,191,36,1)] drop-shadow-[0_0_25px_rgba(245,158,11,0.8)]"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                  >
+                    <path
+                      d="M12 3V17M12 17L6 11M12 17L18 11"
+                      stroke="#fbbf24"
+                      strokeWidth="3.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                    <polygon points="12,21 5,13 19,13" fill="#f59e0b" />
+                  </svg>
+                </div>
+              ) : (
+                /* If button is near top, arrow points upwards */
+                <div className="flex flex-col items-center animate-bounce">
+                  {/* SVG Neon Arrow Upwards */}
+                  <svg
+                    className="w-10 h-10 filter drop-shadow-[0_0_15px_rgba(251,191,36,1)] drop-shadow-[0_0_25px_rgba(245,158,11,0.8)] mb-1"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                  >
+                    <path
+                      d="M12 21V7M12 7L6 13M12 7L18 13"
+                      stroke="#fbbf24"
+                      strokeWidth="3.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                    <polygon points="12,3 5,11 19,11" fill="#f59e0b" />
+                  </svg>
+
+                  {/* Glowing Floating Directive Tag */}
+                  <div className="bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 text-slate-950 font-black text-xs px-3.5 py-1 rounded-full shadow-[0_0_20px_rgba(251,191,36,0.9)] border-2 border-slate-950 flex items-center gap-1.5 whitespace-nowrap">
+                    <Sparkles className="w-3.5 h-3.5 fill-slate-950 animate-spin" />
+                    <span>
+                      {isTargetInSection
+                        ? `اضغط بنفسك هنا: ${currentStep.targetButtonLabel}`
+                        : `اضغط للدخول إلى قسم «${currentStep.navSectionLabel}»`}
+                    </span>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
-          {/* Success Marker Badge on Target */}
+          {/* Success Checkmark Burst on Target */}
           {hasActionSucceeded && (
-            <div className="absolute -top-10 left-1/2 -translate-x-1/2 bg-emerald-500 text-slate-950 font-black text-xs px-3 py-1 rounded-full shadow-xl flex items-center gap-1 border-2 border-slate-950">
-              <span>✓ تمت العملية بنجاح!</span>
+            <div className="absolute -top-11 left-1/2 -translate-x-1/2 bg-gradient-to-r from-emerald-500 to-green-400 text-slate-950 font-black text-xs px-3.5 py-1 rounded-full shadow-[0_0_25px_rgba(52,211,153,1)] flex items-center gap-1.5 border-2 border-slate-950 animate-bounce">
+              <Check className="w-4 h-4 stroke-[3]" />
+              <span>أحسنت! تمت العملية بيدك بنجاح!</span>
             </div>
           )}
         </div>
       )}
 
-      {/* 2. Out-of-section Spotlight: Highlights navigation button to guide user where to click to open the section */}
-      {!isTargetInSection && navTargetRect && (
-        <div
-          className="fixed pointer-events-none z-[9992] rounded-2xl ring-4 ring-amber-400 shadow-[0_0_0_9999px_rgba(2,6,23,0.78),0_0_35px_rgba(251,191,36,0.9)] animate-pulse transition-all duration-300"
-          style={{
-            top: `${Math.max(4, navTargetRect.top - 6)}px`,
-            left: `${Math.max(4, navTargetRect.left - 6)}px`,
-            width: `${navTargetRect.width + 12}px`,
-            height: `${navTargetRect.height + 12}px`,
-          }}
-        >
-          <div className="absolute -top-12 left-1/2 -translate-x-1/2 bg-gradient-to-r from-amber-500 to-yellow-400 text-slate-950 font-black text-xs px-3 py-1.5 rounded-full shadow-2xl border-2 border-slate-950 flex items-center gap-1.5 whitespace-nowrap animate-bounce">
-            <span className="text-base">👇</span>
-            <span>اضغط هنا للدخول إلى قسم «{currentStep.navSectionLabel}»</span>
-          </div>
-        </div>
-      )}
-
-      {/* 3. Floating Guidance Explanation Card (Docked at bottom/right, interactive, non-blocking) */}
-      <div className="fixed bottom-3 sm:bottom-6 left-3 right-3 sm:left-auto sm:right-6 sm:w-[500px] pointer-events-auto z-[9995] transition-all duration-300">
+      {/* 3. DOCKED TOP/BOTTOM EXECUTIVE INSTRUCTION BAR (توضيح صريح للقيام بكل خطوة بنفسه) */}
+      <div className="fixed top-2 sm:top-4 left-2 right-2 sm:left-auto sm:right-6 sm:w-[520px] pointer-events-auto z-[9995] transition-all duration-300">
         {isCollapsed ? (
-          /* Minimized Compact Capsule */
+          /* Minimized Capsule */
           <div
             onClick={() => setIsCollapsed(false)}
-            className="p-3.5 rounded-2xl bg-slate-900/95 border-2 border-amber-500/80 shadow-2xl flex items-center justify-between gap-3 backdrop-blur-md cursor-pointer hover:border-amber-400 transition group"
-            title="انقر لتكبير بطاقة الإرشاد"
+            className="p-3 rounded-2xl bg-slate-900/95 border-2 border-amber-500/80 shadow-[0_0_30px_rgba(0,0,0,0.8)] flex items-center justify-between gap-3 backdrop-blur-xl cursor-pointer hover:border-amber-400 transition"
+            title="تكبير الإرشاد الميداني"
           >
-            <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center font-bold">
-                <Compass className="w-4 h-4 animate-spin" />
-              </div>
-              <div className="text-right">
-                <div className="text-xs font-black text-white flex items-center gap-2">
-                  <span>التوجيه الإلزامي التفاعلي</span>
-                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                    خطوة {currentStepIndex + 1}/{totalSteps}
-                  </span>
-                </div>
-                <p className="text-[11px] text-slate-400 line-clamp-1">{currentStep.title}</p>
-              </div>
+            <div className="flex items-center gap-2">
+              <span className="w-3 h-3 rounded-full bg-amber-400 animate-ping" />
+              <strong className="text-xs text-white">التدريب الميداني: نفّذ الخطوات بنفسك</strong>
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-bold">
+                {currentStepIndex + 1}/{totalSteps}
+              </span>
             </div>
-
             <button
               type="button"
-              className="p-1.5 rounded-lg bg-slate-800 text-slate-300 hover:text-white"
-              aria-label="تكبير البطاقة"
+              className="p-1 rounded-lg bg-slate-800 text-slate-300 hover:text-white"
             >
               <Maximize2 className="w-4 h-4" />
             </button>
           </div>
         ) : (
-          /* Full Rich Guided Instruction Card */
-          <div className="bg-gradient-to-b from-slate-900 via-slate-900/98 to-slate-950 border-2 border-amber-500/90 rounded-3xl p-4 sm:p-5 shadow-2xl shadow-black/90 space-y-3.5 backdrop-blur-2xl relative overflow-hidden">
-            {/* Ambient gold gradient line */}
+          /* Full Rich Interactive Directive Bar */
+          <div className="bg-gradient-to-b from-slate-900 via-slate-900/98 to-slate-950 border-2 border-amber-500/90 rounded-3xl p-4 sm:p-5 shadow-[0_0_50px_rgba(0,0,0,0.9)] space-y-3 backdrop-blur-2xl relative overflow-hidden">
+            {/* Top Amber Ray */}
             <div className="absolute top-0 inset-x-0 h-1.5 bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-600" />
-            <div className="absolute -top-12 -right-12 w-48 h-48 bg-amber-500/15 rounded-full blur-3xl pointer-events-none" />
+            <div className="absolute -top-12 -right-12 w-44 h-44 bg-amber-500/15 rounded-full blur-3xl pointer-events-none" />
 
-            {/* Header: Badge, Step Number & Header Controls */}
-            <div className="flex items-center justify-between border-b border-slate-800/80 pb-3 relative z-10">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center shadow-inner">
-                  {CATEGORY_ICONS[currentStep.category]}
-                </div>
-                <div className="text-right">
+            {/* Header: Title, Step Counter & Minimize */}
+            <div className="flex items-center justify-between border-b border-slate-800/80 pb-2.5 relative z-10">
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping" />
+                <div>
                   <div className="flex items-center gap-2">
-                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-extrabold border border-amber-500/30">
+                    <span className="text-[10px] px-2 py-0.2 rounded-full bg-amber-500/20 text-amber-300 font-black border border-amber-500/30">
                       {currentStep.phaseBadge}
                     </span>
                     <span className="text-[10px] text-slate-400 font-mono">
-                      {currentStepIndex + 1} من {totalSteps}
+                      خطوة {currentStepIndex + 1} من {totalSteps}
                     </span>
                   </div>
-                  <h3 className="text-xs sm:text-sm font-black text-white mt-0.5">
+                  <h3 className="text-sm font-black text-white mt-0.5">
                     {currentStep.title}
                   </h3>
                 </div>
@@ -332,109 +379,105 @@ export function SpotlightWalkthrough({
                   type="button"
                   onClick={() => setIsCollapsed(true)}
                   className="p-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-white transition"
-                  title="تصغير البطاقة"
+                  title="تصغير الإرشاد"
                 >
                   <Minimize2 className="w-3.5 h-3.5" />
-                </button>
-                <button
-                  type="button"
-                  onClick={onSkip}
-                  className="text-slate-400 hover:text-slate-200 text-xs px-2 py-1 rounded-xl hover:bg-slate-800 transition flex items-center gap-1"
-                  title="تخطي الجولة"
-                >
-                  <span>تخطي</span>
-                  <FastForward className="w-3 h-3" />
                 </button>
               </div>
             </div>
 
-            {/* Content State: After real action was completed */}
-            {hasActionSucceeded ? (
-              <div className="space-y-3 relative z-10 animate-fade-in">
-                <div className="p-3.5 rounded-2xl bg-emerald-500/15 border border-emerald-500/40 text-emerald-200 text-xs sm:text-sm leading-relaxed flex items-start gap-2.5 shadow-inner">
-                  <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
-                  <div>
-                    <strong className="block text-emerald-300 font-extrabold mb-1">
-                      {currentStep.successMessage}
-                    </strong>
-                    <p className="text-xs text-slate-300 leading-relaxed">
-                      {currentStep.explorationTip}
-                    </p>
-                  </div>
-                </div>
+            {/* Mandatory Action Notice (تنبيه للمستخدم بالقيام بالخطوات بنفسه) */}
+            <div className="p-2.5 rounded-xl bg-amber-500/15 border border-amber-500/35 flex items-start gap-2 text-amber-200 text-xs">
+              <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+              <p className="leading-relaxed font-semibold">
+                <strong>تعليمات الإدارة الميدانية:</strong> يجب عليك تنفيذ كل خطوة بنفسك داخل اللعبة لتتعلم إدارة أصولك، ولن تكتمل الخطوة إلا بالنقر الفعلي على الزر المطلوب الموضح بالسهم المضيء.
+              </p>
+            </div>
 
-                <div className="flex items-center justify-between gap-2.5 pt-1">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      playSound('click');
-                      onStepComplete();
-                    }}
-                    className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-400 hover:from-emerald-400 hover:to-emerald-300 text-slate-950 font-black text-xs sm:text-sm shadow-xl shadow-emerald-500/25 transition active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
-                  >
-                    <span>الانتقال للمهمة التالية</span>
-                    {autoAdvanceTimer !== null && (
-                      <span className="px-1.5 py-0.2 rounded-full bg-slate-950/20 text-slate-950 text-[10px] font-bold">
-                        ({autoAdvanceTimer} ث)
-                      </span>
-                    )}
-                    <ArrowLeft className="w-4 h-4" />
-                  </button>
+            {/* Step-by-Step Checklist of what to do by hand (قائمة الخطوات اليدوية) */}
+            <div className="space-y-1.5 bg-slate-950/70 p-3 rounded-2xl border border-slate-800 text-xs">
+              <span className="text-[11px] font-bold text-slate-400 block mb-1">
+                📋 مسار التنفيذ اليدوي المطلوب منك:
+              </span>
+              {currentStep.checklist.map((item, idx) => {
+                const isItemDone = hasActionSucceeded || (idx === 0 && isTargetInSection);
+                return (
+                  <div key={idx} className="flex items-center gap-2">
+                    <div
+                      className={`w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-black shrink-0 ${
+                        isItemDone
+                          ? 'bg-emerald-500 text-slate-950'
+                          : idx === (isTargetInSection ? 2 : 0)
+                          ? 'bg-amber-500 text-slate-950 animate-pulse'
+                          : 'bg-slate-800 text-slate-400'
+                      }`}
+                    >
+                      {isItemDone ? '✓' : idx + 1}
+                    </div>
+                    <span
+                      className={`text-xs ${
+                        isItemDone
+                          ? 'text-emerald-300 font-semibold line-through opacity-80'
+                          : idx === (isTargetInSection ? 2 : 0)
+                          ? 'text-white font-bold'
+                          : 'text-slate-400'
+                      }`}
+                    >
+                      {item}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* State: Completed Success */}
+            {hasActionSucceeded ? (
+              <div className="p-3 rounded-2xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-200 text-xs flex items-center justify-between gap-3 animate-fade-in">
+                <div className="flex items-center gap-2 font-bold">
+                  <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+                  <span>{currentStep.successMessage}</span>
                 </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    playSound('click');
+                    onStepComplete();
+                  }}
+                  className="px-3.5 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs shadow-lg transition cursor-pointer shrink-0 flex items-center gap-1"
+                >
+                  <span>التالي</span>
+                  {autoAdvanceTimer !== null && (
+                    <span className="font-mono text-[10px]">({autoAdvanceTimer}ث)</span>
+                  )}
+                  <ArrowLeft className="w-3.5 h-3.5" />
+                </button>
               </div>
             ) : (
-              /* Content State: Active Instruction explaining WHERE TO CLICK and WHY */
-              <div className="space-y-2.5 relative z-10">
-                {/* 1. Target Action & Where to click (Prominent Instruction) */}
-                <div className="p-3.5 rounded-2xl bg-amber-500/15 border border-amber-500/35 text-amber-100 text-xs sm:text-sm leading-relaxed space-y-2">
-                  <div className="flex items-center gap-1.5 font-black text-amber-300 text-xs">
-                    <span className="text-base">📍</span>
-                    <span>أين تضغط للقيام بهذا الإجراء؟</span>
-                  </div>
-                  <p className="text-xs text-amber-100 font-bold leading-relaxed pr-1">
-                    {currentStep.clickInstruction}
-                  </p>
-                </div>
-
-                {/* 2. Why click here? (Clear practical benefit) */}
-                <div className="p-3 rounded-2xl bg-slate-950/70 border border-slate-800 text-slate-300 text-xs leading-relaxed space-y-1">
-                  <div className="flex items-center gap-1.5 font-bold text-sky-400 text-[11px]">
-                    <HelpCircle className="w-3.5 h-3.5" />
-                    <span>لماذا نقوم بهذا الإجراء؟</span>
-                  </div>
-                  <p className="text-[11px] text-slate-300 pr-1">
-                    {currentStep.whyInstruction}
-                  </p>
-                </div>
-
-                {/* 3. Action bar if player is on another section */}
+              /* State: Active Instruction Helpers */
+              <div className="flex items-center justify-between gap-2 pt-0.5">
                 {!isTargetInSection ? (
-                  <div className="pt-1">
-                    <button
-                      type="button"
-                      onClick={handleGoToTarget}
-                      className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-amber-500 via-amber-400 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-slate-950 font-black text-xs shadow-lg shadow-amber-500/25 transition active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
-                    >
-                      <Compass className="w-4 h-4" />
-                      <span>الانتقال المباشر إلى قسم «{currentStep.navSectionLabel}» 🚀</span>
-                    </button>
-                  </div>
+                  <button
+                    type="button"
+                    onClick={handleGoToTarget}
+                    className="w-full py-2 px-3 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-400 hover:from-amber-400 hover:to-yellow-300 text-slate-950 font-black text-xs shadow-lg transition active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    <Compass className="w-4 h-4" />
+                    <span>توجّه إلى قسم «{currentStep.navSectionLabel}» الآن 🎯</span>
+                  </button>
                 ) : (
-                  /* In section helper tools */
-                  <div className="flex items-center justify-between gap-2 pt-1">
-                    <div className="flex items-center gap-1.5 text-amber-300 text-xs font-bold">
-                      <Sparkles className="w-4 h-4 text-amber-400 shrink-0 animate-spin" />
-                      <span className="text-[11px]">انظر للإطار الذهبي النابض واضغط الزر بنفسك</span>
-                    </div>
-
+                  <div className="w-full flex items-center justify-between gap-2">
+                    <span className="text-[11px] text-amber-300 font-bold flex items-center gap-1">
+                      <Flame className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
+                      انظر للسهم المضيء واضغط الزر بيدك
+                    </span>
                     <button
                       type="button"
                       onClick={scrollToTargetElement}
-                      className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-400 text-xs font-bold transition flex items-center gap-1 shadow-sm shrink-0"
-                      title="التركيز على مكان الزر"
+                      className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-400 text-xs font-bold transition flex items-center gap-1 shrink-0 cursor-pointer"
+                      title="تحديد مكان الزر بدقة"
                     >
                       <LocateFixed className="w-3.5 h-3.5" />
-                      <span>أين الزر؟ 🎯</span>
+                      <span>تحديد مكان الزر 🎯</span>
                     </button>
                   </div>
                 )}
