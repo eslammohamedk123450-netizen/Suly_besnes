@@ -65,11 +65,21 @@ export function StoryIntro({ profile, onComplete }: StoryIntroProps) {
             </div>
           </div>
 
-          <div className="flex items-center gap-1.5 bg-slate-900/80 px-3 py-1.5 rounded-full border border-slate-700/60 text-xs">
-            <span className="text-slate-400">خطوة</span>
-            <span className="font-extrabold text-amber-400">{currentStep + 1}</span>
-            <span className="text-slate-600">/</span>
-            <span className="text-slate-400">{steps.length}</span>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={onComplete}
+              className="px-2.5 py-1 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 text-xs font-bold transition flex items-center gap-1 cursor-pointer"
+              title="إغلاق والعودة للعبة"
+            >
+              <span>إغلاق ✕</span>
+            </button>
+            <div className="flex items-center gap-1.5 bg-slate-900/80 px-3 py-1.5 rounded-full border border-slate-700/60 text-xs">
+              <span className="text-slate-400">خطوة</span>
+              <span className="font-extrabold text-amber-400">{currentStep + 1}</span>
+              <span className="text-slate-600">/</span>
+              <span className="text-slate-400">{steps.length}</span>
+            </div>
           </div>
         </header>
 

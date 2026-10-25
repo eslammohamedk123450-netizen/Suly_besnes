@@ -248,6 +248,7 @@ export const SmartOnboardingQuests: React.FC<SmartOnboardingQuestsProps> = ({
                         </span>
                       ) : (
                         <button
+                          data-guide-target="claim-task-btn"
                           onClick={() => handleClaim(quest)}
                           className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-white font-bold text-xs shadow-lg shadow-emerald-950/40 animate-bounce"
                         >

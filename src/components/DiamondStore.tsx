@@ -132,6 +132,31 @@ export function DiamondStore({ profile, isGuest, onLinkAccount, onRefreshProfile
         <span>باقات الألماس مميزة - اشتري واحصل على ألماس إضافي</span>
       </div>
 
+      {/* Recommended Starter Offer Banner for Guided Walkthrough */}
+      <div className="bg-gradient-to-r from-amber-500/20 via-amber-400/10 to-amber-500/20 border-2 border-amber-400/70 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-xl shadow-amber-500/15 mb-6" dir="rtl">
+        <div className="flex items-center gap-3 text-right">
+          <span className="text-3xl p-2.5 bg-amber-500/20 border border-amber-500/40 rounded-xl shrink-0">👑</span>
+          <div>
+            <div className="flex items-center gap-2">
+              <strong className="text-white text-sm sm:text-base font-extrabold">عرض البداية المناسب · باقة الانطلاق السريع</strong>
+              <span className="bg-amber-400 text-slate-950 font-black text-[10px] px-2 py-0.5 rounded-full">موصى به</span>
+            </div>
+            <p className="text-amber-200/90 text-xs mt-1">
+              عرض خاص ومثالي لبدء إمبراطوريتك! يمنحك بطاقات الإكمال الفوري لخطوط الإنتاج وتأمين مواردك.
+            </p>
+          </div>
+        </div>
+        <button
+          type="button"
+          data-guide-target="starter-offer-btn"
+          onClick={() => {
+            onPurchaseSpeedCard("production-instant");
+          }}
+          className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 font-black text-xs sm:text-sm shadow-lg shadow-amber-500/30 transition-all transform hover:scale-[1.03] active:scale-95 whitespace-nowrap cursor-pointer"
+        >
+          شراء هذا العرض المناسب (💎 3 ماسات) ⚡
+        </button>
+      </div>
       {/* Package Cards 2x3 Grid */}
       <div className="suly-cards-grid">
         {DIAMOND_PACKAGES.map((item) => {

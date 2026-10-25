@@ -1,3 +1,5 @@
+import { SpotlightWalkthrough } from "./components/SpotlightWalkthrough";
+import { WALKTHROUGH_STEPS, isWalkthroughCompleted, setWalkthroughCompleted } from "./game/walkthroughState";
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { App as CapacitorApp } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
@@ -79,6 +81,8 @@ export default function App() {
   const [expansion, setExpansion] = useState(() => profile ? loadExpansionState(profile) : null);
   const [isLuckyWheelOpen, setIsLuckyWheelOpen] = useState(false);
   const [isTutorialOpen, setIsTutorialOpen] = useState(false);
+  const [isWalkthroughActive, setIsWalkthroughActive] = useState(() => !isWalkthroughCompleted());
+  const [walkthroughStepIndex, setWalkthroughStepIndex] = useState(0);
   const [celebrationData, setCelebrationData] = useState<CelebrationData | null>(null);
   const [isNotificationModalOpen, setIsNotificationModalOpen] = useState(false);
   const [activeToastAlert, setActiveToastAlert] = useState<ToastAlert | null>(null);
@@ -866,17 +870,7 @@ export default function App() {
     );
   }
 
-  if (!profile.onboarding?.introCompleted || isTutorialOpen) {
-    return (
-      <StoryIntro 
-        profile={profile} 
-        onComplete={() => {
-          setIsTutorialOpen(false);
-          completeIntro();
-        }} 
-      />
-    );
-  }
+  // StoryIntro is now displayed as a voluntary modal so it never blocks the real walkthrough
 
   const unlockedSections = new Set(getUnlockedSectionIds(profile));
   const fixedBottomItems: SectionId[] = ['home', 'companies', 'auctions', 'staff', 'profile'];
@@ -891,13 +885,25 @@ export default function App() {
           <div className="header-location"><span>{country.flag}</span><span>{country.name}</span><small>{country.currency.code}</small></div>
           <span className="header-divider" />
           <button
-            className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/40 text-xs font-bold transition shadow-sm"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs transition shadow-md shadow-amber-500/20 active:scale-95"
             type="button"
-            onClick={() => setIsTutorialOpen(true)}
-            title="فتح التوجيه الإلزامي وشرح سيناريو القصة كاملاً"
+            onClick={() => {
+              setWalkthroughStepIndex(0);
+              setIsWalkthroughActive(true);
+            }}
+            title="بدء الجولة الإرشادية الإلزامية وتجميد الشاشة"
           >
             <Icon name="crown" size={14} />
-            <span className="hidden sm:inline">شرح القصة 🧭</span>
+            <span>الجولة الإرشادية 🎯</span>
+          </button>
+          <button
+            className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-bold transition shadow-sm"
+            type="button"
+            onClick={() => setIsTutorialOpen(true)}
+            title="الاطلاع على سيناريو القصة كاملاً"
+          >
+            <Icon name="tasks" size={14} />
+            <span className="hidden sm:inline">سيناريو القصة 📜</span>
           </button>
           <button className="player-level player-level--button" type="button" onClick={() => navigate('profile')} aria-label="فتح الملف الشخصي"><span className="avatar-initial">{profile.name.trim().charAt(0) || 'م'}</span><span><strong>{profile.name}</strong><small>المستوى {playerProgress?.level ?? profile.level}</small></span></button>
           
@@ -1000,6 +1006,7 @@ export default function App() {
               onLogout={handleLogout}
               onResetWorld={handleResetToCountrySelection}
               onAccountDeleted={handleAccountDeleted}
+                  onRestartWalkthrough={() => { setWalkthroughStepIndex(0); setIsWalkthroughActive(true); }}
             />
           ) : (
             <SectionPage section={getSection(activeSection)} profile={profile} country={country} focus={sectionFocus} notificationTheme={notificationTheme} isGuest={Boolean(account.isGuest)} onNotificationThemeChange={setNotificationTheme} onHome={() => navigate('home')} onNavigate={(section) => navigate(section)} onAction={handleGameResult} onCommand={handleGameCommand} onRedeemed={handleRedeemed} onRefreshProfile={refreshAuthoritativeProfile} onLinkAccount={() => setLinkingAccount(true)} onLogout={handleLogout} onShowGuide={() => setPendingGuide(activeSection)} />
@@ -1108,6 +1115,49 @@ export default function App() {
         isFreeSpinAvailable={getLuckySpinState(profile.lastSpinTimestamp).isFree}
         profile={profile}
       />
+
+      
+      {/* Mandatory Interactive Spotlight Guided Walkthrough */}
+      {isWalkthroughActive && (
+        <SpotlightWalkthrough
+          currentStepIndex={walkthroughStepIndex}
+          currentSection={activeSection}
+          onNavigate={(sec) => navigate(sec)}
+          onStepComplete={() => {
+            if (walkthroughStepIndex < WALKTHROUGH_STEPS.length - 1) {
+              setWalkthroughStepIndex((prev) => prev + 1);
+            } else {
+              setIsWalkthroughActive(false);
+              setWalkthroughCompleted(true);
+              completeIntro();
+              playSound("levelUp");
+              setCelebrationData({
+                title: "أكملت الجولة الإرشادية بنجاح! 👑",
+                subtitle: "تهانينا! لقد أتقنت أساسيات الإدارة وتعرفت على كيفية شراء العروض، وصيانة المعدات، ودفع الرواتب والالتزامات، وتشغيل المصانع بنجاح.",
+                rewardText: "10,000 كاش + 5 ماسات مكافأة إتمام الشرح",
+              });
+            }
+          }}
+          onSkip={() => {
+            setIsWalkthroughActive(false);
+            setWalkthroughCompleted(true);
+            completeIntro();
+          }}
+        />
+      )}
+
+      {/* Story Scenario Modal (Optional for Player Review) */}
+      {isTutorialOpen && (
+        <div className="fixed inset-0 z-[9999] bg-slate-950/90 backdrop-blur-md overflow-y-auto">
+          <StoryIntro
+            profile={profile}
+            onComplete={() => {
+              setIsTutorialOpen(false);
+              completeIntro();
+            }}
+          />
+        </div>
+      )}
 
       <footer className="app-footer pb-14 md:pb-3"><span>إمبراطورية الأعمال</span><span>محاكاة محلية · الأسعار والأحداث لأغراض اللعبة</span></footer>
     </div>

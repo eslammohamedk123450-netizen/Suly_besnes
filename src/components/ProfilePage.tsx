@@ -55,6 +55,7 @@ interface ProfilePageProps {
   onLogout?: () => void;
   onResetWorld?: () => void;
   onAccountDeleted?: () => void;
+  onRestartWalkthrough?: () => void;
 }
 
 async function copyTextWithFallback(text: string): Promise<boolean> {
@@ -98,7 +99,8 @@ export function ProfilePage({
   onLinkAccount, 
   onLogout,
   onResetWorld, 
-  onAccountDeleted 
+  onAccountDeleted,
+  onRestartWalkthrough
 }: ProfilePageProps) {
   // Modals state
   const [showSettingsModal, setShowSettingsModal] = useState(false);
@@ -801,6 +803,29 @@ export function ProfilePage({
                 </div>
               </div>
 
+              {/* Restart Mandatory Walkthrough Button */}
+              <div className="pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    playSound("click");
+                    setShowSettingsModal(false);
+                    onRestartWalkthrough?.();
+                  }}
+                  className="w-full p-3 rounded-2xl bg-gradient-to-r from-amber-500/20 via-amber-400/10 to-amber-500/20 hover:from-amber-500/30 hover:to-amber-400/20 border-2 border-amber-400/60 text-amber-300 hover:text-amber-200 flex items-center justify-between transition cursor-pointer shadow-lg shadow-amber-500/10"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-xl bg-amber-400/20 text-amber-300 flex items-center justify-center shrink-0">
+                      <Sparkles className="w-4 h-4" />
+                    </div>
+                    <div className="text-right">
+                      <strong className="text-xs sm:text-sm block text-white">إعادة تشغيل الجولة الإرشادية الإلزامية 🎯</strong>
+                      <span className="text-[10px] text-amber-200/80">تجميد الشاشة وتسليط الضوء الإرشادي للتدريب خطوة بخطوة</span>
+                    </div>
+                  </div>
+                  <span className="text-[11px] text-slate-950 font-black bg-amber-400 px-2.5 py-1 rounded-lg">بدء ➔</span>
+                </button>
+              </div>
               {/* Account Actions Section inside Settings (تسجيل الخروج وحذف الحساب) */}
               <div className="pt-2 space-y-2 border-t border-slate-800">
                 <span className="text-xs font-bold text-amber-400 block mb-1">
