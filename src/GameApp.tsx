@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { App as CapacitorApp } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
 import { Brand } from './components/Brand';
@@ -8,7 +8,10 @@ import { Dashboard } from './components/Dashboard';
 import { ProfilePage } from './components/ProfilePage';
 import { GameDayTimer } from './components/GameDayTimer';
 import { Icon } from './components/Icon';
-import { NoticeToast } from './components/NoticeToast';
+import { FlyingToast, type ToastAlert } from './components/FlyingToast';
+import { NotificationBell } from './components/NotificationBell';
+import { NotificationModal } from './components/NotificationModal';
+import { selectNotifications, type GameNotification } from './game/notifications';
 import { SectionPage } from './components/SectionPage';
 import { COUNTRIES, findCountry } from './domain/countries';
 import type { CountryId } from './domain/countries';
@@ -75,8 +78,115 @@ export default function App() {
   const [expansion, setExpansion] = useState(() => profile ? loadExpansionState(profile) : null);
   const [isLuckyWheelOpen, setIsLuckyWheelOpen] = useState(false);
   const [celebrationData, setCelebrationData] = useState<CelebrationData | null>(null);
+  const [isNotificationModalOpen, setIsNotificationModalOpen] = useState(false);
+  const [activeToastAlert, setActiveToastAlert] = useState<ToastAlert | null>(null);
+  const [forceBellVibrate, setForceBellVibrate] = useState(false);
+  const [customNotifications, setCustomNotifications] = useState<GameNotification[]>([]);
   const syncLock = useRef(false);
   const remoteCommandAttempts = useRef(new Map<string, Promise<RemoteGameCommandAttempt>>());
+
+  const triggerNotification = (
+    message: string,
+    tone: 'success' | 'warning' | 'info' | 'danger' = 'info',
+    title?: string,
+    section?: SectionId,
+    target?: string
+  ) => {
+    const id = `notif-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+    const inferredTitle = title || (
+      tone === 'danger' ? 'تنبيه عاجل' :
+      tone === 'warning' ? 'تحذير هام' :
+      tone === 'success' ? 'تمت العملية بنجاح' :
+      'إشعار إمبراطورية الأعمال'
+    );
+
+    setActiveToastAlert({
+      id,
+      title: inferredTitle,
+      message,
+      tone,
+      section,
+      target,
+    });
+
+    const newNotif: GameNotification = {
+      id,
+      title: inferredTitle,
+      detail: message,
+      tone,
+      section: (section ?? 'home') as any,
+      target,
+    };
+
+    setCustomNotifications((prev) => [newNotif, ...prev.slice(0, 30)]);
+    setForceBellVibrate(true);
+    setTimeout(() => setForceBellVibrate(false), 2400);
+  };
+
+  const showNotice = (
+    msg: string, 
+    tone: 'success' | 'warning' | 'info' | 'danger' = 'info', 
+    title?: string, 
+    sec?: SectionId, 
+    tgt?: string
+  ) => {
+    setNotice(msg);
+    setNoticeTone(tone === 'danger' ? 'error' : (tone as any));
+    triggerNotification(msg, tone, title, sec, tgt);
+  };
+
+  const allNotifications = useMemo(() => {
+    if (!profile) return customNotifications;
+    const dynamic = selectNotifications(profile);
+    const map = new Map<string, GameNotification>();
+    for (const item of [...customNotifications, ...dynamic]) {
+      if (!map.has(item.id)) {
+        map.set(item.id, item);
+      }
+    }
+    const dismissed = new Set(profile.dismissedNotificationIds ?? []);
+    return Array.from(map.values()).filter((n) => !dismissed.has(n.id));
+  }, [profile, customNotifications]);
+
+  const unreadNotificationsCount = useMemo(() => {
+    const readSet = new Set(profile?.readNotificationIds ?? []);
+    return allNotifications.filter((n) => !readSet.has(n.id)).length;
+  }, [allNotifications, profile?.readNotificationIds]);
+
+  const handleMarkNotificationRead = (notifId: string) => {
+    if (!profile) return;
+    const currentRead = new Set(profile.readNotificationIds ?? []);
+    currentRead.add(notifId);
+    const updated = {
+      ...profile,
+      readNotificationIds: Array.from(currentRead),
+    };
+    setProfile(updated);
+    saveGame(updated, account?.id);
+  };
+
+  const handleMarkAllNotificationsRead = () => {
+    if (!profile) return;
+    const allIds = allNotifications.map((n) => n.id);
+    const updated = {
+      ...profile,
+      readNotificationIds: Array.from(new Set([...(profile.readNotificationIds ?? []), ...allIds])),
+    };
+    setProfile(updated);
+    saveGame(updated, account?.id);
+  };
+
+  const handleClearAllNotifications = () => {
+    if (!profile) return;
+    const allIds = allNotifications.map((n) => n.id);
+    const updated = {
+      ...profile,
+      dismissedNotificationIds: Array.from(new Set([...(profile.dismissedNotificationIds ?? []), ...allIds])),
+    };
+    setCustomNotifications([]);
+    setProfile(updated);
+    saveGame(updated, account?.id);
+  };
 
   const handleLuckySpinReward = (reward: { type: 'cash' | 'gold' | 'diamonds' | 'speed_card'; amount: number; label: string }) => {
     if (!profile) return;
@@ -96,8 +206,7 @@ export default function App() {
     }
     setProfile(next);
     saveGame(next, account?.id);
-    setNotice(`🎉 مبروك! ربحت ${reward.label} من عجلة الحظ اليومية!`);
-    setNoticeTone('success');
+    showNotice(`🎉 مبروك! ربحت ${reward.label} من عجلة الحظ اليومية!`, 'success', 'مكافأة عجلة الحظ');
   };
 
   async function claimDailyLogin(nextAccount: LocalAccount) {
@@ -527,8 +636,11 @@ export default function App() {
     setProfile(newProfile);
     setActiveSection('home');
     setMobileMenuOpen(false);
-    setNotice(result.ok ? 'تم إنشاء عالمك وحفظه على هذا الجهاز.' : 'تعذر حفظ البيانات محليًا؛ قد لا يستمر التقدم بعد إغلاق الصفحة.');
-    setNoticeTone(result.ok ? 'success' : 'error');
+    showNotice(
+      result.ok ? 'تم إنشاء عالمك وحفظه على هذا الجهاز بنجاح! 🌍' : 'تعذر حفظ البيانات محليًا؛ قد لا يستمر التقدم بعد إغلاق الصفحة.',
+      result.ok ? 'success' : 'danger',
+      'بداية إمبراطورية جديدة'
+    );
   }
 
   function completeIntro() {
@@ -538,15 +650,13 @@ export default function App() {
     if (account && !account.isGuest) setSyncState('local');
     setProfile(nextProfile);
     playSound('success');
-    setNotice('بدأ الفصل الأول. ابدأ بالأرض ثم أسس شركتك الأولى.');
-    setNoticeTone('success');
+    showNotice('بدأ الفصل الأول: خطة الإنقاذ. ابدأ بالأرض ثم أسس شركتك الأولى.', 'success', 'انطلاق الفصل الأول', 'lands');
   }
 
   function handleGameResult<T>(result: GameResult<T>, options: { syncRemote?: boolean } = {}) {
     if (!result.ok) {
       playSound('error');
-      setNotice(result.message);
-      setNoticeTone('error');
+      showNotice(result.message, 'danger', 'تنبيه النظام');
       return;
     }
     const saved = saveGame(result.profile, account?.id);
@@ -555,8 +665,11 @@ export default function App() {
     const settlementNote = settledAmount > 0 ? ` وُجّه ${formatMoney(settledAmount, country)} لسداد التزامات سابقة.` : '';
     setProfile(result.profile);
     playSound('success');
-    setNotice(saved.ok ? `${result.message}${settlementNote}` : `${result.message}${settlementNote} تعذر تثبيت الحفظ على هذا الجهاز.`);
-    setNoticeTone(saved.ok ? 'success' : 'error');
+    showNotice(
+      saved.ok ? `${result.message}${settlementNote}` : `${result.message}${settlementNote} تعذر تثبيت الحفظ على هذا الجهاز.`,
+      saved.ok ? 'success' : 'danger',
+      'تحديث العملية'
+    );
   }
 
   function runGameAction(action: (current: PlayerProfile) => GameResult<unknown>) {
@@ -725,7 +838,12 @@ export default function App() {
           onPlayerNameChange={setPlayerName}
           onStart={startNewWorld}
         />
-        {notice && <NoticeToast message={notice} tone={noticeTone} theme={notificationTheme} onDismiss={() => setNotice('')} />}
+        <FlyingToast
+          alert={activeToastAlert}
+          onDismiss={() => setActiveToastAlert(null)}
+          onOpenNotifications={() => setIsNotificationModalOpen(true)}
+          onNavigate={navigate}
+        />
       </>
     );
   }
@@ -745,6 +863,14 @@ export default function App() {
           <div className="header-location"><span>{country.flag}</span><span>{country.name}</span><small>{country.currency.code}</small></div>
           <span className="header-divider" />
           <button className="player-level player-level--button" type="button" onClick={() => navigate('profile')} aria-label="فتح الملف الشخصي"><span className="avatar-initial">{profile.name.trim().charAt(0) || 'م'}</span><span><strong>{profile.name}</strong><small>المستوى {playerProgress?.level ?? profile.level}</small></span></button>
+          
+          {/* Notification Bell with Red Badge & Periodic Vibration */}
+          <NotificationBell
+            unreadCount={unreadNotificationsCount}
+            onClick={() => setIsNotificationModalOpen(true)}
+            forceVibrate={forceBellVibrate}
+          />
+
           <button className="header-settings" type="button" onClick={() => navigate('settings')} aria-label="الإعدادات"><Icon name="settings" size={19} /></button>
         </div>
       </header>
@@ -793,8 +919,7 @@ export default function App() {
                     diamonds: prev.diamonds + diamonds,
                   };
                   saveGame(next, account?.id);
-                  setNotice(`تم استلام المكافأة: +${cash.toLocaleString()} $ و +${diamonds} ألماسة! 🎁`);
-                  setNoticeTone('success');
+                  showNotice(`تم استلام المكافأة: +${cash.toLocaleString()} $ و +${diamonds} ألماسة! 🎁`, 'success', 'مكافأة إنجاز');
                   return next;
                 });
               }}
@@ -806,8 +931,7 @@ export default function App() {
                     bankBalance: prev.bankBalance + 250000,
                   };
                   saveGame(next, account?.id);
-                  setNotice('تم إيداع تسهيل ائتماني طارئ بقيمة 250,000 $ من بنك مصر للأعمال! 🏦');
-                  setNoticeTone('success');
+                  showNotice('تم إيداع تسهيل ائتماني طارئ بقيمة 250,000 $ من بنك مصر للأعمال! 🏦', 'success', 'تسهيل ائتماني طارئ', 'bank');
                   return next;
                 });
               }}
@@ -864,8 +988,7 @@ export default function App() {
           };
           saveGame(nextProfile, account?.id);
           setProfile(nextProfile);
-          setNotice(`تم تحصيل الأرباح الفعلية بنجاح! تم إيداع +${formatMoney(amount, country)} في حسابك البنكي.`);
-          setNoticeTone('success');
+          showNotice(`تم تحصيل الأرباح الفعلية بنجاح! تم إيداع +${formatMoney(amount, country)} في حسابك البنكي.`, 'success', 'تحصيل أرباح الشركات', 'bank');
         }}
         onSellProduct={(productId: string, quantity: number) => {
           void handleGameCommand(
@@ -876,7 +999,23 @@ export default function App() {
         onAdvanceDay={() => void handleDaysElapsed(1)}
       />
 
-      {notice && <NoticeToast message={notice} tone={noticeTone} theme={notificationTheme} onDismiss={() => setNotice('')} />}
+      <FlyingToast
+        alert={activeToastAlert}
+        onDismiss={() => setActiveToastAlert(null)}
+        onOpenNotifications={() => setIsNotificationModalOpen(true)}
+        onNavigate={navigate}
+      />
+
+      <NotificationModal
+        isOpen={isNotificationModalOpen}
+        onClose={() => setIsNotificationModalOpen(false)}
+        notifications={allNotifications}
+        readNotificationIds={profile.readNotificationIds ?? []}
+        onNavigate={navigate}
+        onMarkRead={handleMarkNotificationRead}
+        onMarkAllRead={handleMarkAllNotificationsRead}
+        onClearAll={handleClearAllNotifications}
+      />
       {pendingGuide && <SystemGuideModal section={pendingGuide} onClose={() => { if (!profile) return; const seenGuides = profile.onboarding.seenGuides.includes(pendingGuide) ? profile.onboarding.seenGuides : [...profile.onboarding.seenGuides, pendingGuide]; const nextProfile = { ...profile, onboarding: { ...profile.onboarding, chapter: chapterFor(profile), seenGuides } }; saveGame(nextProfile, account?.id); if (account && !account.isGuest) setSyncState('local'); setProfile(nextProfile); setPendingGuide(null); }} />}
       {activeStoryEvent && (
         <StoryEventPopup
