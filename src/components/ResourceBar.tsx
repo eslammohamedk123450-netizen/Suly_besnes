@@ -7,7 +7,6 @@ import { getPlayerProgress } from '../game/onboarding';
 import { AvatarPortrait } from './AvatarPortrait';
 import { GameDayTimer } from './GameDayTimer';
 import { NotificationBell } from './NotificationBell';
-import { Brand } from './Brand';
 import { Compass, BookOpen } from 'lucide-react';
 
 export type ResourceSyncState = 'synced' | 'syncing' | 'offline' | 'blocked' | 'local';
@@ -46,29 +45,21 @@ export function ResourceBar({
   return (
     <header
       className="sticky top-0 z-40 w-full backdrop-blur-md bg-slate-950/95 border-b border-slate-800/80 shadow-2xl transition-all"
-      aria-label="شريط الأرصدة والهوية العلوي المثبت"
+      aria-label="شريط الأرصدة والملف الشخصي والوقت"
       dir="rtl"
     >
-      <div className="max-w-7xl mx-auto px-2 sm:px-4 py-1.5 flex flex-col gap-1.5">
-        <div className="flex items-center justify-between gap-2 sm:gap-4 flex-wrap lg:flex-nowrap">
-          {/* Main Financial & Identity Cluster: Brand + Avatar + Adjacent Balances */}
-          <div className="flex items-center gap-2 sm:gap-3 flex-wrap sm:flex-nowrap min-w-0">
-            {/* Brand Logo */}
-            <button
-              onClick={() => onNavigate('home')}
-              className="flex items-center gap-1.5 p-1 rounded-xl hover:bg-slate-900 transition cursor-pointer shrink-0"
-              title="العودة للشاشة الرئيسية"
-            >
-              <Brand compact />
-            </button>
-
-            {/* Profile Avatar (No player name, styled prominently with level badge) */}
+      <div className="max-w-7xl mx-auto px-2 sm:px-4 py-2 flex flex-col gap-1.5">
+        {/* ROW 1: Top Right Avatar + Adjacent Balances + Left Controls (No Game Name) */}
+        <div className="flex items-center justify-between gap-2 sm:gap-4">
+          {/* Right Cluster: Avatar + Balances Right Next to it */}
+          <div className="flex items-center gap-2 sm:gap-3 overflow-x-auto no-scrollbar py-0.5 min-w-0">
+            {/* 1. Profile Avatar at Top Right (الصورة الشخصية بالأعلى على اليمين) */}
             <div
               onClick={() => onNavigate('profile')}
               role="button"
               tabIndex={0}
               className="group relative flex items-center justify-center p-1 rounded-2xl bg-gradient-to-tr from-slate-900 via-slate-850 to-slate-900 border-2 border-amber-500/50 hover:border-amber-400 hover:shadow-[0_0_15px_rgba(251,191,36,0.4)] transition-all shadow-md cursor-pointer shrink-0 select-none"
-              title="الملف الشخصي وإدارة الهوية"
+              title="الملف الشخصي وتخصيص الهوية"
             >
               <div className="relative">
                 <AvatarPortrait
@@ -100,8 +91,8 @@ export function ResourceBar({
               </div>
             </div>
 
-            {/* Financial Balances immediately next to the Avatar (الأرصدة بجانب الصورة الشخصية مباشرة) */}
-            <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto no-scrollbar py-0.5 min-w-0">
+            {/* 2. Financial Balances immediately next to the Avatar (الأرصدة بجانب الصورة) */}
+            <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
               {/* Cash Balance (السيولة النقدية) */}
               <div
                 onClick={() => onNavigate('bank')}
@@ -200,36 +191,20 @@ export function ResourceBar({
             </div>
           </div>
 
-          {/* Controls & Status Cluster: Clock, Country, Walkthrough & Notifications */}
+          {/* Left Cluster: Walkthrough, Story, Notifications */}
           <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-            {/* World Day & Simulation Clock */}
-            {onDaysElapsed && (
-              <GameDayTimer profile={profile} onDaysElapsed={onDaysElapsed} />
-            )}
-
-            {/* Country Flag Pill */}
-            <div
-              className="hidden sm:flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-900/80 border border-slate-800 text-xs font-bold text-slate-300 shadow-sm"
-              title={`${country.name} (${country.currency.code})`}
-            >
-              <span>{country.flag}</span>
-              <span className="hidden md:inline text-[11px]">{country.name}</span>
-            </div>
-
-            {/* Walkthrough Button */}
             {onOpenWalkthrough && (
               <button
                 type="button"
                 onClick={onOpenWalkthrough}
-                className="flex items-center gap-1 px-2 sm:px-2.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs transition shadow-md shadow-amber-500/20 active:scale-95 cursor-pointer"
+                className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs transition shadow-md shadow-amber-500/20 active:scale-95 cursor-pointer"
                 title="بدء الجولة الإرشادية التفاعلية"
               >
                 <Compass className="w-3.5 h-3.5" />
-                <span className="hidden xl:inline text-[11px]">الجولة 🎯</span>
+                <span className="hidden sm:inline text-[11px]">الجولة 🎯</span>
               </button>
             )}
 
-            {/* Story Button */}
             {onOpenTutorial && (
               <button
                 type="button"
@@ -238,11 +213,10 @@ export function ResourceBar({
                 title="سيناريو القصة والمهام"
               >
                 <BookOpen className="w-3.5 h-3.5" />
-                <span className="hidden xl:inline text-[11px]">القصة 📜</span>
+                <span className="hidden sm:inline text-[11px]">القصة 📜</span>
               </button>
             )}
 
-            {/* Notification Bell */}
             {onOpenNotifications && (
               <NotificationBell
                 unreadCount={unreadNotificationsCount}
@@ -252,6 +226,24 @@ export function ResourceBar({
             )}
           </div>
         </div>
+
+        {/* ROW 2: Underneath: The Days & Country (تحتها الأيام) */}
+        {onDaysElapsed && (
+          <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-800/60">
+            <div className="flex items-center gap-2 flex-1 min-w-0">
+              <GameDayTimer profile={profile} onDaysElapsed={onDaysElapsed} />
+            </div>
+
+            {/* Country Flag Pill */}
+            <div
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-900/90 border border-slate-800 text-xs font-bold text-slate-300 shadow-sm shrink-0"
+              title={`${country.name} (${country.currency.code})`}
+            >
+              <span>{country.flag}</span>
+              <span className="text-[11px] font-semibold">{country.name}</span>
+            </div>
+          </div>
+        )}
       </div>
     </header>
   );
