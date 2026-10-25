@@ -3,6 +3,7 @@ import type { PlayerProfile } from '../domain/player';
 import type { MegaExpansionState } from '../domain/expansionSystems';
 import { TRADE_VESSELS_CATALOG, TRADE_ROUTES_CATALOG } from '../game/expansionCatalog';
 import { buyVessel, startVoyage, claimVoyageProfit } from '../game/expansionV2Engine';
+import { playSound } from '../game/soundEffects';
 import './MaritimeTradeRoutes.css';
 
 interface Props {
@@ -21,7 +22,10 @@ export const MaritimeTradeRoutes: React.FC<Props> = ({ profile, expansion, onUpd
   const handleBuyShip = (vesselId: string) => {
     const res = buyVessel(profile, expansion, vesselId);
     if (res) {
+      playSound('ship');
       onUpdate(res.profile, res.expansion);
+    } else {
+      playSound('error');
     }
   };
 
@@ -29,13 +33,17 @@ export const MaritimeTradeRoutes: React.FC<Props> = ({ profile, expansion, onUpd
     if (!selectedVessel || !selectedRoute) return;
     const res = startVoyage(profile, expansion, selectedVessel, selectedRoute);
     if (res) {
+      playSound('ship');
       onUpdate(res.profile, res.expansion);
+    } else {
+      playSound('error');
     }
   };
 
   const handleClaim = (voyageId: string) => {
     const res = claimVoyageProfit(profile, expansion, voyageId);
     if (res) {
+      playSound('cash');
       onUpdate(res.profile, res.expansion);
     }
   };

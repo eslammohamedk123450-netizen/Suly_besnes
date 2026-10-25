@@ -78,7 +78,11 @@ export function AvatarWardrobeModal({
     }
     const success = onUnlockAvatar(avatar);
     if (success) {
-      playSound('success');
+      if (avatar.tier === 'vip' || avatar.tier === 'executive') {
+        playSound('vip');
+      } else {
+        playSound('diamond');
+      }
       setSelectedPreviewId(avatar.id);
     }
   };

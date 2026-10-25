@@ -93,7 +93,7 @@ export function StockExchangeTerminal({
 
     setStockState(updatedState);
     if (onProfileUpdate) onProfileUpdate(updatedProfile);
-    playSound('success');
+    playSound('stock');
     showToast(
       `تم شراء ${numShares.toLocaleString()} سهم في ${activeStock.name} بنجاح! عمولة الوساطة (0.5%): ${formatMoney(brokerageCommission, country)}`,
       'success',
@@ -143,7 +143,7 @@ export function StockExchangeTerminal({
     } else {
       setExpansion(res.updatedExpansion);
       if (onProfileUpdate) onProfileUpdate(res.updatedProfile);
-      playSound('success');
+      playSound('vip');
       showToast('📈 تم طرح شركتك للاكتتاب العام بنجاح وحصد سيولة مالية من كبار المساهمين!', 'success');
     }
   };

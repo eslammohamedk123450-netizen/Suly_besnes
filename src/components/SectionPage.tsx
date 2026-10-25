@@ -14,7 +14,7 @@ import { getInvestmentPayoutRate, getOperatingCostProgression } from '../game/ec
 import { getContractOffers, getCustomerSegmentLabel } from '../game/contracts';
 import { selectActiveInvestments, selectAdvancedStatistics, selectAvailableAuctions, selectCompanyPerformance, selectEmpirePoints, selectFinancialReport, selectInventorySummary, selectObligations, selectSalesSummary, selectTaskBoard } from '../game/selectors';
 import { Icon, type IconName } from './Icon';
-import { isSoundEnabled, setSoundEnabled } from '../game/soundEffects';
+import { isSoundEnabled, setSoundEnabled, playSound } from '../game/soundEffects';
 import { EconomyEmpty, EconomyPageShell, EconomyPanel as BaseEconomyPanel, EconomyStat, type EconomyPanelProps } from './EconomyUI';
 import { DiamondStore } from './DiamondStore';
 import { PurchaseOptions } from './PurchaseOptions';
@@ -648,13 +648,19 @@ export function SectionPage({ section, profile, country, focus, notificationThem
                 }
 
                 if (onProfileUpdate) onProfileUpdate(updatedProfile);
+                playSound('auction');
                 setSelectedAuctionId(null);
                 return { ok: true, data: null, message: `مبروك! تم الفوز بالمزاد وترسية [${dynamicItem.title}] لصالحك.`, profile: updatedProfile };
               }
 
               const result = placeBid(profile, selectedAuction.id, amount, targetCompanyId);
+              if (result.ok) {
+                playSound('auction');
+                setSelectedAuctionId(null);
+              } else {
+                playSound('error');
+              }
               onAction(result);
-              if (result.ok) setSelectedAuctionId(null);
               return result;
             }}
           />
@@ -780,7 +786,10 @@ export function SectionPage({ section, profile, country, focus, notificationThem
                       className="button button-secondary text-xs py-1 px-3"
                       type="button"
                       data-guide-target="service-company-btn"
-                      onClick={() => runCommand({ name: 'service_company', args: { companyId: company.id } }, (current) => serviceCompany(current, company.id))}
+                      onClick={() => {
+                        playSound('maintenance');
+                        runCommand({ name: 'service_company', args: { companyId: company.id } }, (current) => serviceCompany(current, company.id));
+                      }}
                       disabled={profile.bankBalance < Math.max(5_000, Math.round((company.operatingCostPerDay ?? 0) * 0.4)) || (company.maintenanceCondition ?? 100) >= 100}
                     >
                       صيانة المصنع ⚙️
@@ -839,7 +848,13 @@ export function SectionPage({ section, profile, country, focus, notificationThem
         >
           {profile.companies.length === 0 ? <EconomyEmpty title="لا توجد مصانع عاملة" message="أسس شركة أولًا؛ يتضمن ترخيصها خط إنتاج للقطاع الذي اخترته." /> : <div className="economy-layout">
             {companyTransferPending && <div className="economy-alert"><Icon name="clock" size={16} /> يجري إنهاء عقود نقل الملكية؛ يبدأ تشغيل هذه الشركة في اليوم {formatNumber(selectedCompany?.operationalFromDay ?? profile.day)}.</div>}
-            <form className="economy-form" onSubmit={(event: FormEvent<HTMLFormElement>) => { event.preventDefault(); if (selectedCompany) runCommand({ name: 'run_production', args: { companyId: selectedCompany.id, batches: Number(productionBatches) } }, (current) => runProduction(current, selectedCompany.id, Number(productionBatches))); }}>
+            <form className="economy-form" onSubmit={(event: FormEvent<HTMLFormElement>) => { 
+              event.preventDefault(); 
+              if (selectedCompany) {
+                playSound('factory');
+                runCommand({ name: 'run_production', args: { companyId: selectedCompany.id, batches: Number(productionBatches) } }, (current) => runProduction(current, selectedCompany.id, Number(productionBatches))); 
+              }
+            }}>
               <div className="economy-field"><label htmlFor="factory-select">الشركة / المصنع</label><select id="factory-select" value={selectedCompany?.id ?? ''} onChange={(event) => setCompanyId(event.target.value)}>{profile.companies.map((company) => <option key={company.id} value={company.id}>{company.name} · {INDUSTRY_CATALOG.find((item) => item.id === company.industryId)?.name}</option>)}</select></div>
               <div className="economy-field"><label htmlFor="production-batches">دفعات الإنتاج</label><input id="production-batches" type="number" min="1" max="100" step="1" value={productionBatches} onChange={(event) => setProductionBatches(event.target.value)} /></div>
               
@@ -876,6 +891,7 @@ export function SectionPage({ section, profile, country, focus, notificationThem
                       disabled={!canAffordAutoSupply || companyTransferPending || !recipe || !selectedCompany}
                       onClick={() => {
                         if (selectedCompany) {
+                          playSound('factory');
                           runCommand(
                             { name: 'auto_supply_and_produce', args: { companyId: selectedCompany.id, batches: selectedBatches } },
                             (current) => autoSupplyAndProduce(current, selectedCompany.id, selectedBatches)

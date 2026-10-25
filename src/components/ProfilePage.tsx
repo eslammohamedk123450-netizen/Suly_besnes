@@ -10,8 +10,12 @@ import { PrivacyPolicyModal } from './PrivacyPolicyModal';
 import { 
   isSoundEnabled, 
   setSoundEnabled, 
+  getSoundVolume,
+  setSoundVolume,
   isMusicPlaying, 
   toggleAmbientMusic, 
+  getMusicVolume,
+  setMusicVolume,
   playSound 
 } from '../game/soundEffects';
 import { 
@@ -126,7 +130,9 @@ export function ProfilePage({
 
   // Settings audio state
   const [soundOn, setSoundOn] = useState(() => isSoundEnabled());
+  const [soundVol, setSoundVol] = useState(() => Math.round(getSoundVolume() * 100));
   const [musicOn, setMusicOn] = useState(() => isMusicPlaying());
+  const [musicVol, setMusicVol] = useState(() => Math.round(getMusicVolume() * 100));
 
   // Delete account form state
   const [typedEmail, setTypedEmail] = useState('');
@@ -309,9 +315,19 @@ export function ProfilePage({
     if (next) playSound('click');
   };
 
+  const handleSoundVolumeChange = (volPercent: number) => {
+    setSoundVol(volPercent);
+    setSoundVolume(volPercent / 100);
+  };
+
   const handleToggleMusic = () => {
     const next = toggleAmbientMusic();
     setMusicOn(next);
+  };
+
+  const handleMusicVolumeChange = (volPercent: number) => {
+    setMusicVol(volPercent);
+    setMusicVolume(volPercent / 100);
   };
 
   const handleCopyCode = async () => {
@@ -885,28 +901,19 @@ export function ProfilePage({
                 الصوت والمؤثرات الصوتية:
               </span>
 
-              {/* Sound FX Toggle */}
-              <div className="p-3.5 rounded-2xl bg-slate-950/70 border border-slate-800 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${soundOn ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-800 text-slate-500'}`}>
-                    {soundOn ? <Volume2 className="w-5 h-5" /> : <VolumeX className="w-5 h-5" />}
+              {/* Sound FX Card */}
+              <div className="p-3.5 rounded-2xl bg-slate-950/70 border border-slate-800 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${soundOn ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-800 text-slate-500'}`}>
+                      {soundOn ? <Volume2 className="w-5 h-5" /> : <VolumeX className="w-5 h-5" />}
+                    </div>
+                    <div>
+                      <strong className="text-xs sm:text-sm text-white block">المؤثرات الصوتية (Sound FX)</strong>
+                      <span className="text-[10px] text-slate-400">أصوات النقود، إتمام الصفقات، والترقيات</span>
+                    </div>
                   </div>
-                  <div>
-                    <strong className="text-xs sm:text-sm text-white block">المؤثرات الصوتية (Sound FX)</strong>
-                    <span className="text-[10px] text-slate-400">أصوات النقود، إتمام الصفقات، والترقيات</span>
-                  </div>
-                </div>
 
-                <div className="flex items-center gap-2">
-                  {soundOn && (
-                    <button
-                      type="button"
-                      onClick={() => playSound('cash')}
-                      className="px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-amber-300 text-[10px] font-bold transition"
-                    >
-                      تجربة 🔔
-                    </button>
-                  )}
                   <button
                     type="button"
                     onClick={handleToggleSound}
@@ -915,27 +922,121 @@ export function ProfilePage({
                     <span className={`block w-5 h-5 rounded-full bg-white shadow-md transition-transform transform ${soundOn ? 'translate-x-1' : 'translate-x-6'}`} />
                   </button>
                 </div>
+
+                {soundOn && (
+                  <div className="pt-2 border-t border-slate-850 space-y-2">
+                    {/* Volume Slider */}
+                    <div className="flex items-center gap-3">
+                      <span className="text-[11px] text-slate-300 font-bold shrink-0">شدة الصوت:</span>
+                      <input
+                        type="range"
+                        min="0"
+                        max="100"
+                        value={soundVol}
+                        onChange={(e) => handleSoundVolumeChange(Number(e.target.value))}
+                        className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-amber-400"
+                      />
+                      <span className="text-[11px] font-mono font-bold text-amber-300 w-9 text-left">
+                        {soundVol}%
+                      </span>
+                    </div>
+
+                    {/* Preview Buttons Grid */}
+                    <div className="flex flex-wrap gap-1.5 pt-1">
+                      <span className="text-[10px] text-slate-400 self-center ml-1">تجربة:</span>
+                      <button
+                        type="button"
+                        onClick={() => playSound('cash')}
+                        className="px-2 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-amber-300 text-[10px] font-bold border border-slate-800 transition active:scale-95"
+                        title="رنين الكاش والأرباح"
+                      >
+                        💵 كاش
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => playSound('gold')}
+                        className="px-2 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-yellow-400 text-[10px] font-bold border border-slate-800 transition active:scale-95"
+                        title="طنين سبائك الذهب"
+                      >
+                        🥇 ذهب
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => playSound('diamond')}
+                        className="px-2 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-cyan-300 text-[10px] font-bold border border-slate-800 transition active:scale-95"
+                        title="بريق الألماس"
+                      >
+                        💎 ألماس
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => playSound('maintenance')}
+                        className="px-2 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 text-[10px] font-bold border border-slate-800 transition active:scale-95"
+                        title="صيانة وتروس المصانع"
+                      >
+                        ⚙️ صيانة
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => playSound('auction')}
+                        className="px-2 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-amber-400 text-[10px] font-bold border border-slate-800 transition active:scale-95"
+                        title="مطرقة المزاد"
+                      >
+                        🔨 مزاد
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => playSound('vip')}
+                        className="px-2 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-purple-300 text-[10px] font-bold border border-slate-800 transition active:scale-95"
+                        title="عزف إمبراطوري فاخر"
+                      >
+                        👑 ترقية
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
 
-              {/* Ambient Music Toggle */}
-              <div className="p-3.5 rounded-2xl bg-slate-950/70 border border-slate-800 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${musicOn ? 'bg-purple-500/20 text-purple-400' : 'bg-slate-800 text-slate-500'}`}>
-                    <Music className="w-5 h-5" />
+              {/* Ambient Music Card */}
+              <div className="p-3.5 rounded-2xl bg-slate-950/70 border border-slate-800 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${musicOn ? 'bg-purple-500/20 text-purple-400' : 'bg-slate-800 text-slate-500'}`}>
+                      <Music className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <strong className="text-xs sm:text-sm text-white block">الموسيقى التصويرية الهادئة</strong>
+                      <span className="text-[10px] text-slate-400">أنغام استثمارية Lo-Fi هادئة ومريحة في الخلفية</span>
+                    </div>
                   </div>
-                  <div>
-                    <strong className="text-xs sm:text-sm text-white block">الموسيقى التصويرية الهادئة</strong>
-                    <span className="text-[10px] text-slate-400">أنغام استثمارية Lo-Fi هادئة في الخلفية</span>
-                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleToggleMusic}
+                    className={`w-12 h-6 rounded-full transition-colors relative cursor-pointer ${musicOn ? 'bg-purple-500' : 'bg-slate-700'}`}
+                  >
+                    <span className={`block w-5 h-5 rounded-full bg-white shadow-md transition-transform transform ${musicOn ? 'translate-x-1' : 'translate-x-6'}`} />
+                  </button>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={handleToggleMusic}
-                  className={`w-12 h-6 rounded-full transition-colors relative cursor-pointer ${musicOn ? 'bg-purple-500' : 'bg-slate-700'}`}
-                >
-                  <span className={`block w-5 h-5 rounded-full bg-white shadow-md transition-transform transform ${musicOn ? 'translate-x-1' : 'translate-x-6'}`} />
-                </button>
+                {musicOn && (
+                  <div className="pt-2 border-t border-slate-850">
+                    <div className="flex items-center gap-3">
+                      <span className="text-[11px] text-slate-300 font-bold shrink-0">شدة الموسيقى:</span>
+                      <input
+                        type="range"
+                        min="0"
+                        max="100"
+                        value={musicVol}
+                        onChange={(e) => handleMusicVolumeChange(Number(e.target.value))}
+                        className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-purple-400"
+                      />
+                      <span className="text-[11px] font-mono font-bold text-purple-300 w-9 text-left">
+                        {musicVol}%
+                      </span>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* System Info */}

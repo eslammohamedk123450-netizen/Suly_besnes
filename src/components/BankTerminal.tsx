@@ -84,7 +84,13 @@ export const BankTerminal: React.FC<BankTerminalProps> = ({
   const calculatedDepositProfit = Math.round(Number(depositAmount) * handleDepositDurationRate(Number(depositDuration)));
 
   const runCommand = (command: GameCommand, fallback: (current: PlayerProfile) => GameResult<unknown>) => {
-    playSound('cash');
+    if (command.name === 'create_deposit') {
+      playSound('vault');
+    } else if (command.name === 'take_loan') {
+      playSound('loan');
+    } else {
+      playSound('cash');
+    }
     onCommand(command, fallback);
   };
 
