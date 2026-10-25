@@ -19,7 +19,11 @@ export type SectionId =
   | 'settings'
   | 'territory'
   | 'tech_tree'
-  | 'luxury';
+  | 'luxury'
+  | 'cartel'
+  | 'maritime'
+  | 'megaprojects'
+  | 'incubator';
 
 export interface SectionItem {
   id: SectionId;
@@ -40,6 +44,10 @@ export const GAME_SECTIONS: readonly SectionItem[] = [
   { id: 'territory', label: 'السيطرة الإقليمية', shortLabel: 'الخريطة', subtitle: 'خريطة السيطرة والتوسع الجغرافي', icon: 'land' },
   { id: 'tech_tree', label: 'الأبحاث والأتمتة', shortLabel: 'الأبحاث', subtitle: 'شجرة التكنولوجيا والأتمتة الذكية', icon: 'factory' },
   { id: 'luxury', label: 'الهيبة والرفاهية', shortLabel: 'الرفاهية', subtitle: 'أصول المدير التنفيذي ونقاط الهيبة', icon: 'user' },
+  { id: 'cartel', label: 'الكارتيل والتحالفات', shortLabel: 'الكارتيل', subtitle: 'تكتلات تجارية وحروب أسعار وحروب تحالفات', icon: 'company' },
+  { id: 'maritime', label: 'الشحن الملاحي والأسطول', shortLabel: 'الأساطيل', subtitle: 'تجارة بحرية وسلاسل إمداد دولية', icon: 'land' },
+  { id: 'megaprojects', label: 'المناقصات ونفوذ الدولة', shortLabel: 'المناقصات', subtitle: 'مشاريع عملاقة ونفوذ سياسي ضريبي', icon: 'gavel' },
+  { id: 'incubator', label: 'حاضنات الأعمال والـ VC', shortLabel: 'الـ VC', subtitle: 'استثمار جريء في الشركات الناشئة Unicorns', icon: 'investment' },
   { id: 'store', label: 'متجر المشتريات', shortLabel: 'المتجر', subtitle: 'الماس والبطاقات والعروض', icon: 'store' },
   { id: 'auctions', label: 'المزادات', shortLabel: 'المزادات', subtitle: 'أراضٍ وأصول وفرص جديدة', icon: 'gavel' },
   { id: 'companies', label: 'الشركات', shortLabel: 'الشركات', subtitle: 'إدارة أعمالك وقطاعاتك', icon: 'company' },
@@ -58,7 +66,7 @@ export const GAME_SECTIONS: readonly SectionItem[] = [
 ];
 
 export const SECTION_GROUPS: readonly SectionGroup[] = [
-  { id: 'home_group', label: 'الرئيسية التفاعلية', sections: ['home', 'territory', 'tech_tree', 'luxury'] },
+  { id: 'home_group', label: 'الرئيسية والتوسع الإمبراطوري', sections: ['home', 'territory', 'tech_tree', 'luxury', 'cartel', 'maritime', 'megaprojects', 'incubator'] },
   { id: 'business_group', label: 'الأعمال والأصول', sections: ['companies', 'lands', 'production', 'inventory'] },
   { id: 'market_group', label: 'السوق والمالية والبورصة', sections: ['auctions', 'investments', 'bank', 'contracts'] },
   { id: 'management_group', label: 'الإدارة والتقدم', sections: ['staff', 'tasks', 'reports', 'obligations'] },

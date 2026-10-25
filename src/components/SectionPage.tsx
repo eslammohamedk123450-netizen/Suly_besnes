@@ -29,7 +29,12 @@ import { StockExchangeTerminal } from './StockExchangeTerminal';
 import { TerritoryConquestMap } from './TerritoryConquestMap';
 import { TechTreeRND } from './TechTreeRND';
 import { CeoLuxurySuite } from './CeoLuxurySuite';
+import { CartelSyndicate } from './CartelSyndicate';
+import { MaritimeTradeRoutes } from './MaritimeTradeRoutes';
+import { GovernmentMegaprojects } from './GovernmentMegaprojects';
+import { StartupIncubatorVC } from './StartupIncubatorVC';
 import { loadExpansionState } from '../game/expansionEngine';
+import { loadMegaExpansionState } from '../game/expansionV2Engine';
 import { HubSubNav } from './HubSubNav';
 import { ItemImage } from './ItemImage';
 
@@ -70,7 +75,7 @@ function panelIconFor(sectionId: SectionId, title: string): IconName {
   if (normalized.includes('التزام') || normalized.includes('سداد')) return 'shield';
   if (normalized.includes('سوق') || normalized.includes('شراء') || normalized.includes('بيع')) return 'store';
   const fallback: Record<SectionId, IconName> = {
-    home: 'home', auctions: 'gavel', companies: 'company', investments: 'investment', lands: 'land', production: 'factory', inventory: 'warehouse', reports: 'report', tasks: 'tasks', settings: 'settings', profile: 'user', bank: 'bank', staff: 'user', obligations: 'shield', store: 'store', contracts: 'briefcase', territory: 'land', tech_tree: 'factory', luxury: 'user',
+    home: 'home', auctions: 'gavel', companies: 'company', investments: 'investment', lands: 'land', production: 'factory', inventory: 'warehouse', reports: 'report', tasks: 'tasks', settings: 'settings', profile: 'user', bank: 'bank', staff: 'user', obligations: 'shield', store: 'store', contracts: 'briefcase', territory: 'land', tech_tree: 'factory', luxury: 'user', cartel: 'company', maritime: 'land', megaprojects: 'gavel', incubator: 'investment',
   };
   return fallback[sectionId];
 }
@@ -130,6 +135,7 @@ export function SectionPage({ section, profile, country, focus, notificationThem
   const [auctionCategoryTab, setAuctionCategoryTab] = useState<'all' | 'land' | 'factory' | 'material'>('land');
   const [activePanelId, setActivePanelId] = useState<string | null>(null);
   const [expansionState, setExpansionState] = useState(() => loadExpansionState(profile));
+  const [megaExpState, setMegaExpState] = useState(() => loadMegaExpansionState(profile));
 
   useEffect(() => {
     if (compactSectionIds.has(section.id)) setActivePanelId(focus ? '__all__' : null);
@@ -820,6 +826,78 @@ export function SectionPage({ section, profile, country, focus, notificationThem
             onUpdate={(updatedProf, updatedExp) => {
               setExpansionState(updatedExp);
               onAction({ ok: true, profile: updatedProf, message: 'تم تحديث جناح الرفاهية والأصول الفاخرة', data: undefined });
+            }}
+          />
+        )}
+      </div>
+    );
+  }
+
+  if (section.id === 'cartel') {
+    return (
+      <div className="section-page">
+        {heading}
+        {pageShell(
+          <CartelSyndicate
+            profile={profile}
+            expansion={megaExpState}
+            onUpdate={(updatedProf, updatedExp) => {
+              setMegaExpState(updatedExp);
+              onAction({ ok: true, profile: updatedProf, message: 'تم تحديث التكتل التجاري والتحالفات', data: undefined });
+            }}
+          />
+        )}
+      </div>
+    );
+  }
+
+  if (section.id === 'maritime') {
+    return (
+      <div className="section-page">
+        {heading}
+        {pageShell(
+          <MaritimeTradeRoutes
+            profile={profile}
+            expansion={megaExpState}
+            onUpdate={(updatedProf, updatedExp) => {
+              setMegaExpState(updatedExp);
+              onAction({ ok: true, profile: updatedProf, message: 'تم تحديث الأسطول الملاحي والخطوط البحرية', data: undefined });
+            }}
+          />
+        )}
+      </div>
+    );
+  }
+
+  if (section.id === 'megaprojects') {
+    return (
+      <div className="section-page">
+        {heading}
+        {pageShell(
+          <GovernmentMegaprojects
+            profile={profile}
+            expansion={megaExpState}
+            onUpdate={(updatedProf, updatedExp) => {
+              setMegaExpState(updatedExp);
+              onAction({ ok: true, profile: updatedProf, message: 'تم تحديث المناقصات القومية والنفوذ السياسي', data: undefined });
+            }}
+          />
+        )}
+      </div>
+    );
+  }
+
+  if (section.id === 'incubator') {
+    return (
+      <div className="section-page">
+        {heading}
+        {pageShell(
+          <StartupIncubatorVC
+            profile={profile}
+            expansion={megaExpState}
+            onUpdate={(updatedProf, updatedExp) => {
+              setMegaExpState(updatedExp);
+              onAction({ ok: true, profile: updatedProf, message: 'تم تحديث محفظة الاستثمار الجريء والحاضنات', data: undefined });
             }}
           />
         )}

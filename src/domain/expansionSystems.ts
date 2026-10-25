@@ -94,3 +94,133 @@ export interface EconomicDilemmaEvent {
   icon: string;
   options: EconomicDilemmaOption[];
 }
+
+// -------------------------------------------------------------
+// 1. Cartels & Alliances
+// -------------------------------------------------------------
+export interface CartelAlliance {
+  id: string;
+  name: string;
+  badge: string;
+  description: string;
+  categoryLabel: string;
+  totalPower: number;
+  memberCount: number;
+  dailyDues: number;
+  joinCost: number;
+  perkTitle: string;
+  perkDescription: string;
+  revenueBonusPercent: number;
+  materialCostDiscountPercent: number;
+}
+
+export interface PlayerCartelState {
+  joinedCartelId: string | null;
+  userRank: 'leader' | 'senior' | 'member' | 'none';
+  contributedFunds: number;
+  activeAgreement: string | null;
+  warVictoryCount: number;
+}
+
+// -------------------------------------------------------------
+// 2. Global Maritime Trade & Supply Chain
+// -------------------------------------------------------------
+export interface TradeVessel {
+  id: string;
+  name: string;
+  type: 'cargo' | 'tanker' | 'lng' | 'freight';
+  typeLabel: string;
+  icon: string;
+  price: number;
+  capacityContainers: number;
+  speedVoyageHours: number;
+  baseProfitPerVoyage: number;
+}
+
+export interface TradeRoute {
+  id: string;
+  name: string;
+  destination: string;
+  distanceKm: number;
+  riskPercent: number; // piracy / weather risk
+  profitMultiplier: number;
+  requiredVesselType: 'cargo' | 'tanker' | 'lng' | 'freight' | 'any';
+  icon: string;
+}
+
+export interface ActiveVoyage {
+  id: string;
+  vesselId: string;
+  vesselName: string;
+  routeId: string;
+  routeName: string;
+  startTime: number; // timestamp
+  durationMs: number;
+  expectedProfit: number;
+  claimed: boolean;
+}
+
+export interface MaritimeFleetState {
+  ownedVesselIds: string[];
+  activeVoyages: ActiveVoyage[];
+  securityLevel: number; // anti-piracy 1 to 5
+  portConcessions: number; // 0 to 5
+}
+
+// -------------------------------------------------------------
+// 3. Government Megaprojects & Political Influence
+// -------------------------------------------------------------
+export interface MegaprojectTender {
+  id: string;
+  title: string;
+  sector: string;
+  icon: string;
+  totalBudget: number;
+  requiredInfluenceLevel: number;
+  milestonesCount: number;
+  completedMilestones: number;
+  payoutPerMilestone: number;
+  description: string;
+  sponsorMinistry: string;
+}
+
+export interface PoliticalLobbyState {
+  influenceLevel: number; // 1 to 10
+  influencePoints: number;
+  taxExemptionActive: boolean;
+  activeTenderIds: string[];
+  totalGovernmentPayouts: number;
+}
+
+// -------------------------------------------------------------
+// 4. Venture Capital & Startup Incubator
+// -------------------------------------------------------------
+export interface StartupDeal {
+  id: string;
+  name: string;
+  tagline: string;
+  sector: 'ai' | 'fintech' | 'biotech' | 'cleantech' | 'drones';
+  sectorLabel: string;
+  icon: string;
+  stage: 'seed' | 'series_a' | 'series_b' | 'unicorn';
+  currentValuation: number;
+  investmentCost: number;
+  equityPercent: number;
+  monthlyGrowthRate: number; // percentage
+  exitMultiple: number; // e.g. 5x - 15x
+}
+
+export interface PlayerVCState {
+  incubatorLevel: number;
+  investedStartupIds: string[];
+  startupValuations: Record<string, number>; // startupId -> updated valuation
+  totalExitsProfit: number;
+}
+
+// Combined Expansion V2 Storage State
+export interface MegaExpansionState {
+  cartel: PlayerCartelState;
+  maritime: MaritimeFleetState;
+  political: PoliticalLobbyState;
+  vc: PlayerVCState;
+}
