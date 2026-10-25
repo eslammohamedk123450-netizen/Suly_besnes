@@ -249,16 +249,14 @@ export function SectionPage({ section, profile, country, focus, notificationThem
 
   if (section.id === 'bank') {
     return (
-      <div className="section-page bank-page">
-        {heading}
-        {pageShell(
-          <BankTerminal
-            profile={profile}
-            country={country}
-            initialTab={bankTab}
-            onCommand={runCommand}
-          />,
-        )}
+      <div className="section-page bank-page w-full min-w-0">
+        <HubSubNav currentSection={section.id} onNavigate={onNavigate} />
+        <BankTerminal
+          profile={profile}
+          country={country}
+          initialTab={bankTab}
+          onCommand={runCommand}
+        />
       </div>
     );
   }
@@ -801,16 +799,14 @@ export function SectionPage({ section, profile, country, focus, notificationThem
 
   if (section.id === 'investments') {
     return (
-      <div className="section-page">
-        {heading}
-        {pageShell(
-          <StockExchangeTerminal
-            profile={profile}
-            country={country}
-            onCommand={onCommand}
-            onAction={onAction}
-          />
-        )}
+      <div className="section-page w-full min-w-0">
+        <HubSubNav currentSection={section.id} onNavigate={onNavigate} />
+        <StockExchangeTerminal
+          profile={profile}
+          country={country}
+          onCommand={onCommand}
+          onAction={onAction}
+        />
       </div>
     );
   }

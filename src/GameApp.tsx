@@ -876,8 +876,6 @@ export default function App() {
             onClick={() => setIsNotificationModalOpen(true)}
             forceVibrate={forceBellVibrate}
           />
-
-          <button className="header-settings" type="button" onClick={() => navigate('settings')} aria-label="الإعدادات"><Icon name="settings" size={19} /></button>
         </div>
       </header>
       <ResourceBar profile={profile} country={country} onNavigate={navigate} syncState={!account || account.isGuest ? 'local' : syncState} pendingCommandCount={pendingCommandCount} />
@@ -959,22 +957,6 @@ export default function App() {
           )}
         </main>
       </div>
-
-      <nav className="mobile-bottom-nav" aria-label="التنقل الرئيسي">
-        {fixedBottomItems.map((sectionId) => {
-          const section = getSection(sectionId);
-          const unlocked = unlockedSections.has(sectionId);
-          return <button className={`mobile-nav-item${activeSection === sectionId ? ' is-active' : ''}${unlocked ? '' : ' is-locked'}`} type="button" key={sectionId} onClick={() => navigate(sectionId)} aria-disabled={!unlocked} title={unlocked ? section.label : getSectionUnlockHint(profile, sectionId)}><Icon name={unlocked ? section.icon : 'lock'} size={20} /><span>{section.shortLabel}</span></button>;
-        })}
-        <button className={`mobile-nav-item${mobileMenuOpen ? ' is-active' : ''}`} type="button" aria-expanded={mobileMenuOpen} onClick={() => setMobileMenuOpen((open) => !open)}><Icon name="menu" size={20} /><span>المزيد</span></button>
-      </nav>
-
-      {mobileMenuOpen && <div className="mobile-menu-backdrop" onClick={() => setMobileMenuOpen(false)}>
-        <nav className="mobile-more-menu" aria-label="المزيد من الأقسام" onClick={(event) => event.stopPropagation()}>
-          <div className="mobile-more-heading"><strong>كل الأقسام</strong><button type="button" className="icon-button" onClick={() => setMobileMenuOpen(false)} aria-label="إغلاق"><Icon name="close" /></button></div>
-          {otherSections.map((section) => { const unlocked = unlockedSections.has(section.id); return <button type="button" className={`mobile-more-item${!unlocked ? ' is-locked' : ''}`} key={section.id} onClick={() => navigate(section.id)} aria-disabled={!unlocked} title={unlocked ? section.label : getSectionUnlockHint(profile, section.id)}><Icon name={unlocked ? section.icon : 'lock'} size={18} /><span>{section.label}{!unlocked && <small>{getSectionUnlockHint(profile, section.id)}</small>}</span><Icon name="chevron" size={16} /></button>; })}
-        </nav>
-      </div>}
 
       <RightActionHub
         profile={profile}
