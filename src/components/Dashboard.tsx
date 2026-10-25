@@ -8,6 +8,11 @@ import { playSound } from '../game/soundEffects';
 import { LeaderboardModal } from './LeaderboardModal';
 import { FinanceReportModal } from './FinanceReportModal';
 import { getLuckySpinState } from '../game/luckyWheelService';
+import {
+  isSectionUnlocked,
+  getSectionRequiredLevel,
+  getSectionUnlockHint,
+} from '../game/onboarding';
 import { 
   Trophy, 
   FileText, 
@@ -27,7 +32,17 @@ import {
   Plus, 
   Flame, 
   ChevronLeft,
-  Briefcase
+  Briefcase,
+  Users,
+  Package,
+  Cpu,
+  Globe,
+  Award,
+  Shield,
+  Anchor,
+  Rocket,
+  Lock,
+  X
 } from 'lucide-react';
 
 interface DashboardProps {
@@ -41,6 +56,18 @@ interface DashboardProps {
   onOpenLuckyWheel?: () => void;
 }
 
+interface CommandItem {
+  id: string;
+  title: string;
+  category: 'core' | 'expansion' | 'special';
+  sectionId?: SectionId;
+  icon: React.ReactNode;
+  gradient: string;
+  requiredLevel: number;
+  isUnlocked: boolean;
+  hint: string;
+}
+
 export function Dashboard({ 
   profile, 
   country, 
@@ -51,6 +78,13 @@ export function Dashboard({
   const [isLeaderboardOpen, setIsLeaderboardOpen] = useState(false);
   const [isFinanceModalOpen, setIsFinanceModalOpen] = useState(false);
   const [spinState, setSpinState] = useState(() => getLuckySpinState(profile.lastSpinTimestamp));
+  const [opsFilter, setOpsFilter] = useState<'all' | 'core' | 'expansion'>('all');
+  const [lockedGateModal, setLockedGateModal] = useState<{
+    title: string;
+    sectionId: SectionId;
+    requiredLevel: number;
+    hint: string;
+  } | null>(null);
 
   // Keep countdown updated
   useEffect(() => {
@@ -82,6 +116,254 @@ export function Dashboard({
     playSound('click');
     onNavigate(section, target);
   };
+
+  // Build the complete Command Operations items with story unlock levels
+  const commandItems: CommandItem[] = [
+    // 1. المتصدرون (دائماً متاح)
+    {
+      id: 'leaderboard',
+      title: 'المتصدرين',
+      category: 'special',
+      icon: <Trophy className="w-5 h-5 sm:w-6 sm:h-6 text-slate-950" />,
+      gradient: 'bg-gradient-to-tr from-amber-600 via-amber-500 to-yellow-400',
+      requiredLevel: 1,
+      isUnlocked: true,
+      hint: 'متاح للجميع لمتابعة تصنيف كبار المستثمرين عالمياً.',
+    },
+    // 2. عجلة الحظ (دائماً متاح)
+    {
+      id: 'lucky_wheel',
+      title: 'عجلة الحظ',
+      category: 'special',
+      icon: <Sparkles className="w-5 h-5 sm:w-6 sm:h-6 text-slate-950" />,
+      gradient: 'bg-gradient-to-tr from-amber-500 to-yellow-400',
+      requiredLevel: 1,
+      isUnlocked: true,
+      hint: 'فرصة دوران مجانية كل 50 دقيقة لدعم السيولة والذهب.',
+    },
+    // 3. الشركات (المستوى 1)
+    {
+      id: 'companies',
+      title: 'الشركات',
+      category: 'core',
+      sectionId: 'companies',
+      icon: <Building2 className="w-5 h-5 sm:w-6 sm:h-6 text-white" />,
+      gradient: 'bg-gradient-to-tr from-blue-600 to-indigo-500',
+      requiredLevel: 1,
+      isUnlocked: isSectionUnlocked(profile, 'companies'),
+      hint: 'تأسيس وإدارة أولى شركاتك الصناعية والخدمية.',
+    },
+    // 4. الأراضي (المستوى 1)
+    {
+      id: 'lands',
+      title: 'الأراضي',
+      category: 'core',
+      sectionId: 'lands',
+      icon: <Map className="w-5 h-5 sm:w-6 sm:h-6 text-white" />,
+      gradient: 'bg-gradient-to-tr from-green-600 to-emerald-600',
+      requiredLevel: 1,
+      isUnlocked: isSectionUnlocked(profile, 'lands'),
+      hint: 'شراء وتطوير الأراضي الاستثمارية لإقامة المصانع والشركات.',
+    },
+    // 5. المزادات (المستوى 1)
+    {
+      id: 'auctions',
+      title: 'المزادات',
+      category: 'core',
+      sectionId: 'auctions',
+      icon: <Gavel className="w-5 h-5 sm:w-6 sm:h-6 text-white" />,
+      gradient: 'bg-gradient-to-tr from-amber-700 to-orange-500',
+      requiredLevel: 1,
+      isUnlocked: isSectionUnlocked(profile, 'auctions'),
+      hint: 'المزايدة على الأصول المتعثرة والصفقات الاستثمارية النادرة.',
+    },
+    // 6. المتجر (المستوى 1)
+    {
+      id: 'store',
+      title: 'المتجر',
+      category: 'core',
+      sectionId: 'store',
+      icon: <Gem className="w-5 h-5 sm:w-6 sm:h-6 text-white" />,
+      gradient: 'bg-gradient-to-tr from-cyan-600 to-blue-400',
+      requiredLevel: 1,
+      isUnlocked: isSectionUnlocked(profile, 'store'),
+      hint: 'متجر الماس وبطاقات التسريع والحزم الاستثمارية.',
+    },
+    // 7. المصانع والإنتاج (المستوى 2)
+    {
+      id: 'production',
+      title: 'الإنتاج والمصانع',
+      category: 'core',
+      sectionId: 'production',
+      icon: <Factory className="w-5 h-5 sm:w-6 sm:h-6 text-white" />,
+      gradient: 'bg-gradient-to-tr from-teal-600 to-emerald-500',
+      requiredLevel: 2,
+      isUnlocked: isSectionUnlocked(profile, 'production'),
+      hint: 'يفتح بعد تأسيس أول شركة وبلوغ المستوى 2 لبدء تشغيل خطوط الإنتاج والتصنيع.',
+    },
+    // 8. المواد الخام والمخازن (المستوى 2)
+    {
+      id: 'inventory',
+      title: 'المخازن والخامات',
+      category: 'core',
+      sectionId: 'inventory',
+      icon: <Package className="w-5 h-5 sm:w-6 sm:h-6 text-white" />,
+      gradient: 'bg-gradient-to-tr from-amber-600 to-yellow-600',
+      requiredLevel: 2,
+      isUnlocked: isSectionUnlocked(profile, 'inventory'),
+      hint: 'يفتح في المستوى 2 لتأمين المواد الخام وتخزين المنتجات الجاهزة للبيع.',
+    },
+    // 9. العقود والعملاء (المستوى 3)
+    {
+      id: 'contracts',
+      title: 'العقود والعملاء',
+      category: 'core',
+      sectionId: 'contracts',
+      icon: <Briefcase className="w-5 h-5 sm:w-6 sm:h-6 text-white" />,
+      gradient: 'bg-gradient-to-tr from-emerald-600 to-green-500',
+      requiredLevel: 3,
+      isUnlocked: isSectionUnlocked(profile, 'contracts'),
+      hint: 'يفتح في المستوى 3 بعد إنتاج أول شحنة ناجحة لاستعادة ثقة كبار التجار والعملاء.',
+    },
+    // 10. البنك والتمويل (المستوى 4)
+    {
+      id: 'bank',
+      title: 'البنك والتمويل',
+      category: 'core',
+      sectionId: 'bank',
+      icon: <Landmark className="w-5 h-5 sm:w-6 sm:h-6 text-white" />,
+      gradient: 'bg-gradient-to-tr from-sky-600 to-blue-500',
+      requiredLevel: 4,
+      isUnlocked: isSectionUnlocked(profile, 'bank'),
+      hint: 'يفتح في المستوى 4 بعد تسليم أول عقد تجاري للحصول على تسهيلات بنكية وقروض استثمارية.',
+    },
+    // 11. البورصة والاستثمار (المستوى 5)
+    {
+      id: 'investments',
+      title: 'البورصة والأسهم',
+      category: 'core',
+      sectionId: 'investments',
+      icon: <TrendingUp className="w-5 h-5 sm:w-6 sm:h-6 text-white" />,
+      gradient: 'bg-gradient-to-tr from-purple-600 to-pink-500',
+      requiredLevel: 5,
+      isUnlocked: isSectionUnlocked(profile, 'investments'),
+      hint: 'يفتح في المستوى 5 (الفصل الثاني) للتداول بالأسهم والاكتتاب العام بالبورصة.',
+    },
+    // 12. التقارير المالية (المستوى 5)
+    {
+      id: 'finance_modal',
+      title: 'التقارير المالية',
+      category: 'core',
+      sectionId: 'reports',
+      icon: <FileText className="w-5 h-5 sm:w-6 sm:h-6 text-white" />,
+      gradient: 'bg-gradient-to-tr from-emerald-600 to-teal-400',
+      requiredLevel: 5,
+      isUnlocked: isSectionUnlocked(profile, 'reports'),
+      hint: 'يفتح في المستوى 5 لتحليل القوائم المالية والأرباح التشغيلية وضريبة المبيعات.',
+    },
+    // 13. الموظفون والإدارة (المستوى 5)
+    {
+      id: 'staff',
+      title: 'الموظفون والإدارة',
+      category: 'core',
+      sectionId: 'staff',
+      icon: <Users className="w-5 h-5 sm:w-6 sm:h-6 text-white" />,
+      gradient: 'bg-gradient-to-tr from-violet-600 to-indigo-500',
+      requiredLevel: 5,
+      isUnlocked: isSectionUnlocked(profile, 'staff'),
+      hint: 'يفتح في المستوى 5 لتعيين المديرين والمحاسبين وخبراء التشغيل لرفع الكفاءة.',
+    },
+    // 14. الأبحاث والتكنولوجيا (المستوى 6)
+    {
+      id: 'tech_tree',
+      title: 'الأبحاث والأتمتة',
+      category: 'expansion',
+      sectionId: 'tech_tree',
+      icon: <Cpu className="w-5 h-5 sm:w-6 sm:h-6 text-white" />,
+      gradient: 'bg-gradient-to-tr from-cyan-600 to-teal-500',
+      requiredLevel: 6,
+      isUnlocked: isSectionUnlocked(profile, 'tech_tree'),
+      hint: 'يفتح في المستوى 6 لتطوير شجرة التكنولوجيا وأبحاث الأتمتة الذكية لتقليل تكاليف المصانع.',
+    },
+    // 15. السيطرة الإقليمية (المستوى 7)
+    {
+      id: 'territory',
+      title: 'السيطرة الإقليمية',
+      category: 'expansion',
+      sectionId: 'territory',
+      icon: <Globe className="w-5 h-5 sm:w-6 sm:h-6 text-white" />,
+      gradient: 'bg-gradient-to-tr from-blue-700 to-cyan-500',
+      requiredLevel: 7,
+      isUnlocked: isSectionUnlocked(profile, 'territory'),
+      hint: 'يفتح في المستوى 7 للسيطرة على حصص الأسواق والتوسع في المحافظات والمدن.',
+    },
+    // 16. الهيبة والرفاهية (المستوى 8)
+    {
+      id: 'luxury',
+      title: 'الهيبة والرفاهية',
+      category: 'expansion',
+      sectionId: 'luxury',
+      icon: <Award className="w-5 h-5 sm:w-6 sm:h-6 text-slate-950" />,
+      gradient: 'bg-gradient-to-tr from-yellow-500 to-amber-300',
+      requiredLevel: 8,
+      isUnlocked: isSectionUnlocked(profile, 'luxury'),
+      hint: 'يفتح في المستوى 8 لاقتناء القصور والسيارات الفاخرة ورفع هيبة ونفوذ المدير التنفيذي.',
+    },
+    // 17. الكارتيل والتحالفات (المستوى 9)
+    {
+      id: 'cartel',
+      title: 'الكارتيل والتحالف',
+      category: 'expansion',
+      sectionId: 'cartel',
+      icon: <Shield className="w-5 h-5 sm:w-6 sm:h-6 text-white" />,
+      gradient: 'bg-gradient-to-tr from-rose-700 to-red-500',
+      requiredLevel: 9,
+      isUnlocked: isSectionUnlocked(profile, 'cartel'),
+      hint: 'يفتح في المستوى 9 لتأسيس التكتلات التجارية والتحالفات وسحق المنافسين في حرب الأسعار.',
+    },
+    // 18. الشحن الملاحي والموانئ (المستوى 10 - الفصل الثالث)
+    {
+      id: 'maritime',
+      title: 'الأسطول والشحن',
+      category: 'expansion',
+      sectionId: 'maritime',
+      icon: <Anchor className="w-5 h-5 sm:w-6 sm:h-6 text-white" />,
+      gradient: 'bg-gradient-to-tr from-indigo-700 to-blue-600',
+      requiredLevel: 10,
+      isUnlocked: isSectionUnlocked(profile, 'maritime'),
+      hint: 'يفتح في المستوى 10 (الفصل الثالث) لبناء أسطول الشحن البحري وفتح الموانئ الدولية للتصدير.',
+    },
+    // 19. المناقصات الحكومية (المستوى 12)
+    {
+      id: 'megaprojects',
+      title: 'المناقصات الكبرى',
+      category: 'expansion',
+      sectionId: 'megaprojects',
+      icon: <Landmark className="w-5 h-5 sm:w-6 sm:h-6 text-white" />,
+      gradient: 'bg-gradient-to-tr from-emerald-700 to-teal-600',
+      requiredLevel: 12,
+      isUnlocked: isSectionUnlocked(profile, 'megaprojects'),
+      hint: 'يفتح في المستوى 12 للمنافسة في مشاريع الدولة القومية والظفر بإعفاءات ضريبية سيادية.',
+    },
+    // 20. حاضنات الـ VC (المستوى 15 - الفصل الرابع)
+    {
+      id: 'incubator',
+      title: 'حاضنات الـ VC',
+      category: 'expansion',
+      sectionId: 'incubator',
+      icon: <Rocket className="w-5 h-5 sm:w-6 sm:h-6 text-white" />,
+      gradient: 'bg-gradient-to-tr from-purple-700 to-pink-600',
+      requiredLevel: 15,
+      isUnlocked: isSectionUnlocked(profile, 'incubator'),
+      hint: 'يفتح في المستوى 15 (عرش الإمبراطورية) للاستثمار الجريء ورعاية شركات اليونيكورن المليارية.',
+    },
+  ];
+
+  const filteredItems = commandItems.filter((item) => {
+    if (opsFilter === 'core') return item.category === 'core' || item.category === 'special';
+    if (opsFilter === 'expansion') return item.category === 'expansion';
+    return true;
+  });
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-12 animate-fade-in" dir="rtl">
@@ -172,182 +454,127 @@ export function Dashboard({
         </div>
       </div>
 
-      {/* 3. Executive Command Operations Bar (Clean Icons with Names Underneath) */}
+      {/* 3. Executive Command Operations Bar with explicit unlock levels & lock badges */}
       <div className="bg-slate-900/95 border border-slate-800 rounded-3xl p-4 sm:p-6 shadow-2xl backdrop-blur-md">
-        <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-800/80">
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-4 pb-3 border-b border-slate-800/80">
           <div className="flex items-center gap-2">
             <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping" />
             <h3 className="font-extrabold text-sm sm:text-base text-white">
               غرفة العمليات المركزية
             </h3>
             <span className="text-xs text-slate-400 hidden sm:inline">
-              (انقر على أيقونة لفتح الخدمة)
+              (أنظمة مقفلة تفتح تدريجياً حسب سيناريو القصة ومستوى اللاعب)
             </span>
           </div>
-          <span className="text-xs text-amber-400/90 font-bold bg-amber-500/10 px-3 py-1 rounded-full border border-amber-500/30">
-            المستوى {profile.level ?? 1} · {profile.name || 'المستثمر الصاعد'}
-          </span>
+
+          <div className="flex items-center gap-2">
+            {/* Category Filter Pills */}
+            <div className="flex items-center bg-slate-950/80 border border-slate-800 p-1 rounded-xl text-[11px] font-bold">
+              <button
+                onClick={() => setOpsFilter('all')}
+                className={`px-2.5 py-1 rounded-lg transition ${opsFilter === 'all' ? 'bg-amber-500 text-slate-950 font-black shadow' : 'text-slate-400 hover:text-white'}`}
+              >
+                الكل ({commandItems.length})
+              </button>
+              <button
+                onClick={() => setOpsFilter('core')}
+                className={`px-2.5 py-1 rounded-lg transition ${opsFilter === 'core' ? 'bg-amber-500 text-slate-950 font-black shadow' : 'text-slate-400 hover:text-white'}`}
+              >
+                الأساسية
+              </button>
+              <button
+                onClick={() => setOpsFilter('expansion')}
+                className={`px-2.5 py-1 rounded-lg transition ${opsFilter === 'expansion' ? 'bg-amber-500 text-slate-950 font-black shadow' : 'text-slate-400 hover:text-white'}`}
+              >
+                التوسع 🚀
+              </button>
+            </div>
+
+            <span className="text-xs text-amber-400/90 font-bold bg-amber-500/10 px-3 py-1 rounded-full border border-amber-500/30">
+              مستواك الحالي: {profile.level ?? 1}
+            </span>
+          </div>
         </div>
 
-        {/* Icons Grid with Names Underneath */}
-        <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-10 gap-2 sm:gap-3">
-          {/* 1. المتصدرون (Opens Leaderboard Modal) */}
-          <button
-            onClick={() => {
-              playSound('click');
-              setIsLeaderboardOpen(true);
-            }}
-            className="flex flex-col items-center justify-center p-2.5 rounded-2xl bg-slate-950/60 border border-amber-500/40 hover:border-amber-400 hover:bg-amber-950/30 transition group cursor-pointer shadow-md"
-            title="فتح قائمة المتصدرين وقادة الأعمال"
-          >
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-amber-600 via-amber-500 to-yellow-400 text-slate-950 flex items-center justify-center shadow-lg shadow-amber-500/25 group-hover:scale-105 transition-transform">
-              <Trophy className="w-6 h-6 text-slate-950" />
-            </div>
-            <span className="text-[11px] sm:text-xs font-bold text-slate-200 mt-2 text-center group-hover:text-amber-300">
-              المتصدرين
-            </span>
-          </button>
+        {/* Icons Grid with Names & Story Lock Labels */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-10 gap-2 sm:gap-2.5">
+          {filteredItems.map((item) => {
+            return (
+              <button
+                key={item.id}
+                onClick={() => {
+                  if (!item.isUnlocked) {
+                    playSound('click');
+                    setLockedGateModal({
+                      title: item.title,
+                      sectionId: item.sectionId ?? 'home',
+                      requiredLevel: item.requiredLevel,
+                      hint: item.hint,
+                    });
+                    return;
+                  }
+                  if (item.id === 'leaderboard') {
+                    playSound('click');
+                    setIsLeaderboardOpen(true);
+                  } else if (item.id === 'finance_modal') {
+                    playSound('click');
+                    setIsFinanceModalOpen(true);
+                  } else if (item.id === 'lucky_wheel') {
+                    playSound('click');
+                    onOpenLuckyWheel?.();
+                  } else if (item.sectionId) {
+                    handleNav(item.sectionId);
+                  }
+                }}
+                className={`flex flex-col items-center justify-between p-2 rounded-2xl transition group cursor-pointer shadow-md relative min-h-[105px] ${
+                  item.isUnlocked
+                    ? 'bg-slate-950/70 border border-slate-800 hover:border-amber-400 hover:bg-slate-900 active:scale-95'
+                    : 'bg-slate-950/40 border border-slate-800/80 hover:border-amber-500/60 hover:bg-slate-900/50'
+                }`}
+                title={item.isUnlocked ? item.title : `يفتح في مستوى ${item.requiredLevel} · ${item.hint}`}
+              >
+                {/* Lucky wheel free badge */}
+                {item.id === 'lucky_wheel' && (
+                  spinState.isFree ? (
+                    <span className="absolute -top-1.5 -right-1.5 px-1.5 py-0.5 rounded-full bg-emerald-500 text-white font-extrabold text-[9px] shadow-sm animate-pulse z-10">
+                      مجاناً
+                    </span>
+                  ) : (
+                    <span className="absolute -top-1.5 -right-1.5 px-1.5 py-0.5 rounded-full bg-slate-800 text-amber-300 font-bold text-[8px] border border-amber-500/30 font-mono z-10">
+                      {spinState.formattedCountdown}
+                    </span>
+                  )
+                )}
 
-          {/* 2. التقارير المالية (Opens Finance Report Modal) */}
-          <button
-            onClick={() => {
-              playSound('click');
-              setIsFinanceModalOpen(true);
-            }}
-            className="flex flex-col items-center justify-center p-2.5 rounded-2xl bg-slate-950/60 border border-emerald-500/40 hover:border-emerald-400 hover:bg-emerald-950/30 transition group cursor-pointer shadow-md"
-            title="عرض التقارير المالية وقوائم الأرباح"
-          >
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-400 text-slate-950 flex items-center justify-center shadow-lg shadow-emerald-500/25 group-hover:scale-105 transition-transform">
-              <FileText className="w-6 h-6 text-slate-950" />
-            </div>
-            <span className="text-[11px] sm:text-xs font-bold text-slate-200 mt-2 text-center group-hover:text-emerald-300">
-              التقارير المالية
-            </span>
-          </button>
+                <div className="relative mt-1">
+                  <div className={`w-11 h-11 sm:w-12 sm:h-12 rounded-2xl ${item.gradient} flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform ${!item.isUnlocked ? 'grayscale-[45%] opacity-70' : ''}`}>
+                    {item.icon}
+                  </div>
+                  {!item.isUnlocked && (
+                    <div className="absolute -bottom-1 -left-1 w-5 h-5 rounded-full bg-slate-950 border border-amber-500 flex items-center justify-center text-[10px] text-amber-400 shadow-md">
+                      🔒
+                    </div>
+                  )}
+                </div>
 
-          {/* 3. عجلة الحظ (Opens Lucky Spin Modal - Free every 50 mins) */}
-          <button
-            onClick={() => {
-              playSound('click');
-              onOpenLuckyWheel?.();
-            }}
-            className="flex flex-col items-center justify-center p-2.5 rounded-2xl bg-slate-950/60 border border-yellow-500/40 hover:border-yellow-400 hover:bg-yellow-950/30 transition group cursor-pointer shadow-md relative"
-            title="عجلة الحظ والاستثمار - مجانية كل 50 دقيقة"
-          >
-            {spinState.isFree ? (
-              <span className="absolute -top-1.5 -right-1.5 px-1.5 py-0.5 rounded-full bg-emerald-500 text-white font-extrabold text-[9px] shadow-sm animate-pulse">
-                مجاناً
-              </span>
-            ) : (
-              <span className="absolute -top-1.5 -right-1.5 px-1.5 py-0.5 rounded-full bg-slate-800 text-amber-300 font-bold text-[8px] border border-amber-500/30 font-mono">
-                {spinState.formattedCountdown}
-              </span>
-            )}
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-amber-500 to-yellow-400 text-slate-950 flex items-center justify-center shadow-lg shadow-yellow-500/25 group-hover:scale-105 transition-transform">
-              <Sparkles className="w-6 h-6 text-slate-950" />
-            </div>
-            <span className="text-[11px] sm:text-xs font-bold text-slate-200 mt-2 text-center group-hover:text-yellow-300">
-              عجلة الحظ
-            </span>
-          </button>
+                <span className="text-[11px] font-bold text-slate-200 mt-1.5 text-center leading-tight group-hover:text-amber-300 truncate w-full px-1">
+                  {item.title}
+                </span>
 
-          {/* 4. الشركات */}
-          <button
-            onClick={() => handleNav('companies')}
-            className="flex flex-col items-center justify-center p-2.5 rounded-2xl bg-slate-950/60 border border-slate-800 hover:border-slate-700 hover:bg-slate-900 transition group cursor-pointer shadow-md"
-            title="إدارة وتطوير الشركات والمؤسسات"
-          >
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-500 text-white flex items-center justify-center shadow-lg shadow-blue-500/20 group-hover:scale-105 transition-transform">
-              <Building2 className="w-6 h-6 text-white" />
-            </div>
-            <span className="text-[11px] sm:text-xs font-bold text-slate-200 mt-2 text-center group-hover:text-blue-300">
-              الشركات
-            </span>
-          </button>
-
-          {/* 5. المصانع والإنتاج */}
-          <button
-            onClick={() => handleNav('production')}
-            className="flex flex-col items-center justify-center p-2.5 rounded-2xl bg-slate-950/60 border border-slate-800 hover:border-slate-700 hover:bg-slate-900 transition group cursor-pointer shadow-md"
-            title="تشغيل خطوط الإنتاج والتصنيع"
-          >
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-teal-600 to-emerald-500 text-white flex items-center justify-center shadow-lg shadow-teal-500/20 group-hover:scale-105 transition-transform">
-              <Factory className="w-6 h-6 text-white" />
-            </div>
-            <span className="text-[11px] sm:text-xs font-bold text-slate-200 mt-2 text-center group-hover:text-teal-300">
-              الإنتاج
-            </span>
-          </button>
-
-          {/* 6. البورصة والاستثمار */}
-          <button
-            onClick={() => handleNav('investments')}
-            className="flex flex-col items-center justify-center p-2.5 rounded-2xl bg-slate-950/60 border border-slate-800 hover:border-slate-700 hover:bg-slate-900 transition group cursor-pointer shadow-md"
-            title="البورصة وأسواق المال والاكتتابات"
-          >
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-purple-600 to-pink-500 text-white flex items-center justify-center shadow-lg shadow-purple-500/20 group-hover:scale-105 transition-transform">
-              <TrendingUp className="w-6 h-6 text-white" />
-            </div>
-            <span className="text-[11px] sm:text-xs font-bold text-slate-200 mt-2 text-center group-hover:text-purple-300">
-              البورصة
-            </span>
-          </button>
-
-          {/* 7. المزادات */}
-          <button
-            onClick={() => handleNav('auctions')}
-            className="flex flex-col items-center justify-center p-2.5 rounded-2xl bg-slate-950/60 border border-slate-800 hover:border-slate-700 hover:bg-slate-900 transition group cursor-pointer shadow-md"
-            title="المزادات العلنية على الأصول والمصانع"
-          >
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-amber-700 to-orange-500 text-white flex items-center justify-center shadow-lg shadow-orange-500/20 group-hover:scale-105 transition-transform">
-              <Gavel className="w-6 h-6 text-white" />
-            </div>
-            <span className="text-[11px] sm:text-xs font-bold text-slate-200 mt-2 text-center group-hover:text-orange-300">
-              المزادات
-            </span>
-          </button>
-
-          {/* 8. الأراضي والعقارات */}
-          <button
-            onClick={() => handleNav('lands')}
-            className="flex flex-col items-center justify-center p-2.5 rounded-2xl bg-slate-950/60 border border-slate-800 hover:border-slate-700 hover:bg-slate-900 transition group cursor-pointer shadow-md"
-            title="المواقع العقارية وتراخيص البناء"
-          >
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-green-600 to-emerald-600 text-white flex items-center justify-center shadow-lg shadow-green-500/20 group-hover:scale-105 transition-transform">
-              <Map className="w-6 h-6 text-white" />
-            </div>
-            <span className="text-[11px] sm:text-xs font-bold text-slate-200 mt-2 text-center group-hover:text-green-300">
-              الأراضي
-            </span>
-          </button>
-
-          {/* 9. البنك والتمويل */}
-          <button
-            onClick={() => handleNav('bank')}
-            className="flex flex-col items-center justify-center p-2.5 rounded-2xl bg-slate-950/60 border border-slate-800 hover:border-slate-700 hover:bg-slate-900 transition group cursor-pointer shadow-md"
-            title="البنك، الودائع، والقروض الميسرة"
-          >
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-sky-600 to-blue-500 text-white flex items-center justify-center shadow-lg shadow-sky-500/20 group-hover:scale-105 transition-transform">
-              <Landmark className="w-6 h-6 text-white" />
-            </div>
-            <span className="text-[11px] sm:text-xs font-bold text-slate-200 mt-2 text-center group-hover:text-sky-300">
-              البنك
-            </span>
-          </button>
-
-          {/* 10. متجر الماس والعروض */}
-          <button
-            onClick={() => handleNav('store')}
-            className="flex flex-col items-center justify-center p-2.5 rounded-2xl bg-slate-950/60 border border-slate-800 hover:border-slate-700 hover:bg-slate-900 transition group cursor-pointer shadow-md"
-            title="متجر الماس والبطاقات والباقات الحصرية"
-          >
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-cyan-600 to-blue-400 text-white flex items-center justify-center shadow-lg shadow-cyan-500/20 group-hover:scale-105 transition-transform">
-              <Gem className="w-6 h-6 text-white" />
-            </div>
-            <span className="text-[11px] sm:text-xs font-bold text-slate-200 mt-2 text-center group-hover:text-cyan-300">
-              المتجر
-            </span>
-          </button>
+                {/* Explicit Lock Level Badge as requested by the user */}
+                {!item.isUnlocked ? (
+                  <span className="text-[9px] font-black text-amber-300 bg-amber-950/90 px-1.5 py-0.5 rounded-md border border-amber-500/40 mt-1 flex items-center gap-0.5 shadow-sm whitespace-nowrap">
+                    <Lock className="w-2.5 h-2.5 text-amber-400 shrink-0" />
+                    <span>يفتح في مستوى {item.requiredLevel}</span>
+                  </span>
+                ) : (
+                  <span className="text-[9px] text-emerald-400/90 font-bold mt-1">
+                    متاح ✓
+                  </span>
+                )}
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -449,28 +676,34 @@ export function Dashboard({
                   لا توجد شركات مؤسسة بعد
                 </h4>
                 <p className="text-xs text-slate-400 mb-4 max-w-sm mx-auto">
-                  اختر القطاع المناسب وأطلق أول مشروع استثماري لك لبدء دوران عجلة الأرباح اليومية.
+                  ابدأ مسار استعادة الإرث: اشترِ أول قطعة أرض صناعية وأسس شركتك الأولى لتبدأ دورة الإنتاج.
                 </p>
                 <button
                   onClick={() => handleNav('companies')}
-                  className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-400 hover:from-amber-400 hover:to-yellow-300 text-slate-950 font-black text-xs shadow-lg transition"
+                  className="py-2.5 px-5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs shadow-lg shadow-amber-500/20 transition active:scale-95"
                 >
-                  تأسيس أول شركة الآن 🚀
+                  تأسيس شركتك الأولى الآن 🚀
                 </button>
               </div>
             )}
           </div>
 
-          <button
-            onClick={() => handleNav('companies')}
-            className="w-full mt-3 py-2.5 rounded-2xl bg-slate-800/80 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700/80 font-bold text-xs transition flex items-center justify-center gap-2 cursor-pointer"
-          >
-            <Plus className="w-4 h-4 text-amber-400" />
-            <span>تأسيس شركة جديدة والتوسع في قطاعات أخرى</span>
-          </button>
+          {/* Quick Production Status Bar */}
+          <div className="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs">
+            <span className="text-slate-400">
+              الإنتاج الفعال: <strong className="text-white">{profile.productionOrders.filter((o) => o.status === 'active').length} دفعات</strong>
+            </span>
+            <button
+              onClick={() => handleNav('production')}
+              className="text-emerald-400 hover:text-emerald-300 font-bold flex items-center gap-1"
+            >
+              <span>متابعة خطوط الإنتاج</span>
+              <ChevronLeft className="w-3.5 h-3.5" />
+            </button>
+          </div>
         </div>
 
-        {/* RIGHT COLUMN: Recent Financial Movements & Ledger */}
+        {/* RIGHT COLUMN: Recent Financial Activity & Quick Actions */}
         <div className="bg-slate-900/95 border border-slate-800 rounded-3xl p-5 sm:p-6 shadow-xl flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between pb-3 mb-4 border-b border-slate-800">
@@ -480,10 +713,10 @@ export function Dashboard({
                 </div>
                 <div>
                   <h3 className="font-extrabold text-sm sm:text-base text-white">
-                    آخر المعاملات النقدية
+                    سجل المعاملات والسيولة
                   </h3>
                   <small className="text-xs text-slate-400">
-                    حركة الإيرادات والمصروفات المسجلة
+                    آخر العمليات المسجلة في دفتر حسابك
                   </small>
                 </div>
               </div>
@@ -495,40 +728,39 @@ export function Dashboard({
                 }}
                 className="text-xs text-emerald-400 hover:text-emerald-300 font-bold flex items-center gap-1 transition"
               >
-                <span>التقرير التفصيلي</span>
-                <ChevronLeft className="w-4 h-4" />
+                <span>التقرير المفصل</span>
+                <ChevronLeft className="w-3.5 h-3.5" />
               </button>
             </div>
 
-            {/* Transactions List */}
-            <div className="space-y-2.5">
-              {recentTransactions.map((tx: any) => {
-                const isRevenue = tx.category === 'revenue';
+            {/* List of 4 recent transactions */}
+            <div className="space-y-2.5 mb-4">
+              {recentTransactions.map((tx, idx) => {
+                const isPositive = tx.category === 'revenue';
                 return (
                   <div
-                    key={tx.id}
-                    className="p-3 rounded-2xl bg-slate-950/60 border border-slate-800/80 flex items-center justify-between hover:border-slate-700 transition"
+                    key={tx.id || idx}
+                    className="flex items-center justify-between p-3 rounded-xl bg-slate-950/60 border border-slate-800/80 hover:border-slate-700 transition"
                   >
-                    <div className="flex items-center gap-3">
-                      <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${
-                        isRevenue ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'
+                    <div className="flex items-center gap-2.5">
+                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs ${
+                        isPositive ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'
                       }`}>
-                        {isRevenue ? <ArrowDownLeft className="w-4 h-4" /> : <ArrowUpRight className="w-4 h-4" />}
+                        {isPositive ? <ArrowDownLeft className="w-4 h-4" /> : <ArrowUpRight className="w-4 h-4" />}
                       </div>
                       <div>
-                        <strong className="text-xs text-white block">
-                          {tx.note || 'عملية مالية'}
-                        </strong>
-                        <span className="text-[10px] text-slate-500">
-                          {new Date(tx.occurredAt).toLocaleDateString('ar-EG')}
+                        <div className="text-xs font-bold text-white leading-tight">
+                          {tx.note || 'معاملة تشغيلية'}
+                        </div>
+                        <span className="text-[10px] text-slate-400">
+                          {new Date(tx.occurredAt).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}
                         </span>
                       </div>
                     </div>
-
-                    <strong className={`font-mono text-xs font-bold ${
-                      isRevenue ? 'text-emerald-400' : 'text-rose-400'
+                    <strong className={`text-xs font-black dir-ltr ${
+                      isPositive ? 'text-emerald-400' : 'text-rose-400'
                     }`}>
-                      {isRevenue ? '+' : '-'} {Number(tx.amount).toLocaleString()} {country.currency.code}
+                      {isPositive ? '+' : '-'}{formatMoney(Math.abs(tx.amount), country)}
                     </strong>
                   </div>
                 );
@@ -536,6 +768,7 @@ export function Dashboard({
             </div>
           </div>
 
+          {/* Quick Lands Asset Summary */}
           <div className="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs">
             <span className="text-slate-400">
               الأراضي المسجلة: <strong className="text-white">{landsCount} قطعة</strong>
@@ -566,6 +799,49 @@ export function Dashboard({
         country={country}
         onNavigate={handleNav}
       />
+
+      {/* 6. Story Level Locked Gate Modal */}
+      {lockedGateModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fade-in" dir="rtl">
+          <div className="bg-slate-900 border border-amber-500/50 rounded-3xl w-full max-w-sm p-6 shadow-2xl space-y-4 text-center">
+            <div className="w-16 h-16 rounded-2xl bg-amber-500/15 border-2 border-amber-500/50 text-amber-400 mx-auto flex items-center justify-center text-3xl shadow-xl shadow-amber-500/20 animate-pulse">
+              🔒
+            </div>
+            <div>
+              <h3 className="text-lg font-black text-white">
+                نظام {lockedGateModal.title} مقفل
+              </h3>
+              <span className="inline-block mt-1 px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 text-xs font-black border border-amber-500/40">
+                يفتح عند بلوغ المستوى {lockedGateModal.requiredLevel}
+              </span>
+            </div>
+            <p className="text-xs text-slate-300 leading-relaxed bg-slate-950/80 p-3.5 rounded-xl border border-slate-800 text-right">
+              📖 <strong>شرط سيناريو القصة:</strong>
+              <br />
+              <span className="text-slate-400 mt-1 block">
+                {lockedGateModal.hint}
+              </span>
+            </p>
+            <div className="flex gap-2 pt-1">
+              <button
+                onClick={() => {
+                  setLockedGateModal(null);
+                  handleNav('tasks');
+                }}
+                className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-500 text-slate-950 font-black text-xs shadow-md hover:brightness-110 transition active:scale-95"
+              >
+                عرض مهام القصة 📜
+              </button>
+              <button
+                onClick={() => setLockedGateModal(null)}
+                className="py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs border border-slate-700 transition"
+              >
+                إغلاق
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

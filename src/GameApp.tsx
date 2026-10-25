@@ -29,7 +29,7 @@ import { PasswordResetGate } from './components/PasswordResetGate';
 import { supabase } from './storage/supabaseClient';
 import { StoryIntro } from './components/StoryIntro';
 import { SystemGuideModal } from './components/SystemGuideModal';
-import { chapterFor, getPlayerProgress, getSectionUnlockHint, getUnlockedSectionIds, isSectionUnlocked } from './game/onboarding';
+import { chapterFor, getPlayerProgress, getSectionUnlockHint, getUnlockedSectionIds, isSectionUnlocked, getSectionRequiredLevel } from './game/onboarding';
 import { normalizeAccountFeatures } from './domain/accountFeatures';
 import { claimDailySeasonLogin, getVisibleSeasons, recordVerifiedGameTransaction } from './storage/leaderboardRepository';
 import { ResourceBar, type ResourceSyncState } from './components/ResourceBar';
@@ -900,9 +900,25 @@ export default function App() {
               {group.sections.map((sectionId) => {
                 const section = getSection(sectionId);
                 const unlocked = unlockedSections.has(section.id);
-                return <button className={`nav-item${activeSection === section.id ? ' is-active' : ''}${!unlocked ? ' is-locked' : ''}`} type="button" key={section.id} onClick={() => navigate(section.id)} aria-current={activeSection === section.id ? 'page' : undefined} aria-disabled={!unlocked} title={unlocked ? section.label : getSectionUnlockHint(profile, section.id)}>
-                  <Icon name={unlocked ? section.icon : 'lock'} size={19} /><span>{section.label}</span>
-                </button>;
+                const reqLevel = getSectionRequiredLevel(section.id);
+                return (
+                  <button
+                    className={`nav-item${activeSection === section.id ? ' is-active' : ''}${!unlocked ? ' is-locked' : ''}`}
+                    type="button"
+                    key={section.id}
+                    onClick={() => navigate(section.id)}
+                    aria-current={activeSection === section.id ? 'page' : undefined}
+                    title={unlocked ? section.label : getSectionUnlockHint(profile, section.id)}
+                  >
+                    <Icon name={unlocked ? section.icon : 'lock'} size={19} />
+                    <span className="flex-1 text-right">{section.label}</span>
+                    {!unlocked && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-extrabold border border-amber-500/40">
+                        مستوى {reqLevel}
+                      </span>
+                    )}
+                  </button>
+                );
               })}
             </div>
           ))}
@@ -1069,6 +1085,7 @@ export default function App() {
         onNavigate={navigate}
         onOpenLuckyWheel={() => setIsLuckyWheelOpen(true)}
         isFreeSpinAvailable={getLuckySpinState(profile.lastSpinTimestamp).isFree}
+        profile={profile}
       />
 
       <footer className="app-footer pb-14 md:pb-3"><span>إمبراطورية الأعمال</span><span>محاكاة محلية · الأسعار والأحداث لأغراض اللعبة</span></footer>

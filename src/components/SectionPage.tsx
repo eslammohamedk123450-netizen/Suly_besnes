@@ -38,6 +38,7 @@ import { loadMegaExpansionState } from '../game/expansionV2Engine';
 import { HubSubNav } from './HubSubNav';
 import { ItemImage } from './ItemImage';
 import { BankTerminal } from './BankTerminal';
+import { getPlayerProgress, getSectionRequiredLevel, getSectionUnlockHint, isSectionUnlocked } from '../game/onboarding';
 
 interface SectionPageProps {
   section: SectionItem;
@@ -175,7 +176,7 @@ export function SectionPage({ section, profile, country, focus, notificationThem
 
   const heading = (
     <>
-      <HubSubNav currentSection={section.id} onNavigate={onNavigate} />
+      <HubSubNav currentSection={section.id} profile={profile} onNavigate={onNavigate} />
       <div className="page-heading">
         <span className="heading-icon"><Icon name={section.icon} size={23} /></span>
         <div className="page-heading-copy"><span className="section-kicker">إدارة الإمبراطورية</span><h1>{section.label}</h1><p className="page-subtitle">{section.subtitle}</p></div>
@@ -183,6 +184,71 @@ export function SectionPage({ section, profile, country, focus, notificationThem
       </div>
     </>
   );
+
+  const isUnlocked = isSectionUnlocked(profile, section.id);
+  const requiredLevel = getSectionRequiredLevel(section.id);
+  const unlockHint = getSectionUnlockHint(profile, section.id);
+
+  if (!isUnlocked) {
+    return (
+      <div className="section-page">
+        {heading}
+        {pageShell(
+          <div className="mx-auto my-6 max-w-xl rounded-3xl border border-amber-500/30 bg-gradient-to-b from-slate-900/95 via-slate-900/85 to-slate-950/95 p-6 md:p-8 text-center shadow-2xl backdrop-blur-xl">
+            <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-2xl bg-amber-500/10 border-2 border-amber-400/40 shadow-inner">
+              <span className="text-4xl">🔒</span>
+            </div>
+
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 text-xs font-black tracking-wide border border-amber-500/40 mb-3">
+              <span>🔒 يفتح في مستوى {formatNumber(requiredLevel)}</span>
+            </div>
+
+            <h2 className="text-2xl font-black text-white mb-2">
+              نظام {section.label} مقفل حالياً
+            </h2>
+
+            <p className="text-slate-300 text-sm leading-relaxed mb-6">
+              وفقاً لسيناريو قصة إمبراطوريتك، يتطلب هذا النظام توسعاً أكبر وخبرة إدارية متقدمة لفتحه.
+            </p>
+
+            <div className="rounded-2xl bg-slate-800/80 border border-slate-700/60 p-4 text-right mb-6">
+              <div className="flex items-center justify-between text-xs text-slate-400 mb-1">
+                <span>مستواك الحالي:</span>
+                <span className="font-bold text-amber-400">مستوى {formatNumber(playerProgress.level)} ({formatNumber(playerProgress.totalExperience)} XP)</span>
+              </div>
+              <div className="flex items-center justify-between text-xs text-slate-400 mb-2">
+                <span>المستوى المطلوب:</span>
+                <span className="font-bold text-emerald-400">مستوى {formatNumber(requiredLevel)}</span>
+              </div>
+              <div className="border-t border-slate-700/60 pt-2 text-xs text-slate-300">
+                <strong className="text-amber-300">متطلب القصة: </strong>
+                {unlockHint}
+              </div>
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              <button
+                type="button"
+                onClick={() => onNavigate('tasks')}
+                className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-sm shadow-lg shadow-amber-500/25 transition-all"
+              >
+                <Icon name="tasks" size={16} />
+                عرض مهام القصة ورفع المستوى
+              </button>
+              <button
+                type="button"
+                onClick={onHome}
+                className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-sm border border-slate-700 transition-all"
+              >
+                <Icon name="home" size={16} />
+                العودة للرئيسية
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
 
   if (section.id === 'obligations') {
     const obligations = selectObligations(profile, country.economy.operatingCostMultiplier ?? 1);
@@ -1018,4 +1084,3 @@ export function SectionPage({ section, profile, country, focus, notificationThem
     </>,
   )}</div>;
 }
-import { getPlayerProgress } from '../game/onboarding';

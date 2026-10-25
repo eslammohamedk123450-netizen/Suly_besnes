@@ -1,13 +1,16 @@
 import React from 'react';
 import type { SectionId } from '../domain/navigation';
-import { Home, Factory, ShoppingCart, Landmark, Sparkles } from 'lucide-react';
+import type { PlayerProfile } from '../domain/player';
+import { Home, Factory, ShoppingCart, Landmark, Sparkles, Lock } from 'lucide-react';
 import { playSound } from '../game/soundEffects';
+import { isSectionUnlocked, getSectionRequiredLevel } from '../game/onboarding';
 
 interface MobileBottomNavProps {
   activeSection: SectionId;
   onNavigate: (section: SectionId) => void;
   onOpenLuckyWheel: () => void;
   isFreeSpinAvailable: boolean;
+  profile?: PlayerProfile;
 }
 
 export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
@@ -15,11 +18,16 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
   onNavigate,
   onOpenLuckyWheel,
   isFreeSpinAvailable,
+  profile,
 }) => {
   const handleNav = (section: SectionId) => {
     playSound('click');
     onNavigate(section);
   };
+
+  const isProductionOpen = profile ? isSectionUnlocked(profile, 'production') : true;
+  const isInventoryOpen = profile ? isSectionUnlocked(profile, 'inventory') : true;
+  const isBankOpen = profile ? isSectionUnlocked(profile, 'bank') : true;
 
   return (
     <nav 
@@ -43,13 +51,20 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
       {/* 2. Factories / Production */}
       <button
         onClick={() => handleNav('production')}
-        className={`flex flex-col items-center gap-1 py-1 px-2.5 rounded-xl transition ${
+        className={`flex flex-col items-center gap-1 py-1 px-2 rounded-xl transition relative ${
           activeSection === 'production' || activeSection === 'companies'
             ? 'text-emerald-400 font-bold'
             : 'text-slate-400 hover:text-slate-200'
         }`}
       >
-        <Factory className={`w-5 h-5 ${activeSection === 'production' || activeSection === 'companies' ? 'text-emerald-400' : ''}`} />
+        <div className="relative">
+          <Factory className={`w-5 h-5 ${activeSection === 'production' || activeSection === 'companies' ? 'text-emerald-400' : ''}`} />
+          {!isProductionOpen && (
+            <span className="absolute -top-1.5 -right-2 px-1 py-0.2 rounded-full bg-slate-900 border border-amber-500/60 text-[8px] text-amber-300 font-bold flex items-center gap-0.5">
+              <Lock className="w-2 h-2 text-amber-400" /> م2
+            </span>
+          )}
+        </div>
         <span className="text-[10px]">المصانع</span>
       </button>
 
@@ -73,26 +88,40 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
       {/* 4. Market / Inventory */}
       <button
         onClick={() => handleNav('inventory')}
-        className={`flex flex-col items-center gap-1 py-1 px-2.5 rounded-xl transition ${
+        className={`flex flex-col items-center gap-1 py-1 px-2 rounded-xl transition relative ${
           activeSection === 'inventory' || activeSection === 'auctions' || activeSection === 'lands'
             ? 'text-blue-400 font-bold'
             : 'text-slate-400 hover:text-slate-200'
         }`}
       >
-        <ShoppingCart className={`w-5 h-5 ${activeSection === 'inventory' || activeSection === 'auctions' || activeSection === 'lands' ? 'text-blue-400' : ''}`} />
+        <div className="relative">
+          <ShoppingCart className={`w-5 h-5 ${activeSection === 'inventory' || activeSection === 'auctions' || activeSection === 'lands' ? 'text-blue-400' : ''}`} />
+          {!isInventoryOpen && (
+            <span className="absolute -top-1.5 -right-2 px-1 py-0.2 rounded-full bg-slate-900 border border-amber-500/60 text-[8px] text-amber-300 font-bold flex items-center gap-0.5">
+              <Lock className="w-2 h-2 text-amber-400" /> م2
+            </span>
+          )}
+        </div>
         <span className="text-[10px]">السوق</span>
       </button>
 
       {/* 5. Bank / Gold */}
       <button
         onClick={() => handleNav('bank')}
-        className={`flex flex-col items-center gap-1 py-1 px-2.5 rounded-xl transition ${
+        className={`flex flex-col items-center gap-1 py-1 px-2 rounded-xl transition relative ${
           activeSection === 'bank' || activeSection === 'investments' || activeSection === 'tasks'
             ? 'text-purple-400 font-bold'
             : 'text-slate-400 hover:text-slate-200'
         }`}
       >
-        <Landmark className={`w-5 h-5 ${activeSection === 'bank' || activeSection === 'investments' ? 'text-purple-400' : ''}`} />
+        <div className="relative">
+          <Landmark className={`w-5 h-5 ${activeSection === 'bank' || activeSection === 'investments' ? 'text-purple-400' : ''}`} />
+          {!isBankOpen && (
+            <span className="absolute -top-1.5 -right-2 px-1 py-0.2 rounded-full bg-slate-900 border border-amber-500/60 text-[8px] text-amber-300 font-bold flex items-center gap-0.5">
+              <Lock className="w-2 h-2 text-amber-400" /> م4
+            </span>
+          )}
+        </div>
         <span className="text-[10px]">البنك</span>
       </button>
     </nav>
