@@ -181,14 +181,14 @@ export function StrategicPillarsModal({
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="text-base sm:text-xl font-black text-white">
-                  المحاور الاستراتيجية لإدارة الإمبراطورية
+                  الشركة الأم · المركز المحوري الإمبراطوري
                 </h2>
                 <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-bold text-[10px] border border-amber-500/30">
-                  لوحة القيادة المركزية
+                  نظام الإدارة المركزية
                 </span>
               </div>
               <p className="text-xs text-slate-400 mt-0.5">
-                مؤشرات الأداء الحية، أهداف النمو، التنبيهات الاستباقية، وتوصيات المستشارين التنفيذيين
+                مركز موحّد لمؤشرات الأداء والتنبيهات وتوصيات المستشارين التنفيذيين وإدارة نمو الإمبراطورية
               </p>
             </div>
           </div>

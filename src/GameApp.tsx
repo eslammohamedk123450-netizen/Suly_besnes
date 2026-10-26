@@ -1437,8 +1437,10 @@ export default function App() {
       <MobileBottomNav
         activeSection={activeSection}
         onNavigate={navigate}
-        onOpenLuckyWheel={() => setIsLuckyWheelOpen(true)}
-        isFreeSpinAvailable={getLuckySpinState(profile.lastSpinTimestamp, profile.luckyWheelLevel ?? 1).isFree}
+        onOpenCentralOperations={() => {
+          triggerHaptic('light');
+          setIsStrategicPillarsOpen(true);
+        }}
         profile={profile}
       />
 

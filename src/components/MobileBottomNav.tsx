@@ -1,7 +1,7 @@
 import React from 'react';
 import type { SectionId } from '../domain/navigation';
 import type { PlayerProfile } from '../domain/player';
-import { Home, Factory, ShoppingCart, Landmark, Sparkles, Lock } from 'lucide-react';
+import { Home, Factory, ShoppingCart, Landmark, Building2, Lock } from 'lucide-react';
 import { playSound } from '../game/soundEffects';
 import { triggerHaptic } from '../services/nativeMobileService';
 import { isSectionUnlocked } from '../game/onboarding';
@@ -9,16 +9,14 @@ import { isSectionUnlocked } from '../game/onboarding';
 interface MobileBottomNavProps {
   activeSection: SectionId;
   onNavigate: (section: SectionId) => void;
-  onOpenLuckyWheel: () => void;
-  isFreeSpinAvailable: boolean;
+  onOpenCentralOperations: () => void;
   profile?: PlayerProfile;
 }
 
 export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
   activeSection,
   onNavigate,
-  onOpenLuckyWheel,
-  isFreeSpinAvailable,
+  onOpenCentralOperations,
   profile,
 }) => {
   const handleNav = (section: SectionId) => {
@@ -72,21 +70,20 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
         <span className="text-[10px]">المصانع</span>
       </button>
 
-      {/* 3. Lucky Wheel (Center Highlight) */}
+      {/* 3. Imperial Hub (Center Highlight) */}
       <button
         onClick={() => {
           playSound('click');
-          onOpenLuckyWheel();
+          onOpenCentralOperations();
         }}
         className="relative -top-3 flex flex-col items-center justify-center"
+        aria-label="الشركة الأم - المركز المحوري الإمبراطوري"
+        title="الشركة الأم - المركز المحوري الإمبراطوري"
       >
-        <div className="w-12 h-12 rounded-full bg-gradient-to-tr from-amber-500 to-yellow-400 text-slate-950 flex items-center justify-center shadow-lg shadow-amber-500/30 border-2 border-slate-900 transition-transform active:scale-95">
-          <Sparkles className="w-6 h-6 animate-pulse" />
+        <div className="w-12 h-12 rounded-full bg-gradient-to-tr from-emerald-500 to-cyan-400 text-slate-950 flex items-center justify-center shadow-lg shadow-emerald-500/30 border-2 border-slate-900 transition-transform active:scale-95">
+          <Building2 className="w-6 h-6" />
         </div>
-        {isFreeSpinAvailable && (
-          <span className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-rose-500 border-2 border-slate-950 animate-ping" />
-        )}
-        <span className="text-[10px] font-bold text-amber-300 mt-0.5">عجلة الحظ</span>
+        <span className="text-[10px] font-bold text-emerald-300 mt-0.5">المركز المحوري</span>
       </button>
 
       {/* 4. Market / Inventory */}
