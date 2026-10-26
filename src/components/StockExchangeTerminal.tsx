@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import type { PlayerProfile } from '../domain/player';
 import type { CountryDefinition } from '../domain/countries';
 import type { GameCommand } from '../game/engine';
+import { buyGold, buyGoldWithDiamonds, sellGold } from '../game/engine';
 import { formatCurrency, formatMoney, formatNumber } from '../domain/formatters';
 import { GOLD_PRICE_PER_GRAM } from '../game/catalog';
 import { playSound } from '../game/soundEffects';
@@ -36,6 +37,7 @@ interface StockExchangeTerminalProps {
 export function StockExchangeTerminal({
   profile,
   country,
+  onCommand,
   onProfileUpdate,
 }: StockExchangeTerminalProps) {
   const [activeTab, setActiveTab] = useState<'stocks' | 'ipo' | 'gold'>('stocks');
@@ -52,6 +54,24 @@ export function StockExchangeTerminal({
   // Gold simulation state
   const [goldTradeMode, setGoldTradeMode] = useState<'buy' | 'sell'>('buy');
   const [goldGramsInput, setGoldGramsInput] = useState<string>('1.0');
+
+  const runGoldCommand = (command: GameCommand, fallback: (current: PlayerProfile) => any) => {
+    if (onCommand) {
+      onCommand(command, fallback);
+      return;
+    }
+    const result = fallback(profile);
+    if (result?.ok && onProfileUpdate) onProfileUpdate(result.profile);
+    showToast(result?.message ?? 'تعذر تنفيذ العملية.', result?.ok ? 'success' : 'error');
+  };
+
+  const handleGoldTrade = (mode: 'buy' | 'sell' | 'diamonds') => {
+    const grams = Number(goldGramsInput);
+    playSound('click');
+    if (mode === 'buy') runGoldCommand({ name: 'buy_gold', args: { grams } }, (current) => buyGold(current, grams));
+    if (mode === 'sell') runGoldCommand({ name: 'sell_gold', args: { grams } }, (current) => sellGold(current, grams));
+    if (mode === 'diamonds') runGoldCommand({ name: 'buy_gold_with_diamonds', args: { grams } }, (current) => buyGoldWithDiamonds(current, grams));
+  };
 
   const showToast = (text: string, type: 'success' | 'error' | 'info' = 'info') => {
     setToastMsg({ text, type });
@@ -677,24 +697,29 @@ export function StockExchangeTerminal({
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800">
-              <span className="text-xs text-slate-400">سعر جرام الذهب الحالي:</span>
-              <div className="text-xl font-black text-yellow-400 font-mono mt-1">
-                {formatMoney(GOLD_PRICE_PER_GRAM, country)}
-              </div>
-            </div>
-            <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800">
-              <span className="text-xs text-slate-400">رصيدك من الذهب:</span>
-              <div className="text-xl font-black text-amber-300 font-mono mt-1">
-                {(profile.goldGrams ?? 0).toFixed(1)} غرام
-              </div>
-            </div>
-            <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800">
-              <span className="text-xs text-slate-400">قيمة مدخراتك الذهبية:</span>
-              <div className="text-xl font-black text-emerald-400 font-mono mt-1">
-                {formatMoney((profile.goldGrams ?? 0) * GOLD_PRICE_PER_GRAM, country)}
-              </div>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-3 py-2 rounded-xl bg-slate-950/80 border border-slate-800 text-[11px]">
+            <span className="text-yellow-300">السعر: <strong>{formatMoney(GOLD_PRICE_PER_GRAM, country)} / غ</strong></span>
+            <span className="text-amber-300">رصيدك: <strong>{(profile.goldGrams ?? 0).toFixed(1)} غ</strong></span>
+            <span className="text-emerald-300">القيمة: <strong>{formatMoney((profile.goldGrams ?? 0) * GOLD_PRICE_PER_GRAM, country)}</strong></span>
+            <span className="text-slate-400">إرشاد: الذهب تحوط طويل الأجل، والبيع برسوم 3%</span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-slate-950/60 p-3 rounded-2xl border border-yellow-500/20">
+            <label className="text-xs text-slate-300 flex flex-col gap-1">
+              الكمية بالجرام
+              <input
+                type="number"
+                min="0.1"
+                step="0.1"
+                value={goldGramsInput}
+                onChange={(event) => setGoldGramsInput(event.target.value)}
+                className="w-full rounded-xl bg-slate-900 border border-slate-700 px-3 py-2 text-sm text-white font-mono"
+              />
+            </label>
+            <div className="flex flex-wrap items-end gap-2">
+              <button type="button" onClick={() => handleGoldTrade('buy')} className="flex-1 min-w-[120px] py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs cursor-pointer">شراء بالرصيد</button>
+              <button type="button" onClick={() => handleGoldTrade('diamonds')} className="flex-1 min-w-[120px] py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black text-xs cursor-pointer">شراء بالماس</button>
+              <button type="button" onClick={() => handleGoldTrade('sell')} className="flex-1 min-w-[120px] py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs cursor-pointer">بيع −3%</button>
             </div>
           </div>
         </div>
