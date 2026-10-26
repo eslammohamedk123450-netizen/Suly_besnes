@@ -14,7 +14,7 @@ import { getInvestmentPayoutRate, getOperatingCostProgression } from '../game/ec
 import { getContractOffers, getCustomerSegmentLabel } from '../game/contracts';
 import { selectActiveInvestments, selectAdvancedStatistics, selectAvailableAuctions, selectCompanyPerformance, selectEmpirePoints, selectFinancialReport, selectInventorySummary, selectObligations, selectSalesSummary, selectTaskBoard } from '../game/selectors';
 import { Icon, type IconName } from './Icon';
-import { Warehouse, Boxes, ShoppingBag } from 'lucide-react';
+import { Warehouse, Boxes, ShoppingBag, Store } from 'lucide-react';
 import { triggerHaptic } from '../services/nativeMobileService';
 import { isSoundEnabled, setSoundEnabled, playSound } from '../game/soundEffects';
 import { EconomyEmpty, EconomyPageShell, EconomyPanel as BaseEconomyPanel, EconomyStat, type EconomyPanelProps } from './EconomyUI';
@@ -961,286 +961,279 @@ export function SectionPage({ section, profile, country, focus, notificationThem
         {heading}
         {pageShell(
           <>
-            {/* بطاقة الدمج الموحدة لجميع قطاعات السوق والمخزن */}
-            <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-slate-900 via-slate-900/90 to-amber-950/30 border border-amber-500/30 shadow-xl mb-4">
+            {/* بطاقة واجهة السوق التجاري المستقل */}
+            <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-slate-900 via-slate-900/90 to-emerald-950/30 border border-emerald-500/30 shadow-xl mb-4">
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-xl bg-gradient-to-tr from-amber-500 to-yellow-400 text-slate-950 flex items-center justify-center font-bold shadow-lg shadow-amber-500/20 shrink-0">
-                    <Warehouse className="w-6 h-6" />
+                  <div className="w-12 h-12 rounded-xl bg-gradient-to-tr from-emerald-500 to-teal-400 text-slate-950 flex items-center justify-center font-bold shadow-lg shadow-emerald-500/20 shrink-0">
+                    <Store className="w-6 h-6" />
                   </div>
                   <div>
                     <h3 className="text-base sm:text-lg font-black text-white flex items-center gap-2">
-                      <span>سوق السلع والمخازن المتكاملة</span>
-                      <span className="text-xs px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 font-mono font-bold">
-                        نظام مدمج
+                      <span>السوق التجاري والبورصة</span>
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-mono font-bold">
+                        مباشر
                       </span>
                     </h3>
                     <p className="text-xs text-slate-300 mt-0.5">
-                      إدارة شاملة ومدمجة: سعة وترقية المخزن · مخزون وبورصة المواد الخام · بيع المنتجات الجاهزة بالسوق
+                      بيع المنتجات المصنعة بالأسعار اليومية، وشراء وتوريد المواد الخام من البورصة العالمية.
                     </p>
                   </div>
                 </div>
 
-                {/* مؤشرات سريعة مدمجة */}
-                <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-                  <span className="text-[11px] px-2.5 py-1 rounded-lg bg-slate-950/80 border border-slate-700/80 text-amber-300 font-medium flex items-center gap-1.5">
-                    <Warehouse className="w-3.5 h-3.5 text-amber-400" />
-                    المخزن م{warehouseLevel}
-                  </span>
-                  <span className="text-[11px] px-2.5 py-1 rounded-lg bg-slate-950/80 border border-slate-700/80 text-blue-300 font-medium flex items-center gap-1.5">
-                    <Boxes className="w-3.5 h-3.5 text-blue-400" />
-                    {materialRows.length} مواد خام
-                  </span>
-                  <span className="text-[11px] px-2.5 py-1 rounded-lg bg-slate-950/80 border border-slate-700/80 text-emerald-300 font-medium flex items-center gap-1.5">
-                    <ShoppingBag className="w-3.5 h-3.5 text-emerald-400" />
-                    {productRows.length} منتجات جاهزة
+                <div className="flex items-center gap-2">
+                  <span className="text-xs px-3 py-1.5 rounded-xl bg-slate-950/80 border border-slate-700/80 text-emerald-300 font-bold flex items-center gap-1.5">
+                    <ShoppingBag className="w-4 h-4 text-emerald-400" />
+                    {productRows.length} منتجات جاهزة للبيع
                   </span>
                 </div>
               </div>
             </div>
 
-            {/* إحصائيات عامة مدمجة */}
+            {/* إحصائيات السوق المباشرة */}
             <div className="economy-grid economy-grid--three-mobile">
               <EconomyStat
-                label="إجمالي قيمة المخزون"
+                label="قيمة البضائع بالسوق"
                 value={formatMoney(inventorySummary.totalValue, country)}
-                note={`خامات + منتجات تامة (${formatNumber(inventorySummary.rows.length)} صنف)`}
+                note={`إجمالي البضائع والخامات (${formatNumber(inventorySummary.rows.length)} صنف)`}
               />
               <EconomyStat
-                label="سعة المواد الخام"
-                value={`${formatNumber(warehouseUsage.materials)} / ${formatNumber(warehouseCapacity.materials)}`}
-                note={`المتبقي: ${formatNumber(Math.max(0, warehouseCapacity.materials - warehouseUsage.materials))}`}
+                label="المنتجات التامة للبيع"
+                value={`${formatNumber(productRows.length)} صنف`}
+                note={`${formatNumber(warehouseUsage.products)} وحدة جاهزة للتسويق`}
               />
               <EconomyStat
-                label="سعة المنتجات التامة"
-                value={`${formatNumber(warehouseUsage.products)} / ${formatNumber(warehouseCapacity.products)}`}
-                note={`المتبقي: ${formatNumber(Math.max(0, warehouseCapacity.products - warehouseUsage.products))}`}
+                label="المواد الخام المتوفرة"
+                value={`${formatNumber(materialRows.length)} صنف`}
+                note={`${formatNumber(warehouseUsage.materials)} وحدة لتغذية المصانع`}
               />
             </div>
 
-            {/* لوحة موحدة واحدة تدمج المخزن والمواد الخام والمنتجات الجاهزة معاً */}
+            {/* 1. قسم بيع المنتجات الجاهزة بالسوق */}
             <SectionPanel
-              id="warehouse-overview"
-              title={`المستودع وسوق السلع المتكامل · المستوى ${formatNumber(warehouseLevel)}`}
-              description="منظومة موحدة متكاملة تجمع سعة وترقية المخزن، مخزون المواد الخام، منصة السوق العالمي، وبيع المنتجات الجاهزة بالسوق."
+              id="inventory-sales"
+              data-guide-panel="inventory-sales"
+              title="بيع المنتجات الجاهزة بالسوق"
+              description="اختر كمية المنتجات التي ترغب في بيعها وفق حجم الطلب الفوري والأسعار الحالية للسوق."
             >
-              {/* أولاً: سعة المستودع والترقية */}
-              <div className="warehouse-capacity-grid">
-                <article>
-                  <span>المواد الخام</span>
-                  <strong>
-                    {formatNumber(warehouseUsage.materials)} / {formatNumber(warehouseCapacity.materials)}
-                  </strong>
-                  <div className="economy-progress">
-                    <span
-                      style={{
-                        width: `${Math.min(100, (warehouseUsage.materials / warehouseCapacity.materials) * 100)}%`,
-                      }}
-                    />
-                  </div>
-                </article>
-                <article>
-                  <span>المنتجات مع الإنتاج المحجوز</span>
-                  <strong>
-                    {formatNumber(warehouseUsage.products)} / {formatNumber(warehouseCapacity.products)}
-                  </strong>
-                  <div className="economy-progress">
-                    <span
-                      style={{
-                        width: `${Math.min(100, (warehouseUsage.products / warehouseCapacity.products) * 100)}%`,
-                      }}
-                    />
-                  </div>
-                </article>
-              </div>
-
-              {upgradeRequirement ? (
-                <div className="warehouse-upgrade-card">
-                  <div>
-                    <strong>تطوير المخزن إلى المستوى {formatNumber(warehouseLevel + 1)}</strong>
-                    <small>التكلفة {formatMoney(upgradeRequirement.cash, country)} · المتطلبات:</small>
-                  </div>
-                  <div className="economy-meta">
-                    {Object.entries(upgradeRequirement.materials).map(([materialId, required]) => {
-                      const material = MATERIAL_CATALOG.find((item) => item.id === materialId);
-                      const owned = materialStock.get(materialId)?.quantity ?? 0;
-                      return (
-                        <span
-                          className={owned >= required ? 'economy-pill economy-pill--green' : 'economy-pill economy-pill--gold'}
-                          key={materialId}
-                        >
-                          {material?.name ?? materialId} {formatNumber(owned)} / {formatNumber(required)}
-                        </span>
-                      );
-                    })}
-                  </div>
-                  <PurchaseOptions
-                    country={country}
-                    cashPrice={upgradeRequirement.cash}
-                    bankBalance={profile.bankBalance}
-                    diamondsBalance={profile.diamonds}
-                    disabled={!canUpgradeWarehouse}
-                    cashLabel="تطوير المخزن نقدًا"
-                    onPurchase={(paymentMethod) =>
-                      runCommand(
-                        { name: 'upgrade_warehouse', args: { paymentMethod } },
-                        (current) => upgradeWarehouse(current, paymentMethod),
-                      )
-                    }
-                  />
+              {productRows.length === 0 ? (
+                <div className="p-6 text-center rounded-xl bg-slate-950/60 border border-slate-800 text-slate-400 text-xs">
+                  <ShoppingBag className="w-8 h-8 text-slate-600 mx-auto mb-2" />
+                  <p className="font-bold text-slate-300 mb-1">لا توجد منتجات جاهزة للبيع حالياً</p>
+                  <p>قم بتشغيل خطوط الإنتاج بالمصانع لتحويل المواد الخام إلى منتجات وطرحها في السوق.</p>
                 </div>
-              ) : null}
-
-              {/* ثانياً: مخزون المواد الخام والمنتجات المدمج */}
-              <div id="inventory-materials" className="pt-2">
-                <div className="flex items-center justify-between pb-2 border-b border-slate-800 mb-3">
-                  <h4 className="text-sm font-bold text-slate-200 flex items-center gap-2">
-                    <Boxes className="w-4 h-4 text-blue-400" />
-                    <span>مخزون المواد الخام في المستودع</span>
-                  </h4>
-                  <span className="text-xs text-slate-400 font-mono">
-                    {materialRows.length} صنف متوفر
-                  </span>
-                </div>
-                {materialRows.length === 0 ? (
-                  <p className="text-xs text-slate-400 py-2">لا توجد مواد خام حالياً في المستودع. يمكنك شراؤها من بورصة السوق أدناه.</p>
-                ) : (
-                  <div className="economy-list">
-                    {MATERIAL_CATALOG.map((material) => {
-                      const stock = materialStock.get(material.id);
-                      if (!stock) return null;
-                      return (
-                        <article className="economy-card economy-card--soft" key={material.id}>
-                          <div className="economy-card-head">
-                            <div className="economy-card-title">
-                              <span className="economy-card-icon">
-                                <Icon name="warehouse" size={18} />
-                              </span>
-                              <span>
-                                <strong>{material.name}</strong>
-                                <small>قيمة المخزون {formatMoney(stock.totalValue, country)}</small>
-                              </span>
-                            </div>
-                            <span className="economy-pill">
-                              {formatNumber(stock.quantity)} {material.unit}
+              ) : (
+                <div className="economy-list">
+                  {productRows.map((row) => {
+                    const product = PRODUCT_CATALOG.find((item) => item.id === row.itemId);
+                    const quantity = productQuantities[row.itemId] ?? '1';
+                    const marketQuote = getMarketQuote(profile, row.itemId);
+                    const maxSellable = Math.min(row.quantity, marketQuote?.demandUnits ?? row.quantity);
+                    return (
+                      <article className="economy-card" key={row.id}>
+                        <div className="economy-card-head">
+                          <div className="economy-card-title">
+                            <span className="economy-card-icon">
+                              <Icon name="briefcase" size={18} />
+                            </span>
+                            <span>
+                              <strong>{row.name}</strong>
+                              <small>
+                                المتوفر {formatNumber(row.quantity)} {row.unit} · سعر السوق{' '}
+                                {formatMoney(marketQuote?.currentPrice ?? product?.baseSellPrice ?? 0, country)}
+                              </small>
                             </span>
                           </div>
-                        </article>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-
-              {/* ثالثاً: المنتجات الجاهزة للبيع */}
-              <div id="inventory-sales" data-guide-panel="inventory-sales" className="pt-3">
-                <div className="flex items-center justify-between pb-2 border-b border-slate-800 mb-3">
-                  <h4 className="text-sm font-bold text-slate-200 flex items-center gap-2">
-                    <ShoppingBag className="w-4 h-4 text-emerald-400" />
-                    <span>المنتجات الجاهزة للبيع في السوق</span>
-                  </h4>
-                  <span className="text-xs text-slate-400 font-mono">
-                    {productRows.length} منتج جاهز
-                  </span>
-                </div>
-                {productRows.length === 0 ? (
-                  <p className="text-xs text-slate-400 py-2">لا توجد منتجات جاهزة للبيع. شغّل خطوط الإنتاج لتحويل الخامات إلى منتجات.</p>
-                ) : (
-                  <div className="economy-list">
-                    {productRows.map((row) => {
-                      const product = PRODUCT_CATALOG.find((item) => item.id === row.itemId);
-                      const quantity = productQuantities[row.itemId] ?? '1';
-                      const marketQuote = getMarketQuote(profile, row.itemId);
-                      const maxSellable = Math.min(row.quantity, marketQuote?.demandUnits ?? row.quantity);
-                      return (
-                        <article className="economy-card" key={row.id}>
-                          <div className="economy-card-head">
-                            <div className="economy-card-title">
-                              <span className="economy-card-icon">
-                                <Icon name="briefcase" size={18} />
-                              </span>
-                              <span>
-                                <strong>{row.name}</strong>
-                                <small>
-                                  المخزون {formatNumber(row.quantity)} {row.unit} · سعر السوق{' '}
-                                  {formatMoney(marketQuote?.currentPrice ?? product?.baseSellPrice ?? 0, country)}
-                                </small>
-                              </span>
-                            </div>
-                            <span
-                              className={`economy-pill economy-pill--${
-                                marketQuote?.trend === 'up'
-                                  ? 'green'
-                                  : marketQuote?.trend === 'down'
-                                  ? 'red'
-                                  : 'gold'
-                              }`}
-                            >
-                              {marketQuote?.trendLabel ?? 'السوق'}
+                          <span
+                            className={`economy-pill economy-pill--${
+                              marketQuote?.trend === 'up'
+                                ? 'green'
+                                : marketQuote?.trend === 'down'
+                                ? 'red'
+                                : 'gold'
+                            }`}
+                          >
+                            {marketQuote?.trendLabel ?? 'السوق'}
+                          </span>
+                        </div>
+                        <div className="economy-card-body">
+                          <div className="economy-meta">
+                            <span>
+                              الطلب المتاح اليوم {formatNumber(marketQuote?.demandUnits ?? 0)} {row.unit}
                             </span>
+                            <span>القيمة الدفترية {formatMoney(row.totalValue, country)}</span>
                           </div>
-                          <div className="economy-card-body">
-                            <div className="economy-meta">
-                              <span>
-                                الطلب المتاح اليوم {formatNumber(marketQuote?.demandUnits ?? 0)} {row.unit}
-                              </span>
-                              <span>القيمة الدفترية {formatMoney(row.totalValue, country)}</span>
+                          <form
+                            className="economy-form"
+                            onSubmit={(event: FormEvent<HTMLFormElement>) => {
+                              event.preventDefault();
+                              runCommand(
+                                { name: 'sell_product', args: { productId: row.itemId, quantity: Number(quantity) } },
+                                (current) => sellProduct(current, row.itemId, Number(quantity)),
+                              );
+                            }}
+                          >
+                            <div className="economy-field">
+                              <label htmlFor={`sell-${row.itemId}`}>كمية البيع ({row.unit})</label>
+                              <input
+                                id={`sell-${row.itemId}`}
+                                type="number"
+                                min="1"
+                                max={maxSellable}
+                                step="1"
+                                value={quantity}
+                                onChange={(event) =>
+                                  setProductQuantities((previous) => ({ ...previous, [row.itemId]: event.target.value }))
+                                }
+                              />
                             </div>
-                            <form
-                              className="economy-form"
-                              onSubmit={(event: FormEvent<HTMLFormElement>) => {
-                                event.preventDefault();
-                                runCommand(
-                                  { name: 'sell_product', args: { productId: row.itemId, quantity: Number(quantity) } },
-                                  (current) => sellProduct(current, row.itemId, Number(quantity)),
-                                );
-                              }}
+                            <button
+                              className="button button-primary"
+                              type="submit"
+                              data-guide-target="sell-product-btn"
+                              disabled={!quantity || Number(quantity) < 1 || Number(quantity) > maxSellable}
                             >
-                              <div className="economy-field">
-                                <label htmlFor={`sell-${row.itemId}`}>كمية البيع ({row.unit})</label>
-                                <input
-                                  id={`sell-${row.itemId}`}
-                                  type="number"
-                                  min="1"
-                                  max={maxSellable}
-                                  step="1"
-                                  value={quantity}
-                                  onChange={(event) =>
-                                    setProductQuantities((previous) => ({ ...previous, [row.itemId]: event.target.value }))
-                                  }
-                                />
-                              </div>
-                              <button
-                                className="button button-primary"
-                                type="submit"
-                                data-guide-target="sell-product-btn"
-                                disabled={!quantity || Number(quantity) < 1 || Number(quantity) > maxSellable}
-                              >
-                                <Icon name="investment" size={15} /> بيع بسعر السوق
-                              </button>
-                            </form>
-                          </div>
-                        </article>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-
-              {/* رابعاً: منصة السوق العالمي وبورصة السلع والتجارة */}
-              <div id="inventory-global-market" data-guide-panel="inventory-global-market" className="pt-4 border-t border-slate-800/80">
-                <div className="mb-3">
-                  <h4 className="text-sm font-bold text-slate-200 flex items-center gap-2">
-                    <Icon name="store" size={16} />
-                    <span>بورصة السوق العالمي والتجارة الدولية</span>
-                  </h4>
-                  <p className="text-xs text-slate-400 mt-0.5">
-                    استيراد الخامات، التفاوض المباشر مع الموردين الدوليين، وعقود التحوط.
-                  </p>
+                              <Icon name="investment" size={15} /> بيع بسعر السوق
+                            </button>
+                          </form>
+                        </div>
+                      </article>
+                    );
+                  })}
                 </div>
-                <GlobalMarketTerminal profile={profile} country={country} onCommand={runCommand} onAction={onAction} />
-              </div>
+              )}
             </SectionPanel>
+
+            {/* 2. قسم بورصة السوق العالمي واستيراد السلع */}
+            <SectionPanel
+              id="inventory-global-market"
+              data-guide-panel="inventory-global-market"
+              title="بورصة السوق العالمي وتوريد السلع"
+              description="شراء المواد الخام، إبرام عقود الشحن الدولي، والتفاوض مع الموردين بالأسعار الفورية."
+            >
+              <GlobalMarketTerminal profile={profile} country={country} onCommand={runCommand} onAction={onAction} />
+            </SectionPanel>
+
+            {/* سعة التخزين وتطوير المخزن ومخزون المواد (مدمج كأداة سعة مساعدة) */}
+            <details id="warehouse-overview" className="group rounded-2xl border border-slate-800/80 bg-slate-900/40 p-4 transition-all">
+              <summary className="cursor-pointer list-none flex items-center justify-between text-xs font-bold text-slate-300 hover:text-white select-none">
+                <span className="flex items-center gap-2">
+                  <Warehouse className="w-4 h-4 text-amber-400" />
+                  <span>بيانات سعة التخزين ومستودع الخامات · المستوى {formatNumber(warehouseLevel)}</span>
+                </span>
+                <span className="text-[11px] px-2.5 py-1 rounded-lg bg-slate-800 text-slate-300 border border-slate-700">
+                  عرض السعة والمخزون ▾
+                </span>
+              </summary>
+
+              <div className="mt-4 space-y-4 pt-3 border-t border-slate-800">
+                <div className="warehouse-capacity-grid">
+                  <article>
+                    <span>سعة المواد الخام</span>
+                    <strong>
+                      {formatNumber(warehouseUsage.materials)} / {formatNumber(warehouseCapacity.materials)}
+                    </strong>
+                    <div className="economy-progress">
+                      <span
+                        style={{
+                          width: `${Math.min(100, (warehouseUsage.materials / warehouseCapacity.materials) * 100)}%`,
+                        }}
+                      />
+                    </div>
+                  </article>
+                  <article>
+                    <span>سعة المنتجات والإنتاج</span>
+                    <strong>
+                      {formatNumber(warehouseUsage.products)} / {formatNumber(warehouseCapacity.products)}
+                    </strong>
+                    <div className="economy-progress">
+                      <span
+                        style={{
+                          width: `${Math.min(100, (warehouseUsage.products / warehouseCapacity.products) * 100)}%`,
+                        }}
+                      />
+                    </div>
+                  </article>
+                </div>
+
+                {upgradeRequirement ? (
+                  <div className="warehouse-upgrade-card">
+                    <div>
+                      <strong>تطوير المخزن إلى المستوى {formatNumber(warehouseLevel + 1)}</strong>
+                      <small>التكلفة {formatMoney(upgradeRequirement.cash, country)} · المتطلبات:</small>
+                    </div>
+                    <div className="economy-meta">
+                      {Object.entries(upgradeRequirement.materials).map(([materialId, required]) => {
+                        const material = MATERIAL_CATALOG.find((item) => item.id === materialId);
+                        const owned = materialStock.get(materialId)?.quantity ?? 0;
+                        return (
+                          <span
+                            className={owned >= required ? 'economy-pill economy-pill--green' : 'economy-pill economy-pill--gold'}
+                            key={materialId}
+                          >
+                            {material?.name ?? materialId} {formatNumber(owned)} / {formatNumber(required)}
+                          </span>
+                        );
+                      })}
+                    </div>
+                    <PurchaseOptions
+                      country={country}
+                      cashPrice={upgradeRequirement.cash}
+                      bankBalance={profile.bankBalance}
+                      diamondsBalance={profile.diamonds}
+                      disabled={!canUpgradeWarehouse}
+                      cashLabel="تطوير المخزن نقدًا"
+                      onPurchase={(paymentMethod) =>
+                        runCommand(
+                          { name: 'upgrade_warehouse', args: { paymentMethod } },
+                          (current) => upgradeWarehouse(current, paymentMethod),
+                        )
+                      }
+                    />
+                  </div>
+                ) : null}
+
+                <div id="inventory-materials" className="pt-2">
+                  <div className="flex items-center justify-between pb-2 border-b border-slate-800 mb-3">
+                    <h4 className="text-xs font-bold text-slate-300 flex items-center gap-2">
+                      <Boxes className="w-4 h-4 text-blue-400" />
+                      <span>المواد الخام المخزنة في المستودع</span>
+                    </h4>
+                    <span className="text-xs text-slate-400 font-mono">
+                      {materialRows.length} صنف متوفر
+                    </span>
+                  </div>
+                  {materialRows.length === 0 ? (
+                    <p className="text-xs text-slate-400 py-1">لا توجد مواد خام حالياً في المستودع.</p>
+                  ) : (
+                    <div className="economy-list">
+                      {MATERIAL_CATALOG.map((material) => {
+                        const stock = materialStock.get(material.id);
+                        if (!stock) return null;
+                        return (
+                          <article className="economy-card economy-card--soft" key={material.id}>
+                            <div className="economy-card-head">
+                              <div className="economy-card-title">
+                                <span className="economy-card-icon">
+                                  <Icon name="warehouse" size={18} />
+                                </span>
+                                <span>
+                                  <strong>{material.name}</strong>
+                                  <small>قيمة المخزون {formatMoney(stock.totalValue, country)}</small>
+                                </span>
+                              </div>
+                              <span className="economy-pill">
+                                {formatNumber(stock.quantity)} {material.unit}
+                              </span>
+                            </div>
+                          </article>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </details>
           </>,
         )}
       </div>

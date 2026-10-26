@@ -56,7 +56,7 @@ export const GAME_SECTIONS: readonly SectionItem[] = [
   { id: 'obligations', label: 'الالتزامات', shortLabel: 'الالتزامات', subtitle: 'ما يجب دفعه ومتى', icon: 'report' },
   { id: 'lands', label: 'الأراضي', shortLabel: 'الأراضي', subtitle: 'أصولك العقارية ومواقعك', icon: 'land' },
   { id: 'production', label: 'المصانع والإنتاج', shortLabel: 'الإنتاج', subtitle: 'مصانعك وسلاسل الإنتاج', icon: 'factory' },
-  { id: 'inventory', label: 'السوق والمخازن', shortLabel: 'السوق', subtitle: 'مخزن · المواد الخام والمخزنة · المنتجات الجاهزة', icon: 'warehouse' },
+  { id: 'inventory', label: 'السوق', shortLabel: 'السوق', subtitle: 'بورصة السلع، بيع المنتجات الجاهزة، وشراء وتوريد المواد الخام', icon: 'store' },
   { id: 'reports', label: 'التقارير المالية', shortLabel: 'التقارير', subtitle: 'صورة واضحة عن الأداء المالي', icon: 'report' },
   { id: 'contracts', label: 'العقود والعملاء', shortLabel: 'العقود', subtitle: 'طلبات السوق والسمعة التجارية', icon: 'briefcase' },
   { id: 'tasks', label: 'المهام والإنجازات', shortLabel: 'المهام', subtitle: 'أهداف وتحديات مستقبلية', icon: 'tasks' },

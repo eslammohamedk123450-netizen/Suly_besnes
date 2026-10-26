@@ -44,6 +44,7 @@ import {
   Rocket,
   Lock,
   BookOpen,
+  Store,
 } from 'lucide-react';
 
 interface DashboardProps {
@@ -253,11 +254,11 @@ export function Dashboard({
     },
     {
       id: 'inventory',
-      title: 'المخازن والخامات',
+      title: 'السوق',
       category: 'core',
       sectionId: 'inventory',
-      icon: <Package className="w-5 h-5 sm:w-6 sm:h-6 text-white" />,
-      gradient: 'bg-gradient-to-tr from-amber-600 to-yellow-600',
+      icon: <Store className="w-5 h-5 sm:w-6 sm:h-6 text-white" />,
+      gradient: 'bg-gradient-to-tr from-emerald-600 to-teal-600',
       requiredLevel: 2,
       isUnlocked: isSectionUnlocked(profile, 'inventory'),
       hint: getSectionUnlockHint(profile, 'inventory'),
