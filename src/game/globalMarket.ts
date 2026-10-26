@@ -45,5 +45,5 @@ export function negotiateGlobalMarketOffer(profile: PlayerProfile, offerId: stri
   const accepted = (profile.day + offer.id.length) % 5 !== 0;
   if (!accepted) return { accepted: false, unitPrice: offer.unitPrice, message: `رفض ${offer.sellerName} التفاوض؛ يمكنك قبول السعر الأصلي.` };
   const negotiatedPrice = offer.floorPrice;
-  return { accepted: true, unitPrice: negotiatedPrice, message: `وافق ${offer.sellerName} على ${negotiatedPrice.toLocaleString('ar-EG')} ج.م لكل ${findMaterial(offer.materialId)?.unit ?? 'وحدة'}.` };
+  return { accepted: true, unitPrice: negotiatedPrice, message: `وافق ${offer.sellerName} على ${negotiatedPrice.toLocaleString('ar-EG')} $ لكل ${findMaterial(offer.materialId)?.unit ?? 'وحدة'}.` };
 }

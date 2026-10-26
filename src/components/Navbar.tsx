@@ -6,7 +6,6 @@ import {
   Users, 
   Store, 
   FolderGit2, 
-  Settings, 
   Lock, 
   CheckCircle2, 
   Sparkles,
@@ -15,7 +14,7 @@ import {
 import { SulyLogo } from './SulyLogo';
 import { GitHubUser } from '../types';
 
-export type ActiveTab = 'dashboard' | 'products' | 'orders' | 'customers' | 'storefront' | 'explorer' | 'settings';
+export type ActiveTab = 'dashboard' | 'products' | 'orders' | 'customers' | 'storefront' | 'explorer';
 
 interface NavbarProps {
   activeTab: ActiveTab;
@@ -124,18 +123,6 @@ export const Navbar: React.FC<NavbarProps> = ({
                 </span>
               )}
             </button>
-
-            <button
-              onClick={() => onSelectTab('settings')}
-              className={`p-2 rounded-xl text-xs font-bold transition-all ${
-                activeTab === 'settings'
-                  ? 'bg-emerald-600 text-white'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
-              }`}
-              title="الإعدادات"
-            >
-              <Settings className="w-4 h-4" />
-            </button>
           </nav>
 
           {/* Right Header Actions */}
@@ -222,14 +209,6 @@ export const Navbar: React.FC<NavbarProps> = ({
           >
             <Store className="w-3.5 h-3.5" />
             المتجر
-          </button>
-          <button
-            onClick={() => onSelectTab('settings')}
-            className={`px-2.5 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap flex items-center gap-1 ${
-              activeTab === 'settings' ? 'bg-emerald-600 text-white' : 'text-slate-400'
-            }`}
-          >
-            <Settings className="w-3.5 h-3.5" />
           </button>
         </div>
       </div>

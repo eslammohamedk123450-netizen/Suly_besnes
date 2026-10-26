@@ -181,8 +181,8 @@ describe('Business Empire economy invariants', () => {
     if (!bought.ok) return;
     expect(bought.profile.diamonds).toBe(59);
     expect(bought.profile.goldGrams).toBe(2);
-    expect(bought.profile.goldCostBasis).toBe(12_000);
-    expect(bought.profile.ledger.at(-1)?.amount).toBe(12_000);
+    expect(bought.profile.goldCostBasis).toBe(220);
+    expect(bought.profile.ledger.at(-1)?.amount).toBe(220);
     const sold = sellGold(bought.profile, 0.5);
     expect(sold.ok).toBe(true);
     if (sold.ok) expect(sold.profile.bankBalance).toBeGreaterThan(bought.profile.bankBalance);
@@ -226,7 +226,7 @@ describe('Business Empire economy invariants', () => {
     }
 
     const lands = Array.from({ length: 4 }, (_, index) => ({ id: `land-${index + 1}`, label: `ضمان ${index + 1}`, landType: 'industrial' as const, areaSquareMeters: 1_000, purchasePrice: 100_000, acquiredAt: '2026-01-01T00:00:00.000Z', acquiredOnDay: 1 }));
-    let loansProfile = profile({ bankBalance: 0, lands });
+    let loansProfile = profile({ bankBalance: 0, lands, banking: { deposits: [], loans: [] } });
     for (let index = 0; index < 3; index += 1) {
       const loan = takeLoan(loansProfile, 'land', lands[index].id, 25_000, 7);
       expect(loan.ok).toBe(true);
@@ -302,7 +302,8 @@ describe('Business Empire economy invariants', () => {
     const purchased = buyDirectLand(profile({ bankBalance: 1_000_000 }), 'starter-village-land');
     expect(purchased.ok).toBe(true);
     if (!purchased.ok) return;
-    expect(purchased.profile.lands[0].availableForCompanyOnDay).toBe(2);
+    const purchasedLand = purchased.profile.lands.find((l) => l.id === purchased.data.landId);
+    expect(purchasedLand?.availableForCompanyOnDay).toBe(2);
     const premature = foundCompany(purchased.profile, 'food', purchased.data.landId, 'شركة مبكرة');
     expect(premature.ok).toBe(false);
     if (!premature.ok) expect(premature.reason).toBe('condition-not-met');
@@ -312,10 +313,10 @@ describe('Business Empire economy invariants', () => {
 
   it('requires a bid above both automated competitors and accepts the safe recommendation', () => {
     const base = profile({ countryId: 'egypt', bankBalance: 1_000_000, createdAt: new Date().toISOString() });
-    const tied = placeBid(base, 'land-cairo-industrial-day-1', 180_000);
+    const tied = placeBid(base, 'land-cairo-industrial-day-1', 3_600);
     expect(tied.ok).toBe(false);
     if (!tied.ok) expect(tied.reason).toBe('auction-lost');
-    const safe = placeBid(base, 'land-cairo-industrial-day-1', 190_000);
+    const safe = placeBid(base, 'land-cairo-industrial-day-1', 3_800);
     expect(safe.ok).toBe(true);
   });
 
@@ -325,8 +326,8 @@ describe('Business Empire economy invariants', () => {
     expect(purchased.ok).toBe(true);
     if (!purchased.ok) return;
     expect(purchased.profile.bankBalance).toBe(0);
-    expect(purchased.profile.diamonds).toBe(6);
-    expect(purchased.data.diamondsSpent).toBe(14);
+    expect(purchased.profile.diamonds).toBe(3);
+    expect(purchased.data.diamondsSpent).toBe(17);
     const invalid = buyDirectLand(base, 'starter-village-land', 'credits' as never);
     expect(invalid.ok).toBe(false);
     if (!invalid.ok) expect(invalid.profile).toEqual(base);

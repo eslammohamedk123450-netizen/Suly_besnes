@@ -142,7 +142,7 @@ export function contributeToCartel(
   return {
     profile: updatedProf,
     expansion: updatedExp,
-    message: `تم التبرع بـ ${amount.toLocaleString('ar-EG')} ج.م لصندوق التكتل وترقية رتبتك إلى (${newRank === 'leader' ? 'رئيس التحالف' : newRank === 'senior' ? 'عضو قيادي' : 'عضو'})`,
+    message: `تم التبرع بـ ${amount.toLocaleString('ar-EG')} $ لصندوق التكتل وترقية رتبتك إلى (${newRank === 'leader' ? 'رئيس التحالف' : newRank === 'senior' ? 'عضو قيادي' : 'عضو'})`,
   };
 }
 
@@ -226,7 +226,7 @@ export function startVoyage(
   return {
     profile,
     expansion: updatedExp,
-    message: `أبحرت ${vessel.name} متجهة نحو "${route.name}"! الأرباح المتوقعة: ${expectedProfit.toLocaleString('ar-EG')} ج.م`,
+    message: `أبحرت ${vessel.name} متجهة نحو "${route.name}"! الأرباح المتوقعة: ${expectedProfit.toLocaleString('ar-EG')} $`,
   };
 }
 
@@ -261,7 +261,7 @@ export function claimVoyageProfit(
   return {
     profile: updatedProf,
     expansion: updatedExp,
-    message: `تم استلام أرباح رحلة ${voyage.vesselName} بقيمة +${voyage.expectedProfit.toLocaleString('ar-EG')} ج.م!`,
+    message: `تم استلام أرباح رحلة ${voyage.vesselName} بقيمة +${voyage.expectedProfit.toLocaleString('ar-EG')} $!`,
   };
 }
 
@@ -371,7 +371,7 @@ export function deliverProjectMilestone(
   return {
     profile: updatedProf,
     expansion: updatedExp,
-    message: `تم تسليم المرحلة بنجاح! تحصيل المستخلص الحكومي بقيمة +${payout.toLocaleString('ar-EG')} ج.م`,
+    message: `تم تسليم المرحلة بنجاح! تحصيل المستخلص الحكومي بقيمة +${payout.toLocaleString('ar-EG')} $`,
   };
 }
 
@@ -448,6 +448,6 @@ export function exitStartupBuyout(
   return {
     profile: updatedProf,
     expansion: updatedExp,
-    message: `استحواذ خرافي! تمت التصفية وبيع أسهمك في "${startup.name}" بقيمة +${exitPayout.toLocaleString('ar-EG')} ج.م (${startup.exitMultiple}x)!`,
+    message: `استحواذ خرافي! تمت التصفية وبيع أسهمك في "${startup.name}" بقيمة +${exitPayout.toLocaleString('ar-EG')} $ (${startup.exitMultiple}x)!`,
   };
 }

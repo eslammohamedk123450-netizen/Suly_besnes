@@ -1,4 +1,5 @@
 import type { PlayerProfile } from '../domain/player';
+import { isSectionUnlocked } from './onboarding';
 import { selectAvailableAuctions } from './selectors';
 import { selectEmpirePulse } from './selectors';
 
@@ -12,8 +13,19 @@ export interface GameNotification {
   count?: number;
   target?: string;
 }
-function money(value: number): string { return `${Math.round(value).toLocaleString('ar-EG')} ج.م`; }
+function money(value: number): string { return `${Math.round(value).toLocaleString('ar-EG')} $`; }
 function plural(count: number, one: string, two: string, many: string): string { return count === 1 ? one : count === 2 ? two : many; }
+
+function isNotificationAllowed(profile: PlayerProfile, section: GameNotification['section']): boolean {
+  if (section === 'home' || section === 'obligations' || section === 'lands' || section === 'companies' || section === 'auctions') return true;
+  if (section === 'staff') return isSectionUnlocked(profile, 'staff') || profile.staff.length > 0;
+  if (section === 'bank') return isSectionUnlocked(profile, 'bank') || (profile.banking?.loans?.length ?? 0) > 0 || (profile.banking?.deposits?.length ?? 0) > 0;
+  if (section === 'contracts') return isSectionUnlocked(profile, 'contracts') || (profile.contracts?.length ?? 0) > 0;
+  if (section === 'production') return isSectionUnlocked(profile, 'production') || (profile.productionOrders?.length ?? 0) > 0;
+  if (section === 'inventory') return isSectionUnlocked(profile, 'inventory') || (profile.inventory?.length ?? 0) > 0;
+  if (section === 'reports') return isSectionUnlocked(profile, 'reports') || (profile.events?.length ?? 0) > 0;
+  return isSectionUnlocked(profile, section as any);
+}
 
 export function selectNotifications(profile: PlayerProfile): GameNotification[] {
   const notifications: GameNotification[] = [];
@@ -61,7 +73,12 @@ export function selectNotifications(profile: PlayerProfile): GameNotification[] 
   if (auctions.length > 0) notifications.push({ id: 'auctions-open', title: 'فرص مزادات متاحة', detail: `يوجد ${auctions.length} ${plural(auctions.length, 'مزاد مفتوح', 'مزادان مفتوحان', 'مزادات مفتوحة')} للمنافسة الآن.`, tone: 'info', section: 'auctions', count: auctions.length, target: 'auctions-list' });
   const earnedBadges = selectEmpirePulse(profile).badges.filter((badge) => badge.earned);
   if (earnedBadges.length > 0) notifications.push({ id: 'badges-earned', title: 'شارات الإمبراطورية', detail: `لديك ${earnedBadges.length} شارات مكتسبة: ${earnedBadges.slice(-3).map((badge) => badge.label).join('، ')}.`, tone: 'success', section: 'home', count: earnedBadges.length });
-  notifications.push({ id: 'global-market-open', title: 'السوق العالمي مفتوح', detail: 'عروض تجار المواد الخام متاحة، وبعضها يقبل التفاوض.', tone: 'info', section: 'inventory' });
+  if (isSectionUnlocked(profile, 'inventory')) {
+    notifications.push({ id: 'global-market-open', title: 'السوق العالمي مفتوح', detail: 'عروض تجار المواد الخام متاحة، وبعضها يقبل التفاوض.', tone: 'info', section: 'inventory' });
+  }
   const dismissed = new Set(profile.dismissedNotificationIds ?? []);
-  return notifications.filter((notification) => !dismissed.has(notification.id)).slice(0, 10);
+  return notifications
+    .filter((notification) => !dismissed.has(notification.id))
+    .filter((notification) => isNotificationAllowed(profile, notification.section))
+    .slice(0, 10);
 }

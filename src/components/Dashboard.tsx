@@ -1,16 +1,57 @@
-import { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import type { CountryDefinition } from '../domain/countries';
-import type { PlayerProfile } from '../domain/player';
+import { type PlayerProfile, calculateTotalAssets } from '../domain/player';
 import type { SectionId } from '../domain/navigation';
-import { Icon } from './Icon';
-import { ItemImage } from './ItemImage';
-import { selectOperationsSnapshot } from '../game/selectors';
+import { formatMoney } from '../domain/formatters';
 import { type GameCommand, type GameResult } from '../game/engine';
-import { MarketNewsTicker } from './MarketNewsTicker';
-import { StoryCampaignHub } from './StoryCampaignHub';
-import { SmartOnboardingQuests } from './SmartOnboardingQuests';
-import { RivalCharactersHub } from './RivalCharactersHub';
-import { StruggleStoryHub } from './StruggleStoryHub';
+import { playSound } from '../game/soundEffects';
+import { LeaderboardModal } from './LeaderboardModal';
+import { FinanceReportModal } from './FinanceReportModal';
+import { getLuckySpinState } from '../game/luckyWheelService';
+import {
+  isSectionUnlocked,
+  getSectionRequiredLevel,
+  getSectionUnlockHint,
+} from '../game/onboarding';
+import { 
+  Trophy, 
+  FileText, 
+  Sparkles, 
+  Building2, 
+  Factory, 
+  TrendingUp, 
+  Gavel, 
+  Map, 
+  Landmark, 
+  Gem, 
+  Crown, 
+  Coins, 
+  Wallet, 
+  ArrowUpRight, 
+  ArrowDownLeft, 
+  Plus, 
+  Flame, 
+  ChevronLeft,
+  Briefcase,
+  Users,
+  Package,
+  Cpu,
+  Globe,
+  Award,
+  Shield,
+  Anchor,
+  Rocket,
+  Lock,
+  X,
+  Compass,
+  BookOpen,
+  ArrowLeft,
+  Swords,
+  Globe2,
+  Clock,
+} from 'lucide-react';
+import { getCurrentCentralBankShock } from '../game/centralBankEngine';
+import { loadPrestigeData } from '../game/prestigeEngine';
 
 interface DashboardProps {
   profile: PlayerProfile;
@@ -20,6 +61,24 @@ interface DashboardProps {
   onClaimReward?: (cash: number, diamonds: number, questId: string) => void;
   onRequestEmergencyLoan?: () => void;
   onUpdateProfile?: (updater: (prev: PlayerProfile) => PlayerProfile) => void;
+  onOpenLuckyWheel?: () => void;
+  onOpenTutorial?: () => void;
+  onOpenMorningReport?: () => void;
+  onOpenCentralBank?: () => void;
+  onOpenPrestige?: () => void;
+  onOpenCampaign?: () => void;
+}
+
+interface CommandItem {
+  id: string;
+  title: string;
+  category: 'core' | 'expansion' | 'special';
+  sectionId?: SectionId;
+  icon: React.ReactNode;
+  gradient: string;
+  requiredLevel: number;
+  isUnlocked: boolean;
+  hint: string;
 }
 
 export function Dashboard({ 
@@ -27,457 +86,976 @@ export function Dashboard({
   country, 
   onNavigate, 
   onCommand,
-  onClaimReward,
-  onRequestEmergencyLoan,
-  onUpdateProfile,
+  onOpenLuckyWheel,
+  onOpenTutorial,
+  onOpenMorningReport,
+  onOpenCentralBank,
+  onOpenPrestige,
+  onOpenCampaign,
 }: DashboardProps) {
-  const [campaignOpen, setCampaignOpen] = useState(false);
-  const operations = selectOperationsSnapshot(profile, country.economy.operatingCostMultiplier ?? 1);
+  const [isLeaderboardOpen, setIsLeaderboardOpen] = useState(false);
+  const [isFinanceModalOpen, setIsFinanceModalOpen] = useState(false);
+  const [spinState, setSpinState] = useState(() => getLuckySpinState(profile.lastSpinTimestamp));
+  const [opsFilter, setOpsFilter] = useState<'all' | 'available' | 'core' | 'expansion'>('all');
+  const [lockedGateModal, setLockedGateModal] = useState<{
+    title: string;
+    sectionId: SectionId;
+    requiredLevel: number;
+    hint: string;
+  } | null>(null);
+
+  // Keep countdown updated
+  useEffect(() => {
+    setSpinState(getLuckySpinState(profile.lastSpinTimestamp));
+    const timer = setInterval(() => {
+      setSpinState(getLuckySpinState(profile.lastSpinTimestamp));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [profile.lastSpinTimestamp]);
+
+  const totalAssets = calculateTotalAssets(profile);
   const companyCount = profile.companies.length;
+  const landsCount = profile.lands.length;
 
-  // Recent Operations for display matching the UI design
-  const recentOperations = [
-    { id: '1', title: 'شراء مواد خام', subtitle: 'ألمونيوم', amount: '- 90K', type: 'expense', icon: 'warehouse' as const },
-    { id: '2', title: 'بيع منتجات', subtitle: 'أغذية', amount: '+ 160K', type: 'revenue', icon: 'briefcase' as const },
-    { id: '3', title: 'تشغيل مصنع', subtitle: 'مواد بفرعين', amount: '- 70K', type: 'expense', icon: 'factory' as const },
+  // Real recent transactions from ledger
+  const recentTransactions = profile.ledger && profile.ledger.length > 0
+    ? [...profile.ledger].reverse().slice(0, 4)
+    : [
+        {
+          id: 'initial-setup',
+          category: 'revenue',
+          amount: profile.bankBalance || 50000,
+          occurredAt: new Date().toISOString(),
+          note: 'رأس مال التأسيس والتشغيل الأولي',
+        },
+      ];
+
+  const handleNav = (section: SectionId, target?: string) => {
+    playSound('click');
+    onNavigate(section, target);
+  };
+
+  // Build the complete Command Operations items with story unlock levels
+  const commandItems: CommandItem[] = [
+    // 1. المتصدرون (دائماً متاح)
+    {
+      id: 'leaderboard',
+      title: 'المتصدرين',
+      category: 'special',
+      icon: <Trophy className="w-5 h-5 sm:w-6 sm:h-6 text-slate-950" />,
+      gradient: 'bg-gradient-to-tr from-amber-600 via-amber-500 to-yellow-400',
+      requiredLevel: 1,
+      isUnlocked: true,
+      hint: 'متاح للجميع لمتابعة تصنيف كبار المستثمرين عالمياً.',
+    },
+    // 2. عجلة الحظ (دائماً متاح)
+    {
+      id: 'lucky_wheel',
+      title: 'عجلة الحظ',
+      category: 'special',
+      icon: <Sparkles className="w-5 h-5 sm:w-6 sm:h-6 text-slate-950" />,
+      gradient: 'bg-gradient-to-tr from-amber-500 to-yellow-400',
+      requiredLevel: 1,
+      isUnlocked: true,
+      hint: 'فرصة دوران مجانية كل 50 دقيقة لدعم السيولة والذهب.',
+    },
+    // 3. الشركات (المستوى 1)
+    {
+      id: 'companies',
+      title: 'الشركات',
+      category: 'core',
+      sectionId: 'companies',
+      icon: <Building2 className="w-5 h-5 sm:w-6 sm:h-6 text-white" />,
+      gradient: 'bg-gradient-to-tr from-blue-600 to-indigo-500',
+      requiredLevel: 1,
+      isUnlocked: isSectionUnlocked(profile, 'companies'),
+      hint: 'تأسيس وإدارة أولى شركاتك الصناعية والخدمية.',
+    },
+    // 4. الأراضي (المستوى 1)
+    {
+      id: 'lands',
+      title: 'الأراضي',
+      category: 'core',
+      sectionId: 'lands',
+      icon: <Map className="w-5 h-5 sm:w-6 sm:h-6 text-white" />,
+      gradient: 'bg-gradient-to-tr from-green-600 to-emerald-600',
+      requiredLevel: 1,
+      isUnlocked: isSectionUnlocked(profile, 'lands'),
+      hint: 'شراء وتطوير الأراضي الاستثمارية لإقامة المصانع والشركات.',
+    },
+    // 5. المزادات (المستوى 1)
+    {
+      id: 'auctions',
+      title: 'المزادات',
+      category: 'core',
+      sectionId: 'auctions',
+      icon: <Gavel className="w-5 h-5 sm:w-6 sm:h-6 text-white" />,
+      gradient: 'bg-gradient-to-tr from-amber-700 to-orange-500',
+      requiredLevel: 1,
+      isUnlocked: isSectionUnlocked(profile, 'auctions'),
+      hint: 'المزايدة على الأصول المتعثرة والصفقات الاستثمارية النادرة.',
+    },
+    // 5.1 المهام اليومية (المستوى 1)
+    {
+      id: 'tasks',
+      title: 'المهام اليومية',
+      category: 'core',
+      sectionId: 'tasks',
+      icon: <Trophy className="w-5 h-5 sm:w-6 sm:h-6 text-white" />,
+      gradient: 'bg-gradient-to-tr from-yellow-600 to-amber-500',
+      requiredLevel: 1,
+      isUnlocked: true,
+      hint: 'مهام القصة والإنجازات اليومية لجني الكاش والماس.',
+    },
+    // 5.2 الالتزامات والرواتب (المستوى 1)
+    {
+      id: 'obligations',
+      title: 'الالتزامات والرواتب',
+      category: 'core',
+      sectionId: 'obligations',
+      icon: <Shield className="w-5 h-5 sm:w-6 sm:h-6 text-white" />,
+      gradient: 'bg-gradient-to-tr from-rose-600 to-orange-500',
+      requiredLevel: 1,
+      isUnlocked: true,
+      hint: 'سداد رواتب العمال وأقساط القروض لتفادي التجميد البنكي.',
+    },
+    // 6. المتجر (المستوى 1)
+    {
+      id: 'store',
+      title: 'المتجر',
+      category: 'core',
+      sectionId: 'store',
+      icon: <Gem className="w-5 h-5 sm:w-6 sm:h-6 text-white" />,
+      gradient: 'bg-gradient-to-tr from-cyan-600 to-blue-400',
+      requiredLevel: 1,
+      isUnlocked: isSectionUnlocked(profile, 'store'),
+      hint: 'متجر الماس وبطاقات التسريع والحزم الاستثمارية.',
+    },
+    // 7. المصانع والإنتاج (المستوى 2)
+    {
+      id: 'production',
+      title: 'الإنتاج والمصانع',
+      category: 'core',
+      sectionId: 'production',
+      icon: <Factory className="w-5 h-5 sm:w-6 sm:h-6 text-white" />,
+      gradient: 'bg-gradient-to-tr from-teal-600 to-emerald-500',
+      requiredLevel: 2,
+      isUnlocked: isSectionUnlocked(profile, 'production'),
+      hint: 'يفتح بعد تأسيس أول شركة وبلوغ المستوى 2 لبدء تشغيل خطوط الإنتاج والتصنيع.',
+    },
+    // 8. المواد الخام والمخازن (المستوى 2)
+    {
+      id: 'inventory',
+      title: 'المخازن والخامات',
+      category: 'core',
+      sectionId: 'inventory',
+      icon: <Package className="w-5 h-5 sm:w-6 sm:h-6 text-white" />,
+      gradient: 'bg-gradient-to-tr from-amber-600 to-yellow-600',
+      requiredLevel: 2,
+      isUnlocked: isSectionUnlocked(profile, 'inventory'),
+      hint: 'يفتح في المستوى 2 لتأمين المواد الخام وتخزين المنتجات الجاهزة للبيع.',
+    },
+    // 9. العقود والعملاء (المستوى 3)
+    {
+      id: 'contracts',
+      title: 'العقود والعملاء',
+      category: 'core',
+      sectionId: 'contracts',
+      icon: <Briefcase className="w-5 h-5 sm:w-6 sm:h-6 text-white" />,
+      gradient: 'bg-gradient-to-tr from-emerald-600 to-green-500',
+      requiredLevel: 3,
+      isUnlocked: isSectionUnlocked(profile, 'contracts'),
+      hint: 'يفتح في المستوى 3 بعد إنتاج أول شحنة ناجحة لاستعادة ثقة كبار التجار والعملاء.',
+    },
+    // 10. البنك والتمويل (المستوى 4)
+    {
+      id: 'bank',
+      title: 'البنك والتمويل',
+      category: 'core',
+      sectionId: 'bank',
+      icon: <Landmark className="w-5 h-5 sm:w-6 sm:h-6 text-white" />,
+      gradient: 'bg-gradient-to-tr from-sky-600 to-blue-500',
+      requiredLevel: 4,
+      isUnlocked: isSectionUnlocked(profile, 'bank'),
+      hint: 'يفتح في المستوى 4 بعد تسليم أول عقد تجاري للحصول على تسهيلات بنكية وقروض استثمارية.',
+    },
+    // 11. البورصة والاستثمار (المستوى 5)
+    {
+      id: 'investments',
+      title: 'البورصة والأسهم',
+      category: 'core',
+      sectionId: 'investments',
+      icon: <TrendingUp className="w-5 h-5 sm:w-6 sm:h-6 text-white" />,
+      gradient: 'bg-gradient-to-tr from-purple-600 to-pink-500',
+      requiredLevel: 5,
+      isUnlocked: isSectionUnlocked(profile, 'investments'),
+      hint: 'يفتح في المستوى 5 (الفصل الثاني) للتداول بالأسهم والاكتتاب العام بالبورصة.',
+    },
+    // 12. التقارير المالية (المستوى 5)
+    {
+      id: 'finance_modal',
+      title: 'التقارير المالية',
+      category: 'core',
+      sectionId: 'reports',
+      icon: <FileText className="w-5 h-5 sm:w-6 sm:h-6 text-white" />,
+      gradient: 'bg-gradient-to-tr from-emerald-600 to-teal-400',
+      requiredLevel: 5,
+      isUnlocked: isSectionUnlocked(profile, 'reports'),
+      hint: 'يفتح في المستوى 5 لتحليل القوائم المالية والأرباح التشغيلية وضريبة المبيعات.',
+    },
+    // 13. الموظفون والإدارة (المستوى 5)
+    {
+      id: 'staff',
+      title: 'الموظفون والإدارة',
+      category: 'core',
+      sectionId: 'staff',
+      icon: <Users className="w-5 h-5 sm:w-6 sm:h-6 text-white" />,
+      gradient: 'bg-gradient-to-tr from-violet-600 to-indigo-500',
+      requiredLevel: 5,
+      isUnlocked: isSectionUnlocked(profile, 'staff'),
+      hint: 'يفتح في المستوى 5 لتعيين المديرين والمحاسبين وخبراء التشغيل لرفع الكفاءة.',
+    },
+    // 14. الأبحاث والتكنولوجيا (المستوى 6)
+    {
+      id: 'tech_tree',
+      title: 'الأبحاث والأتمتة',
+      category: 'expansion',
+      sectionId: 'tech_tree',
+      icon: <Cpu className="w-5 h-5 sm:w-6 sm:h-6 text-white" />,
+      gradient: 'bg-gradient-to-tr from-cyan-600 to-teal-500',
+      requiredLevel: 6,
+      isUnlocked: isSectionUnlocked(profile, 'tech_tree'),
+      hint: 'يفتح في المستوى 6 لتطوير شجرة التكنولوجيا وأبحاث الأتمتة الذكية لتقليل تكاليف المصانع.',
+    },
+    // 15. السيطرة الإقليمية (المستوى 7)
+    {
+      id: 'territory',
+      title: 'السيطرة الإقليمية',
+      category: 'expansion',
+      sectionId: 'territory',
+      icon: <Globe className="w-5 h-5 sm:w-6 sm:h-6 text-white" />,
+      gradient: 'bg-gradient-to-tr from-blue-700 to-cyan-500',
+      requiredLevel: 7,
+      isUnlocked: isSectionUnlocked(profile, 'territory'),
+      hint: 'يفتح في المستوى 7 للسيطرة على حصص الأسواق والتوسع في المحافظات والمدن.',
+    },
+    // 16. الهيبة والرفاهية (المستوى 8)
+    {
+      id: 'luxury',
+      title: 'الهيبة والرفاهية',
+      category: 'expansion',
+      sectionId: 'luxury',
+      icon: <Award className="w-5 h-5 sm:w-6 sm:h-6 text-slate-950" />,
+      gradient: 'bg-gradient-to-tr from-yellow-500 to-amber-300',
+      requiredLevel: 8,
+      isUnlocked: isSectionUnlocked(profile, 'luxury'),
+      hint: 'يفتح في المستوى 8 لاقتناء القصور والسيارات الفاخرة ورفع هيبة ونفوذ المدير التنفيذي.',
+    },
+    // 17. الكارتيل والتحالفات (المستوى 9)
+    {
+      id: 'cartel',
+      title: 'الكارتيل والتحالف',
+      category: 'expansion',
+      sectionId: 'cartel',
+      icon: <Shield className="w-5 h-5 sm:w-6 sm:h-6 text-white" />,
+      gradient: 'bg-gradient-to-tr from-rose-700 to-red-500',
+      requiredLevel: 9,
+      isUnlocked: isSectionUnlocked(profile, 'cartel'),
+      hint: 'يفتح في المستوى 9 لتأسيس التكتلات التجارية والتحالفات وسحق المنافسين في حرب الأسعار.',
+    },
+    // 18. الشحن الملاحي والموانئ (المستوى 10 - الفصل الثالث)
+    {
+      id: 'maritime',
+      title: 'الأسطول والشحن',
+      category: 'expansion',
+      sectionId: 'maritime',
+      icon: <Anchor className="w-5 h-5 sm:w-6 sm:h-6 text-white" />,
+      gradient: 'bg-gradient-to-tr from-indigo-700 to-blue-600',
+      requiredLevel: 10,
+      isUnlocked: isSectionUnlocked(profile, 'maritime'),
+      hint: 'يفتح في المستوى 10 (الفصل الثالث) لبناء أسطول الشحن البحري وفتح الموانئ الدولية للتصدير.',
+    },
+    // 19. المناقصات الحكومية (المستوى 12)
+    {
+      id: 'megaprojects',
+      title: 'المناقصات الكبرى',
+      category: 'expansion',
+      sectionId: 'megaprojects',
+      icon: <Landmark className="w-5 h-5 sm:w-6 sm:h-6 text-white" />,
+      gradient: 'bg-gradient-to-tr from-emerald-700 to-teal-600',
+      requiredLevel: 12,
+      isUnlocked: isSectionUnlocked(profile, 'megaprojects'),
+      hint: 'يفتح في المستوى 12 للمنافسة في مشاريع الدولة القومية والظفر بإعفاءات ضريبية سيادية.',
+    },
+    // 20. حاضنات الـ VC (المستوى 15 - الفصل الرابع)
+    {
+      id: 'incubator',
+      title: 'حاضنات الـ VC',
+      category: 'expansion',
+      sectionId: 'incubator',
+      icon: <Rocket className="w-5 h-5 sm:w-6 sm:h-6 text-white" />,
+      gradient: 'bg-gradient-to-tr from-purple-700 to-pink-600',
+      requiredLevel: 15,
+      isUnlocked: isSectionUnlocked(profile, 'incubator'),
+      hint: 'يفتح في المستوى 15 (عرش الإمبراطورية) للاستثمار الجريء ورعاية شركات اليونيكورن المليارية.',
+    },
   ];
 
-  // Leaderboard data as shown in design image
-  const leaderboardTop3 = [
-    { rank: 1, name: 'صالح ثونة', score: '2,940,915', avatar: '👳‍♂️', badge: '🥇' },
-    { rank: 2, name: 'داوود الهزاع', score: '2,470,600', avatar: '👨‍💼', badge: '🥈' },
-    { rank: 3, name: 'تقى الشمري', score: '1,965,410', avatar: '👩‍💼', badge: '🥉' },
-  ];
+  const availableCount = commandItems.filter((item) => item.isUnlocked).length;
 
-  const leaderboardRanks = [
-    { rank: 4, name: 'سالمو الروية', score: '2,846,915' },
-    { rank: 5, name: 'فارس الماجد', score: '2,415,660' },
-    { rank: 6, name: 'ليلى القاسمي', score: '1,083,430' },
-    { rank: 7, name: 'ياسر المستثمر', score: '1,630,220' },
-    { rank: 8, name: 'مريم التنمية', score: '1,541,775' },
-    { rank: 9, name: 'جابر الابتكار', score: '1,246,320' },
-    { rank: 10, name: 'سارة المستقبل', score: '997,542' },
-  ];
+  const filteredItems = commandItems.filter((item) => {
+    if (opsFilter === 'available') return item.isUnlocked;
+    if (opsFilter === 'core') return item.category === 'core' || item.category === 'special';
+    if (opsFilter === 'expansion') return item.category === 'expansion';
+    return true;
+  });
 
   return (
-    <div className="empire-dashboard-grid">
-      {/* Live Breaking Market News Banner */}
-      <MarketNewsTicker day={profile.day} onOpenCampaign={() => setCampaignOpen(true)} />
-
-      {/* سيناريو قصة كفاح: إنقاذ المصنع المنهار (The Struggle & Turnaround Hub) */}
-      <StruggleStoryHub
-        profile={profile}
-        onNavigate={onNavigate}
-        onUpdateProfile={onUpdateProfile ?? ((updater) => {
-          onCommand(
-            { name: 'redeem_reward_code', args: { code: 'STORY-UPDATE' } } as any,
-            (curr) => ({ ok: true, profile: updater(curr), message: 'تم تحديث قصة الكفاح', data: null })
-          );
-        })}
-      />
-
-      {/* Smart Guided Onboarding Quests & Emergency Loan (التعديل الجديد: دليل المبتدئ والتسهيل الائتماني) */}
-      <SmartOnboardingQuests
-        profile={profile}
-        onNavigate={onNavigate}
-        onClaimReward={onClaimReward ?? ((cash, diamonds) => {
-          onCommand(
-            { name: 'redeem_reward_code', args: { code: 'QUEST-CLAIM' } } as any,
-            (curr) => ({ 
-              ok: true, 
-              profile: { ...curr, bankBalance: (curr.bankBalance ?? 0) + cash, diamonds: (curr.diamonds ?? 0) + diamonds },
-              message: 'تم استلام مكافأة المهمة',
-              data: null
-            })
-          );
-        })}
-        onRequestEmergencyLoan={onRequestEmergencyLoan ?? (() => {
-          onCommand(
-            { name: 'redeem_reward_code', args: { code: 'EMERGENCY-LOAN' } } as any,
-            (curr) => ({ 
-              ok: true, 
-              profile: { ...curr, bankBalance: (curr.bankBalance ?? 0) + 250000 },
-              message: 'تم إيداع التسهيل الائتماني',
-              data: null
-            })
-          );
-        })}
-      />
-
-      {/* Rival Characters Hub (التعديل الجديد: شخصيات المنافسين التفاعلية) */}
-      <RivalCharactersHub profile={profile} />
-
-      {/* ================= TOP ROW: STORY CARD + COMPANIES OVERVIEW ================= */}
-      <div className="empire-top-row">
-        {/* LEFT COLUMN: STORY & QUEST */}
-        <div className="empire-left-col">
-          {/* Story Card */}
-          <section className="empire-card empire-story-card">
-            <div className="empire-story-bg" />
-            <div className="empire-story-content">
-              <span className="empire-badge-kicker">الفصل الأول</span>
-              <h2>إرث عائلة النيل</h2>
-              <p>رحلة تبدأ من قلب القاهرة، حيث تتحول الطموحات إلى إمبراطورية.</p>
-              <div className="empire-story-footer">
-                <span className="empire-story-tag">ماضٍ عريق.. مستقبل أبهر</span>
-                <button className="empire-btn-gold" type="button" onClick={() => setCampaignOpen(true)}>
-                  تابع القصة <Icon name="chevron" size={14} />
-                </button>
-              </div>
-            </div>
-          </section>
-
-          {/* Current Quest Card */}
-          <section className="empire-card empire-quest-card">
-            <div className="empire-quest-icon">
-              <Icon name="tasks" size={28} />
-            </div>
-            <div className="empire-quest-info">
-              <span className="empire-quest-label">مهمتك الحالية</span>
-              <h3>{operations.nextStep.title || 'تأسيس شركتك الأولى'}</h3>
-              <div className="empire-quest-bar">
-                <div className="empire-quest-track">
-                  <span style={{ width: `${companyCount > 0 ? 100 : 0}%` }} />
-                </div>
-                <small>{companyCount > 0 ? '1/1' : '0/1'}</small>
-              </div>
-            </div>
-            <button className="empire-btn-teal" type="button" onClick={() => onNavigate(operations.nextStep.section)}>
-              أذهب المهمة <Icon name="chevron" size={14} />
-            </button>
-          </section>
+    <div className="space-y-6 max-w-7xl mx-auto pb-12 animate-fade-in" dir="rtl">
+      {/* 1. Sleek News & Market Ticker Bar */}
+      <div className="bg-gradient-to-r from-slate-900 via-amber-950/40 to-slate-900 border border-amber-500/30 rounded-2xl p-2.5 sm:p-3 flex items-center justify-between gap-3 shadow-lg">
+        <div className="flex items-center gap-2 overflow-hidden text-xs sm:text-sm">
+          <span className="px-2 py-0.5 rounded-lg bg-amber-500 text-slate-950 font-black text-[11px] shrink-0 flex items-center gap-1">
+            <Flame className="w-3.5 h-3.5 fill-slate-950" />
+            عاجل الأسواق
+          </span>
+          <span className="text-slate-200 truncate">
+            ارتفاع الطلب على المواد الأولية في {country.name} · دورة اليوم {profile.day} بدأت الآن بعوائد استثمارية واعدة
+          </span>
         </div>
-
-        {/* RIGHT COLUMN: COMPANIES SECTION */}
-        <div className="empire-right-col">
-          <section className="empire-card empire-companies-card">
-            <div className="empire-card-header empire-companies-header">
-              <div>
-                <h2>الشركات</h2>
-                <small>شركاتك تقود الإمبراطورية</small>
-              </div>
-              <span className="empire-pill-count">{companyCount} / 10 شركات</span>
-            </div>
-
-            {/* Featured Active Company Card */}
-            <div className="empire-company-featured">
-              <div className="empire-company-head">
-                <div className="empire-company-logo">🌾</div>
-                <div className="empire-company-title">
-                  <h3>شركة النيل للأغذية</h3>
-                  <small>جودة غنية.. لغد أفضل</small>
-                </div>
-                <span className="empire-level-badge">المستوى 8</span>
-              </div>
-              <div className="empire-company-stats">
-                <div>
-                  <small>الأرباح اليومية</small>
-                  <strong>420,900</strong>
-                </div>
-                <div>
-                  <small>حجم المبيعات</small>
-                  <strong>290</strong>
-                </div>
-                <div>
-                  <small>مستوى الشركة</small>
-                  <strong>8</strong>
-                </div>
-              </div>
-              <div className="empire-company-progress">
-                <div className="empire-progress-track">
-                  <span style={{ width: '65%' }} />
-                </div>
-                <small>65%</small>
-              </div>
-              <div className="empire-company-actions">
-                <button className="empire-btn-outline" type="button" onClick={() => onNavigate('production')}>
-                  تطوير ⚡
-                </button>
-                <button className="empire-btn-dark" type="button" onClick={() => onNavigate('companies')}>
-                  إدارة الشركة ⚙️
-                </button>
-              </div>
-            </div>
-
-            {/* Sub-Companies Grid */}
-            <div className="empire-companies-grid">
-              {/* Company 1 */}
-              <div className="empire-company-sub">
-                <div className="empire-sub-head">
-                  <div className="empire-sub-icon">⚡</div>
-                  <div>
-                    <h4>شركة الطاقة</h4>
-                    <small>طاقة اليوم لمستقبل أسيان</small>
-                  </div>
-                </div>
-                <div className="empire-sub-metrics">
-                  <div><span>الأرباح</span><strong>310,900</strong></div>
-                  <div><span>المبيعات</span><strong>190</strong></div>
-                  <div><span>المستوى</span><strong>6</strong></div>
-                </div>
-                <div className="empire-sub-actions">
-                  <button className="empire-btn-sm-teal" type="button" onClick={() => onNavigate('production')}>تطوير ⚡</button>
-                  <button className="empire-btn-sm-dark" type="button" onClick={() => onNavigate('companies')}>إدارة ⚙️</button>
-                </div>
-              </div>
-
-              {/* Company 2 */}
-              <div className="empire-company-sub">
-                <div className="empire-sub-head">
-                  <div className="empire-sub-icon">🚢</div>
-                  <div>
-                    <h4>شركة الممرات</h4>
-                    <small>تربط العالم بالشرق</small>
-                  </div>
-                </div>
-                <div className="empire-sub-metrics">
-                  <div><span>الأرباح</span><strong>270,000</strong></div>
-                  <div><span>المبيعات</span><strong>160</strong></div>
-                  <div><span>المستوى</span><strong>5</strong></div>
-                </div>
-                <div className="empire-sub-actions">
-                  <button className="empire-btn-sm-teal" type="button" onClick={() => onNavigate('production')}>تطوير ⚡</button>
-                  <button className="empire-btn-sm-dark" type="button" onClick={() => onNavigate('companies')}>إدارة ⚙️</button>
-                </div>
-              </div>
-            </div>
-
-            {/* Add Company CTA */}
-            <button className="empire-btn-add-company" type="button" onClick={() => onNavigate('companies')}>
-              <span>+</span> تأسيس شركة جديدة
-            </button>
-          </section>
+        <div className="text-[11px] text-amber-300 font-bold shrink-0 hidden sm:block">
+          {country.flag} {country.name}
         </div>
       </div>
 
-      {/* ================= MIDDLE ROW: LANDS SECTION ================= */}
-      <section className="empire-card empire-lands-section">
-        <div className="empire-card-header">
+      {/* Story Campaign & Horizon Secrets Master Banner */}
+      <div className="bg-gradient-to-r from-amber-950/70 via-slate-900 to-amber-950/70 border-2 border-amber-500/60 rounded-3xl p-4 sm:p-5 shadow-2xl flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div className="flex items-center gap-3 w-full sm:w-auto">
+          <div className="w-12 h-12 rounded-2xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-2xl shadow-inner shrink-0">
+            📜
+          </div>
           <div>
-            <h2>الأراضي</h2>
-            <small>اختر موقع توسعك الاستثماري.</small>
-          </div>
-          <button className="empire-link-btn" type="button" onClick={() => onNavigate('lands')}>
-            عرض الخريطة الكاملة <Icon name="chevron" size={14} />
-          </button>
-        </div>
-
-        <div className="empire-lands-layout">
-          {/* Featured Owned Land */}
-          <div className="empire-land-featured">
-            <div className="empire-land-image-wrap">
-              <span className="empire-land-owned-badge">مملوكة لك</span>
-              <div className="empire-land-overlay-info">
-                <h3>أرض النخيل</h3>
-                <p>520 م² · جاهزة للبناء <Icon name="target" size={14} /></p>
-              </div>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                سيناريو القصة الرئيسي · الفصل {profile.campaignChapterId ?? 1}
+              </span>
+              <span className="text-xs text-slate-400 font-bold">
+                {country.flag} {country.name}
+              </span>
             </div>
-          </div>
-
-          {/* Available Lands List */}
-          <div className="empire-lands-available">
-            <span className="empire-sub-label">الأراضي المتاحة للشراء</span>
-            <div className="empire-lands-grid">
-              <div className="empire-land-card">
-                <ItemImage type="land" landType="agricultural" name="أرض زراعية" size="sm" />
-                <div className="empire-land-details">
-                  <h4>أرض زراعية خصبة</h4>
-                  <small>600 م² · ضفاف النيل</small>
-                  <button className="empire-btn-buy" type="button" onClick={() => onNavigate('lands')}>
-                    اشتر الأرض 🛒
-                  </button>
-                </div>
-              </div>
-
-              <div className="empire-land-card">
-                <ItemImage type="land" landType="commercial" name="أرض تجارية" size="sm" />
-                <div className="empire-land-details">
-                  <h4>أرض تجارية متميزة</h4>
-                  <small>450 م² · وسط العاصمة</small>
-                  <button className="empire-btn-buy" type="button" onClick={() => onNavigate('lands')}>
-                    اشتر الأرض 🛒
-                  </button>
-                </div>
-              </div>
-            </div>
+            <h3 className="text-base sm:text-lg font-black text-white mt-0.5">
+              Suly Business Empire: صعود الإمبراطورية
+            </h3>
+            <p className="text-xs text-slate-300 mt-0.5 line-clamp-1">
+              أسرار مجموعة الأفق العالمية، قرارات التوسع الاستراتيجي، والمنافسون المحليون.
+            </p>
           </div>
         </div>
-      </section>
 
-      {/* ================= BOTTOM ROW: MANAGEMENT, ANALYTICS & LEADERBOARD ================= */}
-      <div className="empire-bottom-row">
-        {/* PANEL 1: STAFF & MANAGEMENT */}
-        <section className="empire-card empire-staff-panel">
-          <div className="empire-card-header">
-            <div>
-              <h2>الإدارة والرواتب</h2>
-              <small>أدر القوة التشغيلية لأثر أكبر</small>
-            </div>
-          </div>
-
-          {/* Staff Manager Card */}
-          <div className="empire-staff-card">
-            <div className="empire-staff-avatar">👷‍♂️</div>
-            <div className="empire-staff-info">
-              <h4>مدير المصنع</h4>
-              <small>مصنع المواد الغذائية</small>
-              <span className="empire-salary-tag">1,000 {country.currency.code} / يوم</span>
-            </div>
-            <button className="empire-btn-sm-gold" type="button" onClick={() => onNavigate('staff')}>
-              ترقية
-            </button>
-          </div>
-
-          {/* Recent Operations Log */}
-          <div className="empire-operations-log">
-            <h4>أحدث العمليات</h4>
-            {recentOperations.map((op) => (
-              <div className="empire-log-item" key={op.id}>
-                <div className={`empire-log-icon empire-log-icon--${op.type}`}>
-                  <Icon name={op.icon} size={16} />
-                </div>
-                <div className="empire-log-info">
-                  <strong>{op.title}</strong>
-                  <small>{op.subtitle}</small>
-                </div>
-                <span className={`empire-log-amount empire-log-amount--${op.type}`}>{op.amount}</span>
-              </div>
-            ))}
-          </div>
-
-          <button className="empire-btn-teal-wide" type="button" onClick={() => onNavigate('staff')}>
-            وظف موظفاً جديداً
+        {onOpenCampaign && (
+          <button
+            type="button"
+            onClick={onOpenCampaign}
+            className="w-full sm:w-auto px-5 py-2.5 rounded-2xl bg-gradient-to-r from-amber-500 to-yellow-400 hover:from-amber-400 hover:to-yellow-300 text-slate-950 font-black text-xs shadow-lg transition active:scale-95 flex items-center justify-center gap-2 cursor-pointer shrink-0"
+          >
+            <span>خريطة القصة والقرارات</span>
+            <ChevronLeft className="w-4 h-4" />
           </button>
-        </section>
-
-        {/* PANEL 2: FINANCIAL CHARTS & PREVIEW */}
-        <section className="empire-card empire-charts-panel">
-          <div className="empire-card-header">
-            <div>
-              <h2>الأداء المالي</h2>
-              <small>تقرير الأرباح والمصروفات</small>
-            </div>
-          </div>
-
-          {/* Financial Totals */}
-          <div className="empire-finance-summary">
-            <div className="empire-finance-box empire-finance-box--green">
-              <small>صافي الربح</small>
-              <strong>250K</strong>
-            </div>
-            <div className="empire-finance-box empire-finance-box--red">
-              <small>المصروفات</small>
-              <strong>230K</strong>
-            </div>
-            <div className="empire-finance-box empire-finance-box--blue">
-              <small>الإيرادات</small>
-              <strong>480K</strong>
-            </div>
-          </div>
-
-          {/* Mock Financial Bar Charts */}
-          <div className="empire-chart-box">
-            <span className="empire-chart-title">الأداء الأسبوعي</span>
-            <div className="empire-bars">
-              <div className="empire-bar-group"><span className="bar green" style={{ height: '60%' }} /><span className="bar red" style={{ height: '30%' }} /></div>
-              <div className="empire-bar-group"><span className="bar green" style={{ height: '80%' }} /><span className="bar red" style={{ height: '40%' }} /></div>
-              <div className="empire-bar-group"><span className="bar green" style={{ height: '45%' }} /><span className="bar red" style={{ height: '50%' }} /></div>
-              <div className="empire-bar-group"><span className="bar green" style={{ height: '90%' }} /><span className="bar red" style={{ height: '35%' }} /></div>
-              <div className="empire-bar-group"><span className="bar green" style={{ height: '70%' }} /><span className="bar red" style={{ height: '25%' }} /></div>
-            </div>
-          </div>
-
-          <div className="empire-chart-box">
-            <span className="empire-chart-title">الأداء اليومي</span>
-            <div className="empire-bars empire-bars--daily">
-              <div className="bar-single green" style={{ height: '40%' }} />
-              <div className="bar-single green" style={{ height: '65%' }} />
-              <div className="bar-single green" style={{ height: '85%' }} />
-              <div className="bar-single green" style={{ height: '50%' }} />
-              <div className="bar-single green" style={{ height: '75%' }} />
-            </div>
-          </div>
-        </section>
-
-        {/* PANEL 3: GLOBAL LEADERBOARD */}
-        <section className="empire-card empire-leaderboard-panel">
-          <div className="empire-card-header">
-            <div>
-              <h2>المتصدرون</h2>
-              <small>أقوى قادة الأعمال في العالم العربي</small>
-            </div>
-            <button className="empire-btn-sm-outline" type="button" onClick={() => onNavigate('reports')}>
-              الموسم الحالي 🏆
-            </button>
-          </div>
-
-          {/* Top 3 Podium */}
-          <div className="empire-podium">
-            {/* 2nd Place */}
-            <div className="empire-podium-spot empire-podium--2">
-              <div className="empire-podium-avatar">{leaderboardTop3[1].avatar}</div>
-              <strong>{leaderboardTop3[1].name}</strong>
-              <small>{leaderboardTop3[1].score}</small>
-              <div className="empire-podium-block">2</div>
-            </div>
-
-            {/* 1st Place */}
-            <div className="empire-podium-spot empire-podium--1">
-              <div className="empire-podium-crown">👑</div>
-              <div className="empire-podium-avatar empire-podium-avatar--gold">{leaderboardTop3[0].avatar}</div>
-              <strong>{leaderboardTop3[0].name}</strong>
-              <small>{leaderboardTop3[0].score}</small>
-              <div className="empire-podium-block empire-podium-block--gold">1</div>
-            </div>
-
-            {/* 3rd Place */}
-            <div className="empire-podium-spot empire-podium--3">
-              <div className="empire-podium-avatar">{leaderboardTop3[2].avatar}</div>
-              <strong>{leaderboardTop3[2].name}</strong>
-              <small>{leaderboardTop3[2].score}</small>
-              <div className="empire-podium-block">3</div>
-            </div>
-          </div>
-
-          {/* Ranks 4 to 10 */}
-          <div className="empire-leaderboard-list">
-            {leaderboardRanks.map((player) => (
-              <div className={`empire-lb-row ${player.rank === 6 ? 'is-player' : ''}`} key={player.rank}>
-                <span className="empire-lb-rank">{player.rank}</span>
-                <span className="empire-lb-name">{player.name}</span>
-                <strong className="empire-lb-score">{player.score}</strong>
-              </div>
-            ))}
-          </div>
-
-          <button className="empire-btn-teal-wide" type="button" onClick={() => onNavigate('reports')}>
-            تفاصيل الموسم 📊
-          </button>
-        </section>
+        )}
       </div>
 
-      {/* Story Campaign Modal */}
-      {campaignOpen && (
-        <StoryCampaignHub
-          profile={profile}
-          country={country}
-          onClose={() => setCampaignOpen(false)}
-          onClaimReward={(diamonds, gold, money, reputation) => {
-            if (onUpdateProfile) {
-              onUpdateProfile((prev) => {
-                const currentChapterId = (prev as unknown as { campaignChapterId?: number }).campaignChapterId ?? 1;
-                return {
-                  ...prev,
-                  diamonds: (prev.diamonds ?? 0) + (diamonds > 0 ? diamonds : 0),
-                  goldGrams: (prev.goldGrams ?? 0) + (gold > 0 ? gold : 0),
-                  bankBalance: prev.bankBalance + (money > 0 ? money : 0),
-                  reputation: Math.min(100, Math.max(0, (prev.reputation ?? 50) + (reputation ?? 0))),
-                  ...({ campaignChapterId: currentChapterId + 1 }),
-                };
-              });
-            }
-          }}
-        />
+      {/* 2. Executive Wealth Overview (4 Premium Cards) */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        {/* Total Net Worth */}
+        <div className="bg-slate-900/90 border border-amber-500/40 rounded-2xl p-4 shadow-xl shadow-amber-950/20 relative overflow-hidden group hover:border-amber-400/80 transition">
+          <div className="absolute top-0 right-0 w-24 h-24 bg-amber-500/10 rounded-full blur-2xl group-hover:bg-amber-500/20 transition" />
+          <div className="flex items-center justify-between text-slate-400 text-xs mb-1">
+            <span className="font-semibold">صافي الثروة الإجمالية</span>
+            <div className="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-300 flex items-center justify-center font-bold">
+              <Crown className="w-4 h-4 text-amber-400" />
+            </div>
+          </div>
+          <strong className="text-lg sm:text-xl font-black text-amber-400 block tracking-tight">
+            {formatMoney(totalAssets, country)}
+          </strong>
+          <span className="text-[10px] text-slate-400 mt-1 block">
+            تقييم الشركات والأراضي والسيولة
+          </span>
+        </div>
+
+        {/* Bank Cash Balance */}
+        <div className="bg-slate-900/90 border border-emerald-500/40 rounded-2xl p-4 shadow-xl shadow-emerald-950/20 relative overflow-hidden group hover:border-emerald-400/80 transition">
+          <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/10 rounded-full blur-2xl group-hover:bg-emerald-500/20 transition" />
+          <div className="flex items-center justify-between text-slate-400 text-xs mb-1">
+            <span className="font-semibold">السيولة النقدية المتاحة</span>
+            <div className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-300 flex items-center justify-center font-bold">
+              <Wallet className="w-4 h-4 text-emerald-400" />
+            </div>
+          </div>
+          <strong className="text-lg sm:text-xl font-black text-emerald-400 block tracking-tight">
+            {formatMoney(profile.bankBalance, country)}
+          </strong>
+          <span className="text-[10px] text-slate-400 mt-1 block">
+            جاهزة للمزايدة والتوسع الفوري
+          </span>
+        </div>
+
+        {/* Pure Gold Bullion */}
+        <div className="bg-slate-900/90 border border-yellow-500/40 rounded-2xl p-4 shadow-xl shadow-yellow-950/20 relative overflow-hidden group hover:border-yellow-400/80 transition">
+          <div className="absolute top-0 right-0 w-24 h-24 bg-yellow-500/10 rounded-full blur-2xl group-hover:bg-yellow-500/20 transition" />
+          <div className="flex items-center justify-between text-slate-400 text-xs mb-1">
+            <span className="font-semibold">احتياطي الذهب الخالص</span>
+            <div className="w-8 h-8 rounded-xl bg-yellow-500/20 text-yellow-300 flex items-center justify-center font-bold">
+              <Coins className="w-4 h-4 text-yellow-400" />
+            </div>
+          </div>
+          <strong className="text-lg sm:text-xl font-black text-yellow-300 block tracking-tight">
+            {(profile.goldGrams ?? 0).toFixed(2)} غرام
+          </strong>
+          <span className="text-[10px] text-slate-400 mt-1 block">
+            ملاذ آمن ضد تقلبات التضخم
+          </span>
+        </div>
+
+        {/* Diamonds */}
+        <div className="bg-slate-900/90 border border-cyan-500/40 rounded-2xl p-4 shadow-xl shadow-cyan-950/20 relative overflow-hidden group hover:border-cyan-400/80 transition">
+          <div className="absolute top-0 right-0 w-24 h-24 bg-cyan-500/10 rounded-full blur-2xl group-hover:bg-cyan-500/20 transition" />
+          <div className="flex items-center justify-between text-slate-400 text-xs mb-1">
+            <span className="font-semibold">رصيد الماس الإمبراطوري</span>
+            <div className="w-8 h-8 rounded-xl bg-cyan-500/20 text-cyan-300 flex items-center justify-center font-bold">
+              <Gem className="w-4 h-4 text-cyan-400" />
+            </div>
+          </div>
+          <strong className="text-lg sm:text-xl font-black text-cyan-300 block tracking-tight">
+            {profile.diamonds ?? 0} 💎
+          </strong>
+          <span className="text-[10px] text-slate-400 mt-1 block">
+            للتسريع والترقيات والفرص النادرة
+          </span>
+        </div>
+      </div>
+
+      {/* 2.2. Offline Mobile Strategic Hub (Phases 1 - 5 Core Modules) */}
+      <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-4 sm:p-5 shadow-2xl backdrop-blur-md space-y-3">
+        <div className="flex items-center justify-between pb-2.5 border-b border-slate-800/80">
+          <div className="flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
+            <h3 className="font-extrabold text-sm sm:text-base text-white">
+              محاور تطوير إمبراطورية الأعمال (Offline Mobile)
+            </h3>
+            <span className="text-[11px] font-extrabold px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40">
+              أوفلاين بالكامل
+            </span>
+          </div>
+          <span className="text-[11px] text-slate-400 hidden sm:inline">
+            أرباح الغياب • صدمات البنك المركزي • حروب الكارتيل • الهيبة والتوسع
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+          {/* Phase 1: Smart Offline Idle Report */}
+          <button
+            type="button"
+            onClick={() => onOpenMorningReport?.()}
+            className="p-3.5 rounded-2xl bg-slate-950/70 border border-amber-500/30 hover:border-amber-400/80 hover:bg-slate-950 transition text-right flex flex-col justify-between group active:scale-95"
+          >
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-xl">🌅</span>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-500/20 text-amber-300">
+                  المرحلة 1
+                </span>
+              </div>
+              <h4 className="text-xs font-black text-white group-hover:text-amber-300 transition">
+                تقرير الصباح لغياب المدير
+              </h4>
+              <p className="text-[11px] text-slate-400 mt-1 line-clamp-2">
+                حساب سلع المصانع وتوزيعات الأسهم أثناء غيابك عن اللعبة.
+              </p>
+            </div>
+            <div className="mt-2 pt-2 border-t border-slate-800/60 flex items-center justify-between text-[11px] font-bold text-amber-400">
+              <span>معاينة الأرباح الآن</span>
+              <ChevronLeft className="w-3.5 h-3.5 group-hover:-translate-x-1 transition" />
+            </div>
+          </button>
+
+          {/* Phase 3: Central Bank & Macroeconomic Shocks */}
+          <button
+            type="button"
+            onClick={() => onOpenCentralBank?.()}
+            className="p-3.5 rounded-2xl bg-slate-950/70 border border-emerald-500/30 hover:border-emerald-400/80 hover:bg-slate-950 transition text-right flex flex-col justify-between group active:scale-95"
+          >
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-xl">🏛️</span>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300">
+                  المرحلة 3
+                </span>
+              </div>
+              <h4 className="text-xs font-black text-white group-hover:text-emerald-300 transition">
+                بيان البنك المركزي العاجل
+              </h4>
+              <p className="text-[11px] text-slate-400 mt-1 line-clamp-2">
+                قرارات الفائدة والتضخم وصدمات العرض والطلب وتقلبات البورصة.
+              </p>
+            </div>
+            <div className="mt-2 pt-2 border-t border-slate-800/60 flex items-center justify-between text-[11px] font-bold text-emerald-400">
+              <span>نشرة الفائدة والأسعار</span>
+              <ChevronLeft className="w-3.5 h-3.5 group-hover:-translate-x-1 transition" />
+            </div>
+          </button>
+
+          {/* Phase 4: Regional Syndicate Wars */}
+          <button
+            type="button"
+            onClick={() => handleNav('territory')}
+            className="p-3.5 rounded-2xl bg-slate-950/70 border border-indigo-500/30 hover:border-indigo-400/80 hover:bg-slate-950 transition text-right flex flex-col justify-between group active:scale-95"
+          >
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-xl">⚔️</span>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300">
+                  المرحلة 4
+                </span>
+              </div>
+              <h4 className="text-xs font-black text-white group-hover:text-indigo-300 transition">
+                حروب الكارتيل والسيطرة
+              </h4>
+              <p className="text-[11px] text-slate-400 mt-1 line-clamp-2">
+                حرب الأسعار والمراكز اللوجستية لبلوغ 60% احتكار في المحافظات.
+              </p>
+            </div>
+            <div className="mt-2 pt-2 border-t border-slate-800/60 flex items-center justify-between text-[11px] font-bold text-indigo-400">
+              <span>خريطة الأقاليم</span>
+              <ChevronLeft className="w-3.5 h-3.5 group-hover:-translate-x-1 transition" />
+            </div>
+          </button>
+
+          {/* Phase 5: Prestige System & International Expansion */}
+          <button
+            type="button"
+            onClick={() => onOpenPrestige?.()}
+            className="p-3.5 rounded-2xl bg-slate-950/70 border border-purple-500/30 hover:border-purple-400/80 hover:bg-slate-950 transition text-right flex flex-col justify-between group active:scale-95"
+          >
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-xl">👑</span>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-purple-500/20 text-purple-300">
+                  المرحلة 5
+                </span>
+              </div>
+              <h4 className="text-xs font-black text-white group-hover:text-purple-300 transition">
+                نظام الهيبة والتوسع الدولي
+              </h4>
+              <p className="text-[11px] text-slate-400 mt-1 line-clamp-2">
+                تأسيس صندوق سيادي عابر للقارات (الرياض، دبي، لندن، نيويورك).
+              </p>
+            </div>
+            <div className="mt-2 pt-2 border-t border-slate-800/60 flex items-center justify-between text-[11px] font-bold text-purple-400">
+              <span>الصندوق والامتيازات</span>
+              <ChevronLeft className="w-3.5 h-3.5 group-hover:-translate-x-1 transition" />
+            </div>
+          </button>
+        </div>
+      </div>
+      {/* 3. Executive Command Operations Bar with explicit unlock levels & lock badges */}
+      <div className="bg-slate-900/95 border border-slate-800 rounded-3xl p-4 sm:p-6 shadow-2xl backdrop-blur-md">
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-4 pb-3 border-b border-slate-800/80">
+          <div className="flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping" />
+            <h3 className="font-extrabold text-sm sm:text-base text-white">
+              غرفة العمليات المركزية
+            </h3>
+            <span className="text-xs text-slate-400 hidden sm:inline">
+              (أنظمة مقفلة تفتح تدريجياً حسب سيناريو القصة ومستوى اللاعب)
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {/* Category Filter Pills */}
+            <div className="flex items-center bg-slate-950/80 border border-slate-800 p-1 rounded-xl text-[11px] font-bold">
+              <button
+                onClick={() => setOpsFilter('all')}
+                className={`px-2.5 py-1 rounded-lg transition ${opsFilter === 'all' ? 'bg-amber-500 text-slate-950 font-black shadow' : 'text-slate-400 hover:text-white'}`}
+              >
+                الكل ({commandItems.length})
+              </button>
+              <button
+                onClick={() => setOpsFilter('available')}
+                className={`px-2.5 py-1 rounded-lg transition ${opsFilter === 'available' ? 'bg-amber-500 text-slate-950 font-black shadow' : 'text-slate-400 hover:text-white'}`}
+              >
+                المتاح ({availableCount})
+              </button>
+              <button
+                onClick={() => setOpsFilter('core')}
+                className={`px-2.5 py-1 rounded-lg transition ${opsFilter === 'core' ? 'bg-amber-500 text-slate-950 font-black shadow' : 'text-slate-400 hover:text-white'}`}
+              >
+                الأساسية
+              </button>
+              <button
+                onClick={() => setOpsFilter('expansion')}
+                className={`px-2.5 py-1 rounded-lg transition ${opsFilter === 'expansion' ? 'bg-amber-500 text-slate-950 font-black shadow' : 'text-slate-400 hover:text-white'}`}
+              >
+                التوسع 🚀
+              </button>
+            </div>
+
+            <span className="text-xs text-amber-400/90 font-bold bg-amber-500/10 px-3 py-1 rounded-full border border-amber-500/30">
+              مستواك الحالي: {profile.level ?? 1}
+            </span>
+          </div>
+        </div>
+
+        {/* Icons Grid with Names & Story Lock Labels */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-10 gap-2 sm:gap-2.5">
+          {filteredItems.map((item) => {
+            return (
+              <button
+                key={item.id}
+                onClick={() => {
+                  if (!item.isUnlocked) {
+                    playSound('click');
+                    setLockedGateModal({
+                      title: item.title,
+                      sectionId: item.sectionId ?? 'home',
+                      requiredLevel: item.requiredLevel,
+                      hint: item.hint,
+                    });
+                    return;
+                  }
+                  if (item.id === 'leaderboard') {
+                    playSound('click');
+                    setIsLeaderboardOpen(true);
+                  } else if (item.id === 'finance_modal') {
+                    playSound('click');
+                    setIsFinanceModalOpen(true);
+                  } else if (item.id === 'lucky_wheel') {
+                    playSound('click');
+                    onOpenLuckyWheel?.();
+                  } else if (item.sectionId) {
+                    handleNav(item.sectionId);
+                  }
+                }}
+                data-guide-nav={item.sectionId}
+                className={`flex flex-col items-center justify-between p-2 rounded-2xl transition group cursor-pointer shadow-md relative min-h-[105px] ${
+                  item.isUnlocked
+                    ? 'bg-slate-950/70 border border-slate-800 hover:border-amber-400 hover:bg-slate-900 active:scale-95'
+                    : 'bg-slate-950/40 border border-slate-800/80 hover:border-amber-500/60 hover:bg-slate-900/50'
+                }`}
+                title={item.isUnlocked ? item.title : `يفتح في مستوى ${item.requiredLevel} · ${item.hint}`}
+              >
+                {/* Lucky wheel free badge */}
+                {item.id === 'lucky_wheel' && (
+                  spinState.isFree ? (
+                    <span className="absolute -top-1.5 -right-1.5 px-1.5 py-0.5 rounded-full bg-emerald-500 text-white font-extrabold text-[9px] shadow-sm animate-pulse z-10">
+                      مجاناً
+                    </span>
+                  ) : (
+                    <span className="absolute -top-1.5 -right-1.5 px-1.5 py-0.5 rounded-full bg-slate-800 text-amber-300 font-bold text-[8px] border border-amber-500/30 font-mono z-10">
+                      {spinState.formattedCountdown}
+                    </span>
+                  )
+                )}
+
+                <div className="relative mt-1">
+                  <div className={`w-11 h-11 sm:w-12 sm:h-12 rounded-2xl ${item.gradient} flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform ${!item.isUnlocked ? 'grayscale-[45%] opacity-70' : ''}`}>
+                    {item.icon}
+                  </div>
+                  {!item.isUnlocked && (
+                    <div className="absolute -bottom-1 -left-1 w-5 h-5 rounded-full bg-slate-950 border border-amber-500 flex items-center justify-center text-[10px] text-amber-400 shadow-md">
+                      🔒
+                    </div>
+                  )}
+                </div>
+
+                <span className="text-[11px] font-bold text-slate-200 mt-1.5 text-center leading-tight group-hover:text-amber-300 truncate w-full px-1">
+                  {item.title}
+                </span>
+
+                {/* Explicit Lock Level Badge as requested by the user */}
+                {opsFilter === 'available' ? (
+                  <span className="text-[9px] text-emerald-400 font-bold mt-1 bg-emerald-500/10 px-1.5 py-0.5 rounded-md border border-emerald-500/30">
+                    نشط ومتاح ✓
+                  </span>
+                ) : !item.isUnlocked ? (
+                  <span className="text-[9px] font-black text-amber-300 bg-amber-950/90 px-1.5 py-0.5 rounded-md border border-amber-500/40 mt-1 flex items-center gap-0.5 shadow-sm whitespace-nowrap">
+                    <Lock className="w-2.5 h-2.5 text-amber-400 shrink-0" />
+                    <span>يفتح في مستوى {item.requiredLevel}</span>
+                  </span>
+                ) : (
+                  <span className="text-[9px] text-emerald-400/90 font-bold mt-1">
+                    متاح ✓
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* 4. Balanced Two-Column Operational Hub */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        {/* LEFT COLUMN: Active Companies & Factories Status */}
+        <div className="bg-slate-900/95 border border-slate-800 rounded-3xl p-5 sm:p-6 shadow-xl flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between pb-3 mb-4 border-b border-slate-800">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center">
+                  <Building2 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-sm sm:text-base text-white">
+                    شركاتك الصناعية والتجارية
+                  </h3>
+                  <small className="text-xs text-slate-400">
+                    {companyCount > 0 ? `${companyCount} شركات قيد النشاط والتشغيل` : 'لم يتم تأسيس شركات بعد'}
+                  </small>
+                </div>
+              </div>
+
+              <button
+                onClick={() => handleNav('companies')}
+                className="text-xs text-amber-400 hover:text-amber-300 font-bold flex items-center gap-1 transition"
+              >
+                <span>إدارة الكل</span>
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Featured Active Company or Get Started Callout */}
+            {profile.companies.length > 0 ? (
+              (() => {
+                const featured = profile.companies[0];
+                const condition = featured.maintenanceCondition ?? 100;
+                const level = featured.upgradeLevel ?? 1;
+                const cost = featured.operatingCostPerDay ?? 15000;
+                return (
+                  <div className="bg-slate-950/70 border border-slate-800 rounded-2xl p-4 mb-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-300 flex items-center justify-center text-xl">
+                          {featured.industryId.includes('food') ? '🌾' : featured.industryId.includes('energy') ? '⚡' : '🏭'}
+                        </div>
+                        <div>
+                          <h4 className="font-extrabold text-white text-sm">
+                            {featured.name}
+                          </h4>
+                          <span className="text-[11px] text-slate-400">
+                            قطاع {featured.industryId} · المستوى {level}
+                          </span>
+                        </div>
+                      </div>
+                      <span className={`text-xs px-2.5 py-1 rounded-full font-bold border ${
+                        condition >= 70 ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40' : 'bg-rose-500/20 text-rose-300 border-rose-500/40'
+                      }`}>
+                        كفاءة {condition}%
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-2 text-center text-xs my-3 p-2.5 bg-slate-900 rounded-xl border border-slate-800/80">
+                      <div>
+                        <span className="text-[10px] text-slate-400 block">التكلفة اليومية</span>
+                        <strong className="text-slate-200">{cost.toLocaleString()} {country.currency.code}</strong>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-slate-400 block">حالة الماكينات</span>
+                        <strong className={condition < 50 ? 'text-rose-400' : 'text-emerald-400'}>{condition}%</strong>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-slate-400 block">المستوى</span>
+                        <strong className="text-amber-400">{level} / 5</strong>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 pt-1">
+                      <button
+                        onClick={() => handleNav('production')}
+                        className="flex-1 py-2.5 px-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs shadow-md transition text-center"
+                      >
+                        تشغيل خط الإنتاج ⚡
+                      </button>
+                      <button
+                        onClick={() => handleNav('companies')}
+                        className="py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs transition border border-slate-700"
+                      >
+                        تطوير وصيانة ⚙️
+                      </button>
+                    </div>
+                  </div>
+                );
+              })()
+            ) : (
+              <div className="bg-slate-950/60 border border-dashed border-slate-800 rounded-2xl p-6 text-center my-2">
+                <span className="text-3xl block mb-2">🏭</span>
+                <h4 className="font-extrabold text-sm text-white mb-1">
+                  لا توجد شركات مؤسسة بعد
+                </h4>
+                <p className="text-xs text-slate-400 mb-4 max-w-sm mx-auto">
+                  ابدأ مسار استعادة الإرث: اشترِ أول قطعة أرض صناعية وأسس شركتك الأولى لتبدأ دورة الإنتاج.
+                </p>
+                <button
+                  onClick={() => handleNav('companies')}
+                  className="py-2.5 px-5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs shadow-lg shadow-amber-500/20 transition active:scale-95"
+                >
+                  تأسيس شركتك الأولى الآن 🚀
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Quick Production Status Bar */}
+          <div className="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs">
+            <span className="text-slate-400">
+              الإنتاج الفعال: <strong className="text-white">{profile.productionOrders.filter((o) => o.status === 'active').length} دفعات</strong>
+            </span>
+            <button
+              onClick={() => handleNav('production')}
+              className="text-emerald-400 hover:text-emerald-300 font-bold flex items-center gap-1"
+            >
+              <span>متابعة خطوط الإنتاج</span>
+              <ChevronLeft className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+
+        {/* RIGHT COLUMN: Recent Financial Activity & Quick Actions */}
+        <div className="bg-slate-900/95 border border-slate-800 rounded-3xl p-5 sm:p-6 shadow-xl flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between pb-3 mb-4 border-b border-slate-800">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
+                  <FileText className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-sm sm:text-base text-white">
+                    سجل المعاملات والسيولة
+                  </h3>
+                  <small className="text-xs text-slate-400">
+                    آخر العمليات المسجلة في دفتر حسابك
+                  </small>
+                </div>
+              </div>
+
+              <button
+                onClick={() => {
+                  playSound('click');
+                  setIsFinanceModalOpen(true);
+                }}
+                className="text-xs text-emerald-400 hover:text-emerald-300 font-bold flex items-center gap-1 transition"
+              >
+                <span>التقرير المفصل</span>
+                <ChevronLeft className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            {/* List of 4 recent transactions */}
+            <div className="space-y-2.5 mb-4">
+              {recentTransactions.map((tx, idx) => {
+                const isPositive = tx.category === 'revenue';
+                return (
+                  <div
+                    key={tx.id || idx}
+                    className="flex items-center justify-between p-3 rounded-xl bg-slate-950/60 border border-slate-800/80 hover:border-slate-700 transition"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs ${
+                        isPositive ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'
+                      }`}>
+                        {isPositive ? <ArrowDownLeft className="w-4 h-4" /> : <ArrowUpRight className="w-4 h-4" />}
+                      </div>
+                      <div>
+                        <div className="text-xs font-bold text-white leading-tight">
+                          {tx.note || 'معاملة تشغيلية'}
+                        </div>
+                        <span className="text-[10px] text-slate-400">
+                          {new Date(tx.occurredAt).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      </div>
+                    </div>
+                    <strong className={`text-xs font-black dir-ltr ${
+                      isPositive ? 'text-emerald-400' : 'text-rose-400'
+                    }`}>
+                      {isPositive ? '+' : '-'}{formatMoney(Math.abs(tx.amount), country)}
+                    </strong>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Quick Lands Asset Summary */}
+          <div className="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs">
+            <span className="text-slate-400">
+              الأراضي المسجلة: <strong className="text-white">{landsCount} قطعة</strong>
+            </span>
+            <button
+              onClick={() => handleNav('lands')}
+              className="text-amber-400 hover:text-amber-300 font-bold flex items-center gap-1"
+            >
+              <span>معاينة الأراضي</span>
+              <ChevronLeft className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* 5. Modals for Leaderboard & Financial Reports */}
+      <LeaderboardModal
+        isOpen={isLeaderboardOpen}
+        onClose={() => setIsLeaderboardOpen(false)}
+        profile={profile}
+        country={country}
+      />
+
+      <FinanceReportModal
+        isOpen={isFinanceModalOpen}
+        onClose={() => setIsFinanceModalOpen(false)}
+        profile={profile}
+        country={country}
+        onNavigate={handleNav}
+      />
+
+      {/* 6. Story Level Locked Gate Modal */}
+      {lockedGateModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fade-in" dir="rtl">
+          <div className="bg-slate-900 border border-amber-500/50 rounded-3xl w-full max-w-sm p-6 shadow-2xl space-y-4 text-center">
+            <div className="w-16 h-16 rounded-2xl bg-amber-500/15 border-2 border-amber-500/50 text-amber-400 mx-auto flex items-center justify-center text-3xl shadow-xl shadow-amber-500/20 animate-pulse">
+              🔒
+            </div>
+            <div>
+              <h3 className="text-lg font-black text-white">
+                نظام {lockedGateModal.title} مقفل
+              </h3>
+              <span className="inline-block mt-1 px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 text-xs font-black border border-amber-500/40">
+                يفتح عند بلوغ المستوى {lockedGateModal.requiredLevel}
+              </span>
+            </div>
+            <p className="text-xs text-slate-300 leading-relaxed bg-slate-950/80 p-3.5 rounded-xl border border-slate-800 text-right">
+              📖 <strong>شرط سيناريو القصة:</strong>
+              <br />
+              <span className="text-slate-400 mt-1 block">
+                {lockedGateModal.hint}
+              </span>
+            </p>
+            <div className="flex gap-2 pt-1">
+              <button
+                onClick={() => {
+                  setLockedGateModal(null);
+                  handleNav('tasks');
+                }}
+                className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-500 text-slate-950 font-black text-xs shadow-md hover:brightness-110 transition active:scale-95"
+              >
+                عرض مهام القصة 📜
+              </button>
+              <button
+                onClick={() => setLockedGateModal(null)}
+                className="py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs border border-slate-700 transition"
+              >
+                إغلاق
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

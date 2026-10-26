@@ -56,17 +56,6 @@ export interface PlayerCompany {
   operatingCostPerDay?: number;
   maintenanceCondition?: number;
   upgradeLevel?: number;
-  /** C-Suite Executive Roles & Automated Monthly Payroll */
-  cfoPayrollAssigned?: boolean;
-  cfoSalaryMonthly?: number;
-  autoPayrollEnabled?: boolean;
-  cooAssigned?: boolean;
-  legalCounselAssigned?: boolean;
-  assignedWorkersCount?: number;
-  assignedAccountantsCount?: number;
-  assignedLawyersCount?: number;
-  productionSupervisorAssigned?: boolean;
-  continuousProductionEnabled?: boolean;
 }
 
 export interface PlayerProfile {
@@ -120,6 +109,17 @@ export interface PlayerProfile {
   contracts: BusinessContract[];
   achievements: AchievementRecord[];
   onboarding: OnboardingProgress;
+  lastSpinTimestamp?: number;
+  lastSpinDay?: number;
+  avatarId?: string;
+  unlockedAvatarIds?: string[];
+  bio?: string;
+  renameCountThisWeek?: number;
+  lastRenameWeekTimestamp?: number;
+  campaignChapterId?: number;
+  completedMissionIds?: string[];
+  claimedRewardIds?: string[];
+  dismissedStoryEventIds?: string[];
 }
 
 function createId(): string {
@@ -133,12 +133,61 @@ export function createNewPlayer(
 ): PlayerProfile {
   const createdAt = now.toISOString();
 
-  // Initial collapsing land (أرض مصنع العاشر من رمضان)
+  const initialCash = country.startingBalance || 25_000;
+  const initialLoanPrincipal = 5_000;
+  const initialLoanRepay = 5_250;
+  const initialLandValue = 7_000;
+  const initialOperatingCost = 80;
+
+  const countryLandNames: Record<string, string> = {
+    egypt: 'أرض مجمع العاشر من رمضان الصناعي (ميراث مهدد)',
+    jordan: 'أرض مدينة الملك عبدالله الثاني الصناعية · سحاب (ميراث مهدد)',
+    saudi: 'أرض المدينة الصناعية الثانية بالرياض (ميراث مهدد)',
+    uae: 'أرض منطقة جبل علي الحرة JAFZA بدبي (ميراث مهدد)',
+    usa: 'أرض مجمع كوينز الصناعي واللوجستي · نيويورك (ميراث مهدد)',
+    kuwait: 'أرض منطقة الشويخ الصناعية · العاصمة (ميراث مهدد)',
+    qatar: 'أرض المنطقة الصناعية الجديدة بالدوحة (ميراث مهدد)',
+    uk: 'أرض مجمع ترافورد بارك الصناعي · مانشستر (ميراث مهدد)',
+    germany: 'أرض حزام الرور الصناعي · دوسلدورف (ميراث مهدد)',
+    japan: 'أرض مجمع يوكوهاما البحري الصناعي · خليج طوكيو (ميراث مهدد)',
+  };
+
+  const countryCompanyNames: Record<string, string> = {
+    egypt: 'مصنع الأغذية النموذجي · العاشر من رمضان',
+    jordan: 'مصنع البتراء للأغذية والسلع الاستهلاكية · سحاب',
+    saudi: 'مصنع نجد للأغذية والتموين · الرياض',
+    uae: 'مصنع دبي للأغذية والضيافة · جبل علي',
+    usa: 'مصنع مانهاتن للسلع الغذائية · نيويورك',
+    kuwait: 'مصنع الديرة للمنتجات الغذائية · الشويخ',
+    qatar: 'مصنع الدوحة للتعبئة والمنتجات الغذائية',
+    uk: 'مصنع التايمز للصناعات الغذائية · مانشستر',
+    germany: 'مصنع بافاريا للصناعات الغذائية · الرور',
+    japan: 'مصنع طوكيو للمنتجات الغذائية · يوكوهاما',
+  };
+
+  const countryBankNames: Record<string, string> = {
+    egypt: 'بنك مصر',
+    jordan: 'البنك العربي · الأردن',
+    saudi: 'مصرف الراجحي',
+    uae: 'بنك الإمارات دبي الوطني',
+    usa: 'جي بي مورغان تشيس',
+    kuwait: 'بنك الكويت الوطني',
+    qatar: 'بنك قطر الوطني QNB',
+    uk: 'بنك باركليز',
+    germany: 'دويتشه بنك',
+    japan: 'ميتسوبيشي يو إف جيه',
+  };
+
+  const landLabel = countryLandNames[country.id] || `أرض المنطقة الصناعية - ${country.name}`;
+  const companyName = countryCompanyNames[country.id] || `مصنع المنتجات الغذائية (${country.name})`;
+  const bankName = countryBankNames[country.id] || 'البنك التجاري الدولي';
+
+  // Initial collapsing land
   const inheritedLand: PlayerLand = {
     id: 'inherited-factory-land',
-    label: 'أرض مصنع العاشر القديم (ميراث مهدد)',
+    label: landLabel,
     areaSquareMeters: 1200,
-    purchasePrice: 350000,
+    purchasePrice: initialLandValue,
     acquiredAt: createdAt,
     acquiredOnDay: 1,
     availableForCompanyOnDay: 1,
@@ -146,10 +195,10 @@ export function createNewPlayer(
     upgradeLevel: 1,
   };
 
-  // Initial collapsing company (مصنع سولي للأغذية المنهار - ماكينات معطلة)
+  // Initial collapsing company
   const inheritedCompany: PlayerCompany = {
     id: 'inherited-food-company',
-    name: 'مصنع سولي للأغذية (قيد الإنقاذ)',
+    name: companyName,
     industryId: 'food',
     countryId: country.id,
     foundedAt: createdAt,
@@ -159,24 +208,24 @@ export function createNewPlayer(
     licenseIds: ['lic-food-inherited'],
     energyUnits: 25,
     energyCapacity: 50,
-    operatingCostPerDay: 3500,
+    operatingCostPerDay: initialOperatingCost,
     maintenanceCondition: 25, // 25% condition - broken machines needing repair!
     upgradeLevel: 1,
   };
 
   // Initial urgent bank loan due on Day 7
   const initialBankLoan: LoanRecord = {
-    id: 'loan-emergency-bank-misr',
+    id: `loan-emergency-${country.id}`,
     collateralType: 'company',
     collateralId: 'inherited-food-company',
-    principal: 50000,
-    totalRepayment: 52500,
+    principal: initialLoanPrincipal,
+    totalRepayment: initialLoanRepay,
     annualRate: 0.12,
     startedOnDay: 1,
     termDays: 7,
     nextPaymentDay: 7,
-    installmentAmount: 52500,
-    remainingBalance: 52500,
+    installmentAmount: initialLoanRepay,
+    remainingBalance: initialLoanRepay,
     status: 'active',
   };
 
@@ -187,11 +236,11 @@ export function createNewPlayer(
     level: 1,
     countryId: country.id,
     createdAt,
-    bankBalance: 120000, // 120,000 EGP emergency cash for turnaround
+    bankBalance: initialCash,
     payables: 0,
     goldGrams: 0,
     goldCostBasis: 0,
-    diamonds: 10,
+    diamonds: 15,
     speedCards: [],
     badges: ['طوق النجاة'],
     assets: [],
@@ -207,7 +256,7 @@ export function createNewPlayer(
         id: 'lic-food-inherited',
         industryId: 'food',
         countryId: country.id,
-        feePaid: 45000,
+        feePaid: 1_200,
         issuedAt: createdAt,
       },
     ],
@@ -222,18 +271,18 @@ export function createNewPlayer(
       {
         id: createId(),
         category: 'revenue',
-        amount: 120000,
+        amount: initialCash,
         countryId: country.id,
         occurredAt: createdAt,
-        note: 'رصيد الطوارئ المتبقي بخزينة المصنع المنهار',
+        note: `سيولة الطوارئ المسلّمة من مدخرات الوالدة بالخزينة ($)`,
       },
       {
         id: createId(),
         category: 'liability',
-        amount: -52500,
+        amount: -initialLoanRepay,
         countryId: country.id,
         occurredAt: createdAt,
-        note: 'قيد مديونية: قسط البنك المستحق خلال 7 أيام',
+        note: `قيد مديونية موروثة: مهلة سماح قضائية 7 أيام لقرض ${bankName} (${initialLoanRepay}$)`,
       },
     ],
     events: [],
@@ -245,8 +294,17 @@ export function createNewPlayer(
     reputation: 35,
     contracts: [],
     achievements: [],
-    onboarding: { introCompleted: true, chapter: 1, seenGuides: [] },
+    onboarding: { introCompleted: false, chapter: 1, seenGuides: [] },
     season: { seasonId: 'expansion-season-1', startedOnDay: 1, endsOnDay: 30, points: 0, claimedChallengeKeys: [] },
+    avatarId: 'avatar_free_male_1',
+    unlockedAvatarIds: ['avatar_free_male_1', 'avatar_free_male_2', 'avatar_free_female_1', 'avatar_free_female_2'],
+    bio: 'ابنِ إمبراطوريتك الاستثمارية بعزيمة لا تلين ورؤية لا تعرف المستحيل.',
+    renameCountThisWeek: 0,
+    lastRenameWeekTimestamp: Date.now(),
+    campaignChapterId: 1,
+    completedMissionIds: [],
+    claimedRewardIds: [],
+    dismissedStoryEventIds: [],
   };
 }
 

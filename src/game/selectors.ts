@@ -1,5 +1,6 @@
 import type { SectionId } from '../domain/navigation';
 import type { PlayerProfile } from '../domain/player';
+import type { AuctionListing } from '../domain/futureSystems';
 import { calculateTotalAssets } from '../domain/player';
 import { AUCTION_CATALOG, findIndustry, findMaterial, findInvestment, PRODUCT_CATALOG, RECIPE_CATALOG, TASK_CATALOG } from './catalog';
 import { getAuctionListings, isAuctionOpen } from './auctions';
@@ -101,7 +102,7 @@ export interface EmpirePoints {
   expansion: number;
 }
 
-export function selectAvailableAuctions(profile: PlayerProfile): typeof AUCTION_CATALOG {
+export function selectAvailableAuctions(profile: PlayerProfile): AuctionListing[] {
   return getAuctionListings(profile).filter((listing) => isAuctionOpen(profile, listing));
 }
 
@@ -163,7 +164,7 @@ export function selectOperationsSnapshot(profile: PlayerProfile, operatingCostMu
   }).length;
   let nextStep: OperationsNextStep;
   if (profile.payables > 0) {
-    nextStep = { section: 'obligations', title: 'سدّد الالتزامات الحرجة', description: `لديك ${Math.round(profile.payables).toLocaleString('ar-EG')} ج.م مسجلة كالتزامات. راجع الأولويات قبل التوسع حتى لا تتوقف الطاقة.`, actionLabel: 'فتح الالتزامات', tone: 'gold' };
+    nextStep = { section: 'obligations', title: 'سدّد الالتزامات الحرجة', description: `لديك ${Math.round(profile.payables).toLocaleString('ar-EG')} $ مسجلة كالتزامات. راجع الأولويات قبل التوسع حتى لا تتوقف الطاقة.`, actionLabel: 'فتح الالتزامات', tone: 'gold' };
   } else if (activeContracts > 0) {
     nextStep = { section: 'contracts', title: 'سلّم عقدك قبل الموعد', description: `لديك ${activeContracts} عقد نشط. راجع المخزون وأكمل التوريد يدويًا حتى تحافظ على سمعتك التجارية.`, actionLabel: 'فتح العقود', tone: 'green' };
   } else if (profile.lands.length === 0) {

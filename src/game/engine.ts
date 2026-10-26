@@ -4,6 +4,8 @@ import type { AuctionBidRecord, BusinessContract, DepositRecord, DepositTranche,
 import {
   DIRECT_COMPANY_CATALOG,
   DIRECT_LAND_CATALOG,
+  getDirectCompaniesForCountry,
+  getDirectLandsForCountry,
   GOLD_PRICE_PER_GRAM,
   findIndustry,
   findInvestment,
@@ -229,12 +231,11 @@ function conditionMet(profile: PlayerProfile, condition: (typeof TASK_CATALOG)[n
   }
 }
 
-function ensureValidCountry(profile: PlayerProfile): GameResult<never> | null {
+function ensureEgypt(profile: PlayerProfile): GameResult<never> | null {
   return findCountry(profile.countryId)
     ? null
-    : failure(profile, 'wrong-country', 'الدولة المحددة غير صالحة.');
+    : failure(profile, 'wrong-country', 'الدولة المختارة غير صالحة.');
 }
-const ensureEgypt = ensureValidCountry;
 
 export function placeBid(profile: PlayerProfile, listingId: string, amount: number, targetCompanyId?: string): GameResult<AuctionOutcome> {
   const countryError = ensureEgypt(profile);
@@ -254,7 +255,7 @@ export function placeBid(profile: PlayerProfile, listingId: string, amount: numb
     { bidderId: `${listing.id}-bot-b`, amount: highestBotBid },
   ];
   if (amount <= highestBotBid) {
-    return failure(profile, 'auction-lost', `خسر عرضك المزاد؛ أعلى عرض منافس كان ${highestBotBid.toLocaleString('ar-EG')} ج.م.`);
+    return failure(profile, 'auction-lost', `خسر عرضك المزاد؛ أعلى عرض منافس كان ${highestBotBid.toLocaleString('ar-EG')} $.`);
   }
   if (profile.bankBalance < amount) return failure(profile, 'insufficient-funds', 'لا يكفي رصيدك لتسديد العرض الفائز.');
   const auctionHistory: AuctionBidRecord[] = [
@@ -330,42 +331,46 @@ export function placeBid(profile: PlayerProfile, listingId: string, amount: numb
 export function buyDirectLand(profile: PlayerProfile, listingId: string, paymentMethod: PurchasePaymentMethod = 'cash'): GameResult<{ landId: string; price: number; diamondsSpent: number }> {
   const countryError = ensureEgypt(profile);
   if (countryError) return countryError;
-  const listing = DIRECT_LAND_CATALOG.find((entry) => entry.id === listingId);
+  const countryLands = getDirectLandsForCountry(profile.countryId);
+  const listing = countryLands.find((entry) => entry.id === listingId) || DIRECT_LAND_CATALOG.find((entry) => entry.id === listingId);
   if (!listing) return failure(profile, 'not-found', 'عرض الأرض غير موجود.');
   if (profile.lands.some((land) => land.id === listing.id)) return failure(profile, 'already-owned', 'تم شراء هذه الأرض بالفعل.');
-  const payment = resolvePurchaseDebit(profile, listing.price, paymentMethod);
+  const price = listing.price;
+  const payment = resolvePurchaseDebit(profile, price, paymentMethod);
   if ('message' in payment) return failure(profile, 'insufficient-funds', payment.message);
-  const land: PlayerLand = { id: listing.id, label: listing.label, areaSquareMeters: listing.areaSquareMeters, purchasePrice: listing.price, acquiredAt: timestampFor(profile), acquiredOnDay: profile.day, availableForCompanyOnDay: profile.day + 1, landType: listing.landType };
+  const land: PlayerLand = { id: listing.id, label: listing.label, areaSquareMeters: listing.areaSquareMeters, purchasePrice: price, acquiredAt: timestampFor(profile), acquiredOnDay: profile.day, availableForCompanyOnDay: profile.day + 1, landType: listing.landType };
   const nextProfile = addLedger(
     { ...profile, lands: [...profile.lands, land] },
-    [ledgerEntry(profile, 'asset', listing.price, `شراء أرض مباشر: ${listing.label}`, 0)],
+    [ledgerEntry(profile, 'asset', price, `شراء أرض مباشر: ${listing.label}`, 0)],
     payment.bankBalance,
     { diamonds: payment.diamonds },
   );
-  return success(syncTasks(nextProfile), `تم شراء ${listing.label} ${paymentMethod === 'diamonds' ? `مقابل ${payment.diamondsSpent} ماسة` : 'نقدًا'}. بدأ إنهاء عقود نقل الملكية؛ ستكون الأرض متاحة بعد يوم داخل اللعبة، في اليوم ${profile.day + 1}. تحلَّ بالصبر.`, { landId: land.id, price: listing.price, diamondsSpent: payment.diamondsSpent });
+  return success(syncTasks(nextProfile), `تم شراء ${listing.label} ${paymentMethod === 'diamonds' ? `مقابل ${payment.diamondsSpent} ماسة` : 'نقدًا'}. بدأ إنهاء عقود نقل الملكية؛ ستكون الأرض متاحة بعد يوم داخل اللعبة، في اليوم ${profile.day + 1}. تحلَّ بالصبر.`, { landId: land.id, price, diamondsSpent: payment.diamondsSpent });
 }
 
 export function buyDirectCompany(profile: PlayerProfile, listingId: string, paymentMethod: PurchasePaymentMethod = 'cash'): GameResult<{ companyId: string; landId: string; price: number; diamondsSpent: number }> {
   const countryError = ensureEgypt(profile);
   if (countryError) return countryError;
-  const listing = DIRECT_COMPANY_CATALOG.find((entry) => entry.id === listingId);
+  const countryCompanies = getDirectCompaniesForCountry(profile.countryId);
+  const listing = countryCompanies.find((entry) => entry.id === listingId) || DIRECT_COMPANY_CATALOG.find((entry) => entry.id === listingId);
   const industry = listing ? findIndustry(listing.industryId) : undefined;
   if (!listing || !industry) return failure(profile, 'not-found', 'عرض الشركة غير موجود.');
   if (profile.companies.some((company) => company.id === listing.id)) return failure(profile, 'already-owned', 'تم شراء هذه الشركة بالفعل.');
-  const payment = resolvePurchaseDebit(profile, listing.price, paymentMethod);
+  const price = listing.price;
+  const payment = resolvePurchaseDebit(profile, price, paymentMethod);
   if ('message' in payment) return failure(profile, 'insufficient-funds', payment.message);
   const landId = `${listing.id}-land`;
   const licenseId = `${listing.id}-license`;
-  const land: PlayerLand = { id: landId, label: `${listing.name} · أرض الشركة`, areaSquareMeters: listing.areaSquareMeters, purchasePrice: Math.floor(listing.price * 0.45), acquiredAt: timestampFor(profile), acquiredOnDay: profile.day, availableForCompanyOnDay: profile.day + 1, landType: listing.landType };
+  const land: PlayerLand = { id: landId, label: `${listing.name} · أرض الشركة`, areaSquareMeters: listing.areaSquareMeters, purchasePrice: Math.floor(price * 0.45), acquiredAt: timestampFor(profile), acquiredOnDay: profile.day, availableForCompanyOnDay: profile.day + 1, landType: listing.landType };
   const company: PlayerCompany = { id: listing.id, name: listing.name, industryId: listing.industryId, countryId: profile.countryId, foundedAt: timestampFor(profile), operationalFromDay: profile.day + 1, landId, licenseIds: [licenseId], energyUnits: industry.energyCapacity, energyCapacity: industry.energyCapacity, operatingCostPerDay: industry.dailyOperatingCost };
-  const license = { id: licenseId, countryId: profile.countryId, industryId: listing.industryId, feePaid: Math.floor(listing.price * 0.15), issuedAt: timestampFor(profile) };
+  const license = { id: licenseId, countryId: profile.countryId, industryId: listing.industryId, feePaid: Math.floor(price * 0.15), issuedAt: timestampFor(profile) };
   const nextProfile = addLedger(
     { ...profile, lands: [...profile.lands, land], companies: [...profile.companies, company], licenses: [...profile.licenses, license] },
-    [ledgerEntry(profile, 'asset', listing.price, `شراء شركة مباشر: ${listing.name}`, 0)],
+    [ledgerEntry(profile, 'asset', price, `شراء شركة مباشر: ${listing.name}`, 0)],
     payment.bankBalance,
     { diamonds: payment.diamonds },
   );
-  return success(syncTasks(nextProfile), `تم شراء ${listing.name} ${paymentMethod === 'diamonds' ? `مقابل ${payment.diamondsSpent} ماسة` : 'نقدًا'}. يجري إنهاء عقود نقل الملكية، ويبدأ التشغيل بعد يوم داخل اللعبة في اليوم ${profile.day + 1}. تحلَّ بالصبر.`, { companyId: company.id, landId, price: listing.price, diamondsSpent: payment.diamondsSpent });
+  return success(syncTasks(nextProfile), `تم شراء ${listing.name} ${paymentMethod === 'diamonds' ? `مقابل ${payment.diamondsSpent} ماسة` : 'نقدًا'}. يجري إنهاء عقود نقل الملكية، ويبدأ التشغيل بعد يوم داخل اللعبة في اليوم ${profile.day + 1}. تحلَّ بالصبر.`, { companyId: company.id, landId, price, diamondsSpent: payment.diamondsSpent });
 }
 
 export function sellLand(profile: PlayerProfile, landId: string): GameResult<{ landId: string; payout: number }> {
@@ -455,7 +460,7 @@ export function upgradeWarehouse(profile: PlayerProfile, paymentMethod: Purchase
   const requirement = WAREHOUSE_UPGRADE_REQUIREMENTS[nextLevel];
   if (!requirement) return failure(profile, 'condition-not-met', 'وصل المخزن إلى أعلى مستوى تطوير.');
   const payment = resolvePurchaseDebit(profile, requirement.cash, paymentMethod);
-  if ('message' in payment) return failure(profile, 'insufficient-funds', `تحتاج إلى ${requirement.cash.toLocaleString('ar-EG')} ج.م أو ما يعادلها بالماس لتطوير المخزن. ${payment.message}`);
+  if ('message' in payment) return failure(profile, 'insufficient-funds', `تحتاج إلى ${requirement.cash.toLocaleString('ar-EG')} $ أو ما يعادلها بالماس لتطوير المخزن. ${payment.message}`);
   const missing = Object.entries(requirement.materials).filter(([materialId, quantity]) => getWarehouseMaterialQuantity(profile, materialId) < quantity);
   if (missing.length > 0) {
     const labels = missing.map(([materialId, quantity]) => {
@@ -479,9 +484,6 @@ export function upgradeWarehouse(profile: PlayerProfile, paymentMethod: Purchase
 export function foundCompany(profile: PlayerProfile, industryId: IndustryId, landId: string, name: string, paymentMethod: PurchasePaymentMethod = 'cash'): GameResult<{ companyId: string; totalCost: number; diamondsSpent: number }> {
   const countryError = ensureEgypt(profile);
   if (countryError) return countryError;
-  if (profile.companies.length >= 1) {
-    return failure(profile, 'condition-not-met', 'نظام الإمبراطورية يركز على صرح الشركة الواحدة المركزية العملاقة (Mega-Corporation)؛ يمكنك توسيع أرضها وترقية مستوياتها وإدارتها بدلاً من تشتيت الموارد.');
-  }
   const industry = findIndustry(industryId);
   const country = findCountry(profile.countryId);
   if (!industry || !country) return failure(profile, 'not-found', 'القطاع أو الدولة غير موجود.');
@@ -530,49 +532,21 @@ export function upgradeCompany(profile: PlayerProfile, companyId: string, paymen
   const company = profile.companies.find((item) => item.id === companyId);
   if (!company) return failure(profile, 'not-found', 'الشركة غير موجودة.');
   const level = company.upgradeLevel ?? 1;
-  if (level >= 10) return failure(profile, 'condition-not-met', 'وصلت هذه الشركة إلى أعلى مستوى تطوير وإمبراطورية صناعية.');
-
-  // Staffing checks required by user:
-  // 1. Scaled workers: (level * 10 workers required)
-  // 2. Exactly 2 accountants: (accountants >= 2)
-  // 3. 2 Lawyers: (lawyers >= 2)
-  const requiredWorkers = Math.max(10, level * 12);
-  const currentWorkers = (company.assignedWorkersCount ?? 0) + profile.staff.filter((m) => m.status === 'active' && m.role === 'worker').length;
-  const currentAccountants = (company.assignedAccountantsCount ?? 0) + profile.staff.filter((m) => m.status === 'active' && m.role === 'accountant').length;
-  const currentLawyers = (company.assignedLawyersCount ?? 0) + profile.staff.filter((m) => m.status === 'active' && m.role === 'lawyer').length;
-
-  if (currentWorkers < requiredWorkers) {
-    return failure(profile, 'condition-not-met', `تحتاج الشركة إلى زيادة العمال للترقية للمستوى ${level + 1}: المطلوب ${requiredWorkers} عاملاً، ولديك حالياً ${currentWorkers} فقط. عيّن طاقم عمال أولاً.`);
-  }
-  if (currentAccountants < 2) {
-    return failure(profile, 'condition-not-met', `تشترط لوائح توسعة الشركات تعيين عدد 2 محاسبين قانونيين معتمدين للميزانية والتدقيق. المتاح لديك: ${currentAccountants}.`);
-  }
-  if (currentLawyers < 2) {
-    return failure(profile, 'condition-not-met', `تشترط التوسعة تعيين عدد 2 محامين للشؤون القانونية والعقود والتراخيص. المتاح لديك: ${currentLawyers}.`);
-  }
-
+  if (level >= 5) return failure(profile, 'condition-not-met', 'وصلت هذه الشركة إلى أعلى مستوى تطوير.');
   const completedBatches = profile.productionOrders
     .filter((order) => order.companyId === companyId && order.status === 'completed')
     .reduce((sum, order) => sum + order.batches, 0);
-  const requiredBatches = Math.max(1, (level - 1) * 2);
-  if (completedBatches < requiredBatches) return failure(profile, 'condition-not-met', `تحتاج إلى إكمال ${requiredBatches} دفعات إنتاج قبل الترقية للمستوى ${level + 1}. أكملت ${completedBatches}.`);
-
-  const cost = Math.round(120_000 * Math.pow(1.5, level - 1));
+  const requiredBatches = level * 2;
+  if (completedBatches < requiredBatches) return failure(profile, 'condition-not-met', `تحتاج إلى إكمال ${requiredBatches} دفعات إنتاج قبل الوصول إلى المستوى ${level + 1}. أكملت ${completedBatches}.`);
+  const cost = Math.round(120_000 * Math.pow(1.55, level - 1));
   const payment = resolvePurchaseDebit(profile, cost, paymentMethod);
-  if ('message' in payment) return failure(profile, 'insufficient-funds', `تحتاج إلى ${cost.toLocaleString('ar-EG')} ج.م أو ما يعادلها بالماس لتطوير وتوسيع الشركة. ${payment.message}`);
-  const capacityBonus = 30 * level;
+  if ('message' in payment) return failure(profile, 'insufficient-funds', `تحتاج إلى ${cost.toLocaleString('ar-EG')} $ أو ما يعادلها بالماس لتطوير الشركة. ${payment.message}`);
+  const capacityBonus = 20 * level;
   const companies = profile.companies.map((item) => item.id === companyId
-    ? {
-        ...item,
-        upgradeLevel: level + 1,
-        energyCapacity: (item.energyCapacity ?? 100) + capacityBonus,
-        energyUnits: (item.energyUnits ?? 100) + capacityBonus,
-        maintenanceCondition: 100,
-        assignedWorkersCount: Math.max(item.assignedWorkersCount ?? 0, requiredWorkers),
-      }
+    ? { ...item, upgradeLevel: level + 1, energyCapacity: (item.energyCapacity ?? 0) + capacityBonus, energyUnits: (item.energyUnits ?? 0) + capacityBonus, maintenanceCondition: 100 }
     : item);
-  const nextProfile = addLedger({ ...profile, companies }, [ledgerEntry(profile, 'expense', cost, `تطوير وتوسيع ${company.name} إلى المستوى ${level + 1}`, 0)], payment.bankBalance, { diamonds: payment.diamonds });
-  return success(nextProfile, `تم تطوير وتوسيع صرح ${company.name} إلى المستوى ${level + 1} بنجاح بعد استيفاء شروط العمال والمحاسبين والمحامين!`, { companyId, level: level + 1, cost, diamondsSpent: payment.diamondsSpent });
+  const nextProfile = addLedger({ ...profile, companies }, [ledgerEntry(profile, 'expense', cost, `تطوير ${company.name} إلى المستوى ${level + 1}`, 0)], payment.bankBalance, { diamonds: payment.diamonds });
+  return success(nextProfile, `تم تطوير ${company.name} إلى المستوى ${level + 1} ${paymentMethod === 'diamonds' ? `مقابل ${payment.diamondsSpent} ماسة` : 'نقدًا'} وزادت طاقتها.`, { companyId, level: level + 1, cost, diamondsSpent: payment.diamondsSpent });
 }
 
 export function runProduction(profile: PlayerProfile, companyId: string, batches: number): GameResult<ProductionOutcome> {
@@ -638,6 +612,90 @@ export function runProduction(profile: PlayerProfile, companyId: string, batches
   return success(syncTasks(nextProfile), `بدأ أمر إنتاج ${recipe.productName} ويكتمل في اليوم ${order.completesOnDay}.`, { orderId: order.id, companyId, productId: recipe.productId, batches, outputQuantity, completesOnDay: order.completesOnDay });
 }
 
+export function autoSupplyAndProduce(profile: PlayerProfile, companyId: string, batches: number): GameResult<ProductionOutcome> {
+  const countryError = ensureEgypt(profile);
+  if (countryError) return countryError;
+  if (!isPositiveInteger(batches)) return failure(profile, 'invalid-input', 'عدد دفعات الإنتاج يجب أن يكون عددًا صحيحًا موجبًا.');
+  const company = profile.companies.find((item) => item.id === companyId);
+  if (!company) return failure(profile, 'not-found', 'الشركة غير موجودة.');
+  if ((company.operationalFromDay ?? 1) > profile.day) return failure(profile, 'condition-not-met', `يجري إنهاء عقود نقل الملكية؛ يبدأ تشغيل الشركة في اليوم ${company.operationalFromDay}.`);
+  const recipe = findRecipeForIndustry(company.industryId);
+  if (!recipe) return failure(profile, 'not-found', 'لا توجد وصفة لهذا القطاع.');
+
+  let missingCost = 0;
+  const purchases: { materialId: string; quantity: number; unitPrice: number; cost: number; name: string }[] = [];
+  for (const input of recipe.inputs) {
+    const lot = profile.inventory.find((item) => item.materialOrProductId === input.materialId);
+    const needed = input.quantity * batches;
+    const owned = lot?.quantity ?? 0;
+    if (owned < needed) {
+      const missing = needed - owned;
+      const mat = findMaterial(input.materialId);
+      const unitPrice = mat?.pricePerUnit ?? 100;
+      const cost = missing * unitPrice;
+      missingCost += cost;
+      purchases.push({ materialId: input.materialId, quantity: missing, unitPrice, cost, name: mat?.name ?? input.materialId });
+    }
+  }
+
+  const energyCost = batches * recipe.energyCost;
+  const maintenanceCost = Math.round((company.operatingCostPerDay ?? 0) * 0.15 * getOperatingCostProgression(profile.day));
+  const totalFundsNeeded = missingCost + energyCost + maintenanceCost;
+
+  if (profile.bankBalance < totalFundsNeeded) {
+    return failure(profile, 'insufficient-funds', `تحتاج إلى ${totalFundsNeeded.toLocaleString('ar-EG')} $ لتأمين الخامات المطلوبة والطاقة والصيانة.`);
+  }
+
+  if (purchases.length > 0) {
+    const level = normalizeWarehouseLevel(profile.warehouseLevel);
+    const warehouseCapacity = getWarehouseCapacity(level);
+    const warehouseUsage = getWarehouseUsage(profile.inventory, profile.productionOrders);
+    const totalNewMaterials = purchases.reduce((sum, p) => sum + p.quantity, 0);
+    if (warehouseUsage.materials + totalNewMaterials > warehouseCapacity.materials) {
+      return failure(profile, 'storage-limit', `سعة تخزين المواد الخام في المخزن لا تكفي لاستيعاب الخامات الناقصة (${totalNewMaterials} وحدة).`);
+    }
+  }
+
+  let updatedInventory = [...profile.inventory];
+  const ledgerEntries: FinanceLedgerEntry[] = [];
+  for (const p of purchases) {
+    const existing = updatedInventory.find((lot) => lot.materialOrProductId === p.materialId);
+    if (existing) {
+      const newQuantity = existing.quantity + p.quantity;
+      const newUnitCost = (existing.quantity * existing.unitCost + p.cost) / newQuantity;
+      updatedInventory = updatedInventory.map((lot) => lot.materialOrProductId === p.materialId ? { ...lot, quantity: newQuantity, unitCost: newUnitCost } : lot);
+    } else {
+      updatedInventory.push({
+        id: nextId(profile, 'inventory', updatedInventory.length),
+        materialOrProductId: p.materialId,
+        quantity: p.quantity,
+        unit: findMaterial(p.materialId)?.unit ?? 'وحدة',
+        unitCost: p.unitPrice,
+      });
+    }
+    ledgerEntries.push(ledgerEntry(profile, 'expense', p.cost, `شراء خامات تشغيل فورية: ${p.name} (${p.quantity} وحدة)`, ledgerEntries.length));
+  }
+
+  const suppliedProfile = purchases.length > 0
+    ? addLedger(
+        { ...profile, inventory: updatedInventory },
+        ledgerEntries,
+        profile.bankBalance - missingCost,
+      )
+    : profile;
+
+  const productionResult = runProduction(suppliedProfile, companyId, batches);
+  if (!productionResult.ok) return productionResult;
+
+  const supplyMsg = purchases.length > 0
+    ? `تم تأمين الخامات الناقصة بقيمة ${missingCost.toLocaleString('ar-EG')} $ و`
+    : '';
+  return {
+    ...productionResult,
+    message: `${supplyMsg}${productionResult.message}`,
+  };
+}
+
 export function serviceCompany(profile: PlayerProfile, companyId: string): GameResult<{ companyId: string; cost: number }> {
   const company = profile.companies.find((item) => item.id === companyId);
   if (!company) return failure(profile, 'not-found', 'الشركة غير موجودة.');
@@ -662,7 +720,7 @@ export function cancelProductionOrder(profile: PlayerProfile, orderId: string): 
     [ledgerEntry(profile, 'settlement', refund, `استرداد 70% من حجز أمر الإنتاج ${order.productName}`, 0), ...(unrecoveredMaterialCost > 0 ? [ledgerEntry(profile, 'expense', unrecoveredMaterialCost, `خسارة مواد غير مستردة لأمر ${order.productName}`, 1)] : [])],
     profile.bankBalance + refund,
   );
-  return success(nextProfile, `تم إلغاء الأمر واسترداد ${refund.toLocaleString('ar-EG')} ج.م من الحجز.`, { orderId, refund });
+  return success(nextProfile, `تم إلغاء الأمر واسترداد ${refund.toLocaleString('ar-EG')} $ من الحجز.`, { orderId, refund });
 }
 
 export function useProductionSpeedCard(profile: PlayerProfile, orderId: string, kind: SpeedCardKind): GameResult<{ orderId: string; kind: SpeedCardKind; completesOnDay: number }> {
@@ -705,7 +763,7 @@ export function buySpeedCard(profile: PlayerProfile, kind: SpeedCardKind, quanti
   const nextProfile = paymentMethod === 'cash'
     ? addLedger(updated, [ledgerEntry(profile, 'expense', cashPrice, `شراء ${quantity} بطاقة ${SPEED_CARD_LABELS[kind]} نقدًا`, 0)], payment.bankBalance, { diamonds: payment.diamonds })
     : { ...updated, diamonds: payment.diamonds };
-  return success(nextProfile, `تم شراء ${quantity} بطاقة ${paymentMethod === 'diamonds' ? `باستخدام ${diamondsSpent} ماسة` : `مقابل ${cashPrice.toLocaleString('ar-EG')} ج.م`}.`, { kind, quantity, diamondsSpent: payment.diamondsSpent, cashSpent: paymentMethod === 'cash' ? cashPrice : 0 });
+  return success(nextProfile, `تم شراء ${quantity} بطاقة ${paymentMethod === 'diamonds' ? `باستخدام ${diamondsSpent} ماسة` : `مقابل ${cashPrice.toLocaleString('ar-EG')} $`}.`, { kind, quantity, diamondsSpent: payment.diamondsSpent, cashSpent: paymentMethod === 'cash' ? cashPrice : 0 });
 }
 
 export function sellProduct(profile: PlayerProfile, productId: string, quantity: number): GameResult<SaleOutcome> {
@@ -736,7 +794,7 @@ export function sellProduct(profile: PlayerProfile, productId: string, quantity:
     ],
     profile.bankBalance + grossRevenue - tax,
   );
-  return success(syncTasks(nextProfile), `تم بيع ${quantity} من ${product.name} بسعر سوق ${marketQuote.currentPrice.toLocaleString('ar-EG')} ج.م للوحدة بعد احتساب الضريبة والتكلفة.`, { productId, quantity, grossRevenue, tax, costOfGoods, netRevenue: grossRevenue - tax - costOfGoods });
+  return success(syncTasks(nextProfile), `تم بيع ${quantity} من ${product.name} بسعر سوق ${marketQuote.currentPrice.toLocaleString('ar-EG')} $ للوحدة بعد احتساب الضريبة والتكلفة.`, { productId, quantity, grossRevenue, tax, costOfGoods, netRevenue: grossRevenue - tax - costOfGoods });
 }
 
 const GOLD_SELL_SPREAD_RATE = 0.03;
@@ -757,7 +815,7 @@ export function buyGold(profile: PlayerProfile, grams: number): GameResult<GoldT
     profile.bankBalance - amount,
     { goldGrams: Math.round((profile.goldGrams + grams) * 10) / 10, goldCostBasis: profile.goldCostBasis + amount },
   );
-  return success(nextProfile, `اشتريت ${grams.toFixed(1)} غرام ذهب بسعر محاكاة ${GOLD_PRICE_PER_GRAM} ج.م للغرام.`, { grams, cashAmount: amount, pricePerGram: GOLD_PRICE_PER_GRAM });
+  return success(nextProfile, `اشتريت ${grams.toFixed(1)} غرام ذهب بسعر محاكاة ${GOLD_PRICE_PER_GRAM} $ للغرام.`, { grams, cashAmount: amount, pricePerGram: GOLD_PRICE_PER_GRAM });
 }
 
 const DIAMONDS_PER_GOLD_GRAM = 0.5;
@@ -824,14 +882,11 @@ export function getDayBriefing(profile: PlayerProfile): DayBriefing {
   return { day, operatingCost, existingPayables: profile.payables + outstandingSalary, maturingInvestments, event, availableEnergy, energyPaused: profile.payables > 0 || outstandingSalary > 0 };
 }
 
-export const STAFF_ROLE_OPTIONS: Record<StaffRole, { label: string; description: string; dailySalary: number; monthlySalary: number; companyRequired: boolean }> = {
-  manager: { label: 'مدير تنفيذي / تشغيلي (COO)', description: 'يرفع كفاءة خطوط الإنتاج وجودة المنتجات ويخفض تكلفة التشغيل.', dailySalary: 800, monthlySalary: 24_000, companyRequired: true },
-  cfo_payroll: { label: 'مدير مالي وشؤون رواتب (CFO)', description: 'يدير السيولة والرواتب نيابة عنك تلقائياً كل شهر لتجنب توقف التشغيل.', dailySalary: 600, monthlySalary: 18_000, companyRequired: true },
-  production_supervisor: { label: 'مدير رقابة إنتاج', description: 'قم بتعيين مدير الإنتاج للإنتاج المستمر', dailySalary: 500, monthlySalary: 15_000, companyRequired: true },
-  accountant: { label: 'محاسب قانوني معتمد', description: 'يقلل الضرائب ويشترط وجود 2 محاسبين لكل ترقية وتوسعة للشركة.', dailySalary: 450, monthlySalary: 13_500, companyRequired: false },
-  lawyer: { label: 'محامٍ ومستشار عقود وتراخيص', description: 'يحمي من الغرامات ويشترط وجود 2 محامين لكل ترقية وتوسعة للشركة.', dailySalary: 400, monthlySalary: 12_000, companyRequired: false },
-  hr: { label: 'مدير موارد بشرية وتوظيف', description: 'يخفض تكاليف التعاقدات الجديدة ويدرب الكوادر ويرفع خبرتهم.', dailySalary: 350, monthlySalary: 10_500, companyRequired: false },
-  worker: { label: 'عامل تشغيل وخط إنتاج', description: 'القوة التشغيلية للماكينات، يتطلب كل مستوى توسعة زيادة عدد العمال.', dailySalary: 150, monthlySalary: 4_500, companyRequired: true },
+const STAFF_ROLE_OPTIONS: Record<StaffRole, { label: string; dailySalary: number; companyRequired: boolean }> = {
+  manager: { label: 'مدير شركة', dailySalary: 7_000, companyRequired: true },
+  accountant: { label: 'محاسب', dailySalary: 4_500, companyRequired: false },
+  lawyer: { label: 'محامٍ', dailySalary: 4_000, companyRequired: false },
+  hr: { label: 'مدير موارد بشرية', dailySalary: 3_500, companyRequired: false },
 };
 
 const MAX_STAFF_LEVEL = 5;
@@ -851,7 +906,7 @@ export function getStaffUpgradeCost(employee: StaffContract): number {
 
 function developStaff(employee: StaffContract): StaffContract {
   let level = staffLevel(employee);
-  let experience = staffExperience(employee) + (employee.role === 'manager' || employee.role === 'cfo_payroll' ? 12 : 10);
+  let experience = staffExperience(employee) + (employee.role === 'manager' ? 12 : 10);
   while (level < MAX_STAFF_LEVEL && experience >= STAFF_EXPERIENCE_PER_LEVEL) {
     experience -= STAFF_EXPERIENCE_PER_LEVEL;
     level += 1;
@@ -862,55 +917,18 @@ function developStaff(employee: StaffContract): StaffContract {
 export function hireStaff(profile: PlayerProfile, role: StaffRole, name: string, companyId?: string): GameResult<StaffContract> {
   const option = STAFF_ROLE_OPTIONS[role];
   if (!option || name.trim().length < 2) return failure(profile, 'invalid-input', 'أدخل اسمًا صحيحًا واختر دورًا معروفًا.');
-  if (option.companyRequired && !profile.companies.some((company) => company.id === companyId)) return failure(profile, 'not-found', 'هذا الدور يجب أن يرتبط بصرح الشركة الموجودة.');
-  if (role === 'manager' && profile.staff.some((member) => member.status === 'active' && member.role === 'manager' && member.companyId === companyId)) {
-    return failure(profile, 'invalid-input', 'هذه الشركة لديها مدير تشغيلي نشط بالفعل.');
-  }
-  if (role === 'cfo_payroll' && profile.staff.some((member) => member.status === 'active' && member.role === 'cfo_payroll' && member.companyId === companyId)) {
-    return failure(profile, 'invalid-input', 'هذه الشركة لديها مدير مالي وشؤون رواتب نشط بالفعل.');
-  }
-  if (role === 'production_supervisor' && profile.staff.some((member) => member.status === 'active' && member.role === 'production_supervisor' && member.companyId === companyId)) {
-    return failure(profile, 'invalid-input', 'هذه الشركة لديها مدير رقابة إنتاج نشط بالفعل.');
-  }
+  if (option.companyRequired && !profile.companies.some((company) => company.id === companyId)) return failure(profile, 'not-found', 'المدير يجب أن يرتبط بشركة موجودة.');
+  if (role === 'manager' && profile.staff.some((member) => member.status === 'active' && member.role === 'manager' && member.companyId === companyId)) return failure(profile, 'invalid-input', 'هذه الشركة لديها مدير نشط بالفعل.');
   const hr = profile.staff.find((member) => member.status === 'active' && member.role === 'hr');
-  const contractCost = Math.round(option.monthlySalary * 0.25 * (hr ? Math.max(0.68, 0.8 - (staffLevel(hr) - 1) * 0.03) : 1));
-  if (profile.bankBalance < contractCost) return failure(profile, 'insufficient-funds', `لا يكفي الرصيد لمقدم توقيع العقد (${contractCost.toLocaleString('ar-EG')} ج.م).`);
-
-  const nextPayMonth = Math.ceil(profile.day / 30) * 30 + (profile.day % 30 === 0 ? 30 : 0);
-  const staff: StaffContract = {
-    id: nextId(profile, 'staff', profile.staff.length),
-    role,
-    name: name.trim(),
-    companyId,
-    dailySalary: option.dailySalary,
-    monthlySalary: option.monthlySalary,
-    level: 1,
-    experience: 0,
-    hiredOnDay: profile.day,
-    nextPayDay: nextPayMonth,
-    status: 'active',
-  };
-
-  const updatedCompanies = profile.companies.map((c) => {
-    if (c.id === companyId) {
-      return {
-        ...c,
-        cfoPayrollAssigned: role === 'cfo_payroll' ? true : c.cfoPayrollAssigned,
-        autoPayrollEnabled: role === 'cfo_payroll' ? true : c.autoPayrollEnabled,
-        cooAssigned: role === 'manager' ? true : c.cooAssigned,
-        productionSupervisorAssigned: role === 'production_supervisor' ? true : c.productionSupervisorAssigned,
-        continuousProductionEnabled: role === 'production_supervisor' ? true : c.continuousProductionEnabled,
-      };
-    }
-    return c;
-  });
-
+  const contractCost = Math.round(option.dailySalary * (hr ? Math.max(0.68, 0.8 - (staffLevel(hr) - 1) * 0.03) : 1));
+  if (profile.bankBalance < contractCost) return failure(profile, 'insufficient-funds', 'لا يكفي الرصيد لتوقيع عقد الموظف ودفع يوم التعاقد.');
+  const staff: StaffContract = { id: nextId(profile, 'staff', profile.staff.length), role, name: name.trim(), companyId, dailySalary: option.dailySalary, level: 1, experience: 0, hiredOnDay: profile.day, nextPayDay: profile.day + 1, status: 'active' };
   const nextProfile = addLedger(
-    { ...profile, staff: [...profile.staff, staff], companies: updatedCompanies },
+    { ...profile, staff: [...profile.staff, staff] },
     [ledgerEntry(profile, 'expense', contractCost, `توقيع عقد ${option.label}: ${staff.name}`, 0)],
     profile.bankBalance - contractCost,
   );
-  return success(nextProfile, `تم تعيين ${staff.name} بوظيفة ${option.label} براتب شهري ${option.monthlySalary.toLocaleString('ar-EG')} ج.م؛ أول استحقاق شهري في اليوم ${nextPayMonth}.`, staff);
+  return success(nextProfile, `تم تعيين ${staff.name} بوظيفة ${option.label}؛ أول راتب دوري في اليوم التالي.`, staff);
 }
 
 export function upgradeStaff(profile: PlayerProfile, staffId: string): GameResult<StaffContract> {
@@ -919,7 +937,7 @@ export function upgradeStaff(profile: PlayerProfile, staffId: string): GameResul
   const level = staffLevel(employee);
   if (level >= MAX_STAFF_LEVEL) return failure(profile, 'condition-not-met', 'وصل الموظف إلى أعلى مستوى متاح.');
   const cost = getStaffUpgradeCost(employee);
-  if (profile.bankBalance < cost) return failure(profile, 'insufficient-funds', `تحتاج إلى ${cost.toLocaleString('ar-EG')} ج.م لترقية ${employee.name}.`);
+  if (profile.bankBalance < cost) return failure(profile, 'insufficient-funds', `تحتاج إلى ${cost.toLocaleString('ar-EG')} $ لترقية ${employee.name}.`);
   const updated = { ...employee, level: level + 1, experience: staffExperience(employee) };
   const nextProfile = addLedger(
     { ...profile, staff: profile.staff.map((member) => member.id === staffId ? updated : member) },
@@ -934,32 +952,13 @@ export function payStaffSalary(profile: PlayerProfile, staffId: string): GameRes
   if (!employee) return failure(profile, 'not-found', 'عقد الموظف غير موجود أو غير نشط.');
   const amount = employee.unpaidSalary ?? 0;
   if (amount <= 0) return failure(profile, 'condition-not-met', 'لا يوجد راتب مستحق لهذا الموظف حاليًا.');
-  if (profile.bankBalance < amount) return failure(profile, 'insufficient-funds', `تحتاج إلى ${amount.toLocaleString('ar-EG')} ج.م لدفع راتب ${employee.name}.`);
+  if (profile.bankBalance < amount) return failure(profile, 'insufficient-funds', `تحتاج إلى ${amount.toLocaleString('ar-EG')} $ لدفع راتب ${employee.name}.`);
   const nextProfile = addLedger(
     { ...profile, staff: profile.staff.map((member) => member.id === staffId ? { ...member, unpaidSalary: 0, nextPayDay: profile.day + 1 } : member) },
     [ledgerEntry(profile, 'settlement', amount, `سداد راتب مستحق: ${employee.name}`, 0)],
     profile.bankBalance - amount,
   );
-  return success(nextProfile, `تم دفع ${amount.toLocaleString('ar-EG')} ج.م للموظف ${employee.name}.`, { staffId, amount });
-}
-
-export function payAllMonthlySalaries(profile: PlayerProfile): GameResult<{ totalPaid: number; count: number }> {
-  const activeStaff = profile.staff.filter((m) => m.status === 'active' && (m.unpaidSalary ?? 0) > 0);
-  const totalUnpaid = activeStaff.reduce((sum, m) => sum + (m.unpaidSalary ?? 0), 0);
-  if (totalUnpaid <= 0) {
-    return failure(profile, 'condition-not-met', 'لا توجد رواتب شهرية مستحقة للصرف حالياً.');
-  }
-  if (profile.bankBalance < totalUnpaid) {
-    return failure(profile, 'insufficient-funds', `تحتاج إلى ${totalUnpaid.toLocaleString('ar-EG')} ج.م في رصيدك لصرف مسير الرواتب الشهري.`);
-  }
-  const nextPayMonth = profile.day + 30;
-  const staff = profile.staff.map((m) => m.status === 'active' ? { ...m, unpaidSalary: 0, nextPayDay: nextPayMonth } : m);
-  const nextProfile = addLedger(
-    { ...profile, staff },
-    [ledgerEntry(profile, 'settlement', totalUnpaid, `صرف مسير الرواتب الشهري لجميع الموظفين والعمال (${activeStaff.length} موظف)`, 0)],
-    profile.bankBalance - totalUnpaid,
-  );
-  return success(nextProfile, `تم صرف مسير الرواتب الشهري بنجاح بقيمة ${totalUnpaid.toLocaleString('ar-EG')} ج.م لـ ${activeStaff.length} كادر وظيفي.`, { totalPaid: totalUnpaid, count: activeStaff.length });
+  return success(nextProfile, `تم دفع ${amount.toLocaleString('ar-EG')} $ للموظف ${employee.name}.`, { staffId, amount });
 }
 
 export function terminateStaff(profile: PlayerProfile, staffId: string): GameResult<StaffContract> {
@@ -1061,7 +1060,7 @@ export function withdrawDeposit(profile: PlayerProfile, depositId: string): Game
     [ledgerEntry(profile, 'revenue', interest, `فائدة وديعة محاكاة ${deposit.id}`, 0), ledgerEntry(profile, 'settlement', principal, `استرداد أصل الوديعة ${deposit.id}`, 1)],
     profile.bankBalance + amount,
   );
-  return success(nextProfile, `تم استرداد المستحق من الوديعة مع فائدة ${interest.toLocaleString('ar-EG')} ج.م.`, { depositId, amount, interest });
+  return success(nextProfile, `تم استرداد المستحق من الوديعة مع فائدة ${interest.toLocaleString('ar-EG')} $.`, { depositId, amount, interest });
 }
 
 function collateralValue(profile: PlayerProfile, collateralType: LoanRecord['collateralType'], collateralId: string): number {
@@ -1079,7 +1078,7 @@ export function takeLoan(profile: PlayerProfile, collateralType: LoanRecord['col
   if (profile.banking.loans.some((loan) => loan.status === 'active' && loan.collateralType === collateralType && loan.collateralId === collateralId)) return failure(profile, 'collateral-in-use', 'هذا الضمان مرتبط بقرض قائم بالفعل.');
   if (![7, 14, 30].includes(termDays)) return failure(profile, 'invalid-input', 'مدة القرض المتاحة 7 أو 14 أو 30 يومًا.');
   const maximumLoan = Math.floor(collateralAmount * 0.6);
-  if (!Number.isInteger(amount) || amount < 25_000 || amount > maximumLoan) return failure(profile, 'invalid-input', `الحد الأقصى لهذا الضمان ${maximumLoan.toLocaleString('ar-EG')} ج.م محاكاة.`);
+  if (!Number.isInteger(amount) || amount < 25_000 || amount > maximumLoan) return failure(profile, 'invalid-input', `الحد الأقصى لهذا الضمان ${maximumLoan.toLocaleString('ar-EG')} $ محاكاة.`);
   const annualRate = termDays === 7 ? 0.18 : termDays === 14 ? 0.22 : 0.28;
   const totalRepayment = Math.round(amount * (1 + annualRate * termDays / 30));
   const loan: LoanRecord = { id: nextId(profile, 'loan', profile.banking.loans.length), collateralType, collateralId, principal: amount, totalRepayment, annualRate, startedOnDay: profile.day, termDays, nextPaymentDay: profile.day + 1, installmentAmount: Math.ceil(totalRepayment / termDays), remainingBalance: totalRepayment, status: 'active' };
@@ -1088,7 +1087,7 @@ export function takeLoan(profile: PlayerProfile, collateralType: LoanRecord['col
     [ledgerEntry(profile, 'liability', amount, `صرف قرض بضمان ${collateralType === 'land' ? 'أرض' : 'شركة'}`, 0)],
     profile.bankBalance + amount,
   );
-  return success(nextProfile, `تم صرف قرض محاكاة بقيمة ${amount.toLocaleString('ar-EG')} ج.م؛ يبدأ القسط في اليوم التالي.`, loan);
+  return success(nextProfile, `تم صرف قرض محاكاة بقيمة ${amount.toLocaleString('ar-EG')} $؛ يبدأ القسط في اليوم التالي.`, loan);
 }
 
 export function repayLoan(profile: PlayerProfile, loanId: string, installments: number | 'all'): GameResult<LoanRecord> {
@@ -1105,7 +1104,7 @@ export function repayLoan(profile: PlayerProfile, loanId: string, installments: 
     [ledgerEntry(profile, 'settlement', amount, `سداد ${installments === 'all' ? 'كامل' : `${count} أقساط`} من القرض ${loanId}`, 0)],
     profile.bankBalance - amount,
   );
-  return success(nextProfile, remainingBalance === 0 ? 'تم سداد القرض بالكامل وإغلاقه.' : `تم سداد ${count} أقساط دفعة واحدة. المتبقي ${remainingBalance.toLocaleString('ar-EG')} ج.م.`, updatedLoan);
+  return success(nextProfile, remainingBalance === 0 ? 'تم سداد القرض بالكامل وإغلاقه.' : `تم سداد ${count} أقساط دفعة واحدة. المتبقي ${remainingBalance.toLocaleString('ar-EG')} $.`, updatedLoan);
 }
 
 export function createInvestment(profile: PlayerProfile, investmentId: string, amount: number): GameResult<InvestmentOutcome> {
@@ -1165,59 +1164,21 @@ export function advanceDay(profile: PlayerProfile): GameResult<DayOutcome> {
     const remainingBalance = Math.max(0, loan.remainingBalance - due);
     return { ...loan, remainingBalance, nextPaymentDay: nextDay + 1, status: remainingBalance === 0 ? 'paid' as const : 'active' as const };
   });
-  const isMonthEnd = nextDay % 30 === 0;
-  const hasCFO = profile.staff.some((m) => m.status === 'active' && m.role === 'cfo_payroll')
-    || profile.companies.some((c) => c.cfoPayrollAssigned);
-
-  let updatedStaff = profile.staff.map((employee) => {
+  const staff = profile.staff.map((employee) => {
     if (employee.status !== 'active') return employee;
     const developed = developStaff(employee);
-    // If not month end and employee's scheduled payday is in the future, no monthly salary due yet
-    if (employee.nextPayDay > nextDay && !isMonthEnd) return developed;
-
-    // Monthly payroll triggered (every 30 days)!
-    const monthlyAmt = employee.monthlySalary ?? Math.round(employee.dailySalary * 30);
-    const nextPayMonth = nextDay + 30;
-    return {
-      ...developed,
-      nextPayDay: nextPayMonth,
-      unpaidSalary: (employee.unpaidSalary ?? 0) + monthlyAmt,
-    };
+    if (employee.nextPayDay > nextDay) return developed;
+    const dueDays = Math.max(1, nextDay - employee.nextPayDay + 1);
+    return { ...developed, nextPayDay: nextDay + 1, unpaidSalary: (employee.unpaidSalary ?? 0) + employee.dailySalary * dueDays };
   });
-
-  // If CFO / Payroll Director is active, CFO pays salaries on player's behalf automatically!
-  if (hasCFO) {
-    const totalDue = updatedStaff.reduce((sum, e) => sum + (e.unpaidSalary ?? 0), 0);
-    if (totalDue > 0) {
-      const autoPaid = Math.min(balance, totalDue);
-      balance -= autoPaid;
-      entries.push(ledgerEntry(profile, 'settlement', autoPaid, `مسير الرواتب الشهري (صرفه المدير المالي تلقائياً نيابة عنك)`, entries.length));
-      let remainingToDeduct = autoPaid;
-      updatedStaff = updatedStaff.map((e) => {
-        const unpaid = e.unpaidSalary ?? 0;
-        if (unpaid <= 0) return e;
-        const paidThis = Math.min(remainingToDeduct, unpaid);
-        remainingToDeduct -= paidThis;
-        return { ...e, unpaidSalary: unpaid - paidThis };
-      });
-      if (totalDue > autoPaid) {
-        const leftover = totalDue - autoPaid;
-        payables += leftover;
-        entries.push(ledgerEntry(profile, 'liability', leftover, 'التزام رواتب شهرية متبقٍ لعدم كفاية الرصيد', entries.length));
-      }
-    }
-  } else {
-    // No CFO: accrue expense once a month on month-end
-    const newlyAccrued = updatedStaff.reduce((sum, e) => {
-      const prev = profile.staff.find((item) => item.id === e.id);
-      return sum + Math.max(0, (e.unpaidSalary ?? 0) - (prev?.unpaidSalary ?? 0));
-    }, 0);
-    if (newlyAccrued > 0) {
-      entries.push(ledgerEntry(profile, 'expense', newlyAccrued, `رواتب شهرية مستحقة عن الشهر ${Math.ceil(nextDay / 30)}`, entries.length));
-      entries.push(ledgerEntry(profile, 'liability', newlyAccrued, 'التزام رواتب شهرية غير مسددة', entries.length));
-    }
+  const salaryAccrued = staff.reduce((sum, employee) => {
+    const previous = profile.staff.find((item) => item.id === employee.id);
+    return sum + Math.max(0, (employee.unpaidSalary ?? 0) - (previous?.unpaidSalary ?? 0));
+  }, 0);
+  if (salaryAccrued > 0) {
+    entries.push(ledgerEntry(profile, 'expense', salaryAccrued, 'رواتب مستحقة عن اليوم', entries.length));
+    entries.push(ledgerEntry(profile, 'liability', salaryAccrued, 'التزام رواتب غير مسدد', entries.length));
   }
-  const staff = updatedStaff;
   let inventory = [...profile.inventory];
   const newlyCompletedProductionIds: string[] = [];
   const productionOrders = profile.productionOrders.map((order) => {
@@ -1290,70 +1251,6 @@ export function advanceDay(profile: PlayerProfile): GameResult<DayOutcome> {
     const supply = industry?.dailyEnergySupply ?? capacity;
     return { ...company, energyUnits: energyPaused ? 0 : Math.min(capacity, (company.energyUnits ?? 0) + supply) };
   });
-
-  // Automated Continuous Production handled by Production Supervision Manager
-  for (let i = 0; i < companies.length; i++) {
-    const comp = companies[i];
-    const hasSupervisor = comp.productionSupervisorAssigned
-      || (comp.continuousProductionEnabled ?? false)
-      || staff.some((s) => s.status === 'active' && s.role === 'production_supervisor' && s.companyId === comp.id);
-    if (!hasSupervisor) continue;
-
-    const hasActive = productionOrders.some((o) => o.companyId === comp.id && o.status === 'active');
-    if (hasActive) continue;
-
-    const recipe = findRecipeForIndustry(comp.industryId);
-    if (!recipe) continue;
-
-    if ((comp.energyUnits ?? 0) < recipe.energyUnits) continue;
-
-    const hasMaterials = recipe.inputs.every((input) => {
-      const lot = inventory.find((item) => item.materialOrProductId === input.materialId);
-      return lot && lot.quantity >= input.quantity;
-    });
-    if (!hasMaterials) continue;
-
-    const energyCost = recipe.energyCost;
-    if (balance < energyCost) continue;
-
-    balance -= energyCost;
-    const materialCost = recipe.inputs.reduce((sum, input) => {
-      const lot = inventory.find((item) => item.materialOrProductId === input.materialId);
-      return sum + input.quantity * (lot?.unitCost ?? 0);
-    }, 0);
-
-    inventory = inventory.map((lot) => {
-      const input = recipe.inputs.find((item) => item.materialId === lot.materialOrProductId);
-      return input ? { ...lot, quantity: lot.quantity - input.quantity } : lot;
-    }).filter((lot) => lot.quantity > 0);
-
-    companies[i] = { ...comp, energyUnits: (comp.energyUnits ?? recipe.energyUnits) - recipe.energyUnits };
-
-    const supervisor = staff.find((s) => s.status === 'active' && s.role === 'production_supervisor' && s.companyId === comp.id);
-    const superLevel = staffLevel(supervisor);
-    const outputQuantity = Math.max(recipe.outputQuantity, Math.round(recipe.outputQuantity * getSynergyProductionMultiplier(profile)));
-
-    const autoOrder: ProductionOrder = {
-      id: nextId(profile, 'production', productionOrders.length),
-      companyId: comp.id,
-      productId: recipe.productId,
-      productName: recipe.productName,
-      batches: 1,
-      outputQuantity,
-      outputUnit: recipe.outputUnit,
-      materialCost,
-      energyCost,
-      expectedUnitCost: (materialCost + energyCost) / outputQuantity,
-      demandForecast: 100,
-      qualityScore: Math.min(100, 88 + (superLevel - 1) * 3),
-      maintenanceCost: 0,
-      startedOnDay: nextDay,
-      completesOnDay: nextDay + 1,
-      status: 'active',
-    };
-    productionOrders.push(autoOrder);
-    entries.push(ledgerEntry(profile, 'expense', energyCost, `إنتاج مستمر تلقائي (مدير رقابة الإنتاج): ${recipe.productName}`, entries.length));
-  }
   const expiredContracts = (profile.contracts ?? []).filter((contract) => contract.status === 'active' && contract.deadlineDay < nextDay);
   const contracts = (profile.contracts ?? []).map((contract) => contract.status === 'active' && contract.deadlineDay < nextDay
     ? { ...contract, status: 'failed' as const, failedOnDay: nextDay }
@@ -1381,7 +1278,7 @@ export function advanceDay(profile: PlayerProfile): GameResult<DayOutcome> {
   );
   const totalOutstanding = payables + outstandingSalary;
   const message = totalOutstanding > 0
-    ? `مرّ اليوم ${nextDay}، لكن بقيت التزامات ورواتب غير مسددة بقيمة ${Math.round(totalOutstanding).toLocaleString('ar-EG')} ج.م؛ أُوقفت الطاقة مؤقتًا حتى السداد.`
+    ? `مرّ اليوم ${nextDay}، لكن بقيت التزامات ورواتب غير مسددة بقيمة ${Math.round(totalOutstanding).toLocaleString('ar-EG')} $؛ أُوقفت الطاقة مؤقتًا حتى السداد.`
     : `مرّ اليوم ${nextDay} وعولجت المصروفات والأحداث والاستثمارات.`;
   return success(syncTasks(nextProfile), message, { day: nextDay, operatingCost, paidOperatingCost, payables, investmentPayout, event });
 }
@@ -1443,7 +1340,7 @@ export function deliverContract(profile: PlayerProfile, contractId: string): Gam
     ],
     profile.bankBalance + revenue - tax + achievements.bonus,
   );
-  return success(syncTasks(nextProfile), `تم تسليم العقد بنجاح. الإيراد ${grossRevenue.toLocaleString('ar-EG')} ج.م والعلاوة ${contract.reward.toLocaleString('ar-EG')} ج.م بعد احتساب الضريبة والتكلفة.`, completed);
+  return success(syncTasks(nextProfile), `تم تسليم العقد بنجاح. الإيراد ${grossRevenue.toLocaleString('ar-EG')} $ والعلاوة ${contract.reward.toLocaleString('ar-EG')} $ بعد احتساب الضريبة والتكلفة.`, completed);
 }
 
 export function negotiateContract(profile: PlayerProfile, contractId: string, mode: 'price' | 'deadline' | 'quality'): GameResult<BusinessContract> {
@@ -1515,6 +1412,7 @@ export type GameCommand =
   | { name: 'found_company'; args: { industryId: IndustryId; landId: string; name: string; paymentMethod?: PurchasePaymentMethod } }
   | { name: 'upgrade_company'; args: { companyId: string; paymentMethod?: PurchasePaymentMethod } }
   | { name: 'run_production'; args: { companyId: string; batches: number } }
+  | { name: 'auto_supply_and_produce'; args: { companyId: string; batches: number } }
   | { name: 'service_company'; args: { companyId: string } }
   | { name: 'cancel_production'; args: { orderId: string } }
   | { name: 'use_speed_card'; args: { orderId: string; kind: SpeedCardKind } }
@@ -1562,6 +1460,7 @@ export function executeGameCommand(profile: PlayerProfile, command: GameCommand)
     case 'found_company': return foundCompany(profile, command.args.industryId, command.args.landId, command.args.name, command.args.paymentMethod);
     case 'upgrade_company': return upgradeCompany(profile, command.args.companyId, command.args.paymentMethod);
     case 'run_production': return runProduction(profile, command.args.companyId, command.args.batches);
+    case 'auto_supply_and_produce': return autoSupplyAndProduce(profile, command.args.companyId, command.args.batches);
     case 'service_company': return serviceCompany(profile, command.args.companyId);
     case 'cancel_production': return cancelProductionOrder(profile, command.args.orderId);
     case 'use_speed_card': return useProductionSpeedCard(profile, command.args.orderId, command.args.kind);

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { Capacitor } from '@capacitor/core';
 import type { PlayerProfile } from '../domain/player';
 import type { SpeedCardKind } from '../domain/accountFeatures';
 import { formatNumber } from '../domain/formatters';
@@ -56,7 +57,7 @@ export function DiamondStore({ profile, isGuest, onLinkAccount, onRefreshProfile
     : existingPendingOrder;
   
   const whatsappText = selected && activeOrder
-    ? `مرحبًا، أرسلت قيمة طلب شحن الماس رقم ${activeOrder.orderNumber}. الباقة: ${selected.label}، ${selected.diamonds} ماسة بقيمة ${selected.priceEgp} ج.م. سأرفق إيصال التحويل.`
+    ? `مرحبًا، أرسلت قيمة طلب شحن الماس رقم ${activeOrder.orderNumber}. الباقة: ${selected.label}، ${selected.diamonds} ماسة بقيمة ${selected.priceEgp} $. سأرفق إيصال التحويل.`
     : 'مرحبًا، أريد الاستفسار عن شحن الماس للعبة إمبراطورية الأعمال.';
 
   async function refreshOrders() {
@@ -131,6 +132,31 @@ export function DiamondStore({ profile, isGuest, onLinkAccount, onRefreshProfile
         <span>باقات الألماس مميزة - اشتري واحصل على ألماس إضافي</span>
       </div>
 
+      {/* Recommended Starter Offer Banner for Guided Walkthrough */}
+      <div className="bg-gradient-to-r from-amber-500/20 via-amber-400/10 to-amber-500/20 border-2 border-amber-400/70 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-xl shadow-amber-500/15 mb-6" dir="rtl">
+        <div className="flex items-center gap-3 text-right">
+          <span className="text-3xl p-2.5 bg-amber-500/20 border border-amber-500/40 rounded-xl shrink-0">👑</span>
+          <div>
+            <div className="flex items-center gap-2">
+              <strong className="text-white text-sm sm:text-base font-extrabold">عرض البداية المناسب · باقة الانطلاق السريع</strong>
+              <span className="bg-amber-400 text-slate-950 font-black text-[10px] px-2 py-0.5 rounded-full">موصى به</span>
+            </div>
+            <p className="text-amber-200/90 text-xs mt-1">
+              عرض خاص ومثالي لبدء إمبراطوريتك! يمنحك بطاقات الإكمال الفوري لخطوط الإنتاج وتأمين مواردك.
+            </p>
+          </div>
+        </div>
+        <button
+          type="button"
+          data-guide-target="starter-offer-btn"
+          onClick={() => {
+            onPurchaseSpeedCard("production-instant");
+          }}
+          className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 font-black text-xs sm:text-sm shadow-lg shadow-amber-500/30 transition-all transform hover:scale-[1.03] active:scale-95 whitespace-nowrap cursor-pointer"
+        >
+          شراء هذا العرض المناسب (💎 3 ماسات) ⚡
+        </button>
+      </div>
       {/* Package Cards 2x3 Grid */}
       <div className="suly-cards-grid">
         {DIAMOND_PACKAGES.map((item) => {
@@ -171,7 +197,7 @@ export function DiamondStore({ profile, isGuest, onLinkAccount, onRefreshProfile
 
               {/* Price Tag */}
               <div className="suly-price-tag">
-                {formatNumber(item.priceEgp)} ج.م
+                {formatNumber(item.priceEgp)} $
               </div>
 
               {/* Buy Golden Pill Button */}
@@ -202,7 +228,7 @@ export function DiamondStore({ profile, isGuest, onLinkAccount, onRefreshProfile
               <strong>باقة {selected.label}</strong>
               <small>{selected.diamonds} ماسة ({selected.note})</small>
             </div>
-            <span className="suly-checkout-price">{selected.priceEgp} ج.م</span>
+            <span className="suly-checkout-price">{selected.priceEgp} $</span>
           </div>
 
           {isGuest ? (
@@ -212,10 +238,27 @@ export function DiamondStore({ profile, isGuest, onLinkAccount, onRefreshProfile
                 ربط الحساب الآن
               </button>
             </div>
+          ) : Capacitor.isNativePlatform() ? (
+            <div className="suly-payment-box" style={{ background: 'rgba(15, 23, 42, 0.8)', border: '1px solid #3b82f6', borderRadius: 12, padding: 18, textAlign: 'center' }}>
+              <h4 style={{ color: '#60a5fa', marginBottom: 8, fontSize: '1rem', fontWeight: 'bold' }}>
+                بوابة الشحن المعتمدة لنسخة التطبيق 📱
+              </h4>
+              <p style={{ color: '#cbd5e1', fontSize: '0.85rem', lineHeight: 1.6, margin: '0 0 14px' }}>
+                وفقاً لسياسات التوزيع الرقمي والمتاجر الرسمية، تتوفر خيارات شحن الماسات والتحويلات المباشرة عبر بوابة الويب الرسمية للألعاب.
+              </p>
+              <a
+                href={typeof window !== 'undefined' ? window.location.origin : 'https://suly-business.web.app'}
+                target="_blank"
+                rel="noreferrer"
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '10px 18px', background: '#2563eb', color: '#fff', borderRadius: 10, textDecoration: 'none', fontWeight: 700, fontSize: '0.88rem', boxShadow: '0 4px 12px rgba(37, 99, 235, 0.3)' }}
+              >
+                <span>فتح بوابة الشحن على موقع الويب الرسمي 🌐</span>
+              </a>
+            </div>
           ) : (
             <>
               <div className="suly-payment-box">
-                <p>للشحن عبر <strong>Vodafone Cash</strong> أرسل المبلغ <strong>({selected.priceEgp} ج.م)</strong> إلى الرقم:</p>
+                <p>للشحن عبر <strong>Vodafone Cash</strong> أرسل المبلغ <strong>({selected.priceEgp} $)</strong> إلى الرقم:</p>
                 <button type="button" className="suly-vodafone-pill" onClick={() => void copyNumber()}>
                   <span>رقم فودافون كاش</span>
                   <strong dir="ltr">{VODAFONE_CASH_NUMBER}</strong>
@@ -309,7 +352,7 @@ export function DiamondStore({ profile, isGuest, onLinkAccount, onRefreshProfile
                 <div className="suly-order-item" key={o.orderId}>
                   <div>
                     <strong dir="ltr">{o.orderNumber}</strong>
-                    <small>{o.packageName} · {o.amountEgp ?? o.amountUsd} ج.م</small>
+                    <small>{o.packageName} · {o.amountEgp ?? o.amountUsd} $</small>
                   </div>
                   <span className={`suly-status-pill suly-status--${o.status}`}>{STATUS_LABELS[o.status]}</span>
                 </div>

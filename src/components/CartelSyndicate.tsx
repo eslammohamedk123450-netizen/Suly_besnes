@@ -102,7 +102,7 @@ export const CartelSyndicate: React.FC<Props> = ({ profile, expansion, onUpdate 
                 <div className="cartel-card-footer">
                   <div className="cartel-cost">
                     <span>رسوم الانضمام:</span>
-                    <strong>{cartel.joinCost.toLocaleString('ar-EG')} ج.م</strong>
+                    <strong>{cartel.joinCost.toLocaleString('ar-EG')} $</strong>
                   </div>
 
                   {isJoined ? (
@@ -153,7 +153,7 @@ export const CartelSyndicate: React.FC<Props> = ({ profile, expansion, onUpdate 
                 </div>
                 <div className="mstat">
                   <span>إجمالي مساهماتك المالية</span>
-                  <strong>💰 {expansion.cartel.contributedFunds.toLocaleString('ar-EG')} ج.م</strong>
+                  <strong>💰 {expansion.cartel.contributedFunds.toLocaleString('ar-EG')} $</strong>
                 </div>
                 <div className="mstat">
                   <span>الاتفاقية النشطة</span>

@@ -244,7 +244,7 @@ export function launchPlayerIPO(
     return { updatedProfile: profile, updatedExpansion: expansion, error: 'الشركة مدرجة في البورصة بالفعل' };
   }
   if (profile.bankBalance < 500000) {
-    return { updatedProfile: profile, updatedExpansion: expansion, error: 'يجب توفير 500,000 ج.م رسوم الطرح والاكتتاب' };
+    return { updatedProfile: profile, updatedExpansion: expansion, error: 'يجب توفير 500,000 $ رسوم الطرح والاكتتاب' };
   }
 
   const publicSharesCount = Math.round((expansion.ipoState.sharesTotal * sharesToOfferPercent) / 100);

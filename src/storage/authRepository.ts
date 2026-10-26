@@ -180,3 +180,77 @@ export async function loginAccount(emailInput: string, password: string): Promis
 export async function logoutAccount(): Promise<void> {
   await supabase.auth.signOut();
 }
+
+export interface DeleteAccountOptions {
+  isGuest?: boolean;
+  email?: string;
+  password?: string;
+}
+
+export async function deleteCurrentAccount(options?: DeleteAccountOptions): Promise<{ ok: true } | { ok: false; message: string }> {
+  try {
+    const isGuest = Boolean(options?.isGuest);
+    const { data: sessionData } = await supabase.auth.getSession();
+    const user = sessionData.session?.user;
+
+    // For registered accounts, verify credentials if password or registered email is present
+    if (!isGuest && user) {
+      if (options?.password) {
+        const verifyEmail = options.email?.trim().toLowerCase() || user.email;
+        if (!verifyEmail) {
+          return { ok: false, message: 'يرجى كتابة البريد الإلكتروني الخاص بالحساب.' };
+        }
+        const { error: authError } = await supabase.auth.signInWithPassword({
+          email: verifyEmail,
+          password: options.password,
+        });
+        if (authError) {
+          return {
+            ok: false,
+            message: 'كلمة المرور غير صحيحة. يرجى كتابة كلمة المرور الصحيحة لحسابك للتأكيد.',
+          };
+        }
+      }
+
+      try {
+        await supabase.rpc('delete_user_account', { p_user_id: user.id });
+      } catch {
+        try {
+          await supabase.from('game_profiles').delete().eq('account_id', user.id);
+        } catch {
+          // ignore
+        }
+      }
+      await supabase.auth.signOut();
+    }
+
+    try {
+      globalThis.localStorage?.removeItem(GUEST_ACCOUNT_KEY);
+      globalThis.localStorage?.removeItem('business-empire.save-profile.v1');
+      globalThis.localStorage?.removeItem('business-empire.save-manifest.v1');
+      globalThis.localStorage?.removeItem('business-empire.command-outbox.v1');
+      globalThis.localStorage?.removeItem('business-empire.save.v1');
+      globalThis.localStorage?.removeItem('business-empire-real-time-clock-v2');
+
+      if (typeof globalThis.localStorage !== 'undefined') {
+        const keysToRemove: string[] = [];
+        for (let i = 0; i < globalThis.localStorage.length; i++) {
+          const key = globalThis.localStorage.key(i);
+          if (key && (key.startsWith('business-empire') || key.startsWith('sb-'))) {
+            keysToRemove.push(key);
+          }
+        }
+        for (const k of keysToRemove) {
+          globalThis.localStorage.removeItem(k);
+        }
+      }
+    } catch {
+      // Storage access fail-safe
+    }
+    return { ok: true };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return { ok: false, message: `تعذر حذف الحساب: ${msg}` };
+  }
+}
+

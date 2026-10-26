@@ -15,14 +15,15 @@ interface PurchaseOptionsProps {
   cashLabel?: string;
   diamondLabel?: string;
   note?: string;
+  guideTarget?: string;
 }
 
-export function PurchaseOptions({ country, cashPrice, bankBalance, diamondsBalance, onPurchase, disabled = false, diamondPrice, cashLabel = 'شراء نقدًا', diamondLabel = 'شراء بالماس', note = 'يُحتسب خصم ١٪ ثم تُقرّب تكلفة الماس إلى الأسفل؛ وقد يزيد الوفر بسبب التقريب.' }: PurchaseOptionsProps) {
+export function PurchaseOptions({ country, cashPrice, bankBalance, diamondsBalance, onPurchase, disabled = false, diamondPrice, cashLabel = 'شراء نقدًا', diamondLabel = 'شراء بالماس', note = 'يُحتسب خصم ١٪ ثم تُقرّب تكلفة الماس إلى الأسفل؛ وقد يزيد الوفر بسبب التقريب.', guideTarget }: PurchaseOptionsProps) {
   const diamonds = diamondPrice ?? getDiscountedDiamondPrice(cashPrice);
   const canBuyWithDiamonds = diamonds > 0 && diamondsBalance >= diamonds;
   return (
     <div className="purchase-options" role="group" aria-label="اختيار وسيلة الدفع">
-      <button className="button button-secondary" type="button" disabled={disabled || bankBalance < cashPrice} onClick={() => onPurchase('cash')}>
+      <button className="button button-secondary" type="button" data-guide-target={guideTarget} disabled={disabled || bankBalance < cashPrice} onClick={() => onPurchase('cash')}>
         {cashLabel} · {formatMoney(cashPrice, country)}
       </button>
       <button className="button button-primary" type="button" disabled={disabled || !canBuyWithDiamonds} onClick={() => onPurchase('diamonds')}>

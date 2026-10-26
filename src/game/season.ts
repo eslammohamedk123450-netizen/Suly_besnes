@@ -86,7 +86,7 @@ export function claimSeasonChallenge(profile: PlayerProfile, challengeId: string
   const key = challenge.kind === 'daily' ? `${profile.day}:${challenge.id}` : challenge.id;
   const season = { ...snapshot.season, points: snapshot.season.points + challenge.points, claimedChallengeKeys: [...snapshot.season.claimedChallengeKeys, key] };
   const nextProfile = withLedger(profile, challenge.reward, `مكافأة موسم التوسع: ${challenge.title}`, { season });
-  return { ok: true, profile: nextProfile, message: `أحسنت! حصلت على ${challenge.points} نقطة و${challenge.reward.toLocaleString('ar-EG')} ج.م من الموسم.`, data: { challengeId, points: challenge.points } };
+  return { ok: true, profile: nextProfile, message: `أحسنت! حصلت على ${challenge.points} نقطة و${challenge.reward.toLocaleString('ar-EG')} $ من الموسم.`, data: { challengeId, points: challenge.points } };
 }
 
 export function claimLoginReward(profile: PlayerProfile, rewardId: (typeof LOGIN_REWARDS)[number]['id']): GameResult<{ rewardId: string }> {
@@ -104,13 +104,13 @@ export function claimLoginReward(profile: PlayerProfile, rewardId: (typeof LOGIN
     return { ok: true, profile: nextProfile, message: 'تمت إضافة 8 ماسات مجانية إلى حسابك.', data: { rewardId } };
   }
   const nextProfile = withLedger(profile, 25_000, 'مكافأة دخول الموسم: سيولة فورية', { season });
-  return { ok: true, profile: nextProfile, message: 'تمت إضافة 25,000 ج.م محاكاة إلى رصيدك.', data: { rewardId } };
+  return { ok: true, profile: nextProfile, message: 'تمت إضافة 25,000 $ محاكاة إلى رصيدك.', data: { rewardId } };
 }
 
 export const SEASON_EVENTS = [
-  { title: 'فرصة توريد عاجلة', description: 'وصل طلب كبير من السوق، لكن القرار يحتاج سرعة.', choices: [{ id: 'safe', label: 'بيع من المخزون', description: '12,000 ج.م و5 نقاط', reward: 12_000, points: 5 }, { id: 'bold', label: 'اقبل الطلب الكبير', description: '24,000 ج.م و10 نقاط', reward: 24_000, points: 10 }] },
-  { title: 'موقع توسعة جديد', description: 'ظهر موقع مناسب قرب منشآتك ويمكن استغلاله اليوم.', choices: [{ id: 'reserve', label: 'احجز الموقع', description: '18,000 ج.م و8 نقاط', reward: 18_000, points: 8 }, { id: 'wait', label: 'انتظر فرصة أفضل', description: '8,000 ج.م و4 نقاط', reward: 8_000, points: 4 }] },
-  { title: 'منافس يضغط السوق', description: 'خفض منافس أسعاره، ويمكنك الرد بهدوء أو بالمخاطرة.', choices: [{ id: 'steady', label: 'حافظ على السعر', description: '10,000 ج.م و5 نقاط', reward: 10_000, points: 5 }, { id: 'compete', label: 'نافس بقوة', description: '22,000 ج.م و9 نقاط', reward: 22_000, points: 9 }] },
+  { title: 'فرصة توريد عاجلة', description: 'وصل طلب كبير من السوق، لكن القرار يحتاج سرعة.', choices: [{ id: 'safe', label: 'بيع من المخزون', description: '12,000 $ و5 نقاط', reward: 12_000, points: 5 }, { id: 'bold', label: 'اقبل الطلب الكبير', description: '24,000 $ و10 نقاط', reward: 24_000, points: 10 }] },
+  { title: 'موقع توسعة جديد', description: 'ظهر موقع مناسب قرب منشآتك ويمكن استغلاله اليوم.', choices: [{ id: 'reserve', label: 'احجز الموقع', description: '18,000 $ و8 نقاط', reward: 18_000, points: 8 }, { id: 'wait', label: 'انتظر فرصة أفضل', description: '8,000 $ و4 نقاط', reward: 8_000, points: 4 }] },
+  { title: 'منافس يضغط السوق', description: 'خفض منافس أسعاره، ويمكنك الرد بهدوء أو بالمخاطرة.', choices: [{ id: 'steady', label: 'حافظ على السعر', description: '10,000 $ و5 نقاط', reward: 10_000, points: 5 }, { id: 'compete', label: 'نافس بقوة', description: '22,000 $ و9 نقاط', reward: 22_000, points: 9 }] },
 ] as const;
 
 export function getSeasonEventSnapshot(profile: PlayerProfile) {
@@ -127,5 +127,5 @@ export function chooseSeasonEvent(profile: PlayerProfile, choiceId: string): Gam
   const currentSeason = getSeasonSnapshot(profile).season;
   const season = { ...currentSeason, points: currentSeason.points + choice.points, claimedChallengeKeys: [...currentSeason.claimedChallengeKeys, `event:${profile.day}`] };
   const nextProfile = withLedger(profile, choice.reward, `قرار موسم التوسع: ${snapshot.event.title} · ${choice.label}`, { season });
-  return { ok: true, profile: nextProfile, message: `تم تنفيذ القرار وحصلت على ${choice.reward.toLocaleString('ar-EG')} ج.م و${choice.points} نقاط موسم.`, data: { choiceId } };
+  return { ok: true, profile: nextProfile, message: `تم تنفيذ القرار وحصلت على ${choice.reward.toLocaleString('ar-EG')} $ و${choice.points} نقاط موسم.`, data: { choiceId } };
 }

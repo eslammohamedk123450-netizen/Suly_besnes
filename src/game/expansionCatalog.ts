@@ -553,7 +553,7 @@ export const DYNAMIC_ECONOMIC_EVENTS: EconomicDilemmaEvent[] = [
       {
         id: 'opt_3',
         label: 'الاعتماد على الموردين المحترفين',
-        description: 'استخدام 5 ماسات لإبرام عقود طويلة الأجل تثبت الأسعار وتمنحك أرباحاً +50,000 ج.م.',
+        description: 'استخدام 5 ماسات لإبرام عقود طويلة الأجل تثبت الأسعار وتمنحك أرباحاً +50,000 $.',
         moneyChange: 50000,
         reputationChange: 3,
         diamondsReward: 0,
@@ -571,7 +571,7 @@ export const DYNAMIC_ECONOMIC_EVENTS: EconomicDilemmaEvent[] = [
       {
         id: 'opt_1',
         label: 'شراء براءة الاختراع فوراً',
-        description: 'استثمار 100,000 ج.م للحصول على زيادة دائمية في سرعة الإنتاج.',
+        description: 'استثمار 100,000 $ للحصول على زيادة دائمية في سرعة الإنتاج.',
         moneyChange: -100000,
         reputationChange: 10,
         diamondsReward: 5,
@@ -579,14 +579,14 @@ export const DYNAMIC_ECONOMIC_EVENTS: EconomicDilemmaEvent[] = [
       {
         id: 'opt_2',
         label: 'تأجير التقنية مؤقتاً',
-        description: 'استثمار 25,000 ج.م لاختبار التقنية في خط واحد.',
+        description: 'استثمار 25,000 $ لاختبار التقنية في خط واحد.',
         moneyChange: -25000,
         reputationChange: 4,
       },
       {
         id: 'opt_3',
         label: 'بيع الفكرة لمستثمر منافس',
-        description: 'بيع الحقوق وحصد سيولة سريعة بقيمة 80,000 ج.م.',
+        description: 'بيع الحقوق وحصد سيولة سريعة بقيمة 80,000 $.',
         moneyChange: 80000,
         reputationChange: -3,
       },
@@ -603,14 +603,14 @@ export const DYNAMIC_ECONOMIC_EVENTS: EconomicDilemmaEvent[] = [
       {
         id: 'opt_1',
         label: 'تقديم المستندات والتعاون الكامل',
-        description: 'سداد تسوية بقيمة 35,000 ج.م والحصول على تقييم ممتاظ AAA ورفع السمعة +12.',
+        description: 'سداد تسوية بقيمة 35,000 $ والحصول على تقييم ممتاظ AAA ورفع السمعة +12.',
         moneyChange: -35000,
         reputationChange: 12,
       },
       {
         id: 'opt_2',
         label: 'تعيين مكتب محاسبة دولي',
-        description: 'تكلفة 15,000 ج.م واسترداد إعفاء ضريبي قدره 45,000 ج.م!',
+        description: 'تكلفة 15,000 $ واسترداد إعفاء ضريبي قدره 45,000 $!',
         moneyChange: 30000,
         reputationChange: 5,
       },
@@ -634,7 +634,7 @@ export const DYNAMIC_ECONOMIC_EVENTS: EconomicDilemmaEvent[] = [
       {
         id: 'opt_1',
         label: 'طرح حصة إضافية وحصد سيولة',
-        description: 'تحصيل 150,000 ج.م كاش فوري لإعادة الاستثمار.',
+        description: 'تحصيل 150,000 $ كاش فوري لإعادة الاستثمار.',
         moneyChange: 150000,
         reputationChange: 6,
       },

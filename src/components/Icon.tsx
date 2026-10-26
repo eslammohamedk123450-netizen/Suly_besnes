@@ -60,6 +60,7 @@ export function Icon({ name, size = 20, className }: IconProps) {
       strokeWidth="1.7"
       strokeLinecap="round"
       strokeLinejoin="round"
+      style={{ minWidth: size, minHeight: size, flexShrink: 0 }}
     >
       {drawings[name]}
     </svg>

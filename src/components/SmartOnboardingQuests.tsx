@@ -135,7 +135,7 @@ export const SmartOnboardingQuests: React.FC<SmartOnboardingQuestsProps> = ({
                 تسهيل ائتماني طارئ من «بنك مصر للأعمال»
               </h4>
               <p className="text-xs text-amber-200/90 mt-0.5">
-                رصيدك الحالي ({formatMoney(profile.bankBalance, profile.countryId)}) قارب على النفاد! اسحب 250,000 ج.م لحماية مصانعك من التوقف.
+                رصيدك الحالي ({formatMoney(profile.bankBalance, profile.countryId)}) قارب على النفاد! اسحب 250,000 $ لحماية مصانعك من التوقف.
               </p>
             </div>
           </div>
@@ -146,7 +146,7 @@ export const SmartOnboardingQuests: React.FC<SmartOnboardingQuestsProps> = ({
             }}
             className="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-emerald-500 hover:from-amber-400 hover:to-emerald-400 text-slate-950 font-bold text-xs shadow-lg transition-transform active:scale-95 shrink-0"
           >
-            سحب 250,000 ج.م قرض إنقاذ
+            سحب 250,000 $ قرض إنقاذ
           </button>
         </div>
       )}
@@ -230,7 +230,7 @@ export const SmartOnboardingQuests: React.FC<SmartOnboardingQuestsProps> = ({
                       </p>
                       <div className="flex items-center gap-2 mt-1.5 text-[10px] text-slate-400">
                         <span className="text-emerald-400 font-mono">
-                          مكافأة: +{quest.cashReward.toLocaleString()} ج.م
+                          مكافأة: +{quest.cashReward.toLocaleString()} $
                         </span>
                         <span>•</span>
                         <span className="text-cyan-300 font-mono">
@@ -248,6 +248,7 @@ export const SmartOnboardingQuests: React.FC<SmartOnboardingQuestsProps> = ({
                         </span>
                       ) : (
                         <button
+                          data-guide-target="claim-task-btn"
                           onClick={() => handleClaim(quest)}
                           className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-white font-bold text-xs shadow-lg shadow-emerald-950/40 animate-bounce"
                         >

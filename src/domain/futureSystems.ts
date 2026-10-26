@@ -131,7 +131,7 @@ export interface LoanRecord {
   status: 'active' | 'paid' | 'defaulted';
 }
 
-export type StaffRole = 'manager' | 'accountant' | 'lawyer' | 'hr' | 'worker' | 'cfo_payroll' | 'production_supervisor';
+export type StaffRole = 'manager' | 'accountant' | 'lawyer' | 'hr';
 
 export interface StaffContract {
   id: string;
@@ -139,7 +139,6 @@ export interface StaffContract {
   name: string;
   companyId?: string;
   dailySalary: number;
-  monthlySalary?: number;
   /** Legacy saves omit these fields and are treated as a level-one employee. */
   level?: number;
   experience?: number;

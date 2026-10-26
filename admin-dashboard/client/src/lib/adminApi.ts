@@ -53,7 +53,7 @@ export interface AuditEntry {
   id: string;
   adminEmail: string;
   accountCode: string | null;
-  action: "resource_adjustment" | "badge_grant" | "badge_revoke" | "badge_expire" | "reward_signing_key_initialized" | "reward_code_issued" | "diamond_topup_approved" | "diamond_topup_rejected";
+  action: "resource_adjustment" | "badge_grant" | "badge_revoke" | "badge_expire" | "reward_signing_key_initialized" | "diamond_topup_approved" | "diamond_topup_rejected";
   reason: string;
   before: Record<string, unknown>;
   after: Record<string, unknown>;
@@ -153,15 +153,6 @@ export async function getBadgeHistory(accountCode: string): Promise<BadgeHistory
 export async function getAuditHistory(): Promise<AuditEntry[]> {
   const response = await post<{ ok: true; entries: AuditEntry[] }>("/api/admin/audit");
   return response.entries ?? [];
-}
-
-export async function issueRewardCode(input: {
-  cash: number;
-  gold: number;
-  expiresAt: string;
-  requestId: string;
-}): Promise<{ code: string; reused: boolean; expiresAt: string }> {
-  return post<{ ok: true; code: string; reused: boolean; expiresAt: string }>("/api/admin/reward-codes/issue", input);
 }
 
 export async function getDiamondTopups(status: TopupFilter): Promise<TopupOrder[]> {

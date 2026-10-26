@@ -124,7 +124,7 @@ function isLoan(value: unknown): value is LoanRecord {
 
 function isStaffContract(value: unknown): value is StaffContract {
   return isRecord(value) && isNonEmptyString(value.id) && isNonEmptyString(value.name)
-    && (value.role === 'manager' || value.role === 'accountant' || value.role === 'lawyer' || value.role === 'hr' || value.role === 'worker' || value.role === 'cfo_payroll' || value.role === 'production_supervisor')
+    && (value.role === 'manager' || value.role === 'accountant' || value.role === 'lawyer' || value.role === 'hr')
     && (value.companyId === undefined || isNonEmptyString(value.companyId)) && isFiniteNonNegative(value.dailySalary)
     && (value.level === undefined || (Number.isInteger(value.level) && (value.level as number) >= 1 && (value.level as number) <= 5))
     && (value.experience === undefined || (isFiniteNonNegative(value.experience) && value.experience <= 100))
@@ -227,7 +227,7 @@ function isLegacyProfile(value: unknown): value is Record<string, unknown> {
 }
 
 /** Converts older profiles into one canonical shape without dropping ownership or financial history. */
-function migrateProfile(value: unknown): PlayerProfile | null {
+export function migrateProfile(value: unknown): PlayerProfile | null {
   if (!isLegacyProfile(value)) return null;
   const rawFinances = value.finances as { netProfit: number; totalRevenue?: number; totalExpenses?: number };
   const countryId = value.countryId as CountryId;
@@ -335,6 +335,17 @@ function migrateProfile(value: unknown): PlayerProfile | null {
     contracts: Array.isArray(value.contracts) && value.contracts.every(isBusinessContract) ? value.contracts : [],
     achievements: Array.isArray(value.achievements) && value.achievements.every(isAchievement) ? value.achievements : [],
     onboarding: isOnboardingProgress(value.onboarding) ? value.onboarding : { introCompleted: true, chapter: 1, seenGuides: [] },
+    avatarId: typeof value.avatarId === 'string' && value.avatarId ? value.avatarId : 'avatar_free_male_1',
+    unlockedAvatarIds: Array.isArray(value.unlockedAvatarIds) && value.unlockedAvatarIds.length > 0
+      ? Array.from(new Set(['avatar_free_male_1', 'avatar_free_male_2', 'avatar_free_female_1', 'avatar_free_female_2', ...value.unlockedAvatarIds.filter(isNonEmptyString)]))
+      : ['avatar_free_male_1', 'avatar_free_male_2', 'avatar_free_female_1', 'avatar_free_female_2'],
+    bio: typeof value.bio === 'string' && value.bio.trim().length > 0 ? value.bio : 'ابنِ إمبراطوريتك الاستثمارية بعزيمة لا تلين ورؤية لا تعرف المستحيل.',
+    renameCountThisWeek: typeof value.renameCountThisWeek === 'number' && Number.isInteger(value.renameCountThisWeek) ? value.renameCountThisWeek : 0,
+    lastRenameWeekTimestamp: typeof value.lastRenameWeekTimestamp === 'number' ? value.lastRenameWeekTimestamp : Date.now(),
+    campaignChapterId: typeof value.campaignChapterId === 'number' && Number.isInteger(value.campaignChapterId) && value.campaignChapterId >= 1 ? value.campaignChapterId : 1,
+    completedMissionIds: Array.isArray(value.completedMissionIds) ? value.completedMissionIds.filter(isNonEmptyString) : [],
+    claimedRewardIds: Array.isArray(value.claimedRewardIds) ? value.claimedRewardIds.filter(isNonEmptyString) : [],
+    dismissedStoryEventIds: Array.isArray(value.dismissedStoryEventIds) ? value.dismissedStoryEventIds.filter(isNonEmptyString) : [],
   }, typeof value.accountCode === 'string' ? value.accountCode : value.id as string);
 }
 

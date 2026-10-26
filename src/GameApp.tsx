@@ -1,4 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import { SpotlightWalkthrough } from "./components/SpotlightWalkthrough";
+import { WALKTHROUGH_STEPS, isWalkthroughCompleted, setWalkthroughCompleted } from "./game/walkthroughState";
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { App as CapacitorApp } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
 import { Brand } from './components/Brand';
@@ -8,7 +10,10 @@ import { Dashboard } from './components/Dashboard';
 import { ProfilePage } from './components/ProfilePage';
 import { GameDayTimer } from './components/GameDayTimer';
 import { Icon } from './components/Icon';
-import { NoticeToast } from './components/NoticeToast';
+import { FlyingToast, type ToastAlert } from './components/FlyingToast';
+import { NotificationBell } from './components/NotificationBell';
+import { NotificationModal } from './components/NotificationModal';
+import { selectNotifications, type GameNotification } from './game/notifications';
 import { SectionPage } from './components/SectionPage';
 import { COUNTRIES, findCountry } from './domain/countries';
 import type { CountryId } from './domain/countries';
@@ -16,7 +21,9 @@ import { GAME_SECTIONS, getSection, SECTION_GROUPS, type SectionId } from './dom
 import { createNewPlayer } from './domain/player';
 import type { PlayerProfile } from './domain/player';
 import { formatMoney } from './domain/formatters';
-import { advanceDay, type GameCommand, type GameResult } from './game/engine';
+import type { FinanceLedgerEntry } from './domain/futureSystems';
+import { advanceDay, sellProduct, type GameCommand, type GameResult } from './game/engine';
+import { loadStockMarketState, disburseHybridDividends } from './game/stockMarket';
 import { loadSavedGame, saveGame } from './storage/saveRepository';
 import { loadNotificationTheme, saveNotificationTheme } from './storage/userPreferences';
 import { createGuestAccount, handlePasswordRecoveryCallback, loadCurrentAccount, logoutAccount, type LocalAccount } from './storage/authRepository';
@@ -25,7 +32,7 @@ import { PasswordResetGate } from './components/PasswordResetGate';
 import { supabase } from './storage/supabaseClient';
 import { StoryIntro } from './components/StoryIntro';
 import { SystemGuideModal } from './components/SystemGuideModal';
-import { chapterFor, getPlayerProgress, getSectionUnlockHint, getUnlockedSectionIds, isSectionUnlocked } from './game/onboarding';
+import { chapterFor, getPlayerProgress, getSectionUnlockHint, getUnlockedSectionIds, isSectionUnlocked, getSectionRequiredLevel } from './game/onboarding';
 import { normalizeAccountFeatures } from './domain/accountFeatures';
 import { claimDailySeasonLogin, getVisibleSeasons, recordVerifiedGameTransaction } from './storage/leaderboardRepository';
 import { ResourceBar, type ResourceSyncState } from './components/ResourceBar';
@@ -36,7 +43,21 @@ import { RightActionHub } from './components/RightActionHub';
 import { StoryEventPopup, GAME_STORY_EVENTS, type StoryEventAlert } from './components/StoryEventPopup';
 import { DynamicEconomyEvents } from './components/DynamicEconomyEvents';
 import { loadExpansionState } from './game/expansionEngine';
-import { ClashVillageHub } from './components/ClashVillageHub';
+import { DailyLuckySpinModal } from './components/DailyLuckySpinModal';
+import { CelebrationModal, type CelebrationData } from './components/CelebrationModal';
+import { MobileBottomNav } from './components/MobileBottomNav';
+import { getLuckySpinState } from './game/luckyWheelService';
+import { AvatarWardrobeModal } from './components/AvatarWardrobeModal';
+import { calculateOfflineIdleProgress, applyOfflineReportToProfile, recordOfflineHeartbeat, type OfflineIdleReport } from './game/offlineIdleEngine';
+import { MorningAbsenceReportModal } from './components/MorningAbsenceReportModal';
+import { CentralBankModal } from './components/CentralBankModal';
+import { PrestigeExpansionModal } from './components/PrestigeExpansionModal';
+import { triggerHaptic } from './services/nativeMobileService';
+import { StoryCampaignHub } from './components/StoryCampaignHub';
+import { StoryBriefingModal } from './components/StoryBriefingModal';
+import { filterSynchronizedNotifications } from './game/synchronizer';
+import { CENTRAL_MISSIONS_CATALOG } from './game/missionsEngine';
+import { getLeadAdvisor } from './game/campaignScenario';
 
 function getPendingSyncCount(accountId: string): number {
   return loadQueuedGameCommands(accountId).length + (loadPendingInitialProfile(accountId) ? 1 : 0);
@@ -50,16 +71,7 @@ function clearWebRecoveryMarker() {
   window.history.replaceState(null, '', `${url.pathname}${url.search}`);
 }
 
-import { Volume2, VolumeX, UploadCloud, Sparkles } from 'lucide-react';
-
-interface GameAppProps {
-  onOpenGitHubPush?: () => void;
-  onOpenChangelog?: () => void;
-  soundOn?: boolean;
-  onToggleSound?: () => void;
-}
-
-export default function App({ onOpenGitHubPush, onOpenChangelog, soundOn = true, onToggleSound }: GameAppProps = {}) {
+export default function App() {
   const [account, setAccount] = useState<LocalAccount | null>(null);
   const [profile, setProfile] = useState<PlayerProfile | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
@@ -79,9 +91,154 @@ export default function App({ onOpenGitHubPush, onOpenChangelog, soundOn = true,
   const [recoveryError, setRecoveryError] = useState('');
   const [activeStoryEvent, setActiveStoryEvent] = useState<StoryEventAlert | null>(null);
   const [expansion, setExpansion] = useState(() => profile ? loadExpansionState(profile) : null);
-  const [homeViewMode, setHomeViewMode] = useState<'village' | 'classic'>('village');
+  const [isLuckyWheelOpen, setIsLuckyWheelOpen] = useState(false);
+  const [isTutorialOpen, setIsTutorialOpen] = useState(false);
+  const [isAvatarWardrobeOpen, setIsAvatarWardrobeOpen] = useState(false);
+  const [isWalkthroughActive, setIsWalkthroughActive] = useState(() => !isWalkthroughCompleted());
+  const [walkthroughStepIndex, setWalkthroughStepIndex] = useState(0);
+  const [celebrationData, setCelebrationData] = useState<CelebrationData | null>(null);
+  const [isNotificationModalOpen, setIsNotificationModalOpen] = useState(false);
+  const [activeToastAlert, setActiveToastAlert] = useState<ToastAlert | null>(null);
+  const [forceBellVibrate, setForceBellVibrate] = useState(false);
+  const [customNotifications, setCustomNotifications] = useState<GameNotification[]>([]);
+  const [isMorningReportOpen, setIsMorningReportOpen] = useState(false);
+  const [offlineReport, setOfflineReport] = useState<OfflineIdleReport | null>(null);
+  const [isCentralBankModalOpen, setIsCentralBankModalOpen] = useState(false);
+  const [isPrestigeModalOpen, setIsPrestigeModalOpen] = useState(false);
+  const [isStoryCampaignOpen, setIsStoryCampaignOpen] = useState(false);
+  const [isStoryBriefingOpen, setIsStoryBriefingOpen] = useState(false);
   const syncLock = useRef(false);
   const remoteCommandAttempts = useRef(new Map<string, Promise<RemoteGameCommandAttempt>>());
+
+  const triggerNotification = (
+    message: string,
+    tone: 'success' | 'warning' | 'info' | 'danger' = 'info',
+    title?: string,
+    section?: SectionId,
+    target?: string
+  ) => {
+    const id = `notif-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+    const inferredTitle = title || (
+      tone === 'danger' ? 'تنبيه عاجل' :
+      tone === 'warning' ? 'تحذير هام' :
+      tone === 'success' ? 'تمت العملية بنجاح' :
+      'إشعار إمبراطورية الأعمال'
+    );
+
+    setActiveToastAlert({
+      id,
+      title: inferredTitle,
+      message,
+      tone,
+      section,
+      target,
+    });
+
+    const newNotif: GameNotification = {
+      id,
+      title: inferredTitle,
+      detail: message,
+      tone,
+      section: (section ?? 'home') as any,
+      target,
+    };
+
+    setCustomNotifications((prev) => [newNotif, ...prev.slice(0, 30)]);
+    setForceBellVibrate(true);
+    setTimeout(() => setForceBellVibrate(false), 2400);
+  };
+
+  const showNotice = (
+    msg: string, 
+    tone: 'success' | 'warning' | 'info' | 'danger' = 'info', 
+    title?: string, 
+    sec?: SectionId, 
+    tgt?: string
+  ) => {
+    setNotice(msg);
+    setNoticeTone(tone === 'danger' ? 'error' : (tone as any));
+    triggerNotification(msg, tone, title, sec, tgt);
+  };
+
+  const allNotifications = useMemo(() => {
+    if (!profile) return customNotifications;
+    const dynamic = selectNotifications(profile);
+    const map = new Map<string, GameNotification>();
+    for (const item of [...customNotifications, ...dynamic]) {
+      if (!map.has(item.id)) {
+        map.set(item.id, item);
+      }
+    }
+    const dismissed = new Set(profile.dismissedNotificationIds ?? []);
+    const list = Array.from(map.values()).filter((n) => !dismissed.has(n.id));
+    return filterSynchronizedNotifications(list, profile);
+  }, [profile, customNotifications]);
+
+  const unreadNotificationsCount = useMemo(() => {
+    const readSet = new Set(profile?.readNotificationIds ?? []);
+    return allNotifications.filter((n) => !readSet.has(n.id)).length;
+  }, [allNotifications, profile?.readNotificationIds]);
+
+  const handleMarkNotificationRead = (notifId: string) => {
+    if (!profile) return;
+    const currentRead = new Set(profile.readNotificationIds ?? []);
+    currentRead.add(notifId);
+    const updated = {
+      ...profile,
+      readNotificationIds: Array.from(currentRead),
+    };
+    setProfile(updated);
+    saveGame(updated, account?.id);
+  };
+
+  const handleMarkAllNotificationsRead = () => {
+    if (!profile) return;
+    const allIds = allNotifications.map((n) => n.id);
+    const updated = {
+      ...profile,
+      readNotificationIds: Array.from(new Set([...(profile.readNotificationIds ?? []), ...allIds])),
+    };
+    setProfile(updated);
+    saveGame(updated, account?.id);
+  };
+
+  const handleClearAllNotifications = () => {
+    if (!profile) return;
+    const allIds = allNotifications.map((n) => n.id);
+    const updated = {
+      ...profile,
+      dismissedNotificationIds: Array.from(new Set([...(profile.dismissedNotificationIds ?? []), ...allIds])),
+    };
+    setCustomNotifications([]);
+    setProfile(updated);
+    saveGame(updated, account?.id);
+  };
+
+  const handleLuckySpinReward = (reward: { type: 'cash' | 'gold' | 'diamonds' | 'speed_card'; amount: number; label: string; wasFree?: boolean }) => {
+    if (!profile) return;
+    let next: any = { ...profile, lastSpinDay: profile.day };
+    if (reward.wasFree) {
+      next.lastSpinTimestamp = Date.now();
+    } else {
+      next.diamonds = Math.max(0, (next.diamonds ?? 0) - 2);
+    }
+    if (reward.type === 'cash') {
+      next.bankBalance = (next.bankBalance ?? 0) + reward.amount;
+    } else if (reward.type === 'gold') {
+      next.goldGrams = Number(((next.goldGrams ?? 0) + reward.amount).toFixed(2));
+    } else if (reward.type === 'diamonds') {
+      next.diamonds = (next.diamonds ?? 0) + reward.amount;
+    } else if (reward.type === 'speed_card') {
+      const existingCards = next.speedCards ? [...next.speedCards] : [];
+      const idx = existingCards.findIndex((c: any) => c.kind === 'production-instant');
+      if (idx >= 0) existingCards[idx].quantity += 1;
+      else existingCards.push({ kind: 'production-instant', quantity: 1 });
+      next.speedCards = existingCards;
+    }
+    setProfile(next);
+    saveGame(next, account?.id);
+    showNotice(`🎉 مبروك! ربحت ${reward.label} من عجلة الحظ!`, 'success', 'مكافأة عجلة الحظ');
+  };
 
   async function claimDailyLogin(nextAccount: LocalAccount) {
     if (nextAccount.isGuest) return;
@@ -185,8 +342,21 @@ export default function App({ onOpenGitHubPush, onOpenChangelog, soundOn = true,
           saveGame(local, current.id);
         }
 
-        setProfile(normalizeAccountFeatures(local, current.id));
+        const loadedProfile = normalizeAccountFeatures(local, current.id);
+        setProfile(loadedProfile);
         setAuthLoading(false);
+
+        // Smart Offline Idle Engine: calculate goods and dividends during absence
+        try {
+          const idleRep = calculateOfflineIdleProgress(loadedProfile);
+          if (idleRep && (idleRep.elapsedSeconds >= 120 || idleRep.isTampered)) {
+            setOfflineReport(idleRep);
+            setIsMorningReportOpen(true);
+          }
+        } catch (e) {
+          console.error('Idle progress error', e);
+        }
+        recordOfflineHeartbeat(current.id);
 
         if (current.isGuest) {
           void claimDailyLogin(current);
@@ -435,6 +605,17 @@ export default function App({ onOpenGitHubPush, onOpenChangelog, soundOn = true,
     setNoticeTone('success');
   }
 
+  function handleAccountDeleted() {
+    setProfile(null);
+    setPlayerName('');
+    setSelectedCountryId(COUNTRIES[0].id);
+    const freshGuest = createGuestAccount();
+    setAccount(freshGuest);
+    setNotice('تم مسح الحساب والبيانات بنجاح. مرحباً بك في بداية جديدة لإمبراطوريتك!');
+    setNoticeTone('success');
+    navigate('home');
+  }
+
   async function handleLinkedAccount(nextAccount: LocalAccount) {
     if (!account?.isGuest) {
       setLinkingAccount(false);
@@ -510,8 +691,11 @@ export default function App({ onOpenGitHubPush, onOpenChangelog, soundOn = true,
     setProfile(newProfile);
     setActiveSection('home');
     setMobileMenuOpen(false);
-    setNotice(result.ok ? 'تم إنشاء عالمك وحفظه على هذا الجهاز.' : 'تعذر حفظ البيانات محليًا؛ قد لا يستمر التقدم بعد إغلاق الصفحة.');
-    setNoticeTone(result.ok ? 'success' : 'error');
+    showNotice(
+      result.ok ? 'تم إنشاء عالمك وحفظه على هذا الجهاز بنجاح! 🌍' : 'تعذر حفظ البيانات محليًا؛ قد لا يستمر التقدم بعد إغلاق الصفحة.',
+      result.ok ? 'success' : 'danger',
+      'بداية إمبراطورية جديدة'
+    );
   }
 
   function completeIntro() {
@@ -521,15 +705,13 @@ export default function App({ onOpenGitHubPush, onOpenChangelog, soundOn = true,
     if (account && !account.isGuest) setSyncState('local');
     setProfile(nextProfile);
     playSound('success');
-    setNotice('بدأ الفصل الأول. ابدأ بالأرض ثم أسس شركتك الأولى.');
-    setNoticeTone('success');
+    showNotice('بدأ الفصل الأول: خطة الإنقاذ. ابدأ بالأرض ثم أسس شركتك الأولى.', 'success', 'انطلاق الفصل الأول', 'lands');
   }
 
   function handleGameResult<T>(result: GameResult<T>, options: { syncRemote?: boolean } = {}) {
     if (!result.ok) {
       playSound('error');
-      setNotice(result.message);
-      setNoticeTone('error');
+      showNotice(result.message, 'danger', 'تنبيه النظام');
       return;
     }
     const saved = saveGame(result.profile, account?.id);
@@ -538,8 +720,11 @@ export default function App({ onOpenGitHubPush, onOpenChangelog, soundOn = true,
     const settlementNote = settledAmount > 0 ? ` وُجّه ${formatMoney(settledAmount, country)} لسداد التزامات سابقة.` : '';
     setProfile(result.profile);
     playSound('success');
-    setNotice(saved.ok ? `${result.message}${settlementNote}` : `${result.message}${settlementNote} تعذر تثبيت الحفظ على هذا الجهاز.`);
-    setNoticeTone(saved.ok ? 'success' : 'error');
+    showNotice(
+      saved.ok ? `${result.message}${settlementNote}` : `${result.message}${settlementNote} تعذر تثبيت الحفظ على هذا الجهاز.`,
+      saved.ok ? 'success' : 'danger',
+      'تحديث العملية'
+    );
   }
 
   function runGameAction(action: (current: PlayerProfile) => GameResult<unknown>) {
@@ -648,10 +833,22 @@ export default function App({ onOpenGitHubPush, onOpenChangelog, soundOn = true,
       latestDayMessage = result.message;
     }
     if (completedDays === 0) return;
+
+    // Process Hybrid Dividends for stocks if player holds any
+    const stockState = loadStockMarketState(current.id);
+    const isSeasonalMilestone = current.day % 5 === 0;
+    const dividendRes = disburseHybridDividends(current, stockState, isSeasonalMilestone);
+    if (dividendRes.payout > 0) {
+      current = dividendRes.updatedProfile;
+    }
+
     const saved = saveGame(current, account?.id);
     setProfile(current);
     const elapsedLabel = `${completedDays} ${completedDays === 1 ? 'يوم' : 'أيام'}`;
-    const summary = completedDays > 1 ? `تم ترحيل ${elapsedLabel}. آخر ملخص: ${latestDayMessage}` : latestDayMessage;
+    let summary = completedDays > 1 ? `تم ترحيل ${elapsedLabel}. آخر ملخص: ${latestDayMessage}` : latestDayMessage;
+    if (dividendRes.payout > 0) {
+      summary += ` | أرباح الأسهم المودعة: +${formatMoney(dividendRes.payout, country)}`;
+    }
     setNotice(saved.ok ? summary : `${summary} تعذر تثبيت الحفظ على هذا الجهاز.`);
     setNoticeTone(saved.ok ? 'success' : 'error');
 
@@ -669,7 +866,7 @@ export default function App({ onOpenGitHubPush, onOpenChangelog, soundOn = true,
     }
     setActiveSection(section);
     setSectionFocus(focus);
-    if (section !== 'home' && section !== 'profile' && !profile.onboarding.seenGuides.includes(section)) { setPendingGuide(section); playSound('unlock'); }
+    if (!isWalkthroughActive && section !== 'home' && section !== 'profile' && !profile.onboarding.seenGuides.includes(section)) { setPendingGuide(section); playSound('unlock'); }
     setMobileMenuOpen(false);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
@@ -708,12 +905,17 @@ export default function App({ onOpenGitHubPush, onOpenChangelog, soundOn = true,
           onPlayerNameChange={setPlayerName}
           onStart={startNewWorld}
         />
-        {notice && <NoticeToast message={notice} tone={noticeTone} theme={notificationTheme} onDismiss={() => setNotice('')} />}
+        <FlyingToast
+          alert={activeToastAlert}
+          onDismiss={() => setActiveToastAlert(null)}
+          onOpenNotifications={() => setIsNotificationModalOpen(true)}
+          onNavigate={navigate}
+        />
       </>
     );
   }
 
-  if (!profile.onboarding?.introCompleted) return <StoryIntro profile={profile} onComplete={completeIntro} />;
+  // StoryIntro is now displayed as a voluntary modal so it never blocks the real walkthrough
 
   const unlockedSections = new Set(getUnlockedSectionIds(profile));
   const fixedBottomItems: SectionId[] = ['home', 'companies', 'auctions', 'staff', 'profile'];
@@ -721,37 +923,26 @@ export default function App({ onOpenGitHubPush, onOpenChangelog, soundOn = true,
 
   return (
     <div className="app-frame">
-      <header className="app-header">
-        <button className="header-brand-button" type="button" onClick={() => navigate('home')} aria-label="العودة إلى الرئيسية"><Brand compact /></button>
-        <div className="header-actions">
-          <GameDayTimer profile={profile} onDaysElapsed={handleDaysElapsed} />
-          <div className="header-location"><span>{country.flag}</span><span>{country.name}</span></div>
-          {onToggleSound && (
-            <button
-              onClick={onToggleSound}
-              className="p-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs flex items-center gap-1 transition-colors"
-              title={soundOn ? 'كتم الصوت' : 'تشغيل الصوت'}
-            >
-              {soundOn ? <Volume2 className="w-3.5 h-3.5 text-emerald-400" /> : <VolumeX className="w-3.5 h-3.5 text-slate-500" />}
-            </button>
-          )}
-          {onOpenGitHubPush && (
-            <button
-              onClick={onOpenGitHubPush}
-              className="p-1.5 px-2.5 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 text-xs flex items-center gap-1 transition-colors"
-              title="تصدير ومزامنة الكود إلى GitHub"
-            >
-              <UploadCloud className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline text-[11px] font-bold">GitHub</span>
-            </button>
-          )}
-          <button className="header-settings" type="button" onClick={() => navigate('settings')} aria-label="الإعدادات"><Icon name="settings" size={19} /></button>
-        </div>
-      </header>
-      <ResourceBar profile={profile} country={country} onNavigate={navigate} syncState={!account || account.isGuest ? 'local' : syncState} pendingCommandCount={pendingCommandCount} />
+      <ResourceBar
+        profile={profile}
+        country={country}
+        onNavigate={navigate}
+        syncState={!account || account.isGuest ? 'local' : syncState}
+        pendingCommandCount={pendingCommandCount}
+        onDaysElapsed={handleDaysElapsed}
+        onOpenWardrobe={() => setIsAvatarWardrobeOpen(true)}
+        onOpenWalkthrough={() => {
+          setWalkthroughStepIndex(0);
+          setIsWalkthroughActive(true);
+        }}
+        onOpenTutorial={() => setIsTutorialOpen(true)}
+        unreadNotificationsCount={unreadNotificationsCount}
+        onOpenNotifications={() => setIsNotificationModalOpen(true)}
+        forceBellVibrate={forceBellVibrate}
+      />
 
-      <div className="app-layout">
-        <aside className="side-nav" aria-label="أقسام اللعبة">
+      <div className="app-layout w-full max-w-7xl mx-auto px-2 sm:px-4 lg:px-6">
+        <aside className="side-nav hidden lg:flex" aria-label="أقسام اللعبة">
           <div className="side-nav-caption">إدارة الإمبراطورية</div>
           {SECTION_GROUPS.map((group) => (
             <div className="nav-group" key={group.id}>
@@ -759,88 +950,117 @@ export default function App({ onOpenGitHubPush, onOpenChangelog, soundOn = true,
               {group.sections.map((sectionId) => {
                 const section = getSection(sectionId);
                 const unlocked = unlockedSections.has(section.id);
-                return <button className={`nav-item${activeSection === section.id ? ' is-active' : ''}${!unlocked ? ' is-locked' : ''}`} type="button" key={section.id} onClick={() => navigate(section.id)} aria-current={activeSection === section.id ? 'page' : undefined} aria-disabled={!unlocked} title={unlocked ? section.label : getSectionUnlockHint(profile, section.id)}>
-                  <Icon name={unlocked ? section.icon : 'lock'} size={19} /><span>{section.label}</span>
-                </button>;
+                const reqLevel = getSectionRequiredLevel(section.id);
+                return (
+                  <button
+                    className={`nav-item${activeSection === section.id ? ' is-active' : ''}${!unlocked ? ' is-locked' : ''}`}
+                    type="button"
+                    key={section.id}
+                    onClick={() => navigate(section.id)}
+                    aria-current={activeSection === section.id ? 'page' : undefined}
+                    title={unlocked ? section.label : getSectionUnlockHint(profile, section.id)}
+                  >
+                    <Icon name={unlocked ? section.icon : 'lock'} size={19} />
+                    <span className="flex-1 text-right">{section.label}</span>
+                    {!unlocked && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-extrabold border border-amber-500/40">
+                        مستوى {reqLevel}
+                      </span>
+                    )}
+                  </button>
+                );
               })}
             </div>
           ))}
           <div className="side-nav-note"><Icon name="shield" size={16} /><span>{!account || account.isGuest ? <>حفظ<br />على هذا الجهاز</> : syncState === 'offline' ? <>اللعب مستمر<br />بانتظار الاتصال</> : syncState === 'blocked' ? <>حماية التقدم<br />مراجعة الحفظ</> : syncState === 'syncing' ? <>جارٍ حفظ<br />خطواتك</> : <>حفظ آمن<br />ومحدّث</>}</span></div>
         </aside>
 
-        <main className="main-content">
+        <main className="main-content flex-1 w-full min-w-0 pb-24 md:pb-8">
           {activeSection === 'home' ? (
-            homeViewMode === 'village' ? (
-              <ClashVillageHub
-                profile={profile}
-                country={country}
-                onNavigate={navigate}
-                onUpdateProfile={(updater) => {
-                  setProfile((prev) => {
-                    if (!prev) return prev;
-                    const next = updater(prev);
-                    saveGame(next, account?.id);
-                    return next;
-                  });
-                }}
-                onSwitchToClassic={() => setHomeViewMode('classic')}
-              />
-            ) : (
-              <div>
-                <div className="p-3 bg-slate-900 border-b border-amber-500/20 flex items-center justify-between">
-                  <span className="text-xs font-bold text-amber-300">لوحة التحكم التفصيلية للشركات 📊</span>
-                  <button
-                    onClick={() => setHomeViewMode('village')}
-                    className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-extrabold text-xs flex items-center gap-1.5 shadow-md transition-all active:scale-95"
-                  >
-                    <span>🏰 العودة إلى مدينة كلاش أوف كلانس</span>
-                  </button>
-                </div>
-                <Dashboard 
-                  profile={profile} 
-                  country={country} 
-                  onNavigate={navigate} 
-                  onCommand={handleGameCommand}
-                  onUpdateProfile={(updater) => {
-                    setProfile((prev) => {
-                      if (!prev) return prev;
-                      const next = updater(prev);
-                      saveGame(next, account?.id);
-                      return next;
-                    });
-                  }}
-                  onClaimReward={(cash, diamonds) => {
-                    setProfile((prev) => {
-                      if (!prev) return prev;
-                      const next = {
-                        ...prev,
-                        bankBalance: prev.bankBalance + cash,
-                        diamonds: prev.diamonds + diamonds,
-                      };
-                      saveGame(next, account?.id);
-                      setNotice(`تم استلام المكافأة: +${cash.toLocaleString()} ج.م و +${diamonds} ألماسة! 🎁`);
-                      setNoticeTone('success');
-                      return next;
-                    });
-                  }}
-                  onRequestEmergencyLoan={() => {
-                    setProfile((prev) => {
-                      if (!prev) return prev;
-                      const next = {
-                        ...prev,
-                        bankBalance: prev.bankBalance + 250000,
-                      };
-                      saveGame(next, account?.id);
-                      setNotice('تم إيداع تسهيل ائتماني طارئ بقيمة 250,000 ج.م من بنك مصر للأعمال! 🏦');
-                      setNoticeTone('success');
-                      return next;
-                    });
-                  }}
-                />
-              </div>
-            )
+            <Dashboard 
+              profile={profile} 
+              country={country} 
+              onNavigate={navigate} 
+              onCommand={handleGameCommand}
+              onOpenLuckyWheel={() => setIsLuckyWheelOpen(true)}
+              onOpenTutorial={() => setIsTutorialOpen(true)}
+              onOpenMorningReport={() => {
+                triggerHaptic('light');
+                const rep = offlineReport || calculateOfflineIdleProgress(profile, 8 * 3600);
+                if (rep) {
+                  setOfflineReport(rep);
+                  setIsMorningReportOpen(true);
+                }
+              }}
+              onOpenCentralBank={() => {
+                triggerHaptic('light');
+                setIsCentralBankModalOpen(true);
+              }}
+              onOpenPrestige={() => {
+                triggerHaptic('light');
+                setIsPrestigeModalOpen(true);
+              }}
+              onUpdateProfile={(updater) => {
+                setProfile((prev) => {
+                  if (!prev) return prev;
+                  const next = updater(prev);
+                  saveGame(next, account?.id);
+                  return next;
+                });
+              }}
+              onClaimReward={(cash, diamonds) => {
+                setProfile((prev) => {
+                  if (!prev) return prev;
+                  const next = {
+                    ...prev,
+                    bankBalance: prev.bankBalance + cash,
+                    diamonds: prev.diamonds + diamonds,
+                  };
+                  saveGame(next, account?.id);
+                  showNotice(`تم استلام المكافأة: +${cash.toLocaleString()} $ و +${diamonds} ألماسة! 🎁`, 'success', 'مكافأة إنجاز');
+                  return next;
+                });
+              }}
+              onRequestEmergencyLoan={() => {
+                setProfile((prev) => {
+                  if (!prev) return prev;
+                  const next = {
+                    ...prev,
+                    bankBalance: prev.bankBalance + 250000,
+                  };
+                  saveGame(next, account?.id);
+                  showNotice('تم إيداع تسهيل ائتماني طارئ بقيمة 250,000 $ من بنك مصر للأعمال! 🏦', 'success', 'تسهيل ائتماني طارئ', 'bank');
+                  return next;
+                });
+              }}
+              onOpenCampaign={() => {
+                triggerHaptic('light');
+                setIsStoryCampaignOpen(true);
+              }}
+            />
           ) : activeSection === 'profile' ? (
-            <ProfilePage profile={profile} country={country} accountId={account.id} isGuest={Boolean(account.isGuest)} isSynced={!account.isGuest && syncState === 'synced' && pendingCommandCount === 0} onLinkAccount={() => setLinkingAccount(true)} onResetWorld={handleResetToCountrySelection} />
+            <ProfilePage
+              profile={profile}
+              country={country}
+              accountId={account.id}
+              isGuest={Boolean(account.isGuest)}
+              isSynced={!account.isGuest && syncState === 'synced' && pendingCommandCount === 0}
+              userEmail={account?.isGuest ? '' : (account?.email || '')}
+              onLinkAccount={() => setLinkingAccount(true)}
+              onLogout={handleLogout}
+              onResetWorld={handleResetToCountrySelection}
+              onAccountDeleted={handleAccountDeleted}
+              onRestartWalkthrough={() => { setWalkthroughStepIndex(0); setIsWalkthroughActive(true); }}
+              onOpenWardrobe={() => setIsAvatarWardrobeOpen(true)}
+              onUpdateProfile={(updater) => {
+                setProfile((prev) => {
+                  if (!prev) return prev;
+                  const next = updater(prev);
+                  saveGame(next, account?.id);
+                  return next;
+                });
+              }}
+            />
           ) : (
             <SectionPage
               section={getSection(activeSection)}
@@ -859,42 +1079,72 @@ export default function App({ onOpenGitHubPush, onOpenChangelog, soundOn = true,
               onLinkAccount={() => setLinkingAccount(true)}
               onLogout={handleLogout}
               onShowGuide={() => setPendingGuide(activeSection)}
-              onUpdateProfile={(updater) => {
-                setProfile((prev) => {
-                  if (!prev) return prev;
-                  const next = updater(prev);
-                  saveGame(next, account?.id);
-                  return next;
-                });
-              }}
-              onNotice={(msg, tone) => {
-                setNotice(msg);
-                setNoticeTone(tone ?? 'success');
+              onProfileUpdate={(updated) => {
+                setProfile(updated);
+                saveGame(updated, account?.id);
               }}
             />
           )}
         </main>
       </div>
 
-      <nav className="mobile-bottom-nav" aria-label="التنقل الرئيسي">
-        {fixedBottomItems.map((sectionId) => {
-          const section = getSection(sectionId);
-          const unlocked = unlockedSections.has(sectionId);
-          return <button className={`mobile-nav-item${activeSection === sectionId ? ' is-active' : ''}${unlocked ? '' : ' is-locked'}`} type="button" key={sectionId} onClick={() => navigate(sectionId)} aria-disabled={!unlocked} title={unlocked ? section.label : getSectionUnlockHint(profile, sectionId)}><Icon name={unlocked ? section.icon : 'lock'} size={20} /><span>{section.shortLabel}</span></button>;
-        })}
-        <button className={`mobile-nav-item${mobileMenuOpen ? ' is-active' : ''}`} type="button" aria-expanded={mobileMenuOpen} onClick={() => setMobileMenuOpen((open) => !open)}><Icon name="menu" size={20} /><span>المزيد</span></button>
-      </nav>
+      <RightActionHub
+        profile={profile}
+        country={country}
+        onNavigate={navigate}
+        onOpenLuckyWheel={() => setIsLuckyWheelOpen(true)}
+        onCollectActualProfit={(amount: number) => {
+          if (!profile) return;
+          const nextBalance = profile.bankBalance + amount;
+          const newEntry: FinanceLedgerEntry = {
+            id: `ledger-actual-profit-${profile.day}-${Date.now()}`,
+            category: 'revenue',
+            amount,
+            countryId: profile.countryId,
+            occurredAt: new Date().toISOString(),
+            note: `الجمع الفعلي لأرباح الشركات والمنشآت (${profile.companies.length} شركات)`,
+          };
+          const nextFinances = {
+            ...profile.finances,
+            netProfit: (profile.finances?.netProfit ?? 0) + amount,
+            totalRevenue: (profile.finances?.totalRevenue ?? 0) + amount,
+          };
+          const nextProfile: PlayerProfile = {
+            ...profile,
+            bankBalance: nextBalance,
+            finances: nextFinances,
+            ledger: [newEntry, ...(profile.ledger ?? [])],
+          };
+          saveGame(nextProfile, account?.id);
+          setProfile(nextProfile);
+          showNotice(`تم تحصيل الأرباح الفعلية بنجاح! تم إيداع +${formatMoney(amount, country)} في حسابك البنكي.`, 'success', 'تحصيل أرباح الشركات', 'bank');
+        }}
+        onSellProduct={(productId: string, quantity: number) => {
+          void handleGameCommand(
+            { name: 'sell_product', args: { productId, quantity } },
+            (curr) => sellProduct(curr, productId, quantity),
+          );
+        }}
+        onAdvanceDay={() => void handleDaysElapsed(1)}
+      />
 
-      {mobileMenuOpen && <div className="mobile-menu-backdrop" onClick={() => setMobileMenuOpen(false)}>
-        <nav className="mobile-more-menu" aria-label="المزيد من الأقسام" onClick={(event) => event.stopPropagation()}>
-          <div className="mobile-more-heading"><strong>كل الأقسام</strong><button type="button" className="icon-button" onClick={() => setMobileMenuOpen(false)} aria-label="إغلاق"><Icon name="close" /></button></div>
-          {otherSections.map((section) => { const unlocked = unlockedSections.has(section.id); return <button type="button" className={`mobile-more-item${!unlocked ? ' is-locked' : ''}`} key={section.id} onClick={() => navigate(section.id)} aria-disabled={!unlocked} title={unlocked ? section.label : getSectionUnlockHint(profile, section.id)}><Icon name={unlocked ? section.icon : 'lock'} size={18} /><span>{section.label}{!unlocked && <small>{getSectionUnlockHint(profile, section.id)}</small>}</span><Icon name="chevron" size={16} /></button>; })}
-        </nav>
-      </div>}
+      <FlyingToast
+        alert={activeToastAlert}
+        onDismiss={() => setActiveToastAlert(null)}
+        onOpenNotifications={() => setIsNotificationModalOpen(true)}
+        onNavigate={navigate}
+      />
 
-      <RightActionHub profile={profile} country={country} onNavigate={navigate} onCollectProfit={() => void handleDaysElapsed(1)} />
-
-      {notice && <NoticeToast message={notice} tone={noticeTone} theme={notificationTheme} onDismiss={() => setNotice('')} />}
+      <NotificationModal
+        isOpen={isNotificationModalOpen}
+        onClose={() => setIsNotificationModalOpen(false)}
+        notifications={allNotifications}
+        readNotificationIds={profile.readNotificationIds ?? []}
+        onNavigate={navigate}
+        onMarkRead={handleMarkNotificationRead}
+        onMarkAllRead={handleMarkAllNotificationsRead}
+        onClearAll={handleClearAllNotifications}
+      />
       {pendingGuide && <SystemGuideModal section={pendingGuide} onClose={() => { if (!profile) return; const seenGuides = profile.onboarding.seenGuides.includes(pendingGuide) ? profile.onboarding.seenGuides : [...profile.onboarding.seenGuides, pendingGuide]; const nextProfile = { ...profile, onboarding: { ...profile.onboarding, chapter: chapterFor(profile), seenGuides } }; saveGame(nextProfile, account?.id); if (account && !account.isGuest) setSyncState('local'); setProfile(nextProfile); setPendingGuide(null); }} />}
       {activeStoryEvent && (
         <StoryEventPopup
@@ -916,7 +1166,212 @@ export default function App({ onOpenGitHubPush, onOpenChangelog, soundOn = true,
           }}
         />
       )}
-      <footer className="app-footer"><span>إمبراطورية الأعمال</span><span>محاكاة محلية · الأسعار والأحداث لأغراض اللعبة</span></footer>
+
+      {/* Interactive Daily Lucky Wheel */}
+      <DailyLuckySpinModal
+        isOpen={isLuckyWheelOpen}
+        onClose={() => setIsLuckyWheelOpen(false)}
+        profile={profile}
+        onRewardWon={handleLuckySpinReward}
+      />
+
+      {/* Major Milestone Celebration Modal */}
+      <CelebrationModal
+        data={celebrationData}
+        onClose={() => setCelebrationData(null)}
+      />
+
+      {/* Streamlined Mobile Bottom Navigation */}
+      <MobileBottomNav
+        activeSection={activeSection}
+        onNavigate={navigate}
+        onOpenLuckyWheel={() => setIsLuckyWheelOpen(true)}
+        isFreeSpinAvailable={getLuckySpinState(profile.lastSpinTimestamp).isFree}
+        profile={profile}
+      />
+
+      
+      {/* Mandatory Interactive Spotlight Guided Walkthrough */}
+      {isWalkthroughActive && (
+        <SpotlightWalkthrough
+          currentStepIndex={walkthroughStepIndex}
+          profile={profile}
+          currentSection={activeSection}
+          onNavigate={(sec) => navigate(sec)}
+          onOpenBriefing={() => setIsStoryBriefingOpen(true)}
+          onStepComplete={() => {
+            if (walkthroughStepIndex < WALKTHROUGH_STEPS.length - 1) {
+              setWalkthroughStepIndex((prev) => prev + 1);
+            } else {
+              setIsWalkthroughActive(false);
+              setWalkthroughCompleted(true);
+              completeIntro();
+              playSound("levelUp");
+              setCelebrationData({
+                title: "أكملت الجولة الإرشادية بنجاح! 👑",
+                subtitle: "تهانينا! لقد أتقنت أساسيات الإدارة وتعرفت على كيفية صيانة المعدات ورفع كفاءة المصانع، ودفع الرواتب والالتزامات، وتملك الأراضي الاستثمارية بنجاح.",
+                rewardText: "10,000 كاش + 5 ماسات مكافأة إتمام الشرح",
+              });
+            }
+          }}
+          onSkip={() => {
+            setIsWalkthroughActive(false);
+            setWalkthroughCompleted(true);
+            completeIntro();
+          }}
+        />
+      )}
+
+      {/* Story Scenario Modal (Optional for Player Review) */}
+      {isTutorialOpen && (
+        <div className="fixed inset-0 z-[9999] bg-slate-950/90 backdrop-blur-md overflow-y-auto">
+          <StoryIntro
+            profile={profile}
+            onComplete={() => {
+              setIsTutorialOpen(false);
+              completeIntro();
+            }}
+          />
+        </div>
+      )}
+
+      {/* Executive Avatar Wardrobe Modal */}
+      {profile && (
+        <AvatarWardrobeModal
+          profile={profile}
+          isOpen={isAvatarWardrobeOpen}
+          onClose={() => setIsAvatarWardrobeOpen(false)}
+          onSelectAvatar={(avatarId) => {
+            setProfile((prev) => {
+              if (!prev) return prev;
+              const next = { ...prev, avatarId };
+              saveGame(next, account?.id);
+              return next;
+            });
+            showNotice('تم اعتماد صورة الشخصية بنجاح! 👑', 'success', 'تغيير الصورة الرمزية');
+          }}
+          onUnlockAvatar={(avatar) => {
+            if (!profile) return false;
+            if ((profile.diamonds ?? 0) < avatar.priceDiamonds) {
+              showNotice(`رصيدك الحالي غير كافٍ لاقتناء هذه الشخصية. تحتاج إلى ${avatar.priceDiamonds} 💎`, 'danger', 'رصيد غير كافٍ');
+              return false;
+            }
+            const nextDiamonds = (profile.diamonds ?? 0) - avatar.priceDiamonds;
+            const nextUnlocked = Array.from(new Set([...(profile.unlockedAvatarIds || []), avatar.id]));
+            const nextProfile: PlayerProfile = {
+              ...profile,
+              diamonds: nextDiamonds,
+              unlockedAvatarIds: nextUnlocked,
+              avatarId: avatar.id,
+            };
+            setProfile(nextProfile);
+            saveGame(nextProfile, account?.id);
+            showNotice(`🎉 مبروك! تم اقتناء شخصية "${avatar.name}" بنجاح بـ ${avatar.priceDiamonds} 💎 وتفعيلها كصورتك المعتمدة.`, 'success', 'اقتناء شخصية فاخرة');
+            return true;
+          }}
+          onOpenStore={() => navigate('store')}
+        />
+      )}
+
+      {/* 1. Morning Absence Report Modal (Smart Offline Idle Engine) */}
+      {offlineReport && (
+        <MorningAbsenceReportModal
+          isOpen={isMorningReportOpen}
+          report={offlineReport}
+          onClaim={() => {
+            if (!profile) return;
+            const updated = applyOfflineReportToProfile(profile, offlineReport);
+            setProfile(updated);
+            saveGame(updated, account?.id);
+            setIsMorningReportOpen(false);
+            setOfflineReport(null);
+            showNotice('تم استلام أرباح وسلع فترة الغياب بنجاح! 🌅', 'success', 'تقرير غياب المدير');
+          }}
+          onClose={() => setIsMorningReportOpen(false)}
+        />
+      )}
+
+      {/* 2. Central Bank Decrees & Macroeconomic Shocks Modal */}
+      {profile && (
+        <CentralBankModal
+          isOpen={isCentralBankModalOpen}
+          onClose={() => setIsCentralBankModalOpen(false)}
+          profile={profile}
+          onNavigate={(sec) => navigate(sec)}
+        />
+      )}
+
+      {/* 3. Prestige & Global Sovereign Expansion Modal */}
+      {profile && (
+        <PrestigeExpansionModal
+          isOpen={isPrestigeModalOpen}
+          onClose={() => setIsPrestigeModalOpen(false)}
+          profile={profile}
+          onExpansionSuccess={(updated) => {
+            setProfile(updated);
+            saveGame(updated, account?.id);
+            playSound('levelUp');
+            setCelebrationData({
+              title: 'تأسس الصندوق السيادي بنجاح! 👑',
+              subtitle: 'انطلقت إمبراطوريتك نحو العواصم العالمية مع الاحتفاظ بكافة امتيازات وأوسمة الهيبة الدائمة.',
+              rewardText: 'توسّع دولي مع نقاط هيبة ورصيد انطلاق جديد',
+            });
+          }}
+        />
+      )}
+
+      {/* 4. Grand 10-Chapter Story Campaign Hub (Suly Business Empire: صعود الإمبراطورية) */}
+      {profile && isStoryCampaignOpen && (
+        <StoryCampaignHub
+          profile={profile}
+          country={country}
+          onClose={() => setIsStoryCampaignOpen(false)}
+          onNavigate={(sec) => {
+            setIsStoryCampaignOpen(false);
+            navigate(sec);
+          }}
+          onClaimReward={(diamonds, gold, money, rep, rewardKey) => {
+            setProfile((prev) => {
+              if (!prev) return prev;
+              const claimedRewardIds = prev.claimedRewardIds ? [...prev.claimedRewardIds] : [];
+              if (rewardKey && !claimedRewardIds.includes(rewardKey)) {
+                claimedRewardIds.push(rewardKey);
+              }
+              const next = {
+                ...prev,
+                bankBalance: prev.bankBalance + money,
+                diamonds: prev.diamonds + diamonds,
+                goldGrams: (prev.goldGrams ?? 0) + gold,
+                claimedRewardIds,
+              };
+              saveGame(next, account?.id);
+              showNotice(`تم استلام مكافأة الفصل: +${formatMoney(money, country)} و +${diamonds}💎 و +${gold}غ ذهب! 🏆`, 'success', 'مكافأة سيناريو القصة');
+              return next;
+            });
+          }}
+        />
+      )}
+
+      {/* 5. Guided Story Briefing Modal (شرح المهمة التفصيلي بدون حل تلقائي) */}
+      {profile && isStoryBriefingOpen && (
+        <StoryBriefingModal
+          mission={CENTRAL_MISSIONS_CATALOG[0]}
+          country={country}
+          character={{
+            name: getLeadAdvisor(profile.countryId).name,
+            title: getLeadAdvisor(profile.countryId).title,
+            avatar: getLeadAdvisor(profile.countryId).avatar,
+          }}
+          onClose={() => setIsStoryBriefingOpen(false)}
+          onSkipDialogue={() => setIsStoryBriefingOpen(false)}
+          onStartExecution={() => {
+            setIsStoryBriefingOpen(false);
+            navigate('companies');
+          }}
+        />
+      )}
+
+      <footer className="app-footer pb-14 md:pb-3"><span>إمبراطورية الأعمال</span><span>محاكاة محلية · الأسعار والأحداث لأغراض اللعبة</span></footer>
     </div>
   );
 }

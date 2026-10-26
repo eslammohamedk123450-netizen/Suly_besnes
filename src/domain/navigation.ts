@@ -16,7 +16,6 @@ export type SectionId =
   | 'contracts'
   | 'tasks'
   | 'profile'
-  | 'settings'
   | 'territory'
   | 'tech_tree'
   | 'luxury'
@@ -50,7 +49,7 @@ export const GAME_SECTIONS: readonly SectionItem[] = [
   { id: 'incubator', label: 'حاضنات الأعمال والـ VC', shortLabel: 'الـ VC', subtitle: 'استثمار جريء في الشركات الناشئة Unicorns', icon: 'investment' },
   { id: 'store', label: 'متجر المشتريات', shortLabel: 'المتجر', subtitle: 'الماس والبطاقات والعروض', icon: 'store' },
   { id: 'auctions', label: 'المزادات', shortLabel: 'المزادات', subtitle: 'أراضٍ وأصول وفرص جديدة', icon: 'gavel' },
-  { id: 'companies', label: 'الشركات والأصول', shortLabel: 'الإمبراطورية', subtitle: 'إدارة شركاتك وأراضيك وتوسعاتك', icon: 'company' },
+  { id: 'companies', label: 'الشركات', shortLabel: 'الشركات', subtitle: 'إدارة أعمالك وقطاعاتك', icon: 'company' },
   { id: 'investments', label: 'الاستثمارات والبورصة', shortLabel: 'الاستثمار', subtitle: 'أسواق المال والطرح العام IPO', icon: 'investment' },
   { id: 'bank', label: 'البنك والتمويل', shortLabel: 'البنك', subtitle: 'ودائع وقروض بضمان', icon: 'bank' },
   { id: 'staff', label: 'الإدارة والرواتب', shortLabel: 'الموظفون', subtitle: 'مديرون ومحاسبون ومحامون', icon: 'users' },
@@ -62,7 +61,6 @@ export const GAME_SECTIONS: readonly SectionItem[] = [
   { id: 'contracts', label: 'العقود والعملاء', shortLabel: 'العقود', subtitle: 'طلبات السوق والسمعة التجارية', icon: 'briefcase' },
   { id: 'tasks', label: 'المهام والإنجازات', shortLabel: 'المهام', subtitle: 'أهداف وتحديات مستقبلية', icon: 'tasks' },
   { id: 'profile', label: 'الملف الشخصي', shortLabel: 'ملفي', subtitle: 'معرفك وتقدمك وشاراتك', icon: 'user' },
-  { id: 'settings', label: 'الإعدادات', shortLabel: 'الإعدادات', subtitle: 'إدارة ملفك المحلي', icon: 'settings' },
 ];
 
 export const SECTION_GROUPS: readonly SectionGroup[] = [
@@ -70,7 +68,7 @@ export const SECTION_GROUPS: readonly SectionGroup[] = [
   { id: 'business_group', label: 'الأعمال والأصول', sections: ['companies', 'lands', 'production', 'inventory'] },
   { id: 'market_group', label: 'السوق والمالية والبورصة', sections: ['auctions', 'investments', 'bank', 'contracts'] },
   { id: 'management_group', label: 'الإدارة والتقدم', sections: ['staff', 'tasks', 'reports', 'obligations'] },
-  { id: 'profile_group', label: 'الحساب والنظام', sections: ['profile', 'store', 'settings'] },
+  { id: 'profile_group', label: 'الحساب والنظام', sections: ['profile', 'store'] },
 ];
 
 export function getSection(id: SectionId): SectionItem {
