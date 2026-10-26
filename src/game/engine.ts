@@ -2573,6 +2573,21 @@ export function claimTask(profile: PlayerProfile, taskId: string): GameResult<Ta
   return success(nextProfile, `تم تحصيل مكافأة مهمة «${task.title}» مرة واحدة.`, { taskId, reward: task.reward });
 }
 
+export function claimAllTasks(profile: PlayerProfile): GameResult<TaskOutcome> {
+  const claimedIds = new Set(profile.completedTaskIds);
+  const claimable = TASK_CATALOG.filter((task) => !claimedIds.has(task.id) && !(profile.tasks ?? []).some((item) => item.taskId === task.id && item.claimed) && conditionMet(profile, task.condition));
+  if (!claimable.length) return failure(profile, 'condition-not-met', 'لا توجد مكافآت جاهزة للتحصيل الآن.');
+  const reward = claimable.reduce((sum, task) => sum + task.reward, 0);
+  const tasks = [...(profile.tasks ??[])].map((item) => claimable.some((task) => task.id === item.taskId) ? { ...item, claimed: true, claimedAt: timestampFor(profile) } : item);
+  for (const task of claimable) if (!tasks.some((item) => item.taskId === task.id)) tasks.push({ taskId: task.id, claimed: true, claimedAt: timestampFor(profile) });
+  const nextProfile = addLedger(
+    { ...profile, tasks, completedTaskIds: [...profile.completedTaskIds, ...claimable.map((task) => task.id)] },
+    [ledgerEntry(profile, 'revenue', reward, `تحصيل جماعي لـ${claimable.length} مهام تنفيذية`, 0)],
+    profile.bankBalance + reward,
+  );
+  return success(nextProfile, `تم جمع ${claimable.length} مكافآت بإجمالي ${reward.toLocaleString('ar-EG')}.`, { taskId: 'all', reward });
+}
+
 /** Compatibility aliases for callers that prefer verb-first names. */
 export const bidOnLand = placeBid;
 export const purchaseMaterial = buyMaterial;
@@ -2660,6 +2675,7 @@ export type GameCommand =
   | { name: 'deliver_contract'; args: { contractId: string } }
   | { name: 'negotiate_contract'; args: { contractId: string; mode: 'price' | 'deadline' | 'quality' } }
   | { name: 'claim_task'; args: { taskId: string } }
+  | { name: 'claim_all_tasks'; args: {} }
   | { name: 'claim_season_challenge'; args: { challengeId: string } }
   | { name: 'claim_login_reward'; args: { rewardId: (typeof LOGIN_REWARDS)[number]['id'] } }
   | { name: 'choose_season_event'; args: { choiceId: string } }
@@ -2719,6 +2735,7 @@ export function executeGameCommand(profile: PlayerProfile, command: GameCommand)
     case 'deliver_contract': return deliverContract(profile, command.args.contractId);
     case 'negotiate_contract': return negotiateContract(profile, command.args.contractId, command.args.mode);
     case 'claim_task': return claimTask(profile, command.args.taskId);
+    case 'claim_all_tasks': return claimAllTasks(profile);
     case 'claim_season_challenge': return claimSeasonChallenge(profile, command.args.challengeId);
     case 'claim_login_reward': return claimLoginReward(profile, command.args.rewardId);
     case 'choose_season_event': return chooseSeasonEvent(profile, command.args.choiceId);

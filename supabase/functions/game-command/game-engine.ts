@@ -3945,6 +3945,20 @@ function claimTask(profile, taskId) {
   );
   return success(nextProfile, `\u062A\u0645 \u062A\u062D\u0635\u064A\u0644 \u0645\u0643\u0627\u0641\u0623\u0629 \u0645\u0647\u0645\u0629 \xAB${task.title}\xBB \u0645\u0631\u0629 \u0648\u0627\u062D\u062F\u0629.`, { taskId, reward: task.reward });
 }
+function claimAllTasks(profile) {
+  const claimedIds = new Set(profile.completedTaskIds);
+  const claimable = TASK_CATALOG.filter((task) => !claimedIds.has(task.id) && !(profile.tasks ?? []).some((item) => item.taskId === task.id && item.claimed) && conditionMet(profile, task.condition));
+  if (!claimable.length) return failure(profile, "condition-not-met", "\u0644\u0627 \u062A\u0648\u062C\u062F \u0645\u0643\u0627\u0641\u0622\u062A \u062C\u0627\u0647\u0632\u0629 \u0644\u0644\u062A\u062D\u0635\u064A\u0644 \u0627\u0644\u0622\u0646.");
+  const reward = claimable.reduce((sum, task) => sum + task.reward, 0);
+  const tasks = [...(profile.tasks ?? [])].map((item) => claimable.some((task) => task.id === item.taskId) ? { ...item, claimed: true, claimedAt: timestampFor(profile) } : item);
+  for (const task of claimable) if (!tasks.some((item) => item.taskId === task.id)) tasks.push({ taskId: task.id, claimed: true, claimedAt: timestampFor(profile) });
+  const nextProfile = addLedger(
+    { ...profile, tasks, completedTaskIds: [...profile.completedTaskIds, ...claimable.map((task) => task.id)] },
+    [ledgerEntry(profile, "revenue", reward, `\u062A\u062D\u0635\u064A\u0644 \u062C\u0645\u0627\u0639\u064A \u0644\u0640${claimable.length} \u0645\u0647\u0627\u0645 \u062A\u0646\u0641\u064A\u0630\u064A\u0629`, 0)],
+    profile.bankBalance + reward
+  );
+  return success(nextProfile, `\u062A\u0645 \u062C\u0645\u0639 ${claimable.length} \u0645\u0643\u0627\u0641\u0622\u062A \u0628\u0625\u062C\u0645\u0627\u0644\u064A ${reward.toLocaleString("ar-EG")}.`, { taskId: "all", reward });
+}
 var bidOnLand = placeBid;
 var purchaseMaterial = buyMaterial;
 var foundBusiness = foundCompany;
@@ -4053,6 +4067,8 @@ function executeGameCommand(profile, command) {
       return negotiateContract(profile, command.args.contractId, command.args.mode);
     case "claim_task":
       return claimTask(profile, command.args.taskId);
+    case "claim_all_tasks":
+      return claimAllTasks(profile);
     case "claim_season_challenge":
       return claimSeasonChallenge(profile, command.args.challengeId);
     case "claim_login_reward":

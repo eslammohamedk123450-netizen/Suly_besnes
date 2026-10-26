@@ -17,7 +17,7 @@ const supportedCommandNames = new Set<GameCommand['name']>([
   'buy_material', 'buy_global_material', 'found_company', 'upgrade_company', 'run_production', 'service_company',
   'cancel_production', 'use_speed_card', 'use_day_speed_card', 'buy_speed_card', 'upgrade_warehouse', 'sell_product', 'buy_gold', 'buy_gold_with_diamonds', 'sell_gold', 'hire_staff',
   'upgrade_staff', 'pay_staff_salary', 'terminate_staff', 'create_deposit', 'merge_deposits', 'withdraw_deposit', 'take_loan', 'repay_loan',
-  'create_investment', 'advance_day', 'accept_contract', 'deliver_contract', 'negotiate_contract', 'claim_task',
+  'create_investment', 'advance_day', 'accept_contract', 'deliver_contract', 'negotiate_contract', 'claim_task', 'claim_all_tasks',
   'claim_season_challenge', 'claim_login_reward', 'choose_season_event', 'update_notification_state',
   'list_player_asset', 'settle_player_auction', 'cancel_player_auction',
   'claim_starter_mission', 'claim_mission_reward',

@@ -82,12 +82,17 @@ export type TaskCondition =
   | 'make-investment'
   | 'reach-day-3';
 
+export type TaskPath = 'operations' | 'trade' | 'management' | 'finance' | 'expansion' | 'mastery';
+
 export interface TaskCatalogEntry {
   id: string;
   title: string;
   description: string;
   condition: TaskCondition;
   reward: number;
+  path: TaskPath;
+  actionSection: string;
+  progressTarget: number;
 }
 
 export const INDUSTRY_CATALOG: readonly IndustryCatalogEntry[] = [
@@ -144,13 +149,13 @@ export const RECIPE_CATALOG: readonly RecipeCatalogEntry[] = [
 export const GOLD_PRICE_PER_GRAM = 110;
 
 export const TASK_CATALOG: readonly TaskCatalogEntry[] = [
-  { id: 'task-first-land', title: 'أول ملكية', description: 'امتلك قطعة أرض استثمارية واحدة.', condition: 'own-land', reward: 500 },
-  { id: 'task-first-company', title: 'تأسيس الإمبراطورية', description: 'أسس شركتك الأولى.', condition: 'own-company', reward: 700 },
-  { id: 'task-first-material', title: 'المخزن الأول', description: 'اشترِ دفعة مواد خام.', condition: 'buy-material', reward: 200 },
-  { id: 'task-first-production', title: 'خط الإنتاج', description: 'شغّل دفعة إنتاج بنجاح.', condition: 'run-production', reward: 600 },
-  { id: 'task-first-sale', title: 'أول صفقة بيع', description: 'بع منتجًا تملكه في السوق.', condition: 'sell-product', reward: 400 },
-  { id: 'task-first-investment', title: 'تنويع رأس المال', description: 'أنشئ استثمارًا عائديًا.', condition: 'make-investment', reward: 400 },
-  { id: 'task-day-three', title: 'ثلاثة أيام', description: 'مرّر ثلاثة أيام من المحاكاة بنجاح.', condition: 'reach-day-3', reward: 800 },
+  { id: 'task-first-land', title: 'أول ملكية', description: 'امتلك قطعة أرض استثمارية واحدة.', condition: 'own-land', reward: 500, path: 'expansion', actionSection: 'lands', progressTarget: 1 },
+  { id: 'task-first-company', title: 'تأسيس الإمبراطورية', description: 'أسس شركتك الأولى.', condition: 'own-company', reward: 700, path: 'expansion', actionSection: 'companies', progressTarget: 1 },
+  { id: 'task-first-material', title: 'المخزن الأول', description: 'اشترِ دفعة مواد خام.', condition: 'buy-material', reward: 200, path: 'trade', actionSection: 'inventory', progressTarget: 1 },
+  { id: 'task-first-production', title: 'خط الإنتاج', description: 'شغّل دفعة إنتاج بنجاح.', condition: 'run-production', reward: 600, path: 'operations', actionSection: 'production', progressTarget: 1 },
+  { id: 'task-first-sale', title: 'أول صفقة بيع', description: 'بع منتجًا تملكه في السوق.', condition: 'sell-product', reward: 400, path: 'trade', actionSection: 'contracts', progressTarget: 1 },
+  { id: 'task-first-investment', title: 'تنويع رأس المال', description: 'أنشئ استثمارًا عائديًا.', condition: 'make-investment', reward: 400, path: 'finance', actionSection: 'investments', progressTarget: 1 },
+  { id: 'task-day-three', title: 'ثلاثة أيام', description: 'مرّر ثلاثة أيام من المحاكاة بنجاح.', condition: 'reach-day-3', reward: 800, path: 'mastery', actionSection: 'reports', progressTarget: 3 },
 ];
 
 export const INVESTMENT_CATALOG: readonly InvestmentCatalogEntry[] = [

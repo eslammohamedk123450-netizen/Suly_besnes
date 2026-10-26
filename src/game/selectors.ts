@@ -283,7 +283,19 @@ export function selectFinancialReport(profile: PlayerProfile): FinancialReport {
   return { balance: profile.bankBalance, totalAssets, liabilities: profile.payables, revenue, expenses, netProfit: revenue - expenses, recentEntries: profile.ledger.slice(-20).reverse() };
 }
 
-export function selectTaskBoard(profile: PlayerProfile): Array<(typeof TASK_CATALOG)[number] & { claimed: boolean; available: boolean }> {
+function taskProgressCurrent(profile: PlayerProfile, condition: (typeof TASK_CATALOG)[number]['condition']): number {
+  switch (condition) {
+    case 'own-land': return profile.lands.length;
+    case 'own-company': return profile.companies.length;
+    case 'buy-material': return profile.ledger.filter((entry) => entry.note.startsWith('شراء ')).length;
+    case 'run-production': return profile.productionOrders.length;
+    case 'sell-product': return profile.sales.length;
+    case 'make-investment': return profile.investments.length;
+    case 'reach-day-3': return profile.day;
+  }
+}
+
+export function selectTaskBoard(profile: PlayerProfile): Array<(typeof TASK_CATALOG)[number] & { claimed: boolean; available: boolean; progressCurrent: number; progressPercent: number; status: 'available' | 'ready' | 'claimed' | 'progress' }> {
   return TASK_CATALOG.map((task) => {
     const progress = profile.tasks.find((item) => item.taskId === task.id);
     const available = (() => {
@@ -297,7 +309,9 @@ export function selectTaskBoard(profile: PlayerProfile): Array<(typeof TASK_CATA
         case 'reach-day-3': return profile.day >= 3;
       }
     })();
-    return { ...task, claimed: Boolean(progress?.claimed || profile.completedTaskIds.includes(task.id)), available };
+    const claimed = Boolean(progress?.claimed || profile.completedTaskIds.includes(task.id));
+    const progressCurrent = Math.min(task.progressTarget, taskProgressCurrent(profile, task.condition));
+    return { ...task, claimed, available, progressCurrent, progressPercent: Math.min(100, Math.round((progressCurrent / task.progressTarget) * 100)), status: claimed ? 'claimed' : available ? 'ready' : progressCurrent > 0 ? 'progress' : 'available' };
   });
 }
 
