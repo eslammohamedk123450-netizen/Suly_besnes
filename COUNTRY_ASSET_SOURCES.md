@@ -1,0 +1,18 @@
+# مصادر أسماء الشركات ومناطق الأعمال داخل اللعبة
+
+الأسماء في هذا الملف تُستخدم كأمثلة جغرافية وتجارية لأصول محاكاة. أسعار الأراضي والشركات في اللعبة هي قيم لعب افتراضية وليست عروضاً عقارية أو تقييمات مالية لهذه الجهات.
+
+- **مصر:** [السويدي إليكتريك](https://www.elsewedyelectric.com/region/egypt-hq-2)، [SCZONE ومناطقها الصناعية](https://sczone.eg/)، [هيئة ميناء الإسكندرية](https://apa.gov.eg/en/).
+- **السعودية:** [أرامكو](https://www.aramco.com/en/about-us)، [سابك](https://www.sabic.com/en/about)، [الهيئة الملكية للجبيل وينبع والمناطق الاقتصادية](https://ecza.gov.sa/en).
+- **الإمارات:** [أدنوك](https://www.adnoc.ae/en/our-story/who-we-are)، [DP World الإمارات](https://www.dpworld.com/en/about-us/our-locations/uae)، [كيزاد](https://www.kezadgroup.com/en/about-us).
+- **الأردن:** [شركة مناجم الفوسفات الأردنية](https://www.jpmc.com.jo/en/about-us)، [المنطقة الاقتصادية الخاصة بالعقبة](https://invest.jo/en/aqaba-special-economic-zone)، [شركة المدن الصناعية الأردنية](https://www.jiec.com/en).
+- **الولايات المتحدة:** [Apple](https://www.apple.com/leadership/)، [Microsoft](https://www.microsoft.com/en-us/about)، [ميناء لوس أنجلوس](https://www.portoflosangeles.org/)، [وادي كاليفورنيا المركزي](https://ca.water.usgs.gov/projects/central-valley/about-central-valley.html).
+- **ألمانيا:** [Siemens](https://www.siemens.com/en-us/company/global-locations/germany/munich-corporate-headquarters/)، [BMW](https://www.bmwgroup.com/en/general/approach-headquarters.html)، [مناطق الأعمال والصناعة بهامبورغ](https://hamburg-business.com/en/commercial-real-estate/commercial-real-estate-and-land/industry-and-business-areas/at-a-glance).
+- **الكويت:** [مؤسسة البترول الكويتية](https://www.kpc.com.kw/)، [شركة البترول الوطنية الكويتية](https://www.knpc.com.kw/)، [موانئ الكويت](https://www.kpa.gov.kw/en/shuwaikh-port/).
+- **قطر:** [قطر للطاقة](https://www.qatarenergy.qa/)، [مناطق قطر الحرة](https://qfz.gov.qa/why_qfz/free-zones/)، [ميناء حمد](https://www.mwani.com.qa/English/Ports/HamadPort/Pages/default.aspx).
+- **المملكة المتحدة:** [Unilever](https://www.unilever.com/contact/)، [Rolls-Royce](https://www.rolls-royce.com/about/where-we-operate.aspx)، [ميناء فيليكستو](https://www.portoffelixstowe.co.uk/)، [Canary Wharf](https://group.canarywharf.com/).
+- **اليابان:** [Toyota](https://global.toyota/en/company/profile/overview/index.html)، [Sony](https://www.sony.com/en/SonyInfo/CorporateInfo/)، [JETRO: طوكيو](https://www.jetro.go.jp/en/invest/region/data/tokyo.html)، [ميناء يوكوهاما](https://www.mlit.go.jp/kankocho/cruise/list/index.html).
+- **فلسطين:** [بورصة فلسطين – الشركات المدرجة](https://www.pex.ps/en/securities-listed-companies/)، [هيئة تشجيع الاستثمار الفلسطينية](https://www.pipa.ps/page/id/1c26ccy1844940Y1c26cc/)، [حديقة أريحا الزراعية الصناعية](https://www.un.org/unispal/document/auto-insert-200718/).
+- **الصين:** [Alibaba](https://www.alibabagroup.com/about-alibaba)، [Tencent](https://www.tencent.com/en-us/about.html)، [مدينة تشانغجيانغ](https://www.zhangjiang.net/)، [ميناء شنغهاي](https://www.portshanghai.com.cn/).
+- **إسبانيا:** [Inditex](https://www.inditex.com/itxcomweb/es/en/info/contact-us)، [Iberdrola](https://www.iberdrola.com/about-us/our-company/group-offices)، [ميناء برشلونة ومناطقه اللوجستية](https://www.portdebarcelona.cat/en/business-and-services/traffic-and-goods/logistics/other-logistics-and-industrial-areas)، [ميناء فالنسيا](https://www.valenciaport.com/en/).
+- **روسيا:** [Gazprom](https://www.gazprom.com/about/)، [LUKOIL](https://www.lukoil.com/Company)، [بوابة الاستثمار في موسكو](https://eng.investmoscow.ru/)، [ميناء نوفوروسيسك](https://www.nmtp.info/en/).

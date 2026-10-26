@@ -372,10 +372,10 @@ describe('Update B Systems Verification', () => {
 
     it('builds an exhaustive land catalog for each country', () => {
       const catalog = buildCountryAuditCatalog();
-      expect(catalog.egypt.parcelsCount).toBe(4);
-      expect(catalog.jordan.parcelsCount).toBe(4);
-      expect(catalog.saudi.parcelsCount).toBe(4);
-      expect(catalog.japan.parcelsCount).toBe(4);
+      expect(catalog.egypt.parcelsCount).toBe(7);
+      expect(catalog.jordan.parcelsCount).toBe(7);
+      expect(catalog.saudi.parcelsCount).toBe(7);
+      expect(catalog.japan.parcelsCount).toBe(7);
     });
   });
 });

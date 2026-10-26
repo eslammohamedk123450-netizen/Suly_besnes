@@ -158,7 +158,7 @@ export const INVESTMENT_CATALOG: readonly InvestmentCatalogEntry[] = [
   { id: 'warehouse-fund', name: 'صندوق الاستثمار اللوجستي', minimumAmount: 2_000, maximumAmount: 15_000, durationDays: 5, returnRate: 0.18, riskRate: 0.08 },
 ];
 
-// Country-Specific Real Locations and Names
+// Country-specific real locations and company names. Prices are gameplay placeholders, not market quotes.
 export const COUNTRY_REAL_ASSETS: Record<CountryId, {
   starterLand: string;
   directLands: readonly { id: string; label: string; landType: 'industrial' | 'agricultural' | 'commercial'; areaSquareMeters: number; price: number }[];
@@ -168,12 +168,17 @@ export const COUNTRY_REAL_ASSETS: Record<CountryId, {
   egypt: {
     starterLand: 'أرض المنطقة الصناعية الأولى · العاشر من رمضان',
     directLands: [
+      { id: 'real-land-egypt-1', label: 'منطقة العين السخنة الصناعية · المنطقة الاقتصادية لقناة السويس', landType: 'industrial', areaSquareMeters: 500, price: 6200 },
+      { id: 'real-land-egypt-2', label: 'المنطقة الصناعية بشرق بورسعيد · SCZONE', landType: 'industrial', areaSquareMeters: 520, price: 6500 },
+      { id: 'real-land-egypt-3', label: 'منطقة غرب القنطرة الصناعية · SCZONE', landType: 'commercial', areaSquareMeters: 420, price: 5300 },
       { id: 'starter-village-land', label: 'أرض المنطقة الصناعية الأولى · العاشر من رمضان', landType: 'agricultural', areaSquareMeters: 520, price: 3_600 },
       { id: 'direct-land-port-said', label: 'مجمع بورسعيد اللوجستي الحرة', landType: 'commercial', areaSquareMeters: 420, price: 5_700 },
       { id: 'direct-land-minya-farm', label: 'أرض مزارع وادي النطرون الخصبة', landType: 'agricultural', areaSquareMeters: 900, price: 4_800 },
       { id: 'direct-land-sokhna-industrial', label: 'موقع العين السخنة للبتروكيماويات', landType: 'industrial', areaSquareMeters: 520, price: 7_200 },
     ],
     directCompanies: [
+      { id: 'real-company-egypt-1', name: 'Elsewedy Electric', industryId: 'electricity', landType: 'industrial', areaSquareMeters: 650, price: 17500 },
+      { id: 'real-company-egypt-2', name: 'Telecom Egypt', industryId: 'electronics', landType: 'commercial', areaSquareMeters: 500, price: 20000 },
       { id: 'direct-company-food', name: 'شركة النيل للتصنيع الغذائي', industryId: 'food', landType: 'agricultural', areaSquareMeters: 650, price: 8_600 },
       { id: 'direct-company-logistics', name: 'شركة قناة السويس للخدمات اللوجستية', industryId: 'transport', landType: 'commercial', areaSquareMeters: 500, price: 10_400 },
       { id: 'direct-company-energy', name: 'مجمع مصر لتوليد وتوزيع الطاقة', industryId: 'electricity', landType: 'industrial', areaSquareMeters: 600, price: 13_600 },
@@ -189,12 +194,17 @@ export const COUNTRY_REAL_ASSETS: Record<CountryId, {
   saudi: {
     starterLand: 'أرض المدينة الصناعية الثانية · الرياض',
     directLands: [
+      { id: 'real-land-saudi-1', label: 'مدينة الجبيل الصناعية', landType: 'industrial', areaSquareMeters: 520, price: 7100 },
+      { id: 'real-land-saudi-2', label: 'مدينة ينبع الصناعية', landType: 'industrial', areaSquareMeters: 500, price: 6800 },
+      { id: 'real-land-saudi-3', label: 'ميناء جدة الإسلامي', landType: 'commercial', areaSquareMeters: 420, price: 5900 },
       { id: 'starter-village-land', label: 'أرض المدينة الصناعية الثانية · الرياض', landType: 'agricultural', areaSquareMeters: 520, price: 3_600 },
       { id: 'direct-land-port-said', label: 'مجمع ميناء الملك عبدالعزيز اللوجستي · الدمام', landType: 'commercial', areaSquareMeters: 420, price: 5_700 },
       { id: 'direct-land-minya-farm', label: 'مزرعة واحة الخرج النموذجية للإنتاج', landType: 'agricultural', areaSquareMeters: 900, price: 4_800 },
       { id: 'direct-land-sokhna-industrial', label: 'موقع الجبيل الصناعي للبتروكيماويات', landType: 'industrial', areaSquareMeters: 520, price: 7_200 },
     ],
     directCompanies: [
+      { id: 'real-company-saudi-1', name: 'Saudi Aramco', industryId: 'petroleum', landType: 'industrial', areaSquareMeters: 650, price: 17500 },
+      { id: 'real-company-saudi-2', name: 'SABIC', industryId: 'detergents', landType: 'industrial', areaSquareMeters: 650, price: 20000 },
       { id: 'direct-company-food', name: 'شركة نجد للتصنيع الغذائي والتموين', industryId: 'food', landType: 'agricultural', areaSquareMeters: 650, price: 8_600 },
       { id: 'direct-company-logistics', name: 'شركة سهم اللوجستية لنقل وشحن البضائع', industryId: 'transport', landType: 'commercial', areaSquareMeters: 500, price: 10_400 },
       { id: 'direct-company-energy', name: 'شركة كهرباء وطاقة الشرقية', industryId: 'electricity', landType: 'industrial', areaSquareMeters: 600, price: 13_600 },
@@ -210,12 +220,17 @@ export const COUNTRY_REAL_ASSETS: Record<CountryId, {
   uae: {
     starterLand: 'مجمع منطقة جبل علي الحرة (JAFZA) · دبي',
     directLands: [
+      { id: 'real-land-uae-1', label: 'جافزا · المنطقة الحرة بجبل علي', landType: 'industrial', areaSquareMeters: 520, price: 7300 },
+      { id: 'real-land-uae-2', label: 'مدينة خليفة الصناعية · كيزاد', landType: 'industrial', areaSquareMeters: 500, price: 7000 },
+      { id: 'real-land-uae-3', label: 'مركز دبي المالي العالمي DIFC', landType: 'commercial', areaSquareMeters: 380, price: 8200 },
       { id: 'starter-village-land', label: 'مجمع منطقة جبل علي الحرة (JAFZA) · دبي', landType: 'agricultural', areaSquareMeters: 520, price: 3_600 },
       { id: 'direct-land-port-said', label: 'مجمع كيزاد اللوجستي التجاري · أبوظبي', landType: 'commercial', areaSquareMeters: 420, price: 5_700 },
       { id: 'direct-land-minya-farm', label: 'مزارع واحة العين والذيد الخضراء', landType: 'agricultural', areaSquareMeters: 900, price: 4_800 },
       { id: 'direct-land-sokhna-industrial', label: 'موقع الرويس الصناعي للبتروكيماويات', landType: 'industrial', areaSquareMeters: 520, price: 7_200 },
     ],
     directCompanies: [
+      { id: 'real-company-uae-1', name: 'ADNOC', industryId: 'petroleum', landType: 'industrial', areaSquareMeters: 650, price: 17500 },
+      { id: 'real-company-uae-2', name: 'DP World', industryId: 'transport', landType: 'commercial', areaSquareMeters: 500, price: 20000 },
       { id: 'direct-company-food', name: 'شركة دبي للأغذية والضيافة', industryId: 'food', landType: 'agricultural', areaSquareMeters: 650, price: 8_600 },
       { id: 'direct-company-logistics', name: 'شركة موانئ الإمارات اللوجستية', industryId: 'transport', landType: 'commercial', areaSquareMeters: 500, price: 10_400 },
       { id: 'direct-company-energy', name: 'شركة شمس لتوليد الطاقة النظيفة', industryId: 'electricity', landType: 'industrial', areaSquareMeters: 600, price: 13_600 },
@@ -231,12 +246,17 @@ export const COUNTRY_REAL_ASSETS: Record<CountryId, {
   usa: {
     starterLand: 'مجمع كوينز الصناعي واللوجستي · نيويورك',
     directLands: [
+      { id: 'real-land-usa-1', label: 'وادي السيليكون · كاليفورنيا', landType: 'commercial', areaSquareMeters: 400, price: 8500 },
+      { id: 'real-land-usa-2', label: 'ممر قناة هيوستن الصناعي · تكساس', landType: 'industrial', areaSquareMeters: 600, price: 7200 },
+      { id: 'real-land-usa-3', label: 'منطقة ميناء لوس أنجلوس اللوجستية', landType: 'commercial', areaSquareMeters: 450, price: 6900 },
       { id: 'starter-village-land', label: 'مجمع كوينز الصناعي واللوجستي · نيويورك', landType: 'agricultural', areaSquareMeters: 520, price: 3_600 },
       { id: 'direct-land-port-said', label: 'ميناء شيكاغو التجاري واللوجستي', landType: 'commercial', areaSquareMeters: 420, price: 5_700 },
       { id: 'direct-land-minya-farm', label: 'مزارع الوادي الأوسط بكاليفورنيا (Central Valley)', landType: 'agricultural', areaSquareMeters: 900, price: 4_800 },
       { id: 'direct-land-sokhna-industrial', label: 'مجمع هيوستن للطاقة والبتروكيماويات · تكساس', landType: 'industrial', areaSquareMeters: 520, price: 7_200 },
     ],
     directCompanies: [
+      { id: 'real-company-usa-1', name: 'Apple Inc.', industryId: 'electronics', landType: 'commercial', areaSquareMeters: 500, price: 17500 },
+      { id: 'real-company-usa-2', name: 'Walmart Inc.', industryId: 'food', landType: 'commercial', areaSquareMeters: 500, price: 20000 },
       { id: 'direct-company-food', name: 'شركة مانهاتن للتصنيع والسلع الاستهلاكية', industryId: 'food', landType: 'agricultural', areaSquareMeters: 650, price: 8_600 },
       { id: 'direct-company-logistics', name: 'شركة أمريكان فريت للشحن وسلاسل الإمداد', industryId: 'transport', landType: 'commercial', areaSquareMeters: 500, price: 10_400 },
       { id: 'direct-company-energy', name: 'شركة هيوستن للكهرباء والطاقة المتجددة', industryId: 'electricity', landType: 'industrial', areaSquareMeters: 600, price: 13_600 },
@@ -252,12 +272,17 @@ export const COUNTRY_REAL_ASSETS: Record<CountryId, {
   kuwait: {
     starterLand: 'أرض منطقة الشويخ الصناعية · العاصمة',
     directLands: [
+      { id: 'real-land-kuwait-1', label: 'منطقة الشويخ الصناعية', landType: 'industrial', areaSquareMeters: 500, price: 6100 },
+      { id: 'real-land-kuwait-2', label: 'منطقة الشعيبة الصناعية', landType: 'industrial', areaSquareMeters: 520, price: 6500 },
+      { id: 'real-land-kuwait-3', label: 'ميناء الشويخ التجاري', landType: 'commercial', areaSquareMeters: 420, price: 5700 },
       { id: 'starter-village-land', label: 'أرض منطقة الشويخ الصناعية · العاصمة', landType: 'agricultural', areaSquareMeters: 520, price: 3_600 },
       { id: 'direct-land-port-said', label: 'مجمع منطقة الصليبية اللوجستي التجاري', landType: 'commercial', areaSquareMeters: 420, price: 5_700 },
       { id: 'direct-land-minya-farm', label: 'مزارع منطقة الوفرة الإنتاجية الخصبة', landType: 'agricultural', areaSquareMeters: 900, price: 4_800 },
       { id: 'direct-land-sokhna-industrial', label: 'موقع ميناء الأحمدي للبتروكيماويات', landType: 'industrial', areaSquareMeters: 520, price: 7_200 },
     ],
     directCompanies: [
+      { id: 'real-company-kuwait-1', name: 'Kuwait Petroleum Corporation', industryId: 'petroleum', landType: 'industrial', areaSquareMeters: 650, price: 17500 },
+      { id: 'real-company-kuwait-2', name: 'Kuwait National Petroleum Company', industryId: 'petroleum', landType: 'industrial', areaSquareMeters: 650, price: 20000 },
       { id: 'direct-company-food', name: 'شركة الديرة للصناعات الغذائية والتجهيز', industryId: 'food', landType: 'agricultural', areaSquareMeters: 650, price: 8_600 },
       { id: 'direct-company-logistics', name: 'شركة بوبيان للنقل والشحن البري والبحري', industryId: 'transport', landType: 'commercial', areaSquareMeters: 500, price: 10_400 },
       { id: 'direct-company-energy', name: 'شركة كويت إنرجي لتوليد الطاقة', industryId: 'electricity', landType: 'industrial', areaSquareMeters: 600, price: 13_600 },
@@ -273,12 +298,17 @@ export const COUNTRY_REAL_ASSETS: Record<CountryId, {
   qatar: {
     starterLand: 'أرض المنطقة الصناعية الجديدة · الدوحة',
     directLands: [
+      { id: 'real-land-qatar-1', label: 'مدينة مسيعيد الصناعية', landType: 'industrial', areaSquareMeters: 520, price: 7000 },
+      { id: 'real-land-qatar-2', label: 'مدينة رأس لفان الصناعية', landType: 'industrial', areaSquareMeters: 550, price: 7400 },
+      { id: 'real-land-qatar-3', label: 'منطقة راس بوفنطاس الحرة', landType: 'commercial', areaSquareMeters: 420, price: 6600 },
       { id: 'starter-village-land', label: 'أرض المنطقة الصناعية الجديدة · الدوحة', landType: 'agricultural', areaSquareMeters: 520, price: 3_600 },
       { id: 'direct-land-port-said', label: 'مجمع ميناء حمد اللوجستي الدولي', landType: 'commercial', areaSquareMeters: 420, price: 5_700 },
       { id: 'direct-land-minya-farm', label: 'مزارع الشمال القطرية الإنتاجية', landType: 'agricultural', areaSquareMeters: 900, price: 4_800 },
       { id: 'direct-land-sokhna-industrial', label: 'مدينة رأس لفان الصناعية للغاز والطاقة', landType: 'industrial', areaSquareMeters: 520, price: 7_200 },
     ],
     directCompanies: [
+      { id: 'real-company-qatar-1', name: 'QatarEnergy', industryId: 'gas', landType: 'industrial', areaSquareMeters: 650, price: 17500 },
+      { id: 'real-company-qatar-2', name: 'Ooredoo Qatar', industryId: 'electronics', landType: 'commercial', areaSquareMeters: 500, price: 20000 },
       { id: 'direct-company-food', name: 'شركة الدوحة للإنتاج الغذائي والتعبئة', industryId: 'food', landType: 'agricultural', areaSquareMeters: 650, price: 8_600 },
       { id: 'direct-company-logistics', name: 'شركة ملاحة قطر للشحن اللوجستي', industryId: 'transport', landType: 'commercial', areaSquareMeters: 500, price: 10_400 },
       { id: 'direct-company-energy', name: 'شركة قطر للطاقة وتوزيع الكهرباء', industryId: 'electricity', landType: 'industrial', areaSquareMeters: 600, price: 13_600 },
@@ -294,12 +324,17 @@ export const COUNTRY_REAL_ASSETS: Record<CountryId, {
   uk: {
     starterLand: 'مجمع مانشستر الصناعي (Trafford Park)',
     directLands: [
+      { id: 'real-land-uk-1', label: 'كاناري وارف · لندن', landType: 'commercial', areaSquareMeters: 350, price: 8800 },
+      { id: 'real-land-uk-2', label: 'ميناء فيليكستو اللوجستي', landType: 'commercial', areaSquareMeters: 450, price: 7200 },
+      { id: 'real-land-uk-3', label: 'لندن غيتواي · ميناء ومنطقة لوجستية', landType: 'industrial', areaSquareMeters: 520, price: 7600 },
       { id: 'starter-village-land', label: 'مجمع مانشستر الصناعي (Trafford Park)', landType: 'agricultural', areaSquareMeters: 520, price: 3_600 },
       { id: 'direct-land-port-said', label: 'حوض ليفربول التجاري اللوجستي الدولي', landType: 'commercial', areaSquareMeters: 420, price: 5_700 },
       { id: 'direct-land-minya-farm', label: 'مزارع يوركشاير الزراعية الخصبة', landType: 'agricultural', areaSquareMeters: 900, price: 4_800 },
       { id: 'direct-land-sokhna-industrial', label: 'مجمع أبردين للبتروكيماويات وطاقة البحر', landType: 'industrial', areaSquareMeters: 520, price: 7_200 },
     ],
     directCompanies: [
+      { id: 'real-company-uk-1', name: 'Unilever', industryId: 'food', landType: 'industrial', areaSquareMeters: 650, price: 17500 },
+      { id: 'real-company-uk-2', name: 'Rolls-Royce', industryId: 'transport', landType: 'industrial', areaSquareMeters: 650, price: 20000 },
       { id: 'direct-company-food', name: 'شركة التايمز للصناعات الغذائية الحديثة', industryId: 'food', landType: 'agricultural', areaSquareMeters: 650, price: 8_600 },
       { id: 'direct-company-logistics', name: 'شركة الشحن الملكية البريطانية', industryId: 'transport', landType: 'commercial', areaSquareMeters: 500, price: 10_400 },
       { id: 'direct-company-energy', name: 'شركة بريتيش باور للطاقة وتوليد الكهرباء', industryId: 'electricity', landType: 'industrial', areaSquareMeters: 600, price: 13_600 },
@@ -315,12 +350,17 @@ export const COUNTRY_REAL_ASSETS: Record<CountryId, {
   germany: {
     starterLand: 'حزام الرور الصناعي الحديث · دوسلدورف',
     directLands: [
+      { id: 'real-land-germany-1', label: 'موقع بويته الصناعي · ميناء هامبورغ', landType: 'industrial', areaSquareMeters: 520, price: 7100 },
+      { id: 'real-land-germany-2', label: 'بيلبروك-روتنبورغسورت · هامبورغ', landType: 'industrial', areaSquareMeters: 500, price: 6800 },
+      { id: 'real-land-germany-3', label: 'منطقة الأعمال أليرمويه · هامبورغ', landType: 'commercial', areaSquareMeters: 420, price: 6200 },
       { id: 'starter-village-land', label: 'حزام الرور الصناعي الحديث · دوسلدورف', landType: 'agricultural', areaSquareMeters: 520, price: 3_600 },
       { id: 'direct-land-port-said', label: 'مجمع ميناء هامبورغ اللوجستي التجاري', landType: 'commercial', areaSquareMeters: 420, price: 5_700 },
       { id: 'direct-land-minya-farm', label: 'مزارع بافاريا الزراعية الإنتاجية', landType: 'agricultural', areaSquareMeters: 900, price: 4_800 },
       { id: 'direct-land-sokhna-industrial', label: 'مجمع لودفيغسهافن للصناعات الكيماوية', landType: 'industrial', areaSquareMeters: 520, price: 7_200 },
     ],
     directCompanies: [
+      { id: 'real-company-germany-1', name: 'Siemens AG', industryId: 'electronics', landType: 'industrial', areaSquareMeters: 650, price: 17500 },
+      { id: 'real-company-germany-2', name: 'BMW Group', industryId: 'transport', landType: 'industrial', areaSquareMeters: 650, price: 20000 },
       { id: 'direct-company-food', name: 'شركة بافاريا للمنتجات الغذائية', industryId: 'food', landType: 'agricultural', areaSquareMeters: 650, price: 8_600 },
       { id: 'direct-company-logistics', name: 'شركة دويتشه للشحن وسلاسل التوريد', industryId: 'transport', landType: 'commercial', areaSquareMeters: 500, price: 10_400 },
       { id: 'direct-company-energy', name: 'شركة راين-إلكتريك لتوليد الطاقة', industryId: 'electricity', landType: 'industrial', areaSquareMeters: 600, price: 13_600 },
@@ -336,12 +376,17 @@ export const COUNTRY_REAL_ASSETS: Record<CountryId, {
   japan: {
     starterLand: 'مجمع يوكوهاما البحري الصناعي · خليج طوكيو',
     directLands: [
+      { id: 'real-land-japan-1', label: 'ميناء يوكوهاما ومنطقته الصناعية', landType: 'industrial', areaSquareMeters: 520, price: 7100 },
+      { id: 'real-land-japan-2', label: 'ميناء ناغويا والمنطقة اللوجستية', landType: 'commercial', areaSquareMeters: 450, price: 6900 },
+      { id: 'real-land-japan-3', label: 'مركز ماكوهاري للأعمال · تشيبا', landType: 'commercial', areaSquareMeters: 400, price: 6700 },
       { id: 'starter-village-land', label: 'مجمع يوكوهاما البحري الصناعي · خليج طوكيو', landType: 'agricultural', areaSquareMeters: 520, price: 3_600 },
       { id: 'direct-land-port-said', label: 'ميناء ناغويا اللوجستي التجاري الدولي', landType: 'commercial', areaSquareMeters: 420, price: 5_700 },
       { id: 'direct-land-minya-farm', label: 'مزارع هوكايدو الزراعية الخصبة', landType: 'agricultural', areaSquareMeters: 900, price: 4_800 },
       { id: 'direct-land-sokhna-industrial', label: 'مجمع أوساكا لتكرير الطاقة والصناعات الثقيلة', landType: 'industrial', areaSquareMeters: 520, price: 7_200 },
     ],
     directCompanies: [
+      { id: 'real-company-japan-1', name: 'Toyota Motor Corporation', industryId: 'transport', landType: 'industrial', areaSquareMeters: 650, price: 17500 },
+      { id: 'real-company-japan-2', name: 'Sony Group Corporation', industryId: 'electronics', landType: 'commercial', areaSquareMeters: 500, price: 20000 },
       { id: 'direct-company-food', name: 'شركة طوكيو للتصنيع الغذائي', industryId: 'food', landType: 'agricultural', areaSquareMeters: 650, price: 8_600 },
       { id: 'direct-company-logistics', name: 'شركة نيبون للنقل السريع والشحن الدولي', industryId: 'transport', landType: 'commercial', areaSquareMeters: 500, price: 10_400 },
       { id: 'direct-company-energy', name: 'شركة كانساي إلكتريك للطاقة وتوليد الكهرباء', industryId: 'electricity', landType: 'industrial', areaSquareMeters: 600, price: 13_600 },
@@ -357,12 +402,17 @@ export const COUNTRY_REAL_ASSETS: Record<CountryId, {
   jordan: {
     starterLand: 'أرض مدينة الملك عبدالله الثاني الصناعية · سحاب',
     directLands: [
+      { id: 'real-land-jordan-1', label: 'منطقة العقبة الاقتصادية الخاصة', landType: 'commercial', areaSquareMeters: 450, price: 6500 },
+      { id: 'real-land-jordan-2', label: 'مدينة الملك عبدالله الثاني الصناعية · سحاب', landType: 'industrial', areaSquareMeters: 520, price: 6200 },
+      { id: 'real-land-jordan-3', label: 'مدينة الزرقاء الصناعية', landType: 'industrial', areaSquareMeters: 500, price: 5900 },
       { id: 'direct-land-jordan-sahab', label: 'أرض مدينة سحاب الصناعية', landType: 'industrial', areaSquareMeters: 520, price: 3_600 },
       { id: 'direct-land-jordan-aqaba', label: 'مجمع منطقة العقبة اللوجستية الخاصة', landType: 'commercial', areaSquareMeters: 420, price: 5_700 },
       { id: 'direct-land-jordan-shuna', label: 'أرض مزارع وادي الأردن والشونة', landType: 'agricultural', areaSquareMeters: 900, price: 4_800 },
       { id: 'direct-land-jordan-zarqa', label: 'موقع الهاشمية الصناعي للتعدين والكيماويات · الزرقاء', landType: 'industrial', areaSquareMeters: 520, price: 7_200 },
     ],
     directCompanies: [
+      { id: 'real-company-jordan-1', name: 'Jordan Petroleum Refinery Company', industryId: 'petroleum', landType: 'industrial', areaSquareMeters: 650, price: 17500 },
+      { id: 'real-company-jordan-2', name: 'Royal Jordanian', industryId: 'transport', landType: 'commercial', areaSquareMeters: 500, price: 20000 },
       { id: 'direct-company-jordan-food', name: 'شركة البتراء للصناعات الغذائية', industryId: 'food', landType: 'industrial', areaSquareMeters: 650, price: 8_600 },
       { id: 'direct-company-jordan-logistics', name: 'شركة العقبة لخطوط الشحن والترانزيت', industryId: 'transport', landType: 'commercial', areaSquareMeters: 500, price: 10_400 },
       { id: 'direct-company-jordan-energy', name: 'شركة شمس معان لتوليد الطاقة النظيفة', industryId: 'electricity', landType: 'industrial', areaSquareMeters: 600, price: 13_600 },
@@ -378,12 +428,17 @@ export const COUNTRY_REAL_ASSETS: Record<CountryId, {
   palestine: {
     starterLand: 'منطقة بيت لحم الصناعية · بيت لحم',
     directLands: [
+      { id: 'real-land-palestine-1', label: 'حديقة أريحا الزراعية الصناعية', landType: 'agricultural', areaSquareMeters: 700, price: 4800 },
+      { id: 'real-land-palestine-2', label: 'المنطقة الصناعية في جنين', landType: 'industrial', areaSquareMeters: 500, price: 5700 },
+      { id: 'real-land-palestine-3', label: 'المنطقة الصناعية في بيت لحم', landType: 'industrial', areaSquareMeters: 480, price: 5600 },
       { id: 'direct-land-palestine-bethlehem', label: 'قطعة صناعية في منطقة بيت لحم الصناعية', landType: 'industrial', areaSquareMeters: 520, price: 3_600 },
       { id: 'direct-land-palestine-gaza', label: 'موقع تجاري في مدينة غزة', landType: 'commercial', areaSquareMeters: 420, price: 5_700 },
       { id: 'direct-land-palestine-jericho', label: 'أرض زراعية في أريحا والأغوار', landType: 'agricultural', areaSquareMeters: 900, price: 4_800 },
       { id: 'direct-land-palestine-jenin', label: 'قطعة إنتاجية في منطقة جنين الصناعية', landType: 'industrial', areaSquareMeters: 520, price: 7_200 },
     ],
     directCompanies: [
+      { id: 'real-company-palestine-1', name: 'Palestine Telecommunications Company (Paltel)', industryId: 'electronics', landType: 'commercial', areaSquareMeters: 500, price: 17500 },
+      { id: 'real-company-palestine-2', name: 'Palestine Development and Investment Company (PADICO)', industryId: 'construction', landType: 'commercial', areaSquareMeters: 500, price: 20000 },
       { id: 'direct-company-palestine-food', name: 'شركة سنابل فلسطين للصناعات الغذائية', industryId: 'food', landType: 'agricultural', areaSquareMeters: 650, price: 8_600 },
       { id: 'direct-company-palestine-logistics', name: 'شركة دروب فلسطين للخدمات اللوجستية', industryId: 'transport', landType: 'commercial', areaSquareMeters: 500, price: 10_400 },
       { id: 'direct-company-palestine-energy', name: 'شركة شمس فلسطين للطاقة', industryId: 'electricity', landType: 'industrial', areaSquareMeters: 600, price: 13_600 },
@@ -399,12 +454,17 @@ export const COUNTRY_REAL_ASSETS: Record<CountryId, {
   china: {
     starterLand: 'منطقة شنغهاي الصناعية · شنغهاي',
     directLands: [
+      { id: 'real-land-china-1', label: 'مدينة تشانغجيانغ للعلوم · شنغهاي', landType: 'commercial', areaSquareMeters: 420, price: 7900 },
+      { id: 'real-land-china-2', label: 'المنطقة الاقتصادية الخاصة في شنتشن', landType: 'industrial', areaSquareMeters: 520, price: 7600 },
+      { id: 'real-land-china-3', label: 'ميناء شنغهاي والمنطقة اللوجستية', landType: 'commercial', areaSquareMeters: 500, price: 7400 },
       { id: 'direct-land-china-bethlehem', label: 'قطعة صناعية في منطقة شنغهاي الصناعية', landType: 'industrial', areaSquareMeters: 520, price: 3_600 },
       { id: 'direct-land-china-gaza', label: 'موقع تجاري في مدينة شنتشن', landType: 'commercial', areaSquareMeters: 420, price: 5_700 },
       { id: 'direct-land-china-jericho', label: 'أرض زراعية في سيتشوان', landType: 'agricultural', areaSquareMeters: 900, price: 4_800 },
       { id: 'direct-land-china-jenin', label: 'قطعة إنتاجية في منطقة سوتشو الصناعية', landType: 'industrial', areaSquareMeters: 520, price: 7_200 },
     ],
     directCompanies: [
+      { id: 'real-company-china-1', name: 'Alibaba Group', industryId: 'electronics', landType: 'commercial', areaSquareMeters: 500, price: 17500 },
+      { id: 'real-company-china-2', name: 'BYD', industryId: 'transport', landType: 'industrial', areaSquareMeters: 650, price: 20000 },
       { id: 'direct-company-china-food', name: 'شركة سنابل الصين للصناعات الغذائية', industryId: 'food', landType: 'agricultural', areaSquareMeters: 650, price: 8_600 },
       { id: 'direct-company-china-logistics', name: 'شركة دروب الصين للخدمات اللوجستية', industryId: 'transport', landType: 'commercial', areaSquareMeters: 500, price: 10_400 },
       { id: 'direct-company-china-energy', name: 'شركة شمس الصين للطاقة', industryId: 'electricity', landType: 'industrial', areaSquareMeters: 600, price: 13_600 },
@@ -420,12 +480,17 @@ export const COUNTRY_REAL_ASSETS: Record<CountryId, {
   spain: {
     starterLand: 'منطقة برشلونة الصناعية · برشلونة',
     directLands: [
+      { id: 'real-land-spain-1', label: 'المنطقة الحرة · زونا فرانكا · برشلونة', landType: 'industrial', areaSquareMeters: 520, price: 7200 },
+      { id: 'real-land-spain-2', label: 'ميناء فالنسيا والمنطقة اللوجستية', landType: 'commercial', areaSquareMeters: 460, price: 6900 },
+      { id: 'real-land-spain-3', label: 'منطقة البيوت الزجاجية الزراعية · ألميريا', landType: 'agricultural', areaSquareMeters: 800, price: 5200 },
       { id: 'direct-land-spain-bethlehem', label: 'قطعة صناعية في منطقة برشلونة الصناعية', landType: 'industrial', areaSquareMeters: 520, price: 3_600 },
       { id: 'direct-land-spain-gaza', label: 'موقع تجاري في مدينة فالنسيا', landType: 'commercial', areaSquareMeters: 420, price: 5_700 },
       { id: 'direct-land-spain-jericho', label: 'أرض زراعية في الأندلس', landType: 'agricultural', areaSquareMeters: 900, price: 4_800 },
       { id: 'direct-land-spain-jenin', label: 'قطعة إنتاجية في منطقة مدريد الصناعية', landType: 'industrial', areaSquareMeters: 520, price: 7_200 },
     ],
     directCompanies: [
+      { id: 'real-company-spain-1', name: 'Iberdrola', industryId: 'electricity', landType: 'industrial', areaSquareMeters: 650, price: 17500 },
+      { id: 'real-company-spain-2', name: 'Repsol', industryId: 'petroleum', landType: 'industrial', areaSquareMeters: 650, price: 20000 },
       { id: 'direct-company-spain-food', name: 'شركة سنابل إسبانيا للصناعات الغذائية', industryId: 'food', landType: 'agricultural', areaSquareMeters: 650, price: 8_600 },
       { id: 'direct-company-spain-logistics', name: 'شركة دروب إسبانيا للخدمات اللوجستية', industryId: 'transport', landType: 'commercial', areaSquareMeters: 500, price: 10_400 },
       { id: 'direct-company-spain-energy', name: 'شركة شمس إسبانيا للطاقة', industryId: 'electricity', landType: 'industrial', areaSquareMeters: 600, price: 13_600 },
@@ -441,12 +506,17 @@ export const COUNTRY_REAL_ASSETS: Record<CountryId, {
   russia: {
     starterLand: 'منطقة موسكو الصناعية · موسكو',
     directLands: [
+      { id: 'real-land-russia-1', label: 'مركز موسكو الدولي للأعمال · موسكو سيتي', landType: 'commercial', areaSquareMeters: 400, price: 8200 },
+      { id: 'real-land-russia-2', label: 'منطقة كراسنودار الزراعية · كوبان', landType: 'agricultural', areaSquareMeters: 900, price: 5100 },
+      { id: 'real-land-russia-3', label: 'ميناء نوفوروسيسك التجاري', landType: 'commercial', areaSquareMeters: 500, price: 7100 },
       { id: 'direct-land-russia-bethlehem', label: 'قطعة صناعية في منطقة موسكو الصناعية', landType: 'industrial', areaSquareMeters: 520, price: 3_600 },
       { id: 'direct-land-russia-gaza', label: 'موقع تجاري في مدينة سانت بطرسبرغ', landType: 'commercial', areaSquareMeters: 420, price: 5_700 },
       { id: 'direct-land-russia-jericho', label: 'أرض زراعية في كراسنودار', landType: 'agricultural', areaSquareMeters: 900, price: 4_800 },
       { id: 'direct-land-russia-jenin', label: 'قطعة إنتاجية في منطقة الأورال الصناعية', landType: 'industrial', areaSquareMeters: 520, price: 7_200 },
     ],
     directCompanies: [
+      { id: 'real-company-russia-1', name: 'Gazprom', industryId: 'gas', landType: 'industrial', areaSquareMeters: 650, price: 17500 },
+      { id: 'real-company-russia-2', name: 'LUKOIL', industryId: 'petroleum', landType: 'industrial', areaSquareMeters: 650, price: 20000 },
       { id: 'direct-company-russia-food', name: 'شركة سنابل روسيا للصناعات الغذائية', industryId: 'food', landType: 'agricultural', areaSquareMeters: 650, price: 8_600 },
       { id: 'direct-company-russia-logistics', name: 'شركة دروب روسيا للخدمات اللوجستية', industryId: 'transport', landType: 'commercial', areaSquareMeters: 500, price: 10_400 },
       { id: 'direct-company-russia-energy', name: 'شركة شمس روسيا للطاقة', industryId: 'electricity', landType: 'industrial', areaSquareMeters: 600, price: 13_600 },
