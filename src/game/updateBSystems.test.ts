@@ -160,9 +160,9 @@ describe('Update B Systems Verification', () => {
       const jordan = COUNTRIES.find((c) => c.id === 'jordan');
       expect(jordan).toBeDefined();
       expect(jordan?.flag).toBe('🇯🇴');
-      expect(jordan?.currency.symbol).toBe('$');
+      expect(jordan?.currency.symbol).toBe('د.أ');
       expect(jordan?.startingBalance).toBe(25_000);
-      expect(COUNTRIES.length).toBe(10);
+      expect(COUNTRIES.length).toBe(14);
     });
 
     it('has full flavor scenario, catalog assets, and global trade profile for Jordan', () => {
@@ -362,10 +362,10 @@ describe('Update B Systems Verification', () => {
   });
 
   describe('Mission 6: Country and Land Integrity Verification', () => {
-    it('verifies that all 10 countries have valid, non-colliding land parcels and configurations', () => {
+    it('verifies that all 14 countries have valid, non-colliding land parcels and configurations', () => {
       const verification = verifyCountryAndLandIntegrity();
       expect(verification.isValid).toBe(true);
-      expect(verification.totalCountries).toBe(10);
+      expect(verification.totalCountries).toBe(14);
       expect(verification.issues).toHaveLength(0);
       expect(verification.totalParcels).toBeGreaterThanOrEqual(40);
     });

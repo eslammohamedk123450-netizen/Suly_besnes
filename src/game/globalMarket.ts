@@ -379,6 +379,16 @@ const COUNTRY_TRADE_PROFILES: Record<CountryId, CountryTradeProfile> = {
     seaFreightMultiplier: 0.82, // Red Sea Aqaba port
     exportHubBonusPct: 7,
   },
+  palestine: {
+    advantagedMaterials: ['grain', 'water', 'packaging', 'cement'],
+    advantageDiscountPct: 7,
+    baseCustomsTariffRate: 0.035,
+    seaFreightMultiplier: 0.9,
+    exportHubBonusPct: 4,
+  },
+  china: { advantagedMaterials: ['components','silicon','steel','packaging'], advantageDiscountPct: 11, baseCustomsTariffRate: 0.04, seaFreightMultiplier: 0.78, exportHubBonusPct: 9 },
+  spain: { advantagedMaterials: ['grain','packaging','cement','chemicals'], advantageDiscountPct: 8, baseCustomsTariffRate: 0.025, seaFreightMultiplier: 0.8, exportHubBonusPct: 7 },
+  russia: { advantagedMaterials: ['crude-oil','natural-gas','steel','fuel'], advantageDiscountPct: 10, baseCustomsTariffRate: 0.04, seaFreightMultiplier: 0.9, exportHubBonusPct: 5 },
 };
 
 const BULK_TIERS_STANDARD: readonly BulkDiscountTier[] = [

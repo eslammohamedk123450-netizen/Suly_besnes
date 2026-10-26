@@ -46,7 +46,7 @@ import {
 } from './offlineIdleEngine';
 import { executePrestigeExpansion } from './prestigeEngine';
 
-const ALL_TEN_COUNTRIES: readonly CountryId[] = [
+const ALL_COUNTRIES: readonly CountryId[] = [
   'egypt',
   'saudi',
   'uae',
@@ -57,6 +57,10 @@ const ALL_TEN_COUNTRIES: readonly CountryId[] = [
   'germany',
   'japan',
   'jordan',
+  'palestine',
+  'china',
+  'spain',
+  'russia',
 ];
 
 class MemoryStorage implements Storage {
@@ -113,10 +117,10 @@ describe('Suly Business Empire — Master System Verification (17 Suites)', () =
     expect(fallbackPlayer.avatarId).toBe(DEFAULT_AVATAR_ID);
   });
 
-  it('2. delivers real starting assets for every one of the 9 supported countries and passes profile validation', () => {
-    expect(COUNTRIES.map((c) => c.id)).toEqual([...ALL_TEN_COUNTRIES]);
+  it('2. delivers real starting assets for every supported country and passes profile validation', () => {
+    expect(COUNTRIES.map((c) => c.id)).toEqual([...ALL_COUNTRIES]);
 
-    for (const countryId of ALL_TEN_COUNTRIES) {
+    for (const countryId of ALL_COUNTRIES) {
       const country = findCountry(countryId)!;
       const profile = createNewPlayer(country, `مؤسس ${country.name}`, new Date('2026-03-01T00:00:00.000Z'));
 
@@ -145,12 +149,12 @@ describe('Suly Business Empire — Master System Verification (17 Suites)', () =
     }
   });
 
-  it('3. enforces strict scenario isolation across all 9 countries with zero cross-country leakage', () => {
+  it('3. enforces strict scenario isolation across all countries with zero cross-country leakage', () => {
     const scenarioTitles = new Set<string>();
     const bankNames = new Set<string>();
     const elderNames = new Set<string>();
 
-    for (const countryId of ALL_TEN_COUNTRIES) {
+    for (const countryId of ALL_COUNTRIES) {
       const scenario = getCountryScenario(countryId);
       expect(scenario.countryId).toBe(countryId);
       expect(scenario.stages).toHaveLength(10);
@@ -182,15 +186,15 @@ describe('Suly Business Empire — Master System Verification (17 Suites)', () =
       expect(marketOffers.length).toBeGreaterThan(0);
 
       // Foreign country notification check must be rejected
-      const otherCountry = ALL_TEN_COUNTRIES.find((id) => id !== countryId)!;
+      const otherCountry = ALL_COUNTRIES.find((id) => id !== countryId)!;
       expect(
         isNotificationAllowedForProfile(profile, { section: 'home', countryId: otherCountry }),
       ).toBe(false);
     }
 
-    expect(scenarioTitles.size).toBe(ALL_TEN_COUNTRIES.length);
-    expect(bankNames.size).toBe(ALL_TEN_COUNTRIES.length);
-    expect(elderNames.size).toBe(ALL_TEN_COUNTRIES.length);
+    expect(scenarioTitles.size).toBe(ALL_COUNTRIES.length);
+    expect(bankNames.size).toBe(ALL_COUNTRIES.length);
+    expect(elderNames.size).toBe(ALL_COUNTRIES.length);
   });
 
   it('4. displays country StoryIntro only once, persists completion across reloads, and locks country mid-save', () => {
@@ -272,7 +276,7 @@ describe('Suly Business Empire — Master System Verification (17 Suites)', () =
   });
 
   it('6 & 7. provides structured advisor briefings before every quest and grants zero rewards/progress on skip', () => {
-    for (const countryId of ALL_TEN_COUNTRIES) {
+    for (const countryId of ALL_COUNTRIES) {
       const country = findCountry(countryId)!;
       const profile = createNewPlayer(country, 'اختبار الحوار', new Date('2026-03-01T00:00:00.000Z'));
       profile.onboarding.introCompleted = true;

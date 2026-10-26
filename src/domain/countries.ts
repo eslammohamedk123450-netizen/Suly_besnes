@@ -9,7 +9,11 @@ export type CountryId =
   | 'uk'
   | 'germany'
   | 'japan'
-  | 'jordan';
+  | 'jordan'
+  | 'palestine'
+  | 'china'
+  | 'spain'
+  | 'russia';
 
 export type IndustryId =
   | 'petroleum'
@@ -77,7 +81,7 @@ export const COUNTRIES: readonly CountryDefinition[] = [
       'لكنني مؤمنة بك! تسللت إليك سراً وأعطيتك خمسة وعشرين ألف دولار (25,000$) كانت مدخراتي الخاصة… اذهب إلى العاشر من رمضان وموانئ السويس وبورسعيد وابنِ إمبراطورية تهز الأسواق!',
       'لا ترجع إلينا إلا وأنت الأسطورة المالية التي يركع لها المنافسون وتثبت لوالدك أنك السند الحقيقي والقائد الأعظم.',
     ],
-    currency: { code: 'USD', symbol: '$', name: 'الدولار الأمريكي' },
+    currency: { code: 'EGP', symbol: 'ج.م', name: 'الجنيه المصري' },
     startingBalance: 25_000,
     startingBalanceEgpEquivalent: 25_000,
     economy: {
@@ -102,7 +106,7 @@ export const COUNTRIES: readonly CountryDefinition[] = [
       'لكن قلبي معك! هربت لك سراً 25,000 دولار كاش… انطلق نحو مدن الرياض الصناعية وموانئ جدة والجبيل!',
       'اقتحم مشاريع الرؤية والتعدين والعقارات المليارية وأثبت لوالدك وعائلتك أنك أقوى تجار المملكة القادمون!',
     ],
-    currency: { code: 'USD', symbol: '$', name: 'الدولار الأمريكي' },
+    currency: { code: 'SAR', symbol: 'ر.س', name: 'الريال السعودي' },
     startingBalance: 25_000,
     startingBalanceEgpEquivalent: 25_000,
     economy: {
@@ -127,7 +131,7 @@ export const COUNTRIES: readonly CountryDefinition[] = [
       'لكنني أعلم أنك العقل المالي الحقيقي! حولت لك سراً 25,000 دولار أمريكي… اتجه فوراً إلى منطقة جبل علي الحرة JAFZA وموانئ أبوظبي!',
       'ابنِ مجمعاتك اللوجستية وتداول في بورصة دبي العالمية حتى تستعيد مكانتك وتجبر الجميع على احترامك.',
     ],
-    currency: { code: 'USD', symbol: '$', name: 'الدولار الأمريكي' },
+    currency: { code: 'AED', symbol: 'د.إ', name: 'الدرهم الإماراتي' },
     startingBalance: 25_000,
     startingBalanceEgpEquivalent: 25_000,
     economy: {
@@ -177,7 +181,7 @@ export const COUNTRIES: readonly CountryDefinition[] = [
       'لكن أُمك لن تتركك! حولت لك 25,000 دولار أمريكي كاش… ابدأ فوراً في الاستثمار!',
       'اقتحم مجمعات الشويخ ومشاريع النفط بالأحمدي والبورصة لتصبح الرقم الأهم والملياردير الأول في السوق.',
     ],
-    currency: { code: 'USD', symbol: '$', name: 'الدولار الأمريكي' },
+    currency: { code: 'KWD', symbol: 'د.ك', name: 'الدينار الكويتي' },
     startingBalance: 25_000,
     startingBalanceEgpEquivalent: 25_000,
     economy: {
@@ -202,7 +206,7 @@ export const COUNTRIES: readonly CountryDefinition[] = [
       'سلّمتك سراً 25,000 دولار أمريكي… انطلق في أسواق الدوحة واللؤلؤة ورأس لفان وميناء حمد!',
       'شيد المصانع والعقارات وأعد صياغة تاريخ العائلة بأسلوبك الاستثماري الفذ والسيطرة الشاملة.',
     ],
-    currency: { code: 'USD', symbol: '$', name: 'الدولار الأمريكي' },
+    currency: { code: 'QAR', symbol: 'ر.ق', name: 'الريال القطري' },
     startingBalance: 25_000,
     startingBalanceEgpEquivalent: 25_000,
     economy: {
@@ -227,7 +231,7 @@ export const COUNTRIES: readonly CountryDefinition[] = [
       'لكنني معك! حولت لك 25,000 دولار أمريكي… اتجه فوراً لـ City of London ومجمعات مانشستر وليفربول!',
       'استثمر في التجارة البحرية والأسهم والشركات لتجبرهم على احترام إمبراطوريتك وإعادة اعتبارك أمام الجميع.',
     ],
-    currency: { code: 'USD', symbol: '$', name: 'الدولار الأمريكي' },
+    currency: { code: 'GBP', symbol: '£', name: 'الجنيه الإسترليني' },
     startingBalance: 25_000,
     startingBalanceEgpEquivalent: 25_000,
     economy: {
@@ -252,7 +256,7 @@ export const COUNTRIES: readonly CountryDefinition[] = [
       'سلّمتك سراً 25,000 دولار أمريكي… انطلق إلى قلاع حزام الرور الصناعي وميناء هامبورغ وميونيخ!',
       'أطلق خطوط الإنتاج والحلول الذكية لتبرهن للجميع أنك العقل المدبر الحقيقي والمستثمر الأقوى في أوروبا.',
     ],
-    currency: { code: 'USD', symbol: '$', name: 'الدولار الأمريكي' },
+    currency: { code: 'EUR', symbol: '€', name: 'اليورو' },
     startingBalance: 25_000,
     startingBalanceEgpEquivalent: 25_000,
     economy: {
@@ -277,7 +281,7 @@ export const COUNTRIES: readonly CountryDefinition[] = [
       'هربت لك سراً 25,000 دولار أمريكي… ابدأ في مجمعات خليج طوكيو وموانئ يوكوهاما الصناعية!',
       'ابنِ إمبراطورية يابانية تكنولوجية لا تُقهر لتثبت للعائلة أن المستقبل بيدك وأنك الأسطورة التي لا تتكرر.',
     ],
-    currency: { code: 'USD', symbol: '$', name: 'الدولار الأمريكي' },
+    currency: { code: 'JPY', symbol: '¥', name: 'الين الياباني' },
     startingBalance: 25_000,
     startingBalanceEgpEquivalent: 25_000,
     economy: {
@@ -302,7 +306,7 @@ export const COUNTRIES: readonly CountryDefinition[] = [
       'لكنني واثقة من ذكائك المالي! سلّمتك سراً 25,000 دولار أمريكي… انطلق فوراً نحو مدينة سحاب الصناعية وميناء العقبة الاقتصادي الخاص!',
       'استثمر في الصناعات الدوائية، وتعدين البوتاس والفوسفات، وسلاسل الإمداد اللوجستية حتى تبني صرحاً استثمارياً يفرض احترامك ويعيدك إلى القمة.',
     ],
-    currency: { code: 'USD', symbol: '$', name: 'الدولار الأمريكي' },
+    currency: { code: 'JOD', symbol: 'د.أ', name: 'الدينار الأردني' },
     startingBalance: 25_000,
     startingBalanceEgpEquivalent: 25_000,
     economy: {
@@ -314,8 +318,55 @@ export const COUNTRIES: readonly CountryDefinition[] = [
       operatingCostMultiplier: 1.02,
     },
   },
+  // 11. Free Palestine
+  {
+    id: 'palestine',
+    name: 'فلسطين حرة',
+    flag: '🇵🇸',
+    storyTitle: 'نهضة الأعمال الفلسطينية بين القدس ورام الله وغزة',
+    storySummary: 'تبدأ رحلتك ببناء مشروع محلي في فلسطين، وتوسيع أعمالك عبر المدن والمناطق الصناعية والزراعية.',
+    storyFull: [
+      'تبدأ من فلسطين بإرادة بناء مشروع منتج يخدم المجتمع المحلي ويخلق فرصاً جديدة.',
+      'اختر مسارك بين الصناعات الغذائية والزراعة والخدمات، وطوّر أعمالك بما يلائم موارد السوق المحلي.',
+      'وسّع إمبراطوريتك خطوة بخطوة عبر القدس ورام الله ونابلس وغزة، ووازن بين النمو والسيولة.',
+    ],
+    currency: { code: 'ILS', symbol: '₪', name: 'الشيكل الإسرائيلي الجديد' },
+    startingBalance: 25_000,
+    startingBalanceEgpEquivalent: 25_000,
+    economy: {
+      exchangeRateToEgp: 1.0,
+      companySetupFee: 1_900,
+      licenseFeesByIndustry: buildIndustryFees(),
+      taxRate: 0.16,
+      customsRate: 0.035,
+      operatingCostMultiplier: 1.05,
+    },
+  },
+  {
+    id: 'china', name: 'جمهورية الصين الشعبية', flag: '🇨🇳', storyTitle: 'بناء الأعمال في جمهورية الصين الشعبية',
+    storySummary: 'ابدأ مشروعك في مراكز الصناعة والتجارة المحلية وطوّر أعمالك تدريجياً.',
+    storyFull: ['ابدأ مشروعك بخطوة عملية في السوق المحلي.', 'استثمر في الإنتاج والتجارة والخدمات.', 'وسّع أعمالك عبر المدن والمراكز الصناعية.'],
+    currency: { code: 'CNY', symbol: '¥', name: 'اليوان الصيني' },
+    startingBalance: 25_000, startingBalanceEgpEquivalent: 25_000,
+    economy: { exchangeRateToEgp: 1.0, companySetupFee: 2_200, licenseFeesByIndustry: buildIndustryFees(), taxRate: 0.18, customsRate: 0.03, operatingCostMultiplier: 1.08 },
+  },
+  {
+    id: 'spain', name: 'مملكة إسبانيا', flag: '🇪🇸', storyTitle: 'بناء الأعمال في مملكة إسبانيا',
+    storySummary: 'ابدأ مشروعك في مراكز الصناعة والتجارة المحلية وطوّر أعمالك تدريجياً.',
+    storyFull: ['ابدأ مشروعك بخطوة عملية في السوق المحلي.', 'استثمر في الإنتاج والتجارة والخدمات.', 'وسّع أعمالك عبر المدن والمراكز الصناعية.'],
+    currency: { code: 'EUR', symbol: '€', name: 'اليورو' },
+    startingBalance: 25_000, startingBalanceEgpEquivalent: 25_000,
+    economy: { exchangeRateToEgp: 1.0, companySetupFee: 2_200, licenseFeesByIndustry: buildIndustryFees(), taxRate: 0.18, customsRate: 0.03, operatingCostMultiplier: 1.08 },
+  },
+  {
+    id: 'russia', name: 'الاتحاد الروسي', flag: '🇷🇺', storyTitle: 'بناء الأعمال في الاتحاد الروسي',
+    storySummary: 'ابدأ مشروعك في مراكز الصناعة والتجارة المحلية وطوّر أعمالك تدريجياً.',
+    storyFull: ['ابدأ مشروعك بخطوة عملية في السوق المحلي.', 'استثمر في الإنتاج والتجارة والخدمات.', 'وسّع أعمالك عبر المدن والمراكز الصناعية.'],
+    currency: { code: 'RUB', symbol: '₽', name: 'الروبل الروسي' },
+    startingBalance: 25_000, startingBalanceEgpEquivalent: 25_000,
+    economy: { exchangeRateToEgp: 1.0, companySetupFee: 2_200, licenseFeesByIndustry: buildIndustryFees(), taxRate: 0.18, customsRate: 0.03, operatingCostMultiplier: 1.08 },
+  },
 ];
-
 export function findCountry(countryId: CountryId): CountryDefinition | undefined {
   return COUNTRIES.find((country) => country.id === countryId);
 }

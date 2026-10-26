@@ -177,6 +177,10 @@ export function createNewPlayer(
     germany: 'أرض حزام الرور الصناعي · دوسلدورف (ميراث مهدد)',
     japan: 'أرض مجمع يوكوهاما البحري الصناعي · خليج طوكيو (ميراث مهدد)',
     jordan: 'أرض مدينة سحاب الصناعية · عمان (ميراث مهدد)',
+    palestine: 'أرض منطقة بيت لحم الصناعية · فلسطين',
+    china: 'أرض منطقة بودونغ الصناعية · شنغهاي',
+    spain: 'أرض زونا فرانكا الصناعية · برشلونة',
+    russia: 'أرض المنطقة الصناعية · موسكو',
   };
 
   const countryCompanyNames: Record<string, string> = {
@@ -190,6 +194,7 @@ export function createNewPlayer(
     germany: 'مصنع بافاريا للصناعات الغذائية · الرور',
     japan: 'مصنع طوكيو للمنتجات الغذائية · يوكوهاما',
     jordan: 'مصنع عمّان للأغذية والتموين · سحاب',
+    palestine: 'مصنع فلسطين للأغذية والتموين · بيت لحم',
   };
 
   const countryBankNames: Record<string, string> = {
@@ -203,6 +208,7 @@ export function createNewPlayer(
     germany: 'دويتشه بنك',
     japan: 'ميتسوبيشي يو إف جيه',
     jordan: 'البنك العربي',
+    palestine: 'بنك فلسطين',
   };
 
   const landLabel = countryLandNames[country.id] || `أرض المنطقة الصناعية - ${country.name}`;

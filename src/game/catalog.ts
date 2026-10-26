@@ -375,6 +375,90 @@ export const COUNTRY_REAL_ASSETS: Record<CountryId, {
       { id: 'auction-jordan-phosphate-bulk', lotType: 'raw-material', label: 'شحنة خامات تعدين وبوتاس من مناجم الشيدية', landType: 'industrial', areaSquareMeters: 0, minimumBid: 600, bidIncrement: 80, closesAt: '2099-12-31T00:00:00.000Z', status: 'open', materialId: 'chemicals', quantity: 15 },
     ],
   },
+  palestine: {
+    starterLand: 'منطقة بيت لحم الصناعية · بيت لحم',
+    directLands: [
+      { id: 'direct-land-palestine-bethlehem', label: 'قطعة صناعية في منطقة بيت لحم الصناعية', landType: 'industrial', areaSquareMeters: 520, price: 3_600 },
+      { id: 'direct-land-palestine-gaza', label: 'موقع تجاري في مدينة غزة', landType: 'commercial', areaSquareMeters: 420, price: 5_700 },
+      { id: 'direct-land-palestine-jericho', label: 'أرض زراعية في أريحا والأغوار', landType: 'agricultural', areaSquareMeters: 900, price: 4_800 },
+      { id: 'direct-land-palestine-jenin', label: 'قطعة إنتاجية في منطقة جنين الصناعية', landType: 'industrial', areaSquareMeters: 520, price: 7_200 },
+    ],
+    directCompanies: [
+      { id: 'direct-company-palestine-food', name: 'شركة سنابل فلسطين للصناعات الغذائية', industryId: 'food', landType: 'agricultural', areaSquareMeters: 650, price: 8_600 },
+      { id: 'direct-company-palestine-logistics', name: 'شركة دروب فلسطين للخدمات اللوجستية', industryId: 'transport', landType: 'commercial', areaSquareMeters: 500, price: 10_400 },
+      { id: 'direct-company-palestine-energy', name: 'شركة شمس فلسطين للطاقة', industryId: 'electricity', landType: 'industrial', areaSquareMeters: 600, price: 13_600 },
+    ],
+    auctions: [
+      { id: 'auction-palestine-bethlehem', lotType: 'land', label: 'قطعة توسعة في منطقة بيت لحم الصناعية', landType: 'industrial', areaSquareMeters: 400, minimumBid: 3_200, bidIncrement: 200, closesAt: '2099-12-31T00:00:00.000Z', status: 'open' },
+      { id: 'auction-palestine-jericho', lotType: 'land', label: 'أرض زراعية في أريحا والأغوار', landType: 'agricultural', areaSquareMeters: 650, minimumBid: 2_700, bidIncrement: 200, closesAt: '2099-12-31T00:00:00.000Z', status: 'open' },
+      { id: 'auction-palestine-ramallah', lotType: 'land', label: 'موقع تجاري في مركز رام الله', landType: 'commercial', areaSquareMeters: 300, minimumBid: 4_200, bidIncrement: 300, closesAt: '2099-12-31T00:00:00.000Z', status: 'open' },
+      { id: 'auction-palestine-jenin', lotType: 'factory', label: 'خط إنتاج إضافي في منطقة جنين الصناعية', landType: 'industrial', areaSquareMeters: 0, minimumBid: 4_800, bidIncrement: 400, closesAt: '2099-12-31T00:00:00.000Z', status: 'open', energyCapacityBonus: 40 },
+      { id: 'auction-palestine-grain', lotType: 'raw-material', label: 'شحنة حبوب محلية من الأغوار', landType: 'agricultural', areaSquareMeters: 0, minimumBid: 600, bidIncrement: 80, closesAt: '2099-12-31T00:00:00.000Z', status: 'open', materialId: 'grain', quantity: 15 },
+    ],
+  },
+  china: {
+    starterLand: 'منطقة شنغهاي الصناعية · شنغهاي',
+    directLands: [
+      { id: 'direct-land-china-bethlehem', label: 'قطعة صناعية في منطقة شنغهاي الصناعية', landType: 'industrial', areaSquareMeters: 520, price: 3_600 },
+      { id: 'direct-land-china-gaza', label: 'موقع تجاري في مدينة شنتشن', landType: 'commercial', areaSquareMeters: 420, price: 5_700 },
+      { id: 'direct-land-china-jericho', label: 'أرض زراعية في سيتشوان', landType: 'agricultural', areaSquareMeters: 900, price: 4_800 },
+      { id: 'direct-land-china-jenin', label: 'قطعة إنتاجية في منطقة سوتشو الصناعية', landType: 'industrial', areaSquareMeters: 520, price: 7_200 },
+    ],
+    directCompanies: [
+      { id: 'direct-company-china-food', name: 'شركة سنابل الصين للصناعات الغذائية', industryId: 'food', landType: 'agricultural', areaSquareMeters: 650, price: 8_600 },
+      { id: 'direct-company-china-logistics', name: 'شركة دروب الصين للخدمات اللوجستية', industryId: 'transport', landType: 'commercial', areaSquareMeters: 500, price: 10_400 },
+      { id: 'direct-company-china-energy', name: 'شركة شمس الصين للطاقة', industryId: 'electricity', landType: 'industrial', areaSquareMeters: 600, price: 13_600 },
+    ],
+    auctions: [
+      { id: 'auction-china-bethlehem', lotType: 'land', label: 'قطعة توسعة في منطقة شنغهاي الصناعية', landType: 'industrial', areaSquareMeters: 400, minimumBid: 3_200, bidIncrement: 200, closesAt: '2099-12-31T00:00:00.000Z', status: 'open' },
+      { id: 'auction-china-jericho', lotType: 'land', label: 'أرض زراعية في سيتشوان', landType: 'agricultural', areaSquareMeters: 650, minimumBid: 2_700, bidIncrement: 200, closesAt: '2099-12-31T00:00:00.000Z', status: 'open' },
+      { id: 'auction-china-ramallah', lotType: 'land', label: 'موقع تجاري في مركز بكين', landType: 'commercial', areaSquareMeters: 300, minimumBid: 4_200, bidIncrement: 300, closesAt: '2099-12-31T00:00:00.000Z', status: 'open' },
+      { id: 'auction-china-jenin', lotType: 'factory', label: 'خط إنتاج إضافي في منطقة سوتشو الصناعية', landType: 'industrial', areaSquareMeters: 0, minimumBid: 4_800, bidIncrement: 400, closesAt: '2099-12-31T00:00:00.000Z', status: 'open', energyCapacityBonus: 40 },
+      { id: 'auction-china-grain', lotType: 'raw-material', label: 'شحنة حبوب محلية من الأغوار', landType: 'agricultural', areaSquareMeters: 0, minimumBid: 600, bidIncrement: 80, closesAt: '2099-12-31T00:00:00.000Z', status: 'open', materialId: 'grain', quantity: 15 },
+    ],
+  },
+  spain: {
+    starterLand: 'منطقة برشلونة الصناعية · برشلونة',
+    directLands: [
+      { id: 'direct-land-spain-bethlehem', label: 'قطعة صناعية في منطقة برشلونة الصناعية', landType: 'industrial', areaSquareMeters: 520, price: 3_600 },
+      { id: 'direct-land-spain-gaza', label: 'موقع تجاري في مدينة فالنسيا', landType: 'commercial', areaSquareMeters: 420, price: 5_700 },
+      { id: 'direct-land-spain-jericho', label: 'أرض زراعية في الأندلس', landType: 'agricultural', areaSquareMeters: 900, price: 4_800 },
+      { id: 'direct-land-spain-jenin', label: 'قطعة إنتاجية في منطقة مدريد الصناعية', landType: 'industrial', areaSquareMeters: 520, price: 7_200 },
+    ],
+    directCompanies: [
+      { id: 'direct-company-spain-food', name: 'شركة سنابل إسبانيا للصناعات الغذائية', industryId: 'food', landType: 'agricultural', areaSquareMeters: 650, price: 8_600 },
+      { id: 'direct-company-spain-logistics', name: 'شركة دروب إسبانيا للخدمات اللوجستية', industryId: 'transport', landType: 'commercial', areaSquareMeters: 500, price: 10_400 },
+      { id: 'direct-company-spain-energy', name: 'شركة شمس إسبانيا للطاقة', industryId: 'electricity', landType: 'industrial', areaSquareMeters: 600, price: 13_600 },
+    ],
+    auctions: [
+      { id: 'auction-spain-bethlehem', lotType: 'land', label: 'قطعة توسعة في منطقة برشلونة الصناعية', landType: 'industrial', areaSquareMeters: 400, minimumBid: 3_200, bidIncrement: 200, closesAt: '2099-12-31T00:00:00.000Z', status: 'open' },
+      { id: 'auction-spain-jericho', lotType: 'land', label: 'أرض زراعية في الأندلس', landType: 'agricultural', areaSquareMeters: 650, minimumBid: 2_700, bidIncrement: 200, closesAt: '2099-12-31T00:00:00.000Z', status: 'open' },
+      { id: 'auction-spain-ramallah', lotType: 'land', label: 'موقع تجاري في مركز إشبيلية', landType: 'commercial', areaSquareMeters: 300, minimumBid: 4_200, bidIncrement: 300, closesAt: '2099-12-31T00:00:00.000Z', status: 'open' },
+      { id: 'auction-spain-jenin', lotType: 'factory', label: 'خط إنتاج إضافي في منطقة مدريد الصناعية', landType: 'industrial', areaSquareMeters: 0, minimumBid: 4_800, bidIncrement: 400, closesAt: '2099-12-31T00:00:00.000Z', status: 'open', energyCapacityBonus: 40 },
+      { id: 'auction-spain-grain', lotType: 'raw-material', label: 'شحنة حبوب محلية من الأغوار', landType: 'agricultural', areaSquareMeters: 0, minimumBid: 600, bidIncrement: 80, closesAt: '2099-12-31T00:00:00.000Z', status: 'open', materialId: 'grain', quantity: 15 },
+    ],
+  },
+  russia: {
+    starterLand: 'منطقة موسكو الصناعية · موسكو',
+    directLands: [
+      { id: 'direct-land-russia-bethlehem', label: 'قطعة صناعية في منطقة موسكو الصناعية', landType: 'industrial', areaSquareMeters: 520, price: 3_600 },
+      { id: 'direct-land-russia-gaza', label: 'موقع تجاري في مدينة سانت بطرسبرغ', landType: 'commercial', areaSquareMeters: 420, price: 5_700 },
+      { id: 'direct-land-russia-jericho', label: 'أرض زراعية في كراسنودار', landType: 'agricultural', areaSquareMeters: 900, price: 4_800 },
+      { id: 'direct-land-russia-jenin', label: 'قطعة إنتاجية في منطقة الأورال الصناعية', landType: 'industrial', areaSquareMeters: 520, price: 7_200 },
+    ],
+    directCompanies: [
+      { id: 'direct-company-russia-food', name: 'شركة سنابل روسيا للصناعات الغذائية', industryId: 'food', landType: 'agricultural', areaSquareMeters: 650, price: 8_600 },
+      { id: 'direct-company-russia-logistics', name: 'شركة دروب روسيا للخدمات اللوجستية', industryId: 'transport', landType: 'commercial', areaSquareMeters: 500, price: 10_400 },
+      { id: 'direct-company-russia-energy', name: 'شركة شمس روسيا للطاقة', industryId: 'electricity', landType: 'industrial', areaSquareMeters: 600, price: 13_600 },
+    ],
+    auctions: [
+      { id: 'auction-russia-bethlehem', lotType: 'land', label: 'قطعة توسعة في منطقة موسكو الصناعية', landType: 'industrial', areaSquareMeters: 400, minimumBid: 3_200, bidIncrement: 200, closesAt: '2099-12-31T00:00:00.000Z', status: 'open' },
+      { id: 'auction-russia-jericho', lotType: 'land', label: 'أرض زراعية في كراسنودار', landType: 'agricultural', areaSquareMeters: 650, minimumBid: 2_700, bidIncrement: 200, closesAt: '2099-12-31T00:00:00.000Z', status: 'open' },
+      { id: 'auction-russia-ramallah', lotType: 'land', label: 'موقع تجاري في مركز قازان', landType: 'commercial', areaSquareMeters: 300, minimumBid: 4_200, bidIncrement: 300, closesAt: '2099-12-31T00:00:00.000Z', status: 'open' },
+      { id: 'auction-russia-jenin', lotType: 'factory', label: 'خط إنتاج إضافي في منطقة الأورال الصناعية', landType: 'industrial', areaSquareMeters: 0, minimumBid: 4_800, bidIncrement: 400, closesAt: '2099-12-31T00:00:00.000Z', status: 'open', energyCapacityBonus: 40 },
+      { id: 'auction-russia-grain', lotType: 'raw-material', label: 'شحنة حبوب محلية من الأغوار', landType: 'agricultural', areaSquareMeters: 0, minimumBid: 600, bidIncrement: 80, closesAt: '2099-12-31T00:00:00.000Z', status: 'open', materialId: 'grain', quantity: 15 },
+    ],
+  },
 };
 
 export function getDirectLandsForCountry(countryId?: CountryId): readonly DirectLandListing[] {

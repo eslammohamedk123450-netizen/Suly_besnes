@@ -37,7 +37,7 @@ export interface LandAuditVerificationResult {
 }
 
 /**
- * Builds the canonical land audit catalog across all 10 supported nations.
+ * Builds the canonical land audit catalog across all 11 supported countries.
  */
 export function buildCountryAuditCatalog(): Record<CountryId, CountryAuditRecord> {
   const result: Partial<Record<CountryId, CountryAuditRecord>> = {};
@@ -90,8 +90,8 @@ export function verifyCountryAndLandIntegrity(): LandAuditVerificationResult {
   const issues: string[] = [];
   let totalParcels = 0;
 
-  if (countryIds.length !== 10) {
-    issues.push(`Expected exactly 10 countries, but found ${countryIds.length}`);
+  if (countryIds.length !== 14) {
+    issues.push(`Expected exactly 14 countries, but found ${countryIds.length}`);
   }
 
   const seenCountryIds = new Set<string>();
