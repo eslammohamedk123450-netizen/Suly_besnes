@@ -19,7 +19,7 @@ jobs:
       - run: npx cap add android
       - run: npx cap copy android
       - run: mkdir -p android/capacitor-cordova-android-plugins
-      - run: echo "" > android/capacitor-cordova-android-plugins/cordova.variables.gradle
+      - run: echo "ext { cdvPluginPostBuildExtras = [] }" > android/capacitor-cordova-android-plugins/cordova.variables.gradle
       - run: cd android && chmod +x gradlew && ./gradlew assembleDebug
       - uses: actions/upload-artifact@v4
         with:
