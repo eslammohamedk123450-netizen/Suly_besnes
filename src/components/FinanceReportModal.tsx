@@ -45,7 +45,8 @@ export const FinanceReportModal: React.FC<FinanceReportModalProps> = ({
   if (!isOpen) return null;
 
   const empireValuation = calculateEmpireValuation(profile);
-  const totalAssets = empireValuation.totalEmpireValuation;
+  const totalAssets = empireValuation.grossAssets;
+  const netWorth = empireValuation.netWorth;
   const liquidCash = empireValuation.liquidCash;
   const goldValue = empireValuation.goldValue;
   const landsValue = empireValuation.landsTotalValue;
@@ -89,7 +90,7 @@ export const FinanceReportModal: React.FC<FinanceReportModalProps> = ({
       } else {
         otherRevenue += entry.amount;
       }
-    } else if (entry.category === 'expense' || entry.category === 'liability') {
+    } else if (entry.category === 'expense') {
       if (note.includes('راتب') || note.includes('عقد')) {
         salaryExpenses += entry.amount;
       } else if (note.includes('خامات') || note.includes('مواد') || note.includes('شراء')) {
@@ -102,32 +103,22 @@ export const FinanceReportModal: React.FC<FinanceReportModalProps> = ({
     }
   });
 
-  // Fallback defaults if new profile
-  const displayFactoryRev = factoryRevenue > 0 ? factoryRevenue : Math.round(totalRevenue * 0.55);
-  const displayContractRev = contractRevenue > 0 ? contractRevenue : Math.round(totalRevenue * 0.25);
-  const displayInvRev = investmentRevenue > 0 ? investmentRevenue : Math.round(totalRevenue * 0.15);
-  const displayOtherRev = otherRevenue > 0 ? otherRevenue : Math.round(totalRevenue * 0.05);
+  // Strictly use real transaction streams - no fake synthetic percentages
+  const displayFactoryRev = factoryRevenue;
+  const displayContractRev = contractRevenue;
+  const displayInvRev = investmentRevenue;
+  const displayOtherRev = otherRevenue;
 
-  const displaySalaryExp = salaryExpenses > 0 ? salaryExpenses : Math.round(totalExpenses * 0.35);
-  const displayMatExp = materialsExpenses > 0 ? materialsExpenses : Math.round(totalExpenses * 0.30);
-  const displayOpExp = operatingExpenses > 0 ? operatingExpenses : Math.round(totalExpenses * 0.20);
-  const displayTaxExp = taxesAndInterest > 0 ? taxesAndInterest : Math.round(totalExpenses * 0.15);
+  const displaySalaryExp = salaryExpenses;
+  const displayMatExp = materialsExpenses;
+  const displayOpExp = operatingExpenses;
+  const displayTaxExp = taxesAndInterest;
 
   const totalRevStreams = displayFactoryRev + displayContractRev + displayInvRev + displayOtherRev;
   const totalExpStreams = displaySalaryExp + displayMatExp + displayOpExp + displayTaxExp;
 
-  // Recent transactions
-  const recentTransactions = ledgerEntries.length > 0
-    ? [...ledgerEntries].reverse().slice(0, 10)
-    : [
-        {
-          id: '1',
-          category: 'revenue' as const,
-          amount: profile.bankBalance || 50000,
-          occurredAt: new Date().toISOString(),
-          note: 'رصيد البدء والاستثمار التأسيسي',
-        },
-      ];
+  // Recent transactions from real ledger
+  const recentTransactions = [...ledgerEntries].reverse().slice(0, 10);
 
   // Liquidity health rating
   const urgentObligations = profile.payables + profile.staff.filter((s) => s.status === 'active').reduce((sum, s) => sum + (s.unpaidSalary ?? 0), 0);
@@ -227,9 +218,9 @@ export const FinanceReportModal: React.FC<FinanceReportModalProps> = ({
                     صافي الثروة الكلية
                   </span>
                   <strong className="text-base font-black text-amber-400 mt-1">
-                    {formatMoney(totalAssets, country)}
+                    {formatMoney(netWorth, country)}
                   </strong>
-                  <small className="text-[10px] text-slate-500">تقييم كامل الأصول</small>
+                  <small className="text-[10px] text-slate-500">الأصول مطروحاً منها الالتزامات</small>
                 </div>
 
                 <div className="p-3.5 rounded-2xl bg-slate-950/70 border border-emerald-500/30 flex flex-col justify-between">

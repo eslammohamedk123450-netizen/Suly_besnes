@@ -28,9 +28,10 @@ interface StrategicPillarsModalProps {
   country: CountryDefinition;
   isOpen: boolean;
   onClose: () => void;
-  onNavigate: (section: SectionId) => void;
+  onNavigate: (section: SectionId, target?: string) => void;
   onOpenMorningReport?: () => void;
   onOpenCentralBank?: () => void;
+  onAcceptBotOffer?: (offerId: string) => void;
 }
 
 export function StrategicPillarsModal({
@@ -41,6 +42,7 @@ export function StrategicPillarsModal({
   onNavigate,
   onOpenMorningReport,
   onOpenCentralBank,
+  onAcceptBotOffer,
 }: StrategicPillarsModalProps) {
   const [activePillarTab, setActivePillarTab] = useState<'overview' | 'financial' | 'industrial' | 'expansion' | 'governance'>('overview');
 

@@ -129,6 +129,9 @@ export interface PlayerProfile {
   soldAssetIds?: string[];
   processedAuctionSaleIds?: string[];
   processedBotOfferIds?: string[];
+  completedMissionIds?: string[];
+  claimedRewardIds?: string[];
+  dismissedStoryEventIds?: string[];
   automationDirectives?: AutomationDirectives;
 }
 
@@ -171,6 +174,7 @@ export function createNewPlayer(
     uk: 'أرض مجمع ترافورد بارك الصناعي · مانشستر (ميراث مهدد)',
     germany: 'أرض حزام الرور الصناعي · دوسلدورف (ميراث مهدد)',
     japan: 'أرض مجمع يوكوهاما البحري الصناعي · خليج طوكيو (ميراث مهدد)',
+    jordan: 'أرض مدينة سحاب الصناعية · عمان (ميراث مهدد)',
   };
 
   const countryCompanyNames: Record<string, string> = {
@@ -183,6 +187,7 @@ export function createNewPlayer(
     uk: 'مصنع التايمز للصناعات الغذائية · مانشستر',
     germany: 'مصنع بافاريا للصناعات الغذائية · الرور',
     japan: 'مصنع طوكيو للمنتجات الغذائية · يوكوهاما',
+    jordan: 'مصنع عمّان للأغذية والتموين · سحاب',
   };
 
   const countryBankNames: Record<string, string> = {
@@ -195,6 +200,7 @@ export function createNewPlayer(
     uk: 'بنك باركليز',
     germany: 'دويتشه بنك',
     japan: 'ميتسوبيشي يو إف جيه',
+    jordan: 'البنك العربي',
   };
 
   const landLabel = countryLandNames[country.id] || `أرض المنطقة الصناعية - ${country.name}`;
@@ -332,16 +338,69 @@ export function createNewPlayer(
     bio: 'ابنِ إمبراطوريتك الاستثمارية بعزيمة لا تلين ورؤية لا تعرف المستحيل.',
     renameCountThisWeek: 0,
     lastRenameWeekTimestamp: now.getTime(),
+    completedMissionIds: [],
+    claimedRewardIds: [],
+    dismissedStoryEventIds: [],
     automationDirectives: getDefaultAutomationDirectives(),
   };
 }
 
 export function calculateTotalAssets(profile: PlayerProfile): number {
-  const movableAssets = profile.assets.reduce((sum, asset) => sum + asset.value, 0);
-  const landAssets = profile.lands.reduce((sum, land) => sum + land.purchasePrice, 0);
-  const inventoryAssets = (profile.inventory ?? []).reduce((sum, lot) => sum + lot.quantity * lot.unitCost, 0);
+  const liquidCash = profile.bankBalance || 0;
+  const movableAssets = (profile.assets ?? []).reduce((sum, asset) => sum + (asset.value || 0), 0);
+
+  const companyLandIds = new Set((profile.companies ?? []).map((c) => c.landId).filter(Boolean));
+  const unlinkedLands = (profile.lands ?? []).filter((l) => !companyLandIds.has(l.id));
+  const landAssets = unlinkedLands.reduce(
+    (sum, land) => sum + Math.round((land.purchasePrice || 0) * (1 + ((land.upgradeLevel ?? 1) * 0.15))),
+    0,
+  );
+
+  const companiesTotalValue = (profile.companies ?? []).reduce((sum, company) => {
+    const linkedLand = company.landId ? profile.lands.find((l) => l.id === company.landId) : undefined;
+    const landValue = linkedLand
+      ? Math.round((linkedLand.purchasePrice || 0) * (1 + ((linkedLand.upgradeLevel ?? 1) * 0.15)))
+      : 0;
+    const baseEquipment = ((company.operatingCostPerDay ?? 120) * 100) + ((company.energyCapacity ?? 80) * 450);
+    const upgradeLevel = Math.max(1, company.upgradeLevel ?? 1);
+    const upgradeInvestments = (upgradeLevel - 1) * 22_000;
+    const condition = Math.max(0, Math.min(100, company.maintenanceCondition ?? 100));
+    const conditionFactor = condition / 100;
+    const conditionDiscount = Math.round((baseEquipment + upgradeInvestments) * (1 - conditionFactor));
+    const bookValue = landValue + baseEquipment + upgradeInvestments;
+    return sum + Math.max(15_000, Math.round(bookValue - conditionDiscount));
+  }, 0);
+
+  const inventoryAssets = (profile.inventory ?? []).reduce((sum, lot) => sum + (lot.quantity || 0) * (lot.unitCost || 0), 0);
   const activeInvestments = (profile.investments ?? [])
     .filter((investment) => investment.status === 'active')
-    .reduce((sum, investment) => sum + investment.principal, 0);
-  return profile.bankBalance + movableAssets + landAssets + inventoryAssets + activeInvestments + profile.goldCostBasis;
+    .reduce((sum, investment) => sum + (investment.principal || 0), 0);
+  const activeDeposits = (profile.banking?.deposits ?? [])
+    .filter((d) => d.status === 'active')
+    .reduce((sum, d) => sum + (d.principal || 0), 0);
+  const goldValue = Math.round((profile.goldGrams || 0) * 85);
+
+  return (
+    liquidCash +
+    movableAssets +
+    landAssets +
+    companiesTotalValue +
+    inventoryAssets +
+    activeInvestments +
+    activeDeposits +
+    goldValue
+  );
+}
+
+export function calculateNetWorth(profile: PlayerProfile): number {
+  const grossAssets = calculateTotalAssets(profile);
+  const payables = profile.payables || 0;
+  const unpaidSalaries = (profile.staff ?? [])
+    .filter((s) => s.status === 'active')
+    .reduce((sum, s) => sum + (s.unpaidSalary || 0), 0);
+  const activeLoans = (profile.banking?.loans ?? [])
+    .filter((l) => l.status === 'active')
+    .reduce((sum, l) => sum + (l.remainingBalance || 0), 0);
+  const totalLiabilities = payables + unpaidSalaries + activeLoans;
+  return Math.max(0, grossAssets - totalLiabilities);
 }

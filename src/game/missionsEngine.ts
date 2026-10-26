@@ -442,23 +442,37 @@ export function getMissionStatus(profile: PlayerProfile, mission: GameMission): 
   return 'in_progress';
 }
 
+import type { GameResult } from './engine';
+
 export function claimMissionReward(
   profile: PlayerProfile,
   missionId: string,
-): { ok: boolean; profile: PlayerProfile; error?: string } {
+): GameResult<{ missionId: string; rewards: GameMission['rewards'] }> & { error?: string } {
   const mission = CENTRAL_MISSIONS_CATALOG.find((m) => m.id === missionId);
   if (!mission) {
-    return { ok: false, profile, error: 'المهمة غير موجودة' };
+    return { ok: false, profile, reason: 'not-found', message: 'المهمة غير موجودة', error: 'المهمة غير موجودة' };
   }
 
   const claimedIds = new Set(profile.claimedRewardIds ?? []);
   if (claimedIds.has(missionId)) {
-    return { ok: false, profile, error: 'تم استلام مكافأة هذه المهمة مسبقاً لمنع التكرار' };
+    return {
+      ok: false,
+      profile,
+      reason: 'already-claimed',
+      message: 'تم استلام مكافأة هذه المهمة مسبقاً لمنع التكرار',
+      error: 'تم استلام مكافأة هذه المهمة مسبقاً لمنع التكرار',
+    };
   }
 
   // Verify real success condition
   if (!mission.isCompleted(profile)) {
-    return { ok: false, profile, error: 'لم يتم استيفاء شروط المهمة الفعلية بعد' };
+    return {
+      ok: false,
+      profile,
+      reason: 'condition-not-met',
+      message: 'لم يتم استيفاء شروط المهمة الفعلية بعد',
+      error: 'لم يتم استيفاء شروط المهمة الفعلية بعد',
+    };
   }
 
   const newClaimed = [...claimedIds, missionId];
@@ -490,5 +504,10 @@ export function claimMissionReward(
     ledger: [ledgerEntry, ...(profile.ledger ?? [])],
   };
 
-  return { ok: true, profile: updatedProfile };
+  return {
+    ok: true,
+    profile: updatedProfile,
+    message: `تم إنجاز المهمة بنجاح: ${mission.title}`,
+    data: { missionId, rewards: mission.rewards },
+  };
 }

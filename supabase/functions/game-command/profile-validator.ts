@@ -34,6 +34,9 @@ const OPTIONAL_PROFILE_KEYS = new Set([
   'soldAssetIds',
   'processedAuctionSaleIds',
   'processedBotOfferIds',
+  'completedMissionIds',
+  'claimedRewardIds',
+  'dismissedStoryEventIds',
   'automationDirectives',
 ]);
 
@@ -46,6 +49,7 @@ const PROFILE_KEYS = new Set([
   'lastSpinTimestamp', 'lastSpinDay', 'avatarId', 'unlockedAvatarIds', 'bio', 'renameCountThisWeek', 'lastRenameWeekTimestamp', 'lastOfflineClaimAt',
   'globalShipments', 'forwardContracts', 'supplierTrust',
   'playerAuctions', 'soldAssetIds', 'processedAuctionSaleIds', 'processedBotOfferIds',
+  'completedMissionIds', 'claimedRewardIds', 'dismissedStoryEventIds',
   'automationDirectives',
 ]);
 
