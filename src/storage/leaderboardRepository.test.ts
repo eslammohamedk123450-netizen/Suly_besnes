@@ -44,4 +44,16 @@ describe('ranked global leaderboard', () => {
       p_limit: 10,
     });
   });
+
+  it('requests real net-worth rankings from the server RPC', async () => {
+    mockRpc.mockResolvedValue({ data: [], error: null });
+
+    await getRankedGlobalLeaderboard('season-1', 'net_worth', 10);
+
+    expect(mockRpc).toHaveBeenCalledWith('get_ranked_global_leaderboard', {
+      p_season_id: 'season-1',
+      p_category: 'net_worth',
+      p_limit: 10,
+    });
+  });
 });

@@ -18,7 +18,7 @@ export interface LeaderboardRow {
   updated_at: string;
 }
 
-export type LeaderboardCategory = 'points' | 'production' | 'contracts' | 'badges';
+export type LeaderboardCategory = 'points' | 'production' | 'contracts' | 'badges' | 'net_worth' | 'prestige' | 'sovereignty' | 'season';
 
 export interface RankedLeaderboardRow extends LeaderboardRow {
   category_value: number;

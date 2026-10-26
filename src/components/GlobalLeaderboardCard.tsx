@@ -4,10 +4,12 @@ import { getRankedGlobalLeaderboard, getVisibleSeasons, type LeaderboardCategory
 import { Icon } from './Icon';
 
 const categories: Array<{ id: LeaderboardCategory; label: string; unit: string }> = [
-  { id: 'points', label: 'النقاط', unit: 'نقطة' },
+  { id: 'net_worth', label: 'صافي الثروة', unit: 'وحدة' },
+  { id: 'prestige', label: 'الهيبة', unit: 'نقطة' },
+  { id: 'sovereignty', label: 'السيادة', unit: 'نقطة' },
+  { id: 'season', label: 'الموسم', unit: 'نقطة' },
   { id: 'production', label: 'الإنتاج', unit: 'عملية إنتاج' },
   { id: 'contracts', label: 'العقود', unit: 'عقد مكتمل' },
-  { id: 'badges', label: 'الشارات', unit: 'شارة' },
 ];
 
 const badgeLabels: Record<string, string> = { industrialist: 'الصناعي الصاعد', 'contract-master': 'سيد العقود', 'trusted-partner': 'الشريك الموثوق', 'first-contract': 'أول صفقة موثوقة' };
