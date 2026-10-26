@@ -248,6 +248,17 @@ export function Dashboard({
       hint: getSectionUnlockHint(profile, 'obligations'),
     },
     {
+      id: 'strategic_pillars',
+      title: 'المحاور الاستراتيجية',
+      category: 'core',
+      sectionId: 'home',
+      icon: <Target className="w-5 h-5 sm:w-6 sm:h-6 text-white" />,
+      gradient: 'bg-gradient-to-tr from-amber-500 via-rose-500 to-indigo-600',
+      requiredLevel: 1,
+      isUnlocked: true,
+      hint: 'أرباح الغياب · السياسة النقدية · التنافس الإقليمي · الصندوق السيادي',
+    },
+    {
       id: 'store',
       title: 'المتجر',
       category: 'core',
@@ -537,172 +548,7 @@ export function Dashboard({
         onStartGuidedWalkthrough={onStartGuidedWalkthrough}
       />
 
-      {/* 2.2. Strategic Systems Hub (Gated by Progression Rules) */}
-      <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-4 sm:p-5 shadow-2xl backdrop-blur-md space-y-3">
-        <div className="flex flex-wrap items-center justify-between gap-2 pb-2.5 border-b border-slate-800/80">
-          <div className="flex items-center gap-2">
-            <h3 className="font-extrabold text-sm sm:text-base text-white">
-              المحاور الاستراتيجية لإدارة الإمبراطورية
-            </h3>
-            <span className="text-xs text-slate-400 hidden sm:inline">
-              · أرباح الغياب · السياسة النقدية · التنافس الإقليمي · الصندوق السيادي
-            </span>
-          </div>
-          <button
-            type="button"
-            onClick={() => {
-              playSound('click');
-              if (onOpenStrategicPillars) {
-                onOpenStrategicPillars();
-              } else {
-                setIsStrategicPillarsOpen(true);
-              }
-            }}
-            className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-500 hover:to-cyan-400 text-white font-black text-xs flex items-center gap-1.5 shadow-md shadow-blue-900/30 active:scale-95 transition cursor-pointer"
-          >
-            <Target className="w-3.5 h-3.5" />
-            <span>لوحة المحاور والمنافسين 🎯</span>
-          </button>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
-          {/* Phase 1: Smart Offline Idle Report */}
-          <button
-            type="button"
-            onClick={() => onOpenMorningReport?.()}
-            className="p-3.5 rounded-2xl bg-slate-950/70 border border-amber-500/30 hover:border-amber-400/80 hover:bg-slate-950 transition text-right flex flex-col justify-between group active:scale-95 cursor-pointer"
-          >
-            <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <span className="text-xl">🌅</span>
-                <span className="text-[10px] font-bold text-amber-300">
-                  متاح دائماً
-                </span>
-              </div>
-              <h4 className="text-xs font-black text-white group-hover:text-amber-300 transition">
-                تقرير الصباح لغياب المدير
-              </h4>
-              <p className="text-[11px] text-slate-400 mt-1 line-clamp-2">
-                حساب سلع المصانع وتوزيعات الأسهم المتراكمة فعلياً أثناء غيابك عن اللعبة.
-              </p>
-            </div>
-            <div className="mt-2 pt-2 border-t border-slate-800/60 flex items-center justify-between text-[11px] font-bold text-amber-400">
-              <span>فحص حصيلة الغياب</span>
-              <ChevronLeft className="w-3.5 h-3.5 group-hover:-translate-x-1 transition" />
-            </div>
-          </button>
-
-          {/* Phase 3: Central Bank & Macroeconomic Shocks (Gated by Bank Unlock) */}
-          <button
-            type="button"
-            onClick={() => {
-              if (!bankUnlocked) {
-                openLockedGate('بيان البنك المركزي والتمويل', 'bank');
-                return;
-              }
-              onOpenCentralBank?.();
-            }}
-            className={`p-3.5 rounded-2xl bg-slate-950/70 border transition text-right flex flex-col justify-between group active:scale-95 cursor-pointer ${
-              bankUnlocked
-                ? 'border-emerald-500/30 hover:border-emerald-400/80 hover:bg-slate-950'
-                : 'border-slate-800 opacity-80 hover:border-amber-500/50'
-            }`}
-          >
-            <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <span className="text-xl">{bankUnlocked ? '🏛️' : '🔒'}</span>
-                <span className={`text-[10px] font-bold ${bankUnlocked ? 'text-emerald-300' : 'text-amber-300'}`}>
-                  {bankUnlocked ? 'نشط ومتاح ✓' : 'يفتح مع البنك (مستوى 4)'}
-                </span>
-              </div>
-              <h4 className="text-xs font-black text-white group-hover:text-emerald-300 transition">
-                بيان {scenario.economicProfile.bankName}
-              </h4>
-              <p className="text-[11px] text-slate-400 mt-1 line-clamp-2">
-                قرارات الفائدة والتضخم وتأثير السياسة النقدية على الودائع والقروض.
-              </p>
-            </div>
-            <div className="mt-2 pt-2 border-t border-slate-800/60 flex items-center justify-between text-[11px] font-bold text-emerald-400">
-              <span>{bankUnlocked ? 'نشرة الفائدة والأسعار' : 'شروط رفع التجميد البنكي'}</span>
-              <ChevronLeft className="w-3.5 h-3.5 group-hover:-translate-x-1 transition" />
-            </div>
-          </button>
-
-          {/* Phase 4: Regional Syndicate Wars (Gated by Territory Unlock) */}
-          <button
-            type="button"
-            onClick={() => {
-              if (!territoryUnlocked) {
-                openLockedGate('السيطرة الإقليمية', 'territory');
-                return;
-              }
-              handleNav('territory');
-            }}
-            className={`p-3.5 rounded-2xl bg-slate-950/70 border transition text-right flex flex-col justify-between group active:scale-95 cursor-pointer ${
-              territoryUnlocked
-                ? 'border-indigo-500/30 hover:border-indigo-400/80 hover:bg-slate-950'
-                : 'border-slate-800 opacity-80 hover:border-amber-500/50'
-            }`}
-          >
-            <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <span className="text-xl">{territoryUnlocked ? '⚔️' : '🔒'}</span>
-                <span className={`text-[10px] font-bold ${territoryUnlocked ? 'text-indigo-300' : 'text-amber-300'}`}>
-                  {territoryUnlocked ? 'نشط ومتاح ✓' : 'يفتح في مستوى 7'}
-                </span>
-              </div>
-              <h4 className="text-xs font-black text-white group-hover:text-indigo-300 transition">
-                السيطرة الإقليمية وحصص السوق
-              </h4>
-              <p className="text-[11px] text-slate-400 mt-1 line-clamp-2">
-                توسيع المراكز اللوجستية ورفع حصتك السوقية في أقاليم {country.name}.
-              </p>
-            </div>
-            <div className="mt-2 pt-2 border-t border-slate-800/60 flex items-center justify-between text-[11px] font-bold text-indigo-400">
-              <span>{territoryUnlocked ? 'خريطة الأقاليم' : 'شروط الفتح'}</span>
-              <ChevronLeft className="w-3.5 h-3.5 group-hover:-translate-x-1 transition" />
-            </div>
-          </button>
-
-          {/* Phase 5: Prestige System & International Expansion (Gated by Luxury/Prestige Unlock) */}
-          <button
-            type="button"
-            onClick={() => {
-              if (!prestigeUnlocked) {
-                openLockedGate('نظام الهيبة والتوسع الدولي', 'luxury');
-                return;
-              }
-              onOpenPrestige?.();
-            }}
-            className={`p-3.5 rounded-2xl bg-slate-950/70 border transition text-right flex flex-col justify-between group active:scale-95 cursor-pointer ${
-              prestigeUnlocked
-                ? 'border-purple-500/30 hover:border-purple-400/80 hover:bg-slate-950'
-                : 'border-slate-800 opacity-80 hover:border-amber-500/50'
-            }`}
-          >
-            <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <span className="text-xl">{prestigeUnlocked ? '👑' : '🔒'}</span>
-                <span className={`text-[10px] font-bold ${prestigeUnlocked ? 'text-purple-300' : 'text-amber-300'}`}>
-                  {prestigeUnlocked ? 'نشط ومتاح ✓' : 'يفتح في مستوى 8'}
-                </span>
-              </div>
-              <h4 className="text-xs font-black text-white group-hover:text-purple-300 transition">
-                نظام الهيبة والصندوق السيادي
-              </h4>
-              <p className="text-[11px] text-slate-400 mt-1 line-clamp-2">
-                تأسيس صندوق استثماري عابر للقارات مع امتيازات دائمة دون خلط حفظ دولتك.
-              </p>
-            </div>
-            <div className="mt-2 pt-2 border-t border-slate-800/60 flex items-center justify-between text-[11px] font-bold text-purple-400">
-              <span>{prestigeUnlocked ? 'الصندوق والامتيازات' : 'شروط الفتح'}</span>
-              <ChevronLeft className="w-3.5 h-3.5 group-hover:-translate-x-1 transition" />
-            </div>
-          </button>
-        </div>
-      </div>
-
-      {/* 3. Executive Command Operations Bar with explicit unlock levels & lock badges */}
+      {/* 2. Executive Command Operations Bar with explicit unlock levels & lock badges */}
       <div className="bg-slate-900/95 border border-slate-800 rounded-3xl p-4 sm:p-6 shadow-2xl backdrop-blur-md">
         <div className="flex flex-wrap items-center justify-between gap-3 mb-4 pb-3 border-b border-slate-800/80">
           <div className="flex items-center gap-2">

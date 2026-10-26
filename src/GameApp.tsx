@@ -411,7 +411,9 @@ export default function App() {
         if (cancelled) return;
 
         if (!current) {
-          current = createGuestAccount();
+          setAccount(null);
+          setAuthLoading(false);
+          return;
         }
         setAccount(current);
 
@@ -1683,6 +1685,36 @@ export default function App() {
           profile={profile}
           country={country}
           onNavigate={(sec) => navigate(sec)}
+          onOpenMorningReport={() => {
+            setIsStrategicPillarsOpen(false);
+            const rep = offlineReport || calculateOfflineIdleProgress(profile);
+            if (rep && (rep.elapsedSeconds >= 120 || rep.isTampered)) {
+              setOfflineReport(rep);
+              setIsMorningReportOpen(true);
+            } else {
+              showNotice(
+                'لا توجد أرباح غياب متراكمة حالياً؛ تُحتسب أرباح المصانع والأسهم تلقائياً عند إغلاق اللعبة لأكثر من دقيقتين.',
+                'info',
+                'تقرير الصباح لغياب المدير',
+              );
+            }
+          }}
+          onOpenCentralBank={() => {
+            setIsStrategicPillarsOpen(false);
+            if (!isSectionUnlocked(profile, 'bank')) {
+              showNotice(getSectionUnlockHint(profile, 'bank'), 'warning', 'البنك مقفل حالياً');
+              return;
+            }
+            setIsCentralBankModalOpen(true);
+          }}
+          onOpenPrestige={() => {
+            setIsStrategicPillarsOpen(false);
+            if (!isSectionUnlocked(profile, 'luxury')) {
+              showNotice(getSectionUnlockHint(profile, 'luxury'), 'warning', 'نظام الهيبة مقفل حالياً');
+              return;
+            }
+            setIsPrestigeModalOpen(true);
+          }}
           onAcceptBotOffer={(offerId) => {
             void handleGameCommand(
               { name: 'accept_bot_offer', args: { offerId } },

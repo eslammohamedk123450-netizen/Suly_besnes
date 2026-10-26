@@ -629,7 +629,7 @@ export function ListAssetAuctionModal({
               <button
                 type="button"
                 onClick={handleStartAuction}
-                disabled={!selectedItem || startingBid <= 0 || (valuation && (startingBid < valuation.minStartingBid || startingBid > valuation.maxStartingBid))}
+                disabled={Boolean(!selectedItem || startingBid <= 0 || (valuation && (startingBid < valuation.minStartingBid || startingBid > valuation.maxStartingBid)))}
                 className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 text-xs sm:text-sm font-black shadow-lg shadow-amber-500/20 transition disabled:opacity-50 cursor-pointer"
               >
                 طرح في المزاد العلني 🔨

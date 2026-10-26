@@ -31,6 +31,7 @@ interface StrategicPillarsModalProps {
   onNavigate: (section: SectionId, target?: string) => void;
   onOpenMorningReport?: () => void;
   onOpenCentralBank?: () => void;
+  onOpenPrestige?: () => void;
   onAcceptBotOffer?: (offerId: string) => void;
 }
 
@@ -42,6 +43,7 @@ export function StrategicPillarsModal({
   onNavigate,
   onOpenMorningReport,
   onOpenCentralBank,
+  onOpenPrestige,
   onAcceptBotOffer,
 }: StrategicPillarsModalProps) {
   const [activePillarTab, setActivePillarTab] = useState<'overview' | 'financial' | 'industrial' | 'expansion' | 'governance'>('overview');
@@ -251,6 +253,147 @@ export function StrategicPillarsModal({
             <small className="text-[10px] text-slate-400 mt-0.5">
               مستوى المستودع {warehouseLevel}
             </small>
+          </div>
+        </div>
+
+        {/* Four Core Strategic Operations Pillars */}
+        <div className="p-4 sm:p-6 pb-2 border-b border-slate-800 bg-slate-950/30">
+          <div className="flex items-center justify-between mb-2.5">
+            <h3 className="text-xs font-black text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+              <span>🎯</span>
+              <span>المحاور التشغيلية المركزية لإدارة الإمبراطورية</span>
+            </h3>
+            <span className="text-[11px] text-slate-400">تحكم فوري بكافة أذرع الإدارة</span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+            {/* Pillar 1: Smart Offline Idle Report */}
+            <button
+              type="button"
+              onClick={() => {
+                playSound('click');
+                onClose();
+                onOpenMorningReport?.();
+              }}
+              className="p-3.5 rounded-2xl bg-slate-900/90 border border-amber-500/40 hover:border-amber-400 hover:bg-slate-900 transition text-right flex flex-col justify-between group active:scale-95 cursor-pointer shadow-lg"
+            >
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-xl">🌅</span>
+                  <span className="text-[10px] font-bold text-amber-300 px-2 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/30">
+                    متاح دائماً
+                  </span>
+                </div>
+                <h4 className="text-xs font-black text-white group-hover:text-amber-300 transition">
+                  تقرير الصباح لغياب المدير
+                </h4>
+                <p className="text-[11px] text-slate-400 mt-1 line-clamp-2">
+                  حصيلة سلع المصانع وأرباح الأسهم المتراكمة أثناء غيابك عن اللعبة.
+                </p>
+              </div>
+              <div className="mt-2.5 pt-2 border-t border-slate-800 flex items-center justify-between text-[11px] font-bold text-amber-400">
+                <span>فحص حصيلة الغياب</span>
+                <ChevronLeft className="w-3.5 h-3.5 group-hover:-translate-x-1 transition" />
+              </div>
+            </button>
+
+            {/* Pillar 2: Central Bank & Monetary Policy */}
+            <button
+              type="button"
+              onClick={() => {
+                playSound('click');
+                onClose();
+                if (onOpenCentralBank) {
+                  onOpenCentralBank();
+                } else {
+                  onNavigate('bank');
+                }
+              }}
+              className="p-3.5 rounded-2xl bg-slate-900/90 border border-emerald-500/40 hover:border-emerald-400 hover:bg-slate-900 transition text-right flex flex-col justify-between group active:scale-95 cursor-pointer shadow-lg"
+            >
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-xl">🏛️</span>
+                  <span className="text-[10px] font-bold text-emerald-300 px-2 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30">
+                    البنك والتمويل
+                  </span>
+                </div>
+                <h4 className="text-xs font-black text-white group-hover:text-emerald-300 transition">
+                  بيان البنك المركزي والسياسة النقدية
+                </h4>
+                <p className="text-[11px] text-slate-400 mt-1 line-clamp-2">
+                  قرارات الفائدة والتضخم والسيولة وتأثيرها على العوائد والقروض.
+                </p>
+              </div>
+              <div className="mt-2.5 pt-2 border-t border-slate-800 flex items-center justify-between text-[11px] font-bold text-emerald-400">
+                <span>نشرة الفائدة والتمويل</span>
+                <ChevronLeft className="w-3.5 h-3.5 group-hover:-translate-x-1 transition" />
+              </div>
+            </button>
+
+            {/* Pillar 3: Regional Syndicate Wars & Territory */}
+            <button
+              type="button"
+              onClick={() => {
+                playSound('click');
+                onClose();
+                onNavigate('territory');
+              }}
+              className="p-3.5 rounded-2xl bg-slate-900/90 border border-indigo-500/40 hover:border-indigo-400 hover:bg-slate-900 transition text-right flex flex-col justify-between group active:scale-95 cursor-pointer shadow-lg"
+            >
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-xl">⚔️</span>
+                  <span className="text-[10px] font-bold text-indigo-300 px-2 py-0.5 rounded-full bg-indigo-500/15 border border-indigo-500/30">
+                    السيطرة وحصص السوق
+                  </span>
+                </div>
+                <h4 className="text-xs font-black text-white group-hover:text-indigo-300 transition">
+                  التنافس الإقليمي وحرب الكارتيل
+                </h4>
+                <p className="text-[11px] text-slate-400 mt-1 line-clamp-2">
+                  توسيع المراكز اللوجستية ومواجهة تحالفات المنافسين في الأقاليم.
+                </p>
+              </div>
+              <div className="mt-2.5 pt-2 border-t border-slate-800 flex items-center justify-between text-[11px] font-bold text-indigo-400">
+                <span>خريطة الأقاليم والنفوذ</span>
+                <ChevronLeft className="w-3.5 h-3.5 group-hover:-translate-x-1 transition" />
+              </div>
+            </button>
+
+            {/* Pillar 4: Prestige System & International Expansion */}
+            <button
+              type="button"
+              onClick={() => {
+                playSound('click');
+                onClose();
+                if (onOpenPrestige) {
+                  onOpenPrestige();
+                } else {
+                  onNavigate('luxury');
+                }
+              }}
+              className="p-3.5 rounded-2xl bg-slate-900/90 border border-purple-500/40 hover:border-purple-400 hover:bg-slate-900 transition text-right flex flex-col justify-between group active:scale-95 cursor-pointer shadow-lg"
+            >
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-xl">👑</span>
+                  <span className="text-[10px] font-bold text-purple-300 px-2 py-0.5 rounded-full bg-purple-500/15 border border-purple-500/30">
+                    الصندوق السيادي
+                  </span>
+                </div>
+                <h4 className="text-xs font-black text-white group-hover:text-purple-300 transition">
+                  نظام الهيبة والتوسع الدولي
+                </h4>
+                <p className="text-[11px] text-slate-400 mt-1 line-clamp-2">
+                  تأسيس محفظة عالمية عابرة للقارات مع امتيازات دائمة لكل دولتك.
+                </p>
+              </div>
+              <div className="mt-2.5 pt-2 border-t border-slate-800 flex items-center justify-between text-[11px] font-bold text-purple-400">
+                <span>الصندوق السيادي والامتيازات</span>
+                <ChevronLeft className="w-3.5 h-3.5 group-hover:-translate-x-1 transition" />
+              </div>
+            </button>
           </div>
         </div>
 
