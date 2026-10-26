@@ -219,9 +219,13 @@ describe('Suly Business Empire — Master System Verification (17 Suites)', () =
     const richJapan: PlayerProfile = { ...reloaded, level: 10, bankBalance: 800_000 };
     const expanded = executePrestigeExpansion(richJapan, 'london');
     expect(expanded).not.toBeNull();
-    expect(expanded!.updatedProfile.countryId).toBe('japan');
-    expect(expanded!.updatedProfile.onboarding.countryIntroSeen).toBe(true);
-    expect(expanded!.updatedProfile.onboarding.introCompleted).toBe(true);
+    if (expanded && 'updatedProfile' in expanded) {
+      expect(expanded.updatedProfile.countryId).toBe('japan');
+      expect(expanded.updatedProfile.onboarding.countryIntroSeen).toBe(true);
+      expect(expanded.updatedProfile.onboarding.introCompleted).toBe(true);
+    } else {
+      expect.fail('Expected prestige expansion to succeed');
+    }
   });
 
   it('5. gates all 22 sections via central progression engine and provides 8-part guides for every section', () => {
@@ -393,7 +397,7 @@ describe('Suly Business Empire — Master System Verification (17 Suites)', () =
         {
           id: 'ct-1',
           clientName: 'عميل',
-          clientType: 'standard',
+          clientType: 'budget',
           productId: 'food-pack',
           productName: 'عبوات غذائية',
           quantity: 5,

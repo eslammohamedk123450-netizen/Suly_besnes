@@ -32,6 +32,19 @@ import { SPEED_CARD_DIAMOND_COSTS, SPEED_CARD_LABELS, type SpeedCardKind } from 
 import { getWarehouseCapacity, getWarehouseItemCapacity, getWarehouseMaterialQuantity, getWarehouseUsage, normalizeWarehouseLevel, removeWarehouseMaterials, WAREHOUSE_UPGRADE_REQUIREMENTS } from './warehouse';
 import { getCashPriceForDiamondPrice, getDiscountedDiamondPrice, type PurchasePaymentMethod } from './purchasePricing';
 import { claimLoginReward, claimSeasonChallenge, chooseSeasonEvent, LOGIN_REWARDS } from './season';
+import {
+  listPlayerAssetForAuction,
+  settlePlayerAssetAuction,
+  cancelPlayerAssetAuction,
+  executeSellPlayerAsset,
+} from './dynamicAuctions';
+import {
+  claimStarterMission,
+  getStarterMissions,
+  getCompletedStarterMissions,
+  getCurrentStarterMissionStage,
+  STARTER_MISSION_SPECS,
+} from './onboarding';
 
 export type GameErrorCode =
   | 'invalid-input'
@@ -2039,12 +2052,9 @@ export {
   settlePlayerAssetAuction,
   cancelPlayerAssetAuction,
   executeSellPlayerAsset,
-} from './dynamicAuctions';
-
-export {
   claimStarterMission,
   getStarterMissions,
   getCompletedStarterMissions,
   getCurrentStarterMissionStage,
   STARTER_MISSION_SPECS,
-} from './onboarding';
+};

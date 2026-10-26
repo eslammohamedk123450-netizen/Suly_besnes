@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { validatePlayerProfile } from '../../supabase/functions/game-command/profile-validator';
 import { findCountry } from '../domain/countries';
-import { createNewPlayer } from '../domain/player';
+import { createNewPlayer, type PlayerProfile } from '../domain/player';
 import {
   advanceDay,
   buyGlobalMaterial,
@@ -140,7 +140,8 @@ describe('global commodity exchange & international trade engine', () => {
 
     // Advance days until cargo arrives at port -> automatically unloaded & 70% LC settled
     let current = seaBuy.profile;
-    while (current.day < seaBuy.data.arrivesOnDay) {
+    const targetArrivalDay = seaBuy.data?.arrivesOnDay ?? (current.day + 2);
+    while (current.day < targetArrivalDay) {
       const next = advanceDay(current);
       expect(next.ok).toBe(true);
       if (next.ok) current = next.profile;
@@ -156,7 +157,7 @@ describe('global commodity exchange & international trade engine', () => {
 
   it('raises finished product quality when using Grade A+ raw materials and exports containers internationally', () => {
     const base = newTestProfile();
-    let current = {
+    let current: PlayerProfile = {
       ...base,
       bankBalance: 25_000,
       companies: base.companies.map((c) => ({ ...c, maintenanceCondition: 100 })),
