@@ -281,7 +281,7 @@ export function SectionPage({ section, profile, country, focus, notificationThem
                 className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-sm shadow-lg shadow-amber-500/25 transition-all"
               >
                 <Icon name="tasks" size={16} />
-                عرض مهام القصة ورفع المستوى
+                عرض المهام التنفيذية ورفع المستوى
               </button>
               <button
                 type="button"

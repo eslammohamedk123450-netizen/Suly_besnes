@@ -7,7 +7,6 @@ import { getPlayerProgress, isSectionUnlocked } from '../game/onboarding';
 import { AvatarPortrait } from './AvatarPortrait';
 import { GameDayTimer } from './GameDayTimer';
 import { NotificationBell } from './NotificationBell';
-import { Compass, BookOpen } from 'lucide-react';
 
 export type ResourceSyncState = 'synced' | 'syncing' | 'offline' | 'blocked' | 'local';
 
@@ -192,32 +191,8 @@ export function ResourceBar({
             </div>
           </div>
 
-          {/* Left Cluster: Walkthrough, Story, Notifications */}
+          {/* Left Cluster: Notifications */}
           <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-            {onOpenWalkthrough && (
-              <button
-                type="button"
-                onClick={onOpenWalkthrough}
-                className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs transition shadow-md shadow-amber-500/20 active:scale-95 cursor-pointer"
-                title="بدء الجولة الإرشادية التفاعلية"
-              >
-                <Compass className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline text-[11px]">الجولة 🎯</span>
-              </button>
-            )}
-
-            {onOpenTutorial && (
-              <button
-                type="button"
-                onClick={onOpenTutorial}
-                className="flex items-center gap-1 px-2 sm:px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-bold transition shadow-sm active:scale-95 cursor-pointer"
-                title="سيناريو القصة والمهام"
-              >
-                <BookOpen className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline text-[11px]">القصة 📜</span>
-              </button>
-            )}
-
             {onOpenNotifications && (
               <NotificationBell
                 unreadCount={unreadNotificationsCount}

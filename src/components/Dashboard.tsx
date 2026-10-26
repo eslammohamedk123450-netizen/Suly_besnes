@@ -448,19 +448,6 @@ export function Dashboard({
           </span>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          {onOpenCampaignHub && (
-            <button
-              type="button"
-              onClick={() => {
-                playSound('click');
-                onOpenCampaignHub();
-              }}
-              className="px-3 py-1 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/40 text-xs font-extrabold flex items-center gap-1.5 transition cursor-pointer whitespace-nowrap"
-            >
-              <BookOpen className="w-3.5 h-3.5" />
-              <span>فصول القصة والمنافسون</span>
-            </button>
-          )}
           {onOpenTutorial && (
             <button
               type="button"
@@ -470,7 +457,7 @@ export function Dashboard({
               }}
               className="px-2.5 py-1 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-bold transition cursor-pointer whitespace-nowrap"
             >
-              مقدمة {country.name}
+              دليل التشغيل {country.name}
             </button>
           )}
         </div>
@@ -826,7 +813,7 @@ export function Dashboard({
                 }}
                 className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-500 text-slate-950 font-black text-xs shadow-md hover:brightness-110 transition active:scale-95 cursor-pointer"
               >
-                عرض مهام القصة 📜
+                عرض المهام التنفيذية 📋
               </button>
               <button
                 type="button"

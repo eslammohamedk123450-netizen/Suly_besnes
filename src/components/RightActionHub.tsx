@@ -152,7 +152,7 @@ export function RightActionHub({
 
   return (
     <>
-      {/* 1. Resting Handle Dock (Lucky Wheel + Story Campaign + Imperial Hub) */}
+      {/* 1. Resting Handle Dock (Lucky Wheel + Executive Tasks + Imperial Hub) */}
       {!open && (
         <div className="right-floating-dock-group">
           {onOpenLuckyWheel && (
@@ -187,11 +187,11 @@ export function RightActionHub({
                 playSound('click');
                 onOpenStoryCampaign();
               }}
-              aria-label="مسار القصة والسيناريو الإمبراطوري"
-              title="مسار القصة والسيناريو الإمبراطوري - فصول القصة والأهداف والمكافآت"
+                aria-label="المهام التنفيذية التعليمية"
+                title="المهام التنفيذية التعليمية - أهداف مستمرة ومكافآت قابلة للتحصيل"
             >
               <span className="right-story-handle-icon">📜</span>
-              <span className="right-story-badge">القصة</span>
+              <span className="right-story-badge">المهام التنفيذية</span>
             </button>
           )}
 
@@ -566,7 +566,7 @@ export function RightActionHub({
                       }}
                     >
                       <span className="right-hub-shortcut-icon">📜</span>
-                      <span>مسار القصة</span>
+                      <span>المهام التنفيذية</span>
                     </div>
                   )}
 

@@ -1346,7 +1346,7 @@ export default function App() {
         onAdvanceDay={() => void handleDaysElapsed(1)}
         onOpenStoryCampaign={() => {
           triggerHaptic('light');
-          setIsCampaignHubOpen(true);
+          navigate('tasks');
         }}
         onOpenStrategicPillars={() => {
           triggerHaptic('light');
@@ -1458,7 +1458,7 @@ export default function App() {
               setIsWalkthroughActive(false);
               playSound('success');
               showNotice(
-                'أحسنت! أتممت خطوة المهمة بيدك — يمكنك استلام مكافأة المهمة من لوحة مهام القصة.',
+                'أحسنت! أتممت خطوة المهمة بيدك — يمكنك استلام مكافأة المهمة من لوحة المهام التنفيذية.',
                 'success',
                 'اكتمل الإرشاد العملي',
                 'home',
@@ -1503,7 +1503,7 @@ export default function App() {
               setCelebrationData({
                 title: 'أكملت الجولة الإرشادية العملية بنجاح! 👑',
                 subtitle: 'أحسنت! أتقنت بيدك صيانة المصنع، وتسوية الالتزامات، وشراء الأراضي والخامات، وتشغيل الإنتاج وتحصيل المهام.',
-                rewardText: 'جاهزية قيادية كاملة · تابع مهام القصة في الرئيسية لاستلام مكافآتها الفعلية',
+                rewardText: 'جاهزية قيادية كاملة · تابع المهام التنفيذية في الرئيسية لاستلام مكافآتها الفعلية',
               });
             }
           }}

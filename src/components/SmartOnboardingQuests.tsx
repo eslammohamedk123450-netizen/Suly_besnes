@@ -50,16 +50,19 @@ export const SmartOnboardingQuests: React.FC<SmartOnboardingQuestsProps> = ({
   const seenBriefings = new Set<string>(profile.onboarding?.seenQuestBriefings ?? []);
 
   const completedCount = quests.filter((q) => q.isCompleted(profile)).length;
-  const currentQuest =
-    quests.find((q) => q.isAvailable(profile) && !q.isCompleted(profile))
-    ?? quests.find((q) => !claimedSet.has(q.id))
-    ?? quests[quests.length - 1];
+  const claimableQuests = quests.filter((q) => q.isCompleted(profile) && !claimedSet.has(q.id));
 
   const handleClaim = (quest: CountryStoryQuest) => {
     if (!quest.isCompleted(profile) || claimedSet.has(quest.id)) return;
     playSound('cash');
     playSound('levelUp');
     onClaimReward(quest.cashReward, quest.diamondReward, quest.id);
+  };
+
+  const handleClaimAll = () => {
+    if (claimableQuests.length === 0) return;
+    playSound('cash');
+    claimableQuests.forEach((quest) => onClaimReward(quest.cashReward, quest.diamondReward, quest.id));
   };
 
   const handleOpenBriefing = (quest: CountryStoryQuest, isReplay: boolean) => {
@@ -88,17 +91,27 @@ export const SmartOnboardingQuests: React.FC<SmartOnboardingQuestsProps> = ({
             <div>
               <div className="flex flex-wrap items-center gap-2">
                 <h3 className="text-sm font-bold text-white">
-                  مهام القصة والإنقاذ الاقتصادي · {country.name}
+                  المهام التعليمية المستمرة · {country.name}
                 </h3>
                 <span className="text-[11px] text-emerald-300 font-bold font-mono">
                   ({completedCount} / {quests.length} مكتمل)
                 </span>
               </div>
               <p className="text-[11px] text-slate-400 mt-0.5">
-                {scenario.scenarioTitle} — اقرأ إيجاز المستشار ثم نفّذ الخطوات بيدك داخل الأقسام المفتوحة
+                اختر أي مهمة متاحة وتعلّم نظامًا جديدًا بالوتيرة المناسبة لك؛ المهام لا تُفرض كسلسلة قصصية متتابعة
               </p>
             </div>
           </div>
+
+          {claimableQuests.length > 0 && (
+            <button
+              type="button"
+              onClick={handleClaimAll}
+              className="w-full mb-3 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black text-xs shadow-lg cursor-pointer"
+            >
+              جمع الكل · {claimableQuests.length} مكافآت جاهزة 🎁
+            </button>
+          )}
 
           <button
             type="button"
@@ -123,7 +136,7 @@ export const SmartOnboardingQuests: React.FC<SmartOnboardingQuestsProps> = ({
               const available = quest.isAvailable(profile);
               const completed = quest.isCompleted(profile);
               const claimed = claimedSet.has(quest.id);
-              const isCurrent = currentQuest?.id === quest.id && !completed && available;
+              const isCurrent = false;
               const advisor = scenario.advisors[quest.briefing.advisorRole];
 
               return (
@@ -196,7 +209,7 @@ export const SmartOnboardingQuests: React.FC<SmartOnboardingQuestsProps> = ({
                         className="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-[11px] font-bold border border-slate-700 cursor-pointer"
                         title="قراءة أو إعادة عرض حوار المستشار وخطة التنفيذ"
                       >
-                        {seenBriefings.has(quest.id) ? 'إعادة الحوار 📖' : 'قصة المهمة 📖'}
+                          {seenBriefings.has(quest.id) ? 'مراجعة الشرح 📖' : 'شرح المهمة 📖'}
                       </button>
                     )}
 

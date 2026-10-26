@@ -26,8 +26,8 @@ export function StoryIntro({ profile, onComplete }: StoryIntroProps) {
           <div className="flex items-center gap-3">
             <span className="text-3xl">{country.flag}</span>
             <div>
-              <span className="text-[11px] text-amber-400 font-bold block">
-                {country.name} · {scenario.scenarioTitle}
+                <span className="text-[11px] text-amber-400 font-bold block">
+                {country.name} · خطة التشغيل التعليمية
               </span>
               <h2 className="text-base sm:text-lg font-black text-white">
                 انطلاق إمبراطورية الأعمال 👑
@@ -55,7 +55,7 @@ export function StoryIntro({ profile, onComplete }: StoryIntroProps) {
                     {elder.name} · {elder.title}
                   </div>
                   <p className="text-slate-200 text-xs sm:text-sm leading-relaxed">
-                    «أهلاً بك يا <strong>{profile.name}</strong>! تم تسجيلك رسمياً كرجل أعمال في أسواق {country.name}. سلّمناك الأصول التأسيسية كاملة، وسيرشدك مستشارك الذكي خطوة بخطوة بالأسهم المضيئة.»
+                    «أهلاً بك يا <strong>{profile.name}</strong>! ابدأ بتعلّم إدارة إمبراطوريتك عبر مهام عملية مستقلة. سيشرح لك المستشار الهدف والموارد والنتيجة، ثم تختار أنت وقت التنفيذ.»
                   </p>
                 </div>
               </div>
@@ -128,10 +128,10 @@ export function StoryIntro({ profile, onComplete }: StoryIntroProps) {
               <div className="p-4 rounded-2xl bg-slate-950/80 border border-cyan-500/40 space-y-2">
                 <span className="text-xs font-black text-cyan-400 flex items-center gap-1.5">
                   <Sparkles className="w-4 h-4" />
-                  دورة الأرباح والإرشاد الميداني
+                  خطة المهارات والإرشاد العملي
                 </span>
                 <p className="text-xs text-slate-300 leading-relaxed">
-                  سيرشدك الروبوت المساعد بأسهم النيون وحلقات النبض المشعة لتنفيذ 4 خطوات أساسية:
+                  ستجد مهام تعليمية مستمرة تساعدك على فهم الاقتصاد والتشغيل والبيع والإدارة دون إجبارك على تسلسل قصصي سريع:
                 </p>
                 <div className="grid grid-cols-2 gap-2 text-xs pt-1">
                   <div className="p-2.5 rounded-xl bg-slate-900 border border-slate-800">
@@ -188,7 +188,7 @@ export function StoryIntro({ profile, onComplete }: StoryIntroProps) {
               onClick={onComplete}
               className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 via-amber-400 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-slate-950 font-black text-xs sm:text-sm shadow-xl shadow-amber-500/25 transition-transform active:scale-95 flex items-center gap-2 cursor-pointer"
             >
-              <span>انطلق لبدء الجولة التوجيهية 🚀</span>
+                <span>ابدأ المهام التعليمية 🚀</span>
               <ArrowRight className="w-4 h-4" />
             </button>
           </div>
