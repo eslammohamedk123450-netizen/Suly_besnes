@@ -15,6 +15,10 @@ const filterOptions: { value: TopupFilter; label: string }[] = [
 type ReviewAction = "approve" | "reject";
 type ReviewTarget = { order: TopupOrder; action: ReviewAction };
 
+function orderPrice(order: TopupOrder) {
+  return order.amountUsd ?? order.amountEgp ?? 0;
+}
+
 function dateText(value: string) {
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? "وقت غير متاح" : dateFormat.format(date);
@@ -134,7 +138,7 @@ export default function TopupRequests({ onReviewed }: Props) {
           <div className="topup-details-grid">
             <div className="topup-detail"><span>الباقة</span><strong>{order.packageName}</strong></div>
             <div className="topup-detail"><span>الماس</span><strong className="topup-diamonds"><Diamond size={14} />{numberFormat.format(order.diamonds)}</strong></div>
-            <div className="topup-detail"><span>السعر</span><strong>{numberFormat.format(order.amountEgp)} <small>ج.م</small></strong></div>
+            <div className="topup-detail"><span>السعر</span><strong>{numberFormat.format(orderPrice(order))} <small>$</small></strong></div>
             <div className="topup-detail"><span>تاريخ الطلب</span><strong className="topup-date"><Clock3 size={13} />{dateText(order.createdAt)}</strong></div>
           </div>
           {order.status !== "pending" && <div className="topup-review-meta"><span>{order.reviewedAt ? `تمت المراجعة: ${dateText(order.reviewedAt)}` : "تمت المراجعة"}{order.reviewedBy ? ` · ${order.reviewedBy}` : ""}</span>{order.reviewReason && <p>السبب: {order.reviewReason}</p>}</div>}
@@ -146,9 +150,9 @@ export default function TopupRequests({ onReviewed }: Props) {
         <section className="modal-card topup-review-modal" role="dialog" aria-modal="true" aria-labelledby="topup-review-title" dir="rtl">
           <header className="modal-header"><div><span className="eyebrow">مراجعة طلب شحن الماس</span><h2 id="topup-review-title">{target.action === "approve" ? "تأكيد اعتماد الطلب" : "تأكيد رفض الطلب"}</h2><p>رقم الطلب: <b dir="ltr">{target.order.orderNumber}</b></p></div><button className="icon-button modal-close" type="button" onClick={closeReview} disabled={submitting} aria-label="إغلاق"><X size={18} /></button></header>
           <form className="topup-review-form" onSubmit={(event) => void submitReview(event)}>
-            {target.action === "approve" ? <div className="review-warning"><span className="review-warning-mark"><AlertTriangle size={14} /></span><span>تأكد من مطابقة إيصال Vodafone Cash خارج النظام للمبلغ <strong>{numberFormat.format(target.order.amountEgp)} ج.م</strong> قبل الاعتماد.</span></div> : <div className="topup-reject-note"><XCircle size={16} /><span>سيُسجّل الطلب كمرفوض مع السبب الذي تدخله أدناه.</span></div>}
+            {target.action === "approve" ? <div className="review-warning"><span className="review-warning-mark"><AlertTriangle size={14} /></span><span>تأكد من مطابقة إيصال Vodafone Cash خارج النظام للمبلغ <strong>{numberFormat.format(orderPrice(target.order))} $</strong> قبل الاعتماد.</span></div> : <div className="topup-reject-note"><XCircle size={16} /><span>سيُسجّل الطلب كمرفوض مع السبب الذي تدخله أدناه.</span></div>}
             <div className="review-account"><span className="topup-player-avatar">{target.order.playerName?.trim().charAt(0) || "؟"}</span><span><strong>{target.order.playerName}</strong><small dir="ltr">{target.order.accountCode} · {target.order.packageName} · {numberFormat.format(target.order.diamonds)} ماس</small></span></div>
-            <div className="topup-review-summary"><span>قيمة الطلب</span><strong>{numberFormat.format(target.order.amountEgp)} ج.م</strong></div>
+            <div className="topup-review-summary"><span>قيمة الطلب</span><strong>{numberFormat.format(orderPrice(target.order))} $</strong></div>
             <label className="field-label" htmlFor="topup-review-reason">سبب {target.action === "approve" ? "الاعتماد" : "الرفض"}<span className="required-mark">*</span></label>
             <textarea id="topup-review-reason" className="text-input reason-input" rows={3} minLength={5} required value={reason} onChange={(event) => setReason(event.target.value)} placeholder={target.action === "approve" ? "مثال: تمت مطابقة إيصال Vodafone Cash يدويًا…" : "اكتب سبب رفض الطلب…"} />
             <div className="field-footer"><span>الحد الأدنى 5 أحرف</span><span>{reason.trim().length} حرف</span></div>

@@ -16,6 +16,8 @@ import {
   ArrowUpRight,
   UserCheck,
   Zap,
+  Award,
+  Trash2,
 } from 'lucide-react';
 import type { PlayerProfile } from '../domain/player';
 import type { CountryDefinition } from '../domain/countries';

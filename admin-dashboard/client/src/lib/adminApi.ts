@@ -11,7 +11,8 @@ export interface TopupOrder {
   packageId: string;
   packageName: string;
   diamonds: number;
-  amountEgp: number;
+  amountUsd?: number;
+  amountEgp?: number;
   status: TopupStatus;
   createdAt: string;
   reviewedAt: string | null;

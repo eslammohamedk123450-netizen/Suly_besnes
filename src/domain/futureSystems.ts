@@ -46,7 +46,7 @@ export interface PlayerAuctionBid {
 
 export interface PlayerAuctionListing {
   id: string;
-  assetType: 'land' | 'company';
+  assetType: 'land' | 'company' | 'asset';
   assetId: string;
   assetName: string;
   assetSpecs: string;
@@ -55,6 +55,7 @@ export interface PlayerAuctionListing {
   currentBid: number;
   status: 'active' | 'sold' | 'cancelled';
   leadingBidderName: string;
+  winningBidderName?: string;
   leadingBidderType: string;
   totalBidsCount: number;
   closesAtMs: number;

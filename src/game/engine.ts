@@ -32,6 +32,8 @@ import { SPEED_CARD_DIAMOND_COSTS, SPEED_CARD_LABELS, type SpeedCardKind } from 
 import { getWarehouseCapacity, getWarehouseItemCapacity, getWarehouseMaterialQuantity, getWarehouseUsage, normalizeWarehouseLevel, removeWarehouseMaterials, WAREHOUSE_UPGRADE_REQUIREMENTS } from './warehouse';
 import { getCashPriceForDiamondPrice, getDiscountedDiamondPrice, type PurchasePaymentMethod } from './purchasePricing';
 import { claimLoginReward, claimSeasonChallenge, chooseSeasonEvent, LOGIN_REWARDS } from './season';
+import { listPlayerAssetForAuction, settlePlayerAssetAuction, cancelPlayerAssetAuction } from './dynamicAuctions';
+import { claimStarterMission } from './onboarding';
 
 export type GameErrorCode =
   | 'invalid-input'

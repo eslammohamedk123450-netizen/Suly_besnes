@@ -1,4 +1,4 @@
-import type { PlayerProfile, PlayerLand, PlayerCompany } from '../domain/player';
+import type { PlayerAsset, PlayerProfile, PlayerLand, PlayerCompany } from '../domain/player';
 import type { FinanceLedgerEntry, PlayerAuctionListing, PlayerAuctionBid } from '../domain/futureSystems';
 import type { GameResult } from './engine';
 

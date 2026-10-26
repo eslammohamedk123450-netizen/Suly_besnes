@@ -10,7 +10,7 @@ const order = {
   packageId: 'starter',
   packageName: 'الباقة الأولى',
   diamonds: 100,
-  amountEgp: 50,
+  amountUsd: 1,
   status: 'pending',
   createdAt: '2026-10-24T00:00:00.000Z',
   reviewedAt: null,
