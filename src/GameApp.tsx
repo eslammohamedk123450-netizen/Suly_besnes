@@ -964,6 +964,7 @@ export default function App() {
       setNoticeTone('error');
       return;
     }
+    const isDifferentSection = activeSection !== section;
     setActiveSection(section);
     setSectionFocus(focus);
     if (!isWalkthroughActive && section !== 'home' && section !== 'profile' && !profile.onboarding.seenGuides.includes(section)) {
@@ -971,7 +972,9 @@ export default function App() {
       playSound('unlock');
     }
     setMobileMenuOpen(false);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    if (isDifferentSection && !focus) {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
   }
 
   function handleLogout() {

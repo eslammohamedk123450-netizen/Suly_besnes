@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import type { CountryDefinition, IndustryId } from '../domain/countries';
 import type { PlayerProfile } from '../domain/player';
 import type { GameCommand } from '../game/engine';
@@ -108,6 +108,36 @@ function economicEventDetails(event: PlayerProfile['events'][number], currentDay
   return details;
 }
 
+interface SectionPageContextValue {
+  compactPage: boolean;
+  activePanelId: string | null;
+  sectionId: SectionId;
+  onTogglePanel: (key: string) => void;
+}
+
+const SectionPageContext = createContext<SectionPageContextValue>({
+  compactPage: false,
+  activePanelId: null,
+  sectionId: 'home',
+  onTogglePanel: () => {},
+});
+
+export function SectionPanel(props: EconomyPanelProps) {
+  const { compactPage, activePanelId, sectionId, onTogglePanel } = useContext(SectionPageContext);
+  const panelKey = props.id ?? props.title;
+  const expanded = compactPage && (activePanelId === '__all__' || activePanelId === panelKey);
+  const resolvedIcon = props.icon ?? panelIconFor(sectionId, props.title);
+  return (
+    <BaseEconomyPanel
+      {...props}
+      compact={compactPage}
+      icon={resolvedIcon}
+      expanded={expanded}
+      onToggle={() => onTogglePanel(panelKey)}
+    />
+  );
+}
+
 export function SectionPage({ section, profile, country, focus, notificationTheme, isGuest, onNotificationThemeChange, onHome, onNavigate, onAction, onCommand, onRedeemed, onRefreshProfile, onLinkAccount, onLogout, onShowGuide, onProfileUpdate }: SectionPageProps) {
   const playerProgress = getPlayerProgress(profile);
   const [bidAmounts, setBidAmounts] = useState<Record<string, string>>({});
@@ -148,6 +178,7 @@ export function SectionPage({ section, profile, country, focus, notificationThem
   const [activePanelId, setActivePanelId] = useState<string | null>(null);
   const [expansionState, setExpansionState] = useState(() => loadExpansionState(profile));
   const [megaExpState, setMegaExpState] = useState(() => loadMegaExpansionState(profile));
+  const lastScrolledFocusRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (compactSectionIds.has(section.id)) setActivePanelId(focus ? '__all__' : null);
@@ -159,6 +190,9 @@ export function SectionPage({ section, profile, country, focus, notificationThem
   useEffect(() => {
     if (section.id === 'bank' && focus === 'loans') setBankTab('loans');
     if (!focus) return;
+    const focusKey = `${section.id}:${focus}`;
+    if (lastScrolledFocusRef.current === focusKey) return;
+    lastScrolledFocusRef.current = focusKey;
     const timer = window.setTimeout(() => document.getElementById(focus)?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 80);
     return () => window.clearTimeout(timer);
   }, [section.id, focus]);
@@ -170,17 +204,21 @@ export function SectionPage({ section, profile, country, focus, notificationThem
   const compactPage = compactSectionIds.has(section.id);
   const run = (action: (current: PlayerProfile) => GameResult<unknown>) => onAction(action(profile));
   const runCommand = (command: GameCommand, fallback: (current: PlayerProfile) => GameResult<unknown>) => onCommand(command, fallback);
+
+  const contextValue = useMemo<SectionPageContextValue>(() => ({
+    compactPage,
+    activePanelId,
+    sectionId: section.id,
+    onTogglePanel: (key: string) => setActivePanelId((current) => (current === key ? null : key)),
+  }), [compactPage, activePanelId, section.id]);
+
   const pageShell = (children: ReactNode) => (
-    <EconomyPageShell dayLabel={dayLabel} balanceLabel={balanceLabel} dayDurationMinutes={dayDurationMinutes} daySpeedMultiplier={daySpeedMultiplier} compact={compactPage}>
-      {children}
-    </EconomyPageShell>
+    <SectionPageContext.Provider value={contextValue}>
+      <EconomyPageShell dayLabel={dayLabel} balanceLabel={balanceLabel} dayDurationMinutes={dayDurationMinutes} daySpeedMultiplier={daySpeedMultiplier} compact={compactPage}>
+        {children}
+      </EconomyPageShell>
+    </SectionPageContext.Provider>
   );
-  const SectionPanel = (props: EconomyPanelProps) => {
-    const panelKey = props.id ?? props.title;
-    const expanded = compactPage && (activePanelId === '__all__' || activePanelId === panelKey);
-    const resolvedIcon = props.icon ?? panelIconFor(section.id, props.title);
-    return <BaseEconomyPanel {...props} compact={compactPage} icon={resolvedIcon} expanded={expanded} onToggle={() => setActivePanelId((current) => current === panelKey ? null : panelKey)} />;
-  };
 
   const heading = (
     <>

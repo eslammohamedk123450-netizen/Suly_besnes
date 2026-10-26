@@ -134,9 +134,6 @@ export function SpotlightWalkthrough({
         const selectorKey = `${currentStep.id}:${currentSection}:${resolved.directiveLabel}`;
         if (lastSelectorKeyRef.current !== selectorKey) {
           lastSelectorKeyRef.current = selectorKey;
-          if (rect.top < 90 || rect.bottom > window.innerHeight - 90) {
-            resolved.element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          }
         }
         return;
       }
