@@ -4,6 +4,7 @@ import { getSessionCookieOptions } from "./_core/cookies";
 const SUPABASE_URL = "https://kamxjsddjxowodatafqo.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_2s3qwuJhqStXG1UQZ0XeqQ_6tw5ns_8";
 const ADMIN_FUNCTION_URL = `${SUPABASE_URL}/functions/v1/business-empire-admin`;
+const REWARD_ISSUER_FUNCTION_URL = `${SUPABASE_URL}/functions/v1/reward-code-issuer`;
 const ADMIN_COOKIE = "be_admin_session";
 const SESSION_MAX_AGE_MS = 12 * 60 * 60 * 1000;
 
@@ -67,6 +68,24 @@ async function callAdminFunction(
     }
   } else if (!upstream.ok) {
     body = { ok: false, error: "خدمة الإدارة غير متاحة مؤقتًا." };
+  }
+  return { status: upstream.status, body };
+}
+
+async function callRewardIssuer(payload: JsonRecord, sessionToken: string): Promise<{ status: number; body: JsonRecord }> {
+  const upstream = await fetch(REWARD_ISSUER_FUNCTION_URL, {
+    method: "POST",
+    headers: { apikey: SUPABASE_PUBLISHABLE_KEY, Authorization: `Bearer ${sessionToken}`, "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+    signal: AbortSignal.timeout(20_000),
+  });
+  const raw = await upstream.text();
+  let body: JsonRecord = {};
+  try {
+    const parsed: unknown = raw ? JSON.parse(raw) : {};
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) body = parsed as JsonRecord;
+  } catch {
+    body = { ok: false, error: "تعذر قراءة خدمة إصدار الأكواد." };
   }
   return { status: upstream.status, body };
 }
@@ -207,6 +226,15 @@ export function registerAdminRoutes(app: Express) {
       limit: request.body?.limit,
       offset: request.body?.offset,
     });
+  });
+
+  app.post("/api/admin/reward-codes/issue", (request, response) => {
+    if (!requireBrowserRequest(request, response)) return;
+    const sessionToken = readCookie(request, ADMIN_COOKIE);
+    if (!sessionToken) { sendJson(response, 401, { ok: false, error: "سجّل الدخول للمتابعة." }); return; }
+    void callRewardIssuer({ cash: request.body?.cash, gold: request.body?.gold, expiresAt: request.body?.expiresAt, requestId: request.body?.requestId }, sessionToken)
+      .then((result) => sendJson(response, result.status, result.body))
+      .catch(() => sendJson(response, 503, { ok: false, error: "تعذر الاتصال بخدمة إصدار الأكواد. حاول مجددًا." }));
   });
 
   app.post("/api/admin/diamond-topups", (request, response) => {

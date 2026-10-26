@@ -25,6 +25,7 @@ import { getGlobalMarketOffers, negotiateGlobalMarketOffer } from '../game/globa
 import { getWarehouseCapacity, getWarehouseItemCapacity, getWarehouseUsage, normalizeWarehouseLevel, WAREHOUSE_UPGRADE_REQUIREMENTS } from '../game/warehouse';
 import { getGameDayDurationMinutes } from '../game/time';
 import { getDiscountedDiamondPrice, type PurchasePaymentMethod } from '../game/purchasePricing';
+import { CodeRedemption } from './CodeRedemption';
 
 interface SectionPageProps {
   section: SectionItem;
@@ -202,6 +203,9 @@ export function SectionPage({ section, profile, country, focus, notificationThem
           <div className="settings-row"><span>طريقة الحفظ</span><strong className="saved-status"><span /> {isGuest ? 'ضيف · محلي فقط' : 'حفظ متصل'}</strong></div>
           <div className="settings-note"><Icon name="shield" size={17} /><p>{isGuest ? 'عالم الضيف محفوظ على هذا الجهاز. اربط حسابًا لاستعادة العالم على أجهزة أخرى.' : 'يُحفظ العالم على جهازك ويتزامن عند الاتصال؛ اللعب الأساسي متاح دون اتصال.'}</p></div>
           {isGuest && <button className="button button-primary account-link-button" type="button" onClick={onLinkAccount}>ربط الحساب ونسخ العالم واستعادته</button>}
+          <SectionPanel title="استرداد كود مكافأة" description={isGuest ? 'اربط حسابًا أولًا حتى تُسجّل المكافأة عالميًا ولا تُستخدم مرة ثانية.' : 'أدخل كود SULY1 صادرًا من لوحة الإدارة لاستلام المكافأة بأمان.'}>
+            <CodeRedemption profile={profile} onRedeemed={onRedeemed} />
+          </SectionPanel>
           <button className="button button-secondary settings-store-link" type="button" onClick={() => onNavigate('store')}><Icon name="store" size={16} /> فتح متجر المشتريات</button>
           <div className="settings-notice-theme">
             <span>المؤثرات الصوتية</span>

@@ -15,7 +15,7 @@ const headings: Record<AdminTab, { title: string; subtitle: string }> = {
   overview: { title: "الرئيسية", subtitle: "إدارة آمنة وواضحة لعالم إمبراطورية الأعمال." },
   players: { title: "إدارة اللاعبين", subtitle: "ابحث بمعرّف BE واعرض البيانات الضرورية فقط." },
   badges: { title: "إدارة الشارات", subtitle: "كل شارة موثقة بسببها ومدتها وسجلها." },
-  codes: { title: "أكواد المكافآت", subtitle: "الحفاظ على توافق الأكواد الحالية قبل تفعيل الإصدار." },
+  codes: { title: "أكواد المكافآت", subtitle: "إصدار أكواد موقعة خادميًا مع منع التكرار وسجل تدقيق." },
   topups: { title: "طلبات شحن الماس", subtitle: "تحقق يدويًا من إيصال Vodafone Cash خارج النظام قبل الاعتماد." },
   audit: { title: "سجل التدقيق", subtitle: "سجل زمني غير قابل للتعديل من لوحة الإدارة." },
 };
@@ -54,7 +54,6 @@ export default function AdminShell({ tab, email, onTabChange, onLogout, children
               >
                 <span className="nav-icon"><Icon size={19} /></span>
                 <span className="nav-copy"><strong>{item.label}</strong><small>{item.hint}</small></span>
-                {item.id === "codes" && <span className="nav-soon">مراجعة</span>}
               </button>
             );
           })}

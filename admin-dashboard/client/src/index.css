@@ -596,3 +596,21 @@ textarea.text-input { resize: vertical; line-height: 1.8; }
   .topup-review-form { gap: 9px; padding: 12px 15px 14px; }
   .topup-modal-foot { padding: 0 15px 13px; }
 }
+
+.codes-page .signing-key-warning.is-ready { color: #2e6f59; background: #effaf4; border-color: #cce9d9; }
+.codes-page .signing-key-warning.is-ready strong { color: #246047; }
+.code-issuer-card { display: grid; gap: 14px; padding: 18px; background: linear-gradient(145deg, #102c43, #173c52); border: 1px solid rgba(215, 190, 112, .28); border-radius: 15px; box-shadow: 0 15px 35px rgba(11, 37, 55, .12); }
+.code-issuer-heading { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; color: #e8c969; }
+.code-issuer-heading > div { display: grid; gap: 4px; }
+.code-issuer-heading strong { color: #fff8e5; font-size: 14px; }
+.code-issuer-heading span { color: #a9c0ce; font-size: 9px; }
+.code-issuer-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.code-issuer-grid label, .issued-code-box label { display: grid; gap: 6px; color: #b6cbd5; font-size: 9px; }
+.code-issuer-grid input { min-width: 0; height: 39px; padding: 0 10px; color: #edf6f7; background: #0a2035; border: 1px solid rgba(177, 207, 215, .22); border-radius: 9px; direction: ltr; font: 11px/1 Arial, sans-serif; }
+.code-issuer-grid input:focus { outline: none; border-color: #d6b858; box-shadow: 0 0 0 3px rgba(214, 184, 88, .12); }
+.admin-code-issue-button { min-height: 42px; color: #122b3e; background: linear-gradient(100deg, #e9c967, #b9953e); border: 0; border-radius: 10px; font-weight: 900; cursor: pointer; }
+.admin-code-issue-button:disabled { opacity: .45; cursor: not-allowed; }
+.issued-code-box { display: grid; gap: 8px; padding: 12px; background: rgba(5, 20, 34, .62); border: 1px solid rgba(226, 199, 110, .3); border-radius: 11px; }
+.issued-code-box textarea { min-height: 78px; resize: vertical; padding: 10px; color: #f4d978; background: #07192a; border: 1px solid rgba(226, 199, 110, .25); border-radius: 8px; direction: ltr; text-align: left; font: 10px/1.6 ui-monospace, monospace; }
+.admin-code-copy { display: inline-flex; justify-content: center; align-items: center; gap: 6px; min-height: 34px; color: #173149; background: #e9d486; border: 0; border-radius: 8px; font-size: 9px; font-weight: 900; cursor: pointer; }
+@media (max-width: 760px) { .code-issuer-grid { grid-template-columns: 1fr; } .code-issuer-card { padding: 13px; } }

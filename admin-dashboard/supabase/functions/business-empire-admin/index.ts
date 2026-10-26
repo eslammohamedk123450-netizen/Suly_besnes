@@ -10,6 +10,10 @@ const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 const PBKDF2_ITERATIONS = 310_000;
 const SESSION_HOURS = 12;
 const DUMMY_SALT = "AAAAAAAAAAAAAAAAAAAAAA==";
+const TRUSTED_REWARD_PUBLIC_KEYS = new Set([
+  "MCowBQYDK2VwAyEA84UjrthL2DPvb0nU4FJv519tEWgUpuHEBhP4gdmrAiY=",
+  "MCowBQYDK2VwAyEAE8KYanYlY/M5eQuNNuKP/EMerujT9v9IaC374LZtBCs=",
+]);
 const encoder = new TextEncoder();
 
 type JsonRecord = Record<string, unknown>;
@@ -45,6 +49,10 @@ function fromBase64(value: string): Uint8Array {
 
 function base64url(bytes: Uint8Array): string {
   return base64(bytes).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+}
+
+function uuid(value: unknown): value is string {
+  return typeof value === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 }
 
 async function sha256Hex(value: string): Promise<string> {
@@ -178,6 +186,8 @@ function knownError(error: unknown): { status: number; message: string } {
   if (value.includes("invalid_badge")) return { status: 400, message: "بيانات الشارة غير صالحة." };
   if (value.includes("invalid_admin_setup")) return { status: 400, message: "بيانات الحساب غير صالحة." };
   if (value.includes("invalid_setup_code")) return { status: 403, message: "رمز الإعداد غير صحيح أو تم استخدامه." };
+  if (value.includes("invalid_reward_issue")) return { status: 400, message: "بيانات الكود غير صالحة أو انتهت مدة الصلاحية." };
+  if (value.includes("reward_code_issue_conflict")) return { status: 409, message: "تعارض طلب إصدار الكود؛ لا تعِد الإرسال بنفس الطلب." };
   if (value.includes("service_unavailable")) return { status: 503, message: "خدمة الإدارة غير متاحة مؤقتًا." };
   return { status: 500, message: "تعذر إكمال الطلب. حاول لاحقًا." };
 }
@@ -349,6 +359,62 @@ Deno.serve(async (request: Request) => {
         p_offset: Math.min(Math.max(Number(body.offset) || 0, 0), 10_000),
       });
       return json(200, { ok: true, entries: result });
+    }
+
+    if (action === "issue_reward_code") {
+      const requestId = body.requestId;
+      const expiresAtText = getText(body.expiresAt, 40);
+      const cash = typeof body.cash === "number" && Number.isSafeInteger(body.cash) ? body.cash : Number.NaN;
+      const gold = typeof body.gold === "number" && Number.isFinite(body.gold) ? body.gold : Number.NaN;
+      const expiresAt = expiresAtText ? new Date(expiresAtText) : null;
+      if (!uuid(requestId) || !expiresAt || !Number.isFinite(expiresAt.getTime()) || expiresAt.getTime() <= Date.now()
+        || !Number.isSafeInteger(cash) || cash < 0 || cash > 1_000_000
+        || !Number.isFinite(gold) || gold < 0 || gold > 1_000_000 || (cash === 0 && gold === 0)) {
+        return json(400, { ok: false, error: "بيانات الكود غير صالحة." });
+      }
+
+      const keyRows = await rpc<unknown>("admin_get_active_reward_signing_key", {});
+      const keyRecord = Array.isArray(keyRows) && keyRows[0] && typeof keyRows[0] === "object"
+        ? keyRows[0] as JsonRecord
+        : null;
+      const privateKey = keyRecord && typeof keyRecord.private_key_pkcs8_b64 === "string" ? keyRecord.private_key_pkcs8_b64 : null;
+      const publicKey = keyRecord && typeof keyRecord.public_key_spki_b64 === "string" ? keyRecord.public_key_spki_b64 : null;
+      if (!privateKey || !publicKey || !TRUSTED_REWARD_PUBLIC_KEYS.has(publicKey)) throw new Error("service_unavailable");
+
+      const issuedAt = new Date().toISOString();
+      const codeId = crypto.randomUUID();
+      const rewards = [
+        ...(cash > 0 ? [{ type: "cash", amount: cash }] : []),
+        ...(gold > 0 ? [{ type: "gold", grams: gold }] : []),
+      ];
+      const payload = { version: 1, codeId, issuedAt, expiresAt: expiresAt.toISOString(), rewards };
+      const encodedPayload = base64url(encoder.encode(JSON.stringify(payload)));
+      const signingKey = await crypto.subtle.importKey(
+        "pkcs8",
+        toArrayBuffer(fromBase64(privateKey)),
+        { name: "Ed25519" },
+        false,
+        ["sign"],
+      );
+      const signature = new Uint8Array(await crypto.subtle.sign(
+        { name: "Ed25519" },
+        signingKey,
+        toArrayBuffer(encoder.encode(encodedPayload)),
+      ));
+      const code = `SULY1.${encodedPayload}.${base64url(signature)}`;
+      const recorded = await rpc<unknown>("admin_record_reward_code_issue", {
+        p_request_id: requestId,
+        p_code_id: codeId,
+        p_code_text: code,
+        p_cash_amount: cash,
+        p_gold_grams: gold,
+        p_expires_at: expiresAt.toISOString(),
+        p_admin_email: adminEmail,
+      });
+      const row = Array.isArray(recorded) ? recorded[0] : recorded;
+      const result = row && typeof row === "object" ? row as JsonRecord : null;
+      if (!result || typeof result.code_text !== "string") throw new Error("service_unavailable");
+      return json(200, { ok: true, code: result.code_text, reused: result.reused === true, expiresAt: expiresAt.toISOString() });
     }
 
     if (action === "list_diamond_topups") {
