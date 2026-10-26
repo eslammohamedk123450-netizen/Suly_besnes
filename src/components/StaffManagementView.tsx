@@ -16,6 +16,8 @@ import {
   ArrowUpRight,
   UserCheck,
   Zap,
+  Award,
+  Trash2,
 } from 'lucide-react';
 import type { PlayerProfile } from '../domain/player';
 import type { CountryDefinition } from '../domain/countries';
@@ -30,6 +32,7 @@ import {
   payStaffSalary,
   terminateStaff,
   updateAutomationDirectives,
+  getCompanyStaffingAnalysis,
   type GameCommandHandler,
 } from '../game/engine';
 import { formatMoney, formatNumber } from '../domain/formatters';
@@ -365,6 +368,85 @@ export const StaffManagementView: React.FC<StaffManagementViewProps> = ({
           </div>
         </div>
       </div>
+
+      {/* 2.5 Factory Staffing Analysis & Operational Health */}
+      {profile.companies.length > 0 && (
+        <div className="rounded-3xl bg-slate-900/90 border border-slate-800 p-5 space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Building className="w-5 h-5 text-indigo-400" />
+              <h3 className="text-sm font-black text-white">تغطية كوادر المصانع والشركات التابعة</h3>
+            </div>
+            <span className="text-[11px] text-slate-400">
+              احتياجات العمال والمديرين بحسب قطاع النشاط والحجم
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {profile.companies.map((company) => {
+              const analysis = getCompanyStaffingAnalysis(company, profile);
+              const categoryLabel =
+                analysis.industryCategory === 'heavy'
+                  ? 'صناعة ثقيلة'
+                  : analysis.industryCategory === 'medium'
+                  ? 'صناعة متوسطة'
+                  : 'صناعة خفيفة';
+
+              return (
+                <div
+                  key={company.id}
+                  className="p-4 rounded-2xl bg-slate-950/70 border border-slate-800/80 space-y-2.5"
+                >
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <strong className="text-xs font-black text-white">{company.name}</strong>
+                      <span className="text-[10px] text-slate-400 block">
+                        {categoryLabel} · مستوى {analysis.upgradeLevel}
+                      </span>
+                    </div>
+                    <div className="text-left">
+                      <span className="text-xs font-black text-emerald-400 block">
+                        كفاءة: {analysis.operationalEfficiencyPercent}%
+                      </span>
+                      {analysis.materialWasteReductionPercent > 0 && (
+                        <span className="text-[10px] text-sky-400">
+                          وفر هدر: -{analysis.materialWasteReductionPercent}%
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 text-[11px] pt-1">
+                    <div className="p-2 rounded-xl bg-slate-900 border border-slate-800/60 flex items-center justify-between">
+                      <span className="text-slate-400">مدير الشركة:</span>
+                      <span className={analysis.hasManager ? 'text-emerald-400 font-bold' : 'text-amber-400'}>
+                        {analysis.hasManager ? `✓ ${analysis.manager?.name}` : 'غير معيّن'}
+                      </span>
+                    </div>
+                    <div className="p-2 rounded-xl bg-slate-900 border border-slate-800/60 flex items-center justify-between">
+                      <span className="text-slate-400">رئيس العمال:</span>
+                      <span className={analysis.hasForeman ? 'text-emerald-400 font-bold' : 'text-amber-400'}>
+                        {analysis.hasForeman ? `✓ ${analysis.foreman?.name}` : 'غير معيّن'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {analysis.recommendations.length > 0 && (
+                    <div className="p-2.5 rounded-xl bg-amber-950/20 border border-amber-500/20 text-[10px] text-amber-200/90 space-y-1">
+                      {analysis.recommendations.map((rec, idx) => (
+                        <div key={idx} className="flex items-start gap-1.5">
+                          <span className="text-amber-400 shrink-0">•</span>
+                          <span>{rec}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* 3. Filter Segment Tabs */}
       <div className="flex items-center gap-2 overflow-x-auto pb-1" role="tablist">

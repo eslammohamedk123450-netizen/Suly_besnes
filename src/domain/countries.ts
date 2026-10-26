@@ -8,7 +8,8 @@ export type CountryId =
   | 'qatar'
   | 'uk'
   | 'germany'
-  | 'japan';
+  | 'japan'
+  | 'jordan';
 
 export type IndustryId =
   | 'petroleum'
@@ -286,6 +287,31 @@ export const COUNTRIES: readonly CountryDefinition[] = [
       taxRate: 0.15,
       customsRate: 0.02,
       operatingCostMultiplier: 1.1,
+    },
+  },
+
+  // 10. The Hashemite Kingdom of Jordan
+  {
+    id: 'jordan',
+    name: 'المملكة الأردنية الهاشمية',
+    flag: '🇯🇴',
+    storyTitle: 'تحدي عمان وميناء العقبة ومنطقة التعدين',
+    storySummary: 'طردتك العائلة من مجلس عمان المالي متهماً بالإخفاق. سرّبت لك أمك 25,000$ كاش لتنطلق في مشاريع العقبة، سحاب الصناعية، وتعدين الفوسفات والبوتاس.',
+    storyFull: [
+      'أهلاً بك يا بني… لقد قرر كبار العائلة في عمان تجريدك من حصص التجارة وطردك بدعوى عدم قدرتك على إدارة الأصول والاستثمارات الكبرى.',
+      'لكنني واثقة من ذكائك المالي! سلّمتك سراً 25,000 دولار أمريكي… انطلق فوراً نحو مدينة سحاب الصناعية وميناء العقبة الاقتصادي الخاص!',
+      'استثمر في الصناعات الدوائية، وتعدين البوتاس والفوسفات، وسلاسل الإمداد اللوجستية حتى تبني صرحاً استثمارياً يفرض احترامك ويعيدك إلى القمة.',
+    ],
+    currency: { code: 'USD', symbol: '$', name: 'الدولار الأمريكي' },
+    startingBalance: 25_000,
+    startingBalanceEgpEquivalent: 25_000,
+    economy: {
+      exchangeRateToEgp: 1.0,
+      companySetupFee: 2_100,
+      licenseFeesByIndustry: buildIndustryFees(),
+      taxRate: 0.14,
+      customsRate: 0.025,
+      operatingCostMultiplier: 1.02,
     },
   },
 ];

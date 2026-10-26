@@ -354,6 +354,27 @@ export const COUNTRY_REAL_ASSETS: Record<CountryId, {
       { id: 'bulk-crude-oil', lotType: 'raw-material', label: 'شحنة خام نفط مستوردة فائقة النقاوة', landType: 'industrial', areaSquareMeters: 0, minimumBid: 600, bidIncrement: 80, closesAt: '2099-12-31T00:00:00.000Z', status: 'open', materialId: 'crude-oil', quantity: 15 },
     ],
   },
+  jordan: {
+    starterLand: 'أرض مدينة الملك عبدالله الثاني الصناعية · سحاب',
+    directLands: [
+      { id: 'starter-village-land', label: 'أرض مدينة سحاب الصناعية', landType: 'agricultural', areaSquareMeters: 520, price: 3_600 },
+      { id: 'direct-land-port-said', label: 'مجمع منطقة العقبة اللوجستية الخاصة', landType: 'commercial', areaSquareMeters: 420, price: 5_700 },
+      { id: 'direct-land-minya-farm', label: 'أرض مزارع وادي الأردن والشونة', landType: 'agricultural', areaSquareMeters: 900, price: 4_800 },
+      { id: 'direct-land-sokhna-industrial', label: 'موقع الهاشمية الصناعي للتعدين والكيماويات · الزرقاء', landType: 'industrial', areaSquareMeters: 520, price: 7_200 },
+    ],
+    directCompanies: [
+      { id: 'direct-company-food', name: 'شركة البتراء للصناعات الغذائية', industryId: 'food', landType: 'agricultural', areaSquareMeters: 650, price: 8_600 },
+      { id: 'direct-company-logistics', name: 'شركة العقبة لخطوط الشحن والترانزيت', industryId: 'transport', landType: 'commercial', areaSquareMeters: 500, price: 10_400 },
+      { id: 'direct-company-energy', name: 'شركة شمس معان لتوليد الطاقة النظيفة', industryId: 'electricity', landType: 'industrial', areaSquareMeters: 600, price: 13_600 },
+    ],
+    auctions: [
+      { id: 'land-cairo-industrial', lotType: 'land', label: 'قطعة توسعة مدينة الموقر الصناعية', landType: 'industrial', areaSquareMeters: 400, minimumBid: 3_200, bidIncrement: 200, closesAt: '2099-12-31T00:00:00.000Z', status: 'open' },
+      { id: 'land-alexandria-farm', lotType: 'land', label: 'أرض مزارع الأغوار الجنوبية المروية', landType: 'agricultural', areaSquareMeters: 650, minimumBid: 2_700, bidIncrement: 200, closesAt: '2099-12-31T00:00:00.000Z', status: 'open' },
+      { id: 'land-suez-commerce', lotType: 'land', label: 'موقع الشاطئ الجنوبي التجاري · العقبة', landType: 'commercial', areaSquareMeters: 300, minimumBid: 4_200, bidIncrement: 300, closesAt: '2099-12-31T00:00:00.000Z', status: 'open' },
+      { id: 'factory-petroleum-expansion', lotType: 'factory', label: 'خط معالجة وتكرير إضافي بمجمع الصافي للبوتاس', landType: 'industrial', areaSquareMeters: 0, minimumBid: 4_800, bidIncrement: 400, closesAt: '2099-12-31T00:00:00.000Z', status: 'open', energyCapacityBonus: 40 },
+      { id: 'bulk-crude-oil', lotType: 'raw-material', label: 'شحنة خامات تعدين وبوتاس من مناجم الشيدية', landType: 'industrial', areaSquareMeters: 0, minimumBid: 600, bidIncrement: 80, closesAt: '2099-12-31T00:00:00.000Z', status: 'open', materialId: 'chemicals', quantity: 15 },
+    ],
+  },
 };
 
 export function getDirectLandsForCountry(countryId?: CountryId): readonly DirectLandListing[] {

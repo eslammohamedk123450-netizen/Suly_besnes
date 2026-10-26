@@ -23,7 +23,7 @@ import { calculateTotalAssets } from '../domain/player';
 import type { CountryDefinition } from '../domain/countries';
 import { formatMoney } from '../domain/formatters';
 import type { SectionId } from '../domain/navigation';
-import { staffLevel } from '../game/engine';
+import { staffLevel, calculateEmpireValuation } from '../game/engine';
 
 interface FinanceReportModalProps {
   isOpen: boolean;
@@ -44,16 +44,18 @@ export const FinanceReportModal: React.FC<FinanceReportModalProps> = ({
 
   if (!isOpen) return null;
 
-  const totalAssets = calculateTotalAssets(profile);
-  const liquidCash = profile.bankBalance || 0;
-  const goldValue = (profile.goldGrams || 0) * 85000;
-  const landsValue = profile.lands.reduce((sum, land) => sum + land.areaSquareMeters * 350, 0);
-  const companiesValue = profile.companies.reduce((sum, c) => sum + (c.upgradeLevel || 1) * 350000, 0);
-  const inventoryValue = (profile.inventory || []).reduce((sum, item) => sum + item.quantity * 250, 0);
+  const empireValuation = calculateEmpireValuation(profile);
+  const totalAssets = empireValuation.totalEmpireValuation;
+  const liquidCash = empireValuation.liquidCash;
+  const goldValue = empireValuation.goldValue;
+  const landsValue = empireValuation.landsTotalValue;
+  const companiesValue = empireValuation.companiesTotalValue;
+  const inventoryValue = empireValuation.inventoryMarketValue;
+  const totalLiabilities = empireValuation.totalLiabilities;
 
-  // Financial operating pulse
-  const totalRevenue = profile.finances?.totalRevenue ?? 480000;
-  const totalExpenses = profile.finances?.totalExpenses ?? 230000;
+  // Financial operating pulse - real ledger sums
+  const totalRevenue = profile.finances?.totalRevenue ?? 0;
+  const totalExpenses = profile.finances?.totalExpenses ?? 0;
   const netProfit = profile.finances?.netProfit ?? (totalRevenue - totalExpenses);
   const netMarginPercent = totalRevenue > 0 ? Math.round((netProfit / totalRevenue) * 100) : 0;
 
@@ -310,6 +312,41 @@ export const FinanceReportModal: React.FC<FinanceReportModalProps> = ({
                     <strong className="text-slate-200 font-bold">{formatMoney(inventoryValue, country)}</strong>
                   </div>
                 </div>
+
+                {/* Subsidiaries Fair Value & Health */}
+                {empireValuation.subsidiaries.length > 0 && (
+                  <div className="mt-3 pt-3 border-t border-slate-800 space-y-2">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-bold text-slate-300">تقييم الشركات والمصانع التابعة (القيمة العادلة):</span>
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-amber-300 border border-amber-500/30">
+                        التصنيف الائتماني: {empireValuation.creditRating}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {empireValuation.subsidiaries.map((sub) => (
+                        <div key={sub.companyId} className="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 flex items-center justify-between text-xs">
+                          <div>
+                            <div className="font-bold text-white flex items-center gap-1.5">
+                              <span>{sub.name}</span>
+                              <span className={`text-[9px] px-1.5 py-0.2 rounded font-bold ${
+                                sub.operatingHealth === 'excellent' ? 'bg-emerald-500/20 text-emerald-400' :
+                                sub.operatingHealth === 'stable' ? 'bg-sky-500/20 text-sky-400' : 'bg-rose-500/20 text-rose-400'
+                              }`}>
+                                {sub.operatingHealth === 'excellent' ? 'ممتاز' : sub.operatingHealth === 'stable' ? 'مستقر' : 'صيانة مطلوبة'}
+                              </span>
+                            </div>
+                            <div className="text-[10px] text-slate-400">
+                              أصول + خطوط إنتاج: {formatMoney(sub.bookValue, country)}
+                            </div>
+                          </div>
+                          <span className="font-mono font-black text-emerald-400">
+                            {formatMoney(sub.fairValue, country)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </>
           )}

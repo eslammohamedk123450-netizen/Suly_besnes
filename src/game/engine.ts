@@ -32,6 +32,12 @@ import { SPEED_CARD_DIAMOND_COSTS, SPEED_CARD_LABELS, type SpeedCardKind } from 
 import { getWarehouseCapacity, getWarehouseItemCapacity, getWarehouseMaterialQuantity, getWarehouseUsage, normalizeWarehouseLevel, removeWarehouseMaterials, WAREHOUSE_UPGRADE_REQUIREMENTS } from './warehouse';
 import { getCashPriceForDiamondPrice, getDiscountedDiamondPrice, type PurchasePaymentMethod } from './purchasePricing';
 import { claimLoginReward, claimSeasonChallenge, chooseSeasonEvent, LOGIN_REWARDS } from './season';
+import {
+  listPlayerAssetForAuction,
+  settlePlayerAssetAuction,
+  cancelPlayerAssetAuction,
+} from './dynamicAuctions';
+import { claimStarterMission } from './onboarding';
 
 export type GameErrorCode =
   | 'invalid-input'
@@ -1419,6 +1425,13 @@ export function staffExperience(employee: StaffContract | undefined): number {
   return Math.max(0, Math.min(STAFF_EXPERIENCE_PER_LEVEL - 1, Math.floor(employee?.experience ?? 0)));
 }
 
+export function calculateStaffSalaryForLevel(role: StaffRole, level: number): number {
+  const option = STAFF_ROLE_OPTIONS[role];
+  const baseSalary = option?.dailySalary ?? 3_500;
+  const safeLevel = Math.max(1, Math.min(MAX_STAFF_LEVEL, Math.floor(level)));
+  return Math.round(baseSalary * (1 + (safeLevel - 1) * 0.18));
+}
+
 export function getStaffUpgradeCost(employee: StaffContract): number {
   return Math.round(employee.dailySalary * (2 + staffLevel(employee)));
 }
@@ -1430,7 +1443,12 @@ function developStaff(employee: StaffContract): StaffContract {
     experience -= STAFF_EXPERIENCE_PER_LEVEL;
     level += 1;
   }
-  return { ...employee, level, experience };
+  return {
+    ...employee,
+    level,
+    experience,
+    dailySalary: calculateStaffSalaryForLevel(employee.role, level),
+  };
 }
 
 export function hireStaff(profile: PlayerProfile, role: StaffRole, name: string, companyId?: string): GameResult<StaffContract> {
@@ -1464,13 +1482,20 @@ export function upgradeStaff(profile: PlayerProfile, staffId: string): GameResul
   if (level >= MAX_STAFF_LEVEL) return failure(profile, 'condition-not-met', 'وصل الموظف إلى أعلى مستوى متاح.');
   const cost = getStaffUpgradeCost(employee);
   if (profile.bankBalance < cost) return failure(profile, 'insufficient-funds', `تحتاج إلى ${cost.toLocaleString('ar-EG')} $ لترقية ${employee.name}.`);
-  const updated = { ...employee, level: level + 1, experience: staffExperience(employee) };
+  const newLevel = level + 1;
+  const newSalary = calculateStaffSalaryForLevel(employee.role, newLevel);
+  const updated: StaffContract = {
+    ...employee,
+    level: newLevel,
+    experience: staffExperience(employee),
+    dailySalary: newSalary,
+  };
   const nextProfile = addLedger(
     { ...profile, staff: profile.staff.map((member) => member.id === staffId ? updated : member) },
-    [ledgerEntry(profile, 'expense', cost, `ترقية الموظف ${employee.name} إلى المستوى ${level + 1}`, 0)],
+    [ledgerEntry(profile, 'expense', cost, `ترقية الموظف ${employee.name} إلى المستوى ${newLevel} (الراتب الجديد: ${newSalary.toLocaleString('ar-EG')} $)`, 0)],
     profile.bankBalance - cost,
   );
-  return success(nextProfile, `تمت ترقية ${employee.name} إلى المستوى ${level + 1}.`, updated);
+  return success(nextProfile, `تمت ترقية ${employee.name} إلى المستوى ${newLevel} (الراتب اليومي: ${newSalary.toLocaleString('ar-EG')} $).`, updated);
 }
 
 export function payStaffSalary(profile: PlayerProfile, staffId: string): GameResult<{ staffId: string; amount: number }> {
@@ -1494,6 +1519,237 @@ export function terminateStaff(profile: PlayerProfile, staffId: string): GameRes
   return success({ ...profile, staff: profile.staff.map((member) => member.id === staffId ? updated : member) }, `تم إنهاء عقد ${employee.name}.`, updated);
 }
 
+export interface CompanyStaffingAnalysis {
+  companyId: string;
+  companyName: string;
+  industryId: IndustryId;
+  industryCategory: 'heavy' | 'medium' | 'light';
+  upgradeLevel: number;
+  recommendedWorkers: number;
+  hasManager: boolean;
+  hasForeman: boolean;
+  manager?: StaffContract;
+  foreman?: StaffContract;
+  operationalEfficiencyPercent: number;
+  materialWasteReductionPercent: number;
+  qualityBonus: number;
+  operatingCostDiscountPercent: number;
+  advisorsSummary: {
+    accountantActive: boolean;
+    lawyerActive: boolean;
+    cfoActive: boolean;
+    ceoActive: boolean;
+    cooActive: boolean;
+  };
+  recommendations: string[];
+}
+
+export function getCompanyStaffingAnalysis(company: PlayerCompany, profile: PlayerProfile): CompanyStaffingAnalysis {
+  const heavyIndustries: IndustryId[] = ['petroleum', 'electricity', 'gas', 'construction'];
+  const mediumIndustries: IndustryId[] = ['transport', 'electronics', 'detergents'];
+  const industryCategory: 'heavy' | 'medium' | 'light' = heavyIndustries.includes(company.industryId)
+    ? 'heavy'
+    : mediumIndustries.includes(company.industryId)
+    ? 'medium'
+    : 'light';
+
+  const upgradeLevel = Math.max(1, company.upgradeLevel ?? 1);
+  const recommendedWorkers = industryCategory === 'heavy'
+    ? 5 + (upgradeLevel - 1) * 2
+    : industryCategory === 'medium'
+    ? 3 + (upgradeLevel - 1) * 2
+    : 2 + (upgradeLevel - 1);
+
+  const manager = profile.staff.find((s) => s.status === 'active' && s.role === 'manager' && s.companyId === company.id);
+  const foreman = profile.staff.find((s) => s.status === 'active' && s.role === 'foreman' && s.companyId === company.id);
+  const accountant = profile.staff.find((s) => s.status === 'active' && s.role === 'accountant');
+  const lawyer = profile.staff.find((s) => s.status === 'active' && s.role === 'lawyer');
+  const cfo = profile.staff.find((s) => s.status === 'active' && s.role === 'cfo');
+  const ceo = profile.staff.find((s) => s.status === 'active' && s.role === 'general_manager');
+  const coo = profile.staff.find((s) => s.status === 'active' && s.role === 'operations_director');
+
+  const managerLvl = staffLevel(manager);
+  const foremanLvl = staffLevel(foreman);
+  const accountantLvl = staffLevel(accountant);
+
+  let efficiency = 80;
+  if (manager) efficiency += 12 + (managerLvl - 1) * 3;
+  if (foreman) efficiency += 8 + (foremanLvl - 1) * 2;
+  if (coo) efficiency += 10;
+  if (industryCategory === 'heavy' && !manager) efficiency -= 10;
+  const operationalEfficiencyPercent = Math.max(50, Math.min(135, efficiency));
+
+  const materialWasteReductionPercent = foreman ? 5 + (foremanLvl - 1) * 2.5 : 0;
+  const qualityBonus = (manager ? 10 + (managerLvl - 1) * 3 : 0) + (foreman ? 5 + (foremanLvl - 1) * 2 : 0);
+  const operatingCostDiscountPercent = accountant ? 10 + (accountantLvl - 1) * 3 : 0;
+
+  const recommendations: string[] = [];
+  if (!manager) {
+    recommendations.push(
+      industryCategory === 'heavy'
+        ? 'المصنع في قطاع ثقيل وبحاجة ماسة إلى مدير شركة لجدولة التشغيل وضبط خطوط الإمداد.'
+        : 'يوصى بتعيين مدير شركة لتقليل زمن دورة الإنتاج بيوم كامل وزيادة الجودة.'
+    );
+  }
+  if (!foreman) {
+    recommendations.push('تعيين رئيس عمال يقلل هدر الخامات بنسبة تصل إلى 15% ويضاعف جودة المنتج.');
+  }
+  if (!accountant) {
+    recommendations.push('محاسب الإدارة القانوني يخفض الضرائب وتكاليف التشغيل.');
+  }
+
+  return {
+    companyId: company.id,
+    companyName: company.name,
+    industryId: company.industryId,
+    industryCategory,
+    upgradeLevel,
+    recommendedWorkers,
+    hasManager: Boolean(manager),
+    hasForeman: Boolean(foreman),
+    manager,
+    foreman,
+    operationalEfficiencyPercent,
+    materialWasteReductionPercent,
+    qualityBonus,
+    operatingCostDiscountPercent,
+    advisorsSummary: {
+      accountantActive: Boolean(accountant),
+      lawyerActive: Boolean(lawyer),
+      cfoActive: Boolean(cfo),
+      ceoActive: Boolean(ceo),
+      cooActive: Boolean(coo),
+    },
+    recommendations,
+  };
+}
+
+export interface CompanyValuation {
+  companyId: string;
+  name: string;
+  industryId: IndustryId;
+  fairValue: number;
+  bookValue: number;
+  breakdown: {
+    landValue: number;
+    equipmentValue: number;
+    upgradeInvestments: number;
+    staffGoodwill: number;
+    conditionDiscount: number;
+  };
+  operatingHealth: 'excellent' | 'stable' | 'distressed';
+}
+
+export function calculateCompanyValuation(company: PlayerCompany, profile: PlayerProfile): CompanyValuation {
+  const linkedLand = company.landId ? profile.lands.find((l) => l.id === company.landId) : undefined;
+  const landValue = linkedLand ? Math.round(linkedLand.purchasePrice * (1 + (linkedLand.upgradeLevel ?? 1) * 0.15)) : 0;
+
+  const baseEquipment = (company.operatingCostPerDay ?? 120) * 100 + (company.energyCapacity ?? 80) * 450;
+  const upgradeLevel = Math.max(1, company.upgradeLevel ?? 1);
+  const upgradeInvestments = (upgradeLevel - 1) * 22_000;
+  const condition = Math.max(0, Math.min(100, company.maintenanceCondition ?? 100));
+  const conditionFactor = condition / 100;
+  const conditionDiscount = Math.round((baseEquipment + upgradeInvestments) * (1 - conditionFactor));
+
+  const manager = profile.staff.find((s) => s.status === 'active' && s.role === 'manager' && s.companyId === company.id);
+  const foreman = profile.staff.find((s) => s.status === 'active' && s.role === 'foreman' && s.companyId === company.id);
+  const staffGoodwill = (manager ? manager.dailySalary * 8 * staffLevel(manager) : 0) +
+                        (foreman ? foreman.dailySalary * 6 * staffLevel(foreman) : 0);
+
+  const bookValue = landValue + baseEquipment + upgradeInvestments;
+  const fairValue = Math.max(15_000, Math.round(bookValue - conditionDiscount + staffGoodwill));
+
+  const operatingHealth = condition >= 75 ? 'excellent' : condition >= 40 ? 'stable' : 'distressed';
+
+  return {
+    companyId: company.id,
+    name: company.name,
+    industryId: company.industryId,
+    fairValue,
+    bookValue,
+    breakdown: {
+      landValue,
+      equipmentValue: baseEquipment,
+      upgradeInvestments,
+      staffGoodwill,
+      conditionDiscount,
+    },
+    operatingHealth,
+  };
+}
+
+export interface EmpireValuation {
+  totalEmpireValuation: number;
+  liquidCash: number;
+  goldValue: number;
+  landsTotalValue: number;
+  companiesTotalValue: number;
+  inventoryMarketValue: number;
+  activeInvestmentsValue: number;
+  bankDepositsValue: number;
+  totalLiabilities: number;
+  netWorth: number;
+  creditRating: 'AAA' | 'AA' | 'A' | 'BBB' | 'BB' | 'B';
+  subsidiaries: CompanyValuation[];
+}
+
+export function calculateEmpireValuation(profile: PlayerProfile): EmpireValuation {
+  const liquidCash = profile.bankBalance || 0;
+  const goldValue = Math.round((profile.goldGrams || 0) * GOLD_PRICE_PER_GRAM);
+
+  const companyLandIds = new Set(profile.companies.map((c) => c.landId).filter(Boolean));
+  const unlinkedLands = profile.lands.filter((l) => !companyLandIds.has(l.id));
+  const landsTotalValue = unlinkedLands.reduce((sum, l) => sum + Math.round(l.purchasePrice * (1 + (l.upgradeLevel ?? 1) * 0.15)), 0);
+
+  const subsidiaries = profile.companies.map((c) => calculateCompanyValuation(c, profile));
+  const companiesTotalValue = subsidiaries.reduce((sum, v) => sum + v.fairValue, 0);
+
+  const inventoryMarketValue = (profile.inventory || []).reduce((sum, item) => sum + Math.round(item.quantity * item.unitCost), 0);
+
+  const activeInvestmentsValue = (profile.investments || [])
+    .filter((inv) => inv.status === 'active')
+    .reduce((sum, inv) => sum + inv.principal, 0);
+
+  const bankDepositsValue = (profile.banking?.deposits || [])
+    .filter((d) => d.status === 'active')
+    .reduce((sum, d) => sum + d.principal, 0);
+
+  const outstandingSalary = unpaidSalaryTotal(profile);
+  const activeLoansBalance = (profile.banking?.loans || [])
+    .filter((l) => l.status === 'active')
+    .reduce((sum, l) => sum + l.remainingBalance, 0);
+  const totalLiabilities = (profile.payables || 0) + outstandingSalary + activeLoansBalance;
+
+  const grossAssets = liquidCash + goldValue + landsTotalValue + companiesTotalValue + inventoryMarketValue + activeInvestmentsValue + bankDepositsValue;
+  const netWorth = grossAssets - totalLiabilities;
+  const totalEmpireValuation = Math.max(0, netWorth);
+
+  const debtRatio = grossAssets > 0 ? totalLiabilities / grossAssets : 1;
+  const rep = profile.reputation ?? 50;
+  let creditRating: 'AAA' | 'AA' | 'A' | 'BBB' | 'BB' | 'B' = 'BBB';
+  if (debtRatio < 0.1 && rep >= 85) creditRating = 'AAA';
+  else if (debtRatio < 0.25 && rep >= 70) creditRating = 'AA';
+  else if (debtRatio < 0.4 && rep >= 55) creditRating = 'A';
+  else if (debtRatio < 0.6 && rep >= 40) creditRating = 'BBB';
+  else if (debtRatio < 0.8) creditRating = 'BB';
+  else creditRating = 'B';
+
+  return {
+    totalEmpireValuation,
+    liquidCash,
+    goldValue,
+    landsTotalValue,
+    companiesTotalValue,
+    inventoryMarketValue,
+    activeInvestmentsValue,
+    bankDepositsValue,
+    totalLiabilities,
+    netWorth,
+    creditRating,
+    subsidiaries,
+  };
+}
+
 const DEPOSIT_OPTIONS = [
   { durationDays: 3, annualRate: 0.05 },
   { durationDays: 7, annualRate: 0.08 },
@@ -1504,7 +1760,7 @@ export function createDeposit(profile: PlayerProfile, amount: number, durationDa
   const option = DEPOSIT_OPTIONS.find((item) => item.durationDays === durationDays);
   if (!option) return failure(profile, 'invalid-input', 'مدة الوديعة غير متاحة. اختر 3 أو 7 أو 14 يومًا.');
   if (profile.banking.deposits.filter((deposit) => deposit.status === 'active').length >= 5) return failure(profile, 'condition-not-met', 'وصلت إلى الحد الأقصى: 5 ودائع نشطة. ادمج الودائع أو استرد وديعة مستحقة أولًا.');
-  if (!Number.isInteger(amount) || amount < 50_000) return failure(profile, 'invalid-input', 'الحد الأدنى للوديعة 50,000 جنيه محاكاة.');
+  if (!Number.isInteger(amount) || amount < 50_000) return failure(profile, 'invalid-input', 'الحد الأدنى للوديعة 50,000 $ محاكاة.');
   if (amount > profile.bankBalance) return failure(profile, 'insufficient-funds', 'لا يكفي الرصيد لإنشاء هذه الوديعة.');
   const cfo = profile.staff.find((member) => member.status === 'active' && member.role === 'cfo');
   const cfoRateBonus = cfo ? 0.02 + (staffLevel(cfo) - 1) * 0.006 : 0;
@@ -1739,6 +1995,31 @@ export function advanceDay(profile: PlayerProfile): GameResult<DayOutcome> {
     entries.push(ledgerEntry(profile, 'asset', order.materialCost, `اكتمل أمر إنتاج ${order.productName}`, entries.length));
     return { ...order, status: 'completed' as const };
   });
+
+  // Award practical production experience to company manager & foreman
+  if (newlyCompletedProductionIds.length > 0) {
+    const completedCompanyIds = new Set(
+      profile.productionOrders
+        .filter((o) => newlyCompletedProductionIds.includes(o.id))
+        .map((o) => o.companyId),
+    );
+    staff = staff.map((emp) => {
+      if (emp.status === 'active' && emp.companyId && completedCompanyIds.has(emp.companyId) && (emp.role === 'manager' || emp.role === 'foreman')) {
+        const nextExp = (emp.experience ?? 0) + 15;
+        if (nextExp >= STAFF_EXPERIENCE_PER_LEVEL && staffLevel(emp) < MAX_STAFF_LEVEL) {
+          const nextLvl = staffLevel(emp) + 1;
+          return {
+            ...emp,
+            level: nextLvl,
+            experience: nextExp - STAFF_EXPERIENCE_PER_LEVEL,
+            dailySalary: calculateStaffSalaryForLevel(emp.role, nextLvl),
+          };
+        }
+        return { ...emp, experience: nextExp };
+      }
+      return emp;
+    });
+  }
 
   // Settle arriving international CIF shipments & forward contracts
   const warehouseLevel = normalizeWarehouseLevel(profile.warehouseLevel);
@@ -2072,11 +2353,34 @@ export function deliverContract(profile: PlayerProfile, contractId: string): Gam
   const lawyer = profile.staff.find((member) => member.status === 'active' && member.role === 'lawyer');
   const lawyerLevel = staffLevel(lawyer);
   const lawyerBonusMult = lawyer ? 1 + (0.10 + (lawyerLevel - 1) * 0.04) : 1;
-  const contractReward = Math.round(contract.reward * lawyerBonusMult);
-  const revenue = grossRevenue + contractReward;
+  const contractReward = Math.round((contract.reward ?? 0) * lawyerBonusMult);
   const completed: BusinessContract = { ...contract, reward: contractReward, status: 'completed', completedOnDay: profile.day };
   const contracts = (profile.contracts ?? []).map((item) => item.id === contract.id ? completed : item);
-  const base = { ...profile, inventory: nextInventory, sales: [...profile.sales, sale], contracts, reputation: Math.min(100, (profile.reputation ?? 50) + contract.reputationReward) };
+  const updatedStaff = (profile.staff || []).map((emp) => {
+    if (emp.status === 'active' && (emp.role === 'lawyer' || emp.role === 'accountant')) {
+      const xpGain = emp.role === 'lawyer' ? 20 : 10;
+      const nextExp = (emp.experience ?? 0) + xpGain;
+      if (nextExp >= STAFF_EXPERIENCE_PER_LEVEL && staffLevel(emp) < MAX_STAFF_LEVEL) {
+        const nextLvl = staffLevel(emp) + 1;
+        return {
+          ...emp,
+          level: nextLvl,
+          experience: nextExp - STAFF_EXPERIENCE_PER_LEVEL,
+          dailySalary: calculateStaffSalaryForLevel(emp.role, nextLvl),
+        };
+      }
+      return { ...emp, experience: nextExp };
+    }
+    return emp;
+  });
+  const base = {
+    ...profile,
+    staff: updatedStaff,
+    inventory: nextInventory,
+    sales: [...profile.sales, sale],
+    contracts,
+    reputation: Math.min(100, (profile.reputation ?? 50) + contract.reputationReward),
+  };
   const achievements = awardAchievements(base);
   const nextProfile = addLedger(
     { ...base, achievements: achievements.achievements },
@@ -2087,7 +2391,7 @@ export function deliverContract(profile: PlayerProfile, contractId: string): Gam
       ledgerEntry(profile, 'expense', costOfGoods, `تكلفة البضاعة المباعة بعقد: ${contract.productName}`, 3),
       ...(achievements.bonus > 0 ? [ledgerEntry(profile, 'revenue', achievements.bonus, 'مكافأة إنجازات العقود', 4)] : []),
     ],
-    profile.bankBalance + revenue - tax + achievements.bonus,
+    profile.bankBalance + grossRevenue + contractReward - tax + achievements.bonus,
   );
   return success(syncTasks(nextProfile), `تم تسليم العقد بنجاح. الإيراد ${grossRevenue.toLocaleString('ar-EG')} $ والعلاوة ${contractReward.toLocaleString('ar-EG')} $ بعد احتساب الضريبة والتكلفة.`, completed);
 }

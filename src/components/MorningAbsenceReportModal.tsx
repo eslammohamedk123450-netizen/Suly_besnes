@@ -130,7 +130,7 @@ export const MorningAbsenceReportModal: React.FC<Props> = ({
                       <span className="text-xl">{g.icon}</span>
                       <div>
                         <div className="text-xs font-bold text-white">{g.name}</div>
-                        <div className="text-[11px] text-slate-400">+{g.quantity} وحدة للمخزن</div>
+                        <div className="text-[11px] text-slate-400">+{g.quantity} {g.unit} للمخزن</div>
                       </div>
                     </div>
                     <span className="text-xs font-extrabold text-emerald-400">
@@ -141,6 +141,46 @@ export const MorningAbsenceReportModal: React.FC<Props> = ({
               </div>
             )}
           </div>
+
+          {/* Raw Materials Consumed & Auto-Purchased Breakdown */}
+          {((report.materialsConsumed && report.materialsConsumed.length > 0) || (report.materialsAutoPurchased && report.materialsAutoPurchased.length > 0)) && (
+            <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-3">
+              {report.materialsConsumed && report.materialsConsumed.length > 0 && (
+                <div>
+                  <span className="text-xs font-extrabold text-amber-300 block mb-2">
+                    📦 مواد خام تم استهلاكها في خطوط الإنتاج:
+                  </span>
+                  <div className="flex flex-wrap gap-2">
+                    {report.materialsConsumed.map((m, idx) => (
+                      <span key={idx} className="px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-800 text-[11px] text-slate-300">
+                        {m.name}: <strong className="text-amber-400">-{m.quantity} {m.unit}</strong>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {report.materialsAutoPurchased && report.materialsAutoPurchased.length > 0 && (
+                <div className="pt-2 border-t border-slate-800/80">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-xs font-extrabold text-sky-400">
+                      🛒 شراء آلي بتوجيه المدير التنفيذي:
+                    </span>
+                    <span className="text-xs font-bold text-rose-400">
+                      تكلفة: -{formatCurrency(report.autoPurchaseTotalCost)}
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {report.materialsAutoPurchased.map((m, idx) => (
+                      <span key={idx} className="px-2.5 py-1 rounded-lg bg-sky-950/40 border border-sky-800/40 text-[11px] text-sky-200">
+                        {m.name}: +{m.quantity} {m.unit} ({formatCurrency(m.cost)})
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Revenue & Deductions Breakdown */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">

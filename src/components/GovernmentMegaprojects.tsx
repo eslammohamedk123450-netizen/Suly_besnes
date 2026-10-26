@@ -48,7 +48,7 @@ export const GovernmentMegaprojects: React.FC<Props> = ({ profile, expansion, on
         <div className="megaprojects-header-copy">
           <span className="megaprojects-kicker">🏛️ المناقصات القومية والنفوذ السياسي</span>
           <h2>المشاريع العملاقة وعقود الدولة</h2>
-          <p>بناء خطوط المونوريل، مجمعات الطاقة الشمسية، ومراكز السوبركومبيوتر بمليارات الجنيهات!</p>
+          <p>بناء خطوط المونوريل، مجمعات الطاقة الشمسية، ومراكز السوبركومبيوتر بمليارات الدولارات!</p>
         </div>
         <div className="megaprojects-header-badge">🏛️</div>
       </div>

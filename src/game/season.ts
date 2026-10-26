@@ -39,7 +39,7 @@ export const SEASON_CHALLENGES: readonly SeasonChallenge[] = [
 ];
 
 export const LOGIN_REWARDS = [
-  { id: 'cash', title: 'سيولة فورية', description: '25,000 جنيه محاكاة', points: 5 },
+  { id: 'cash', title: 'سيولة فورية', description: '25,000 $ محاكاة', points: 5 },
   { id: 'gold', title: 'ذهب للمحفظة', description: '0.5 غرام ذهب محاكاة', points: 5 },
   { id: 'diamonds', title: 'ماس الإمبراطورية', description: '8 ماسات مجانية للبطاقات', points: 5 },
 ] as const;

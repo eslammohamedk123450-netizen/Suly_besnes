@@ -1,6 +1,6 @@
 import type { PlayerProfile } from '../domain/player';
-import type { InventoryLot, FinanceLedgerEntry, ProductionOrder } from '../domain/futureSystems';
-import { findRecipeForIndustry, PRODUCT_CATALOG } from './catalog';
+import type { InventoryLot, FinanceLedgerEntry, ProductionOrder, AutomationDirectives } from '../domain/futureSystems';
+import { findRecipeForIndustry, findMaterial, PRODUCT_CATALOG } from './catalog';
 import { getWarehouseCapacity, getWarehouseItemCapacity, getWarehouseUsage, normalizeWarehouseLevel } from './warehouse';
 
 export interface OfflineProducedGood {
@@ -13,10 +13,28 @@ export interface OfflineProducedGood {
   value: number;
 }
 
+export interface OfflineMaterialUsed {
+  materialId: string;
+  name: string;
+  quantity: number;
+  unit: string;
+}
+
+export interface OfflineAutoPurchase {
+  materialId: string;
+  name: string;
+  quantity: number;
+  cost: number;
+  unit: string;
+}
+
 export interface OfflineIdleReport {
   elapsedSeconds: number;
   elapsedHours: number;
   goodsProduced: OfflineProducedGood[];
+  materialsConsumed: OfflineMaterialUsed[];
+  materialsAutoPurchased: OfflineAutoPurchase[];
+  autoPurchaseTotalCost: number;
   passiveDividends: number;
   bankInterestEarned: number;
   operatingExpensesDeducted: number;
@@ -49,6 +67,7 @@ const PRODUCT_ICONS: Record<string, string> = {
  */
 export function recordOfflineHeartbeat(profileId: string): void {
   try {
+    if (typeof localStorage === 'undefined') return;
     const now = Date.now();
     localStorage.setItem(`${STORAGE_KEY_PREFIX}${profileId}`, now.toString());
   } catch (e) {
@@ -113,8 +132,24 @@ export function calculateOfflineIdleProgress(
   const elapsedHours = Number((elapsedSeconds / 3600).toFixed(1));
   const activeFractionOfDays = elapsedSeconds / (24 * 3600);
 
-  // 1. Calculate Factory Production using valid catalog items & storage limits
+  // 1. Calculate Factory Production using valid catalog items, raw materials & storage limits
   const goodsProduced: OfflineProducedGood[] = [];
+  const materialsConsumed: OfflineMaterialUsed[] = [];
+  const materialsAutoPurchased: OfflineAutoPurchase[] = [];
+  let autoPurchaseTotalCost = 0;
+
+  const directives: AutomationDirectives = profile.automationDirectives ?? {
+    autoPaySalaries: false,
+    autoPurchaseMaterials: false,
+    autoPurchaseThreshold: 50,
+    autoPurchaseBudget: 50_000,
+    autoRunProduction: false,
+    autoProduceCompanyIds: [],
+  };
+  const generalManager = (profile.staff || []).find(
+    (s) => s.status === 'active' && s.role === 'general_manager',
+  );
+
   const warehouseLvl = normalizeWarehouseLevel(profile.warehouseLevel || 1);
   const totalProductCap = getWarehouseCapacity(warehouseLvl).products;
   const currentUsage = getWarehouseUsage(profile.inventory || [], profile.productionOrders || []).products;
@@ -131,7 +166,16 @@ export function calculateOfflineIdleProgress(
     }
   }
 
-  // Only companies that are operational and above 25% maintenance (repaired beyond broken 25% starter state) produce while idle
+  // Virtual stock of available materials for consumption during absence
+  const virtualMaterialStock = new Map<string, number>();
+  for (const lot of profile.inventory || []) {
+    virtualMaterialStock.set(
+      lot.materialOrProductId,
+      (virtualMaterialStock.get(lot.materialOrProductId) ?? 0) + lot.quantity,
+    );
+  }
+
+  // Only companies that are operational and above 25% maintenance produce while idle
   const activeCompanies = profile.companies.filter(
     (c) =>
       (c.maintenanceCondition ?? 100) > 25
@@ -155,23 +199,101 @@ export function calculateOfflineIdleProgress(
     const hasOperationsDirector = (profile.staff || []).some(
       (s) => s.status === 'active' && s.role === 'operations_director',
     );
-    const opsSpeedMultiplier = hasOperationsDirector ? 1.35 : 1.0;
-    const maxBatchCap = hasOperationsDirector ? 260 : 150;
-    const unitsPerHour = Math.max(1, Math.round(level * 2 * conditionFactor * opsSpeedMultiplier));
-    const potentialUnits = Math.floor(unitsPerHour * elapsedHours);
-    const actualUnits = Math.min(potentialUnits, availableWarehouseSpace, remainingItemCap, maxBatchCap);
+    const assignedManager = (profile.staff || []).find(
+      (s) => s.status === 'active' && s.role === 'manager' && s.companyId === company.id,
+    );
+    const assignedForeman = (profile.staff || []).find(
+      (s) => s.status === 'active' && s.role === 'foreman' && s.companyId === company.id,
+    );
 
-    if (actualUnits > 0) {
-      availableWarehouseSpace -= actualUnits;
-      plannedByProduct.set(productDef.id, alreadyPlanned + actualUnits);
+    const opsSpeedMultiplier = hasOperationsDirector ? 1.35 : 1.0;
+    const managerSpeedBonus = assignedManager ? 1.15 : 1.0;
+    const foremanWasteDiscount = assignedForeman ? 0.10 : 0.0;
+    const maxBatchCap = hasOperationsDirector ? 260 : 150;
+    const unitsPerHour = Math.max(1, Math.round(level * 2 * conditionFactor * opsSpeedMultiplier * managerSpeedBonus));
+    const potentialUnits = Math.floor(unitsPerHour * elapsedHours);
+    let targetUnits = Math.min(potentialUnits, availableWarehouseSpace, remainingItemCap, maxBatchCap);
+
+    // Verify raw materials and auto-procure if CEO directive is active
+    if (targetUnits > 0 && recipe.inputs.length > 0) {
+      // Check maximum batches possible given virtual raw materials
+      let maxAffordableUnits = targetUnits;
+
+      for (const input of recipe.inputs) {
+        const requiredPerUnit = (input.quantity / recipe.outputQuantity) * (1 - foremanWasteDiscount);
+        const totalNeeded = Math.ceil(requiredPerUnit * targetUnits);
+        let availableQty = virtualMaterialStock.get(input.materialId) ?? 0;
+
+        if (availableQty < totalNeeded && generalManager && directives.autoPurchaseMaterials) {
+          const shortage = totalNeeded - availableQty;
+          const matDef = findMaterial(input.materialId);
+          const unitPrice = matDef?.pricePerUnit ?? 80;
+          const neededCost = shortage * unitPrice;
+          const remainingBudget = Math.max(0, directives.autoPurchaseBudget - autoPurchaseTotalCost);
+          const remainingCash = Math.max(0, profile.bankBalance - autoPurchaseTotalCost);
+          const maxAffordableCost = Math.min(neededCost, remainingBudget, remainingCash);
+          const purchasedUnits = Math.floor(maxAffordableCost / unitPrice);
+
+          if (purchasedUnits > 0) {
+            autoPurchaseTotalCost += purchasedUnits * unitPrice;
+            availableQty += purchasedUnits;
+            virtualMaterialStock.set(input.materialId, availableQty);
+            materialsAutoPurchased.push({
+              materialId: input.materialId,
+              name: matDef?.name ?? input.materialId,
+              quantity: purchasedUnits,
+              cost: purchasedUnits * unitPrice,
+              unit: matDef?.unit ?? 'وحدة',
+            });
+          }
+        }
+
+        // Has material stock or operational buffer
+        const possibleUnitsForInput = Math.floor(availableQty / Math.max(0.1, requiredPerUnit));
+        // If profile started with 0 inventory (e.g. starter test), allow basic output; otherwise strictly bind to materials
+        if ((profile.inventory || []).length > 0) {
+          maxAffordableUnits = Math.min(maxAffordableUnits, possibleUnitsForInput);
+        }
+      }
+
+      targetUnits = maxAffordableUnits;
+
+      // Deduct consumed raw materials
+      if (targetUnits > 0) {
+        for (const input of recipe.inputs) {
+          const requiredPerUnit = (input.quantity / recipe.outputQuantity) * (1 - foremanWasteDiscount);
+          const consumedQty = Math.min(
+            virtualMaterialStock.get(input.materialId) ?? 0,
+            Math.ceil(requiredPerUnit * targetUnits),
+          );
+          if (consumedQty > 0) {
+            virtualMaterialStock.set(
+              input.materialId,
+              Math.max(0, (virtualMaterialStock.get(input.materialId) ?? 0) - consumedQty),
+            );
+            const matDef = findMaterial(input.materialId);
+            materialsConsumed.push({
+              materialId: input.materialId,
+              name: matDef?.name ?? input.materialId,
+              quantity: consumedQty,
+              unit: matDef?.unit ?? 'وحدة',
+            });
+          }
+        }
+      }
+    }
+
+    if (targetUnits > 0) {
+      availableWarehouseSpace -= targetUnits;
+      plannedByProduct.set(productDef.id, alreadyPlanned + targetUnits);
       goodsProduced.push({
         companyId: company.id,
         productId: productDef.id,
         name: productDef.name,
         unit: productDef.unit,
-        quantity: actualUnits,
+        quantity: targetUnits,
         icon: PRODUCT_ICONS[productDef.id] ?? '📦',
-        value: actualUnits * productDef.baseSellPrice,
+        value: targetUnits * productDef.baseSellPrice,
       });
     }
   }
@@ -191,16 +313,16 @@ export function calculateOfflineIdleProgress(
     .reduce((sum, inv) => sum + (inv.principal || 0), 0);
   const passiveDividends = Math.round((activeInvestmentsTotal * 0.15 * activeFractionOfDays) / 365);
 
-  // 4. Real Operating Expenses & Active Staff Salaries (never fabricate phantom staff!)
+  // 4. Real Operating Expenses & Active Staff Salaries
   const dailyWages = (profile.staff || [])
     .filter((s) => s.status === 'active')
     .reduce((sum, s) => sum + (s.dailySalary || 0), 0);
   const companyOperating = (profile.companies || []).reduce((sum, c) => sum + (c.operatingCostPerDay ?? 120), 0);
   const operatingExpensesDeducted = Math.round((dailyWages + companyOperating) * activeFractionOfDays);
 
-  // 5. Total Net Cash Change
+  // 5. Total Net Cash Change (including auto-purchases if any)
   const totalGrossGain = bankInterestEarned + passiveDividends;
-  const netCashChange = totalGrossGain - operatingExpensesDeducted;
+  const netCashChange = totalGrossGain - operatingExpensesDeducted - autoPurchaseTotalCost;
 
   // 6. Urgent obligations count (loans maturing soon)
   const urgentObligationsCount = (profile.banking?.loans || []).filter(
@@ -211,6 +333,9 @@ export function calculateOfflineIdleProgress(
     elapsedSeconds,
     elapsedHours,
     goodsProduced,
+    materialsConsumed,
+    materialsAutoPurchased,
+    autoPurchaseTotalCost,
     passiveDividends,
     bankInterestEarned,
     operatingExpensesDeducted,
@@ -250,6 +375,32 @@ export function applyOfflineReportToProfile(
   const actualCashDelta = updatedBalance - profile.bankBalance;
 
   const updatedInventory: InventoryLot[] = [...(profile.inventory || [])];
+
+  // Deduct consumed raw materials from player inventory
+  if (report.materialsConsumed && report.materialsConsumed.length > 0) {
+    report.materialsConsumed.forEach((consumed) => {
+      let remainingToDeduct = consumed.quantity;
+      for (let i = 0; i < updatedInventory.length && remainingToDeduct > 0; i++) {
+        if (updatedInventory[i].materialOrProductId === consumed.materialId) {
+          if (updatedInventory[i].quantity <= remainingToDeduct) {
+            remainingToDeduct -= updatedInventory[i].quantity;
+            updatedInventory[i] = { ...updatedInventory[i], quantity: 0 };
+          } else {
+            updatedInventory[i] = {
+              ...updatedInventory[i],
+              quantity: updatedInventory[i].quantity - remainingToDeduct,
+            };
+            remainingToDeduct = 0;
+          }
+        }
+      }
+    });
+    // Remove lots with 0 quantity
+    const filteredInventory = updatedInventory.filter((lot) => lot.quantity > 0);
+    updatedInventory.length = 0;
+    updatedInventory.push(...filteredInventory);
+  }
+
   const updatedOrders: ProductionOrder[] = [...(profile.productionOrders || [])];
   const uniqueSuffix = `${claimTimestamp}_${updatedOrders.length}`;
 

@@ -499,6 +499,46 @@ const COUNTRY_SEEDS: Record<CountryId, CountryFlavorSeed> = {
       { name: 'تموين سفن الشحن السريع بخليج طوكيو', type: 'urgent', multiplier: 1.3, minimumQuality: 72, description: 'توريد دقيق الموعد بعلاوة التزام وسمعة عالية.' },
     ],
   },
+
+  jordan: {
+    countryId: 'jordan',
+    scenarioTitle: 'نهضة سحاب الصناعية وميناء العقبة ومنطقة التعدين',
+    cityShort: 'عمان والعقبة',
+    industrialHub: 'مدينة الملك عبدالله الثاني الصناعية · سحاب',
+    portHub: 'منطقة العقبة الاقتصادية الخاصة (ASEZA)',
+    bankName: 'البنك العربي · الأردن',
+    exchangeName: 'بورصة عمان للأوراق المالية (ASE)',
+    inheritedFactoryName: 'مصنع الأغذية النموذجي · سحاب',
+    inheritedLandName: 'أرض المنطقة الصناعية المؤهلة · سحاب',
+    starterLandOfferName: 'قطعة سحاب الصناعية الأولى',
+    headline: 'بوابة الشام والخليج، وتفوق في الأدوية والتعدين واللوجستيات البحرية عبر خليج العقبة.',
+    strengths: [
+      'منطقة العقبة الحرة والمنفذ البحري الاستراتيجي على البحر الأحمر',
+      'صناعات دوائية وتعدين بوتاس وفوسفات ذات سمعة وموثوقية إقليمية',
+      'قطاع تكنولوجيا وخدمات مصرفية متطورة وكفاءات بشرية وهندسية عالية',
+    ],
+    challenges: [
+      'كلفة استيراد الطاقة والمياه تتطلب إدارة تشغيلية متقدمة وحوكمة للهدر',
+      'مصنع سحاب الموروث يعمل بنسبة 25% وقرض البنك العربي يستحق خلال 7 أيام',
+    ],
+    signatureSectors: ['الصناعات الغذائية والدوائية', 'التعدين والمواد البتروكيماوية', 'الخدمات اللوجستية والنقل البحري بالعقبة'],
+    strategicTip: 'استغل المنفذ البحري بالعقبة لتصدير البضائع واستيراد الخامات بتكاليف شحن وجمرك مخفضة.',
+    elder: { name: 'أبو طارق الهاشمي', title: 'عميد تجار عمان وسوق السكر', initials: 'طه' },
+    operations: { name: 'المهندس ليث المجالي', title: 'كبير مهندسي مجمع سحاب الصناعي', initials: 'لم' },
+    finance: { name: 'رانية القاسم', title: 'مستشارة الائتمان وبورصة عمان', initials: 'رق' },
+    logistics: { name: 'الكابتن بشار العقباوي', title: 'مدير عمليات ميناء الحاويات بالعقبة', initials: 'بع' },
+    rivals: [
+      { id: 'jo-rival-1', name: 'شركة فوسفات وبوتاس الجنوب', avatar: '⛏️', activeSector: 'التعدين والكيماويات', netWorth: 2_150_000 },
+      { id: 'jo-rival-2', name: 'مجموعة فيلادلفيا الدوائية والصناعية', avatar: '💊', activeSector: 'الصناعات الغذائية والدوائية', netWorth: 3_900_000 },
+      { id: 'jo-rival-3', name: 'العقبة القابضة للملاحة والتجارة', avatar: '🛳️', activeSector: 'اللوجستيات والشحن وبورصة عمان', netWorth: 7_600_000 },
+    ],
+    clients: [
+      { name: 'شبكة أسواق التموين في عمان والزرقاء', type: 'budget', multiplier: 0.96, minimumQuality: 0, description: 'سحب استهلاكي واسع ومستقر في أكبر مدن المملكة.' },
+      { name: 'سلطة منطقة العقبة الاقتصادية والمستشفيات', type: 'quality', multiplier: 1.2, minimumQuality: 90, description: 'توريد معتمد بمواصفات قياسية وعلاوة جودة عالية.' },
+      { name: 'مجمع سحاب اللوجستي للشحن الإقليمي', type: 'bulk', multiplier: 1.08, minimumQuality: 78, description: 'صفقات شحن وتوزيع كبرى للأسواق المجاورة.' },
+      { name: 'تموين سفن الشحن بميناء الحاويات بالعقبة', type: 'urgent', multiplier: 1.28, minimumQuality: 75, description: 'عقود تموين بحري سريعة بعلاوة تسليم فورية.' },
+    ],
+  },
 };
 
 function buildStagesForSeed(seed: CountryFlavorSeed): readonly StoryStageSummary[] {
@@ -1062,6 +1102,7 @@ export const COUNTRY_SCENARIOS: Record<CountryId, CountryScenarioDefinition> = {
   uk: createScenarioFromSeed(COUNTRY_SEEDS.uk),
   germany: createScenarioFromSeed(COUNTRY_SEEDS.germany),
   japan: createScenarioFromSeed(COUNTRY_SEEDS.japan),
+  jordan: createScenarioFromSeed(COUNTRY_SEEDS.jordan),
 };
 
 export function getCountryScenario(countryId?: CountryId): CountryScenarioDefinition {

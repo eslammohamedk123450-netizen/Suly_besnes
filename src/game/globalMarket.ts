@@ -372,6 +372,13 @@ const COUNTRY_TRADE_PROFILES: Record<CountryId, CountryTradeProfile> = {
     seaFreightMultiplier: 0.84,
     exportHubBonusPct: 9,
   },
+  jordan: {
+    advantagedMaterials: ['chemicals', 'water', 'packaging', 'cement'],
+    advantageDiscountPct: 8,
+    baseCustomsTariffRate: 0.025, // ASEZA free-zone strategic tariff
+    seaFreightMultiplier: 0.82, // Red Sea Aqaba port
+    exportHubBonusPct: 7,
+  },
 };
 
 const BULK_TIERS_STANDARD: readonly BulkDiscountTier[] = [

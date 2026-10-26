@@ -9,7 +9,7 @@ const MAX_SEASON_POINTS = 1_000_000_000;
 const MAX_ENERGY = 100_000;
 
 const SUPPORTED_COUNTRY_IDS = new Set([
-  'egypt', 'saudi', 'uae', 'usa', 'kuwait', 'qatar', 'uk', 'germany', 'japan',
+  'egypt', 'saudi', 'uae', 'usa', 'kuwait', 'qatar', 'uk', 'germany', 'japan', 'jordan',
 ]);
 
 const OPTIONAL_PROFILE_KEYS = new Set([
