@@ -128,6 +128,7 @@ export interface PlayerProfile {
   playerAuctions?: PlayerAuctionListing[];
   soldAssetIds?: string[];
   processedAuctionSaleIds?: string[];
+  processedBotOfferIds?: string[];
   automationDirectives?: AutomationDirectives;
 }
 

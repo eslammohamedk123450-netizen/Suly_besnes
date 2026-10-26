@@ -482,6 +482,7 @@ function migrateProfile(value: unknown): PlayerProfile | null {
     ...(Array.isArray(value.playerAuctions) && value.playerAuctions.every(isPlayerAuctionListing) ? { playerAuctions: value.playerAuctions } : {}),
     ...(Array.isArray(value.soldAssetIds) ? { soldAssetIds: Array.from(new Set(value.soldAssetIds.filter(isNonEmptyString))) } : {}),
     ...(Array.isArray(value.processedAuctionSaleIds) ? { processedAuctionSaleIds: Array.from(new Set(value.processedAuctionSaleIds.filter(isNonEmptyString))) } : {}),
+    ...(Array.isArray(value.processedBotOfferIds) ? { processedBotOfferIds: Array.from(new Set(value.processedBotOfferIds.filter(isNonEmptyString))) } : {}),
   }, typeof value.accountCode === 'string' ? value.accountCode : value.id as string);
 }
 

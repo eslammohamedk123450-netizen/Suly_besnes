@@ -763,12 +763,60 @@
   line-height: 1.2;
 }
 
+.right-story-handle {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  width: 48px;
+  min-height: 56px;
+  padding: 6px 4px;
+  background: linear-gradient(135deg, #1e1b4b 0%, #0f172a 100%);
+  border: 1.5px solid rgba(168, 85, 247, 0.7);
+  border-right: none;
+  border-radius: 16px 0 0 16px;
+  box-shadow: -4px 8px 25px rgba(0, 0, 0, 0.65), 0 0 18px rgba(168, 85, 247, 0.35);
+  color: #e9d5ff;
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  direction: rtl;
+}
+
+.right-story-handle:hover {
+  width: 56px;
+  background: linear-gradient(135deg, #2e1065 0%, #1e1b4b 100%);
+  border-color: rgba(192, 132, 252, 1);
+  box-shadow: -6px 12px 30px rgba(0, 0, 0, 0.75), 0 0 25px rgba(168, 85, 247, 0.5);
+  transform: translateX(-2px);
+}
+
+.right-story-handle-icon {
+  font-size: 1.3rem;
+  line-height: 1;
+}
+
+.right-story-badge {
+  font-size: 0.62rem;
+  font-weight: 800;
+  color: #c084fc;
+  letter-spacing: -0.2px;
+}
+
 /* Mobile Responsiveness */
 @media (max-width: 768px) {
   .right-hub-handle {
     bottom: 120px;
     width: 42px;
     min-height: 60px;
+  }
+  .right-story-handle {
+    width: 42px;
+    min-height: 52px;
+  }
+  .right-wheel-handle {
+    width: 42px;
+    min-height: 58px;
   }
   .right-hub-backdrop {
     padding: 8px;
@@ -780,3 +828,4 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+

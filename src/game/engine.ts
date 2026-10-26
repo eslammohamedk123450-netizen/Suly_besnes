@@ -38,6 +38,7 @@ import {
   cancelPlayerAssetAuction,
 } from './dynamicAuctions';
 import { claimStarterMission } from './onboarding';
+import { acceptBotMarketOffer } from './economyBots';
 
 export type GameErrorCode =
   | 'invalid-input'
@@ -216,6 +217,7 @@ function ledgerEntry(
 
 function syncTasks(profile: PlayerProfile): PlayerProfile {
   const existing = new Map((profile.tasks ?? []).map((task) => [task.taskId, task]));
+  const completedSet = new Set(profile.completedTaskIds ?? []);
   const automaticBadges = [
     profile.companies.length > 0 ? 'شارة المؤسس' : null,
     profile.productionOrders.length > 0 ? 'مشغّل مصنع' : null,
@@ -225,7 +227,15 @@ function syncTasks(profile: PlayerProfile): PlayerProfile {
   ].filter((badge): badge is string => Boolean(badge));
   return {
     ...profile,
-    tasks: TASK_CATALOG.map((task) => existing.get(task.id) ?? { taskId: task.id, claimed: false }),
+    tasks: TASK_CATALOG.map((task) => {
+      const prev = existing.get(task.id);
+      const isClaimed = Boolean(prev?.claimed || completedSet.has(task.id));
+      return {
+        taskId: task.id,
+        claimed: isClaimed,
+        ...(prev?.claimedAt ? { claimedAt: prev.claimedAt } : {}),
+      };
+    }),
     badges: [...new Set([...(profile.badges ?? []), ...automaticBadges])],
   };
 }
@@ -384,13 +394,43 @@ export function buyDirectCompany(profile: PlayerProfile, listingId: string, paym
   return success(syncTasks(nextProfile), `تم شراء ${listing.name} ${paymentMethod === 'diamonds' ? `مقابل ${payment.diamondsSpent} ماسة` : 'نقدًا'}. يجري إنهاء عقود نقل الملكية، ويبدأ التشغيل بعد يوم داخل اللعبة في اليوم ${profile.day + 1}. تحلَّ بالصبر.`, { companyId: company.id, landId, price, diamondsSpent: payment.diamondsSpent });
 }
 
-export function sellLand(profile: PlayerProfile, landId: string): GameResult<{ landId: string; payout: number }> {
+export function sellLand(profile: PlayerProfile, landId: string): GameResult<{ landId: string; payout: number; transactionId: string }> {
   const land = profile.lands.find((item) => item.id === landId);
   if (!land) return failure(profile, 'not-found', 'الأرض غير موجودة.');
   if (profile.companies.some((company) => company.landId === landId)) return failure(profile, 'condition-not-met', 'لا يمكن بيع أرض مرتبطة بشركة. بع الشركة أو انقلها أولًا.');
+  if ((profile.soldAssetIds ?? []).includes(landId)) {
+    return failure(profile, 'already-owned', 'تم بيع هذه الأرض واستلام قيمتها مسبقاً.');
+  }
+
+  const transactionId = `tx-sell-land-${landId}-${Date.now()}`;
+  if ((profile.processedAuctionSaleIds ?? []).includes(transactionId)) {
+    return failure(profile, 'condition-not-met', 'تم تسجيل هذه المعاملة مسبقاً.');
+  }
+
   const payout = Math.floor(land.purchasePrice * 0.5);
-  const nextProfile = addLedger({ ...profile, lands: profile.lands.filter((item) => item.id !== landId) }, [ledgerEntry(profile, 'revenue', payout, `بيع أرض: ${land.label} بنصف القيمة`, 0)], profile.bankBalance + payout);
-  return success(nextProfile, `تم بيع ${land.label} واسترداد 50% من قيمتها.`, { landId, payout });
+  const updatedSoldAssetIds = Array.from(new Set([...(profile.soldAssetIds ?? []), landId]));
+  const updatedProcessedSaleIds = Array.from(new Set([...(profile.processedAuctionSaleIds ?? []), transactionId]));
+  const updatedPlayerAuctions = (profile.playerAuctions ?? []).map((l) =>
+    l.assetId === landId && l.status === 'active' ? { ...l, status: 'cancelled' as const } : l
+  );
+
+  const nextProfile = addLedger(
+    {
+      ...profile,
+      lands: profile.lands.filter((item) => item.id !== landId),
+      soldAssetIds: updatedSoldAssetIds,
+      processedAuctionSaleIds: updatedProcessedSaleIds,
+      playerAuctions: updatedPlayerAuctions,
+      finances: {
+        ...profile.finances,
+        totalRevenue: (profile.finances?.totalRevenue ?? 0) + payout,
+        netProfit: (profile.finances?.netProfit ?? 0) + payout,
+      },
+    },
+    [ledgerEntry(profile, 'revenue', payout, `بيع أرض: ${land.label} بنصف القيمة (معاملة: ${transactionId})`, 0)],
+    profile.bankBalance + payout
+  );
+  return success(syncTasks(nextProfile), `تم بيع ${land.label} واسترداد 50% من قيمتها.`, { landId, payout, transactionId });
 }
 
 export function upgradeLand(profile: PlayerProfile, landId: string, paymentMethod: PurchasePaymentMethod = 'cash'): GameResult<{ landId: string; level: number; cost: number; diamondsSpent: number }> {
@@ -406,25 +446,94 @@ export function upgradeLand(profile: PlayerProfile, landId: string, paymentMetho
   return success(nextProfile, `تم تطوير ${land.label} إلى المستوى ${level + 1} ${paymentMethod === 'diamonds' ? `مقابل ${payment.diamondsSpent} ماسة` : 'نقدًا'}.`, { landId, level: level + 1, cost, diamondsSpent: payment.diamondsSpent });
 }
 
-export function sellCompany(profile: PlayerProfile, companyId: string): GameResult<{ companyId: string; payout: number }> {
+export function sellCompany(profile: PlayerProfile, companyId: string): GameResult<{ companyId: string; payout: number; transactionId: string }> {
   const company = profile.companies.find((item) => item.id === companyId);
   if (!company) return failure(profile, 'not-found', 'الشركة غير موجودة.');
   if (profile.productionOrders.some((order) => order.companyId === companyId && order.status === 'active')) return failure(profile, 'condition-not-met', 'أوقف أو أكمل أوامر الإنتاج قبل بيع الشركة.');
   if (profile.staff.some((member) => member.companyId === companyId && member.status === 'active')) return failure(profile, 'condition-not-met', 'أنه عقود موظفي الشركة قبل بيعها.');
+  if ((profile.soldAssetIds ?? []).includes(companyId)) {
+    return failure(profile, 'already-owned', 'تم بيع هذه الشركة واستلام قيمتها مسبقاً.');
+  }
+
+  const transactionId = `tx-sell-company-${companyId}-${Date.now()}`;
+  if ((profile.processedAuctionSaleIds ?? []).includes(transactionId)) {
+    return failure(profile, 'condition-not-met', 'تم تسجيل هذه المعاملة مسبقاً.');
+  }
+
   const industry = findIndustry(company.industryId);
   const land = company.landId ? profile.lands.find((item) => item.id === company.landId) : undefined;
   const value = (industry?.setupFee ?? 0) + (industry?.licenseFee ?? 0) + (land?.purchasePrice ?? 0);
   const payout = Math.floor(value * 0.5);
-  const nextProfile = addLedger({ ...profile, companies: profile.companies.filter((item) => item.id !== companyId), lands: land ? profile.lands.filter((item) => item.id !== land.id) : profile.lands, licenses: profile.licenses.filter((license) => !company.licenseIds?.includes(license.id)) }, [ledgerEntry(profile, 'revenue', payout, `بيع شركة: ${company.name} بنصف القيمة`, 0)], profile.bankBalance + payout);
-  return success(nextProfile, `تم بيع ${company.name} واسترداد 50% من قيمة الشركة وأرضها.`, { companyId, payout });
+
+  const updatedSoldAssetIds = Array.from(new Set([
+    ...(profile.soldAssetIds ?? []),
+    companyId,
+    ...(land ? [land.id] : []),
+  ]));
+  const updatedProcessedSaleIds = Array.from(new Set([...(profile.processedAuctionSaleIds ?? []), transactionId]));
+  const updatedPlayerAuctions = (profile.playerAuctions ?? []).map((l) =>
+    (l.assetId === companyId || (land && l.assetId === land.id)) && l.status === 'active'
+      ? { ...l, status: 'cancelled' as const }
+      : l
+  );
+
+  const nextProfile = addLedger(
+    {
+      ...profile,
+      companies: profile.companies.filter((item) => item.id !== companyId),
+      lands: land ? profile.lands.filter((item) => item.id !== land.id) : profile.lands,
+      licenses: profile.licenses.filter((license) => !company.licenseIds?.includes(license.id)),
+      soldAssetIds: updatedSoldAssetIds,
+      processedAuctionSaleIds: updatedProcessedSaleIds,
+      playerAuctions: updatedPlayerAuctions,
+      finances: {
+        ...profile.finances,
+        totalRevenue: (profile.finances?.totalRevenue ?? 0) + payout,
+        netProfit: (profile.finances?.netProfit ?? 0) + payout,
+      },
+    },
+    [ledgerEntry(profile, 'revenue', payout, `بيع شركة: ${company.name} بنصف القيمة (معاملة: ${transactionId})`, 0)],
+    profile.bankBalance + payout
+  );
+  return success(syncTasks(nextProfile), `تم بيع ${company.name} واسترداد 50% من قيمة الشركة وأرضها.`, { companyId, payout, transactionId });
 }
 
-export function sellAsset(profile: PlayerProfile, assetId: string): GameResult<{ assetId: string; payout: number }> {
+export function sellAsset(profile: PlayerProfile, assetId: string): GameResult<{ assetId: string; payout: number; transactionId: string }> {
   const asset = profile.assets.find((item) => item.id === assetId);
   if (!asset) return failure(profile, 'not-found', 'الأصل غير موجود.');
+  if ((profile.soldAssetIds ?? []).includes(assetId)) {
+    return failure(profile, 'already-owned', 'تم بيع هذا الأصل واستلام قيمته مسبقاً.');
+  }
+
+  const transactionId = `tx-sell-asset-${assetId}-${Date.now()}`;
+  if ((profile.processedAuctionSaleIds ?? []).includes(transactionId)) {
+    return failure(profile, 'condition-not-met', 'تم تسجيل هذه المعاملة مسبقاً.');
+  }
+
   const payout = Math.floor(asset.value * 0.5);
-  const nextProfile = addLedger({ ...profile, assets: profile.assets.filter((item) => item.id !== assetId) }, [ledgerEntry(profile, 'revenue', payout, `بيع أصل: ${asset.label} بنصف القيمة`, 0)], profile.bankBalance + payout);
-  return success(nextProfile, `تم بيع ${asset.label} واسترداد 50% من قيمته.`, { assetId, payout });
+  const updatedSoldAssetIds = Array.from(new Set([...(profile.soldAssetIds ?? []), assetId]));
+  const updatedProcessedSaleIds = Array.from(new Set([...(profile.processedAuctionSaleIds ?? []), transactionId]));
+  const updatedPlayerAuctions = (profile.playerAuctions ?? []).map((l) =>
+    l.assetId === assetId && l.status === 'active' ? { ...l, status: 'cancelled' as const } : l
+  );
+
+  const nextProfile = addLedger(
+    {
+      ...profile,
+      assets: profile.assets.filter((item) => item.id !== assetId),
+      soldAssetIds: updatedSoldAssetIds,
+      processedAuctionSaleIds: updatedProcessedSaleIds,
+      playerAuctions: updatedPlayerAuctions,
+      finances: {
+        ...profile.finances,
+        totalRevenue: (profile.finances?.totalRevenue ?? 0) + payout,
+        netProfit: (profile.finances?.netProfit ?? 0) + payout,
+      },
+    },
+    [ledgerEntry(profile, 'revenue', payout, `بيع أصل: ${asset.label} بنصف القيمة (معاملة: ${transactionId})`, 0)],
+    profile.bankBalance + payout
+  );
+  return success(syncTasks(nextProfile), `تم بيع ${asset.label} واسترداد 50% من قيمته.`, { assetId, payout, transactionId });
 }
 
 export function buyMaterial(profile: PlayerProfile, _materialId: string, _quantity: number): GameResult<{ materialId: string; quantity: number; totalCost: number }> {
@@ -2521,7 +2630,8 @@ export type GameCommand =
   | { name: 'list_player_asset'; args: { assetType: 'land' | 'company'; assetId: string; startingBid: number } }
   | { name: 'settle_player_auction'; args: { listingId: string; customWinningAmount?: number; customBuyerName?: string } }
   | { name: 'cancel_player_auction'; args: { listingId: string } }
-  | { name: 'claim_starter_mission'; args: { missionId: string } };
+  | { name: 'claim_starter_mission'; args: { missionId: string } }
+  | { name: 'accept_bot_offer'; args: { offerId: string } };
 
 export type GameCommandHandler = (command: GameCommand, fallback: (profile: PlayerProfile) => GameResult<unknown>) => void | Promise<void>;
 
@@ -2578,6 +2688,7 @@ export function executeGameCommand(profile: PlayerProfile, command: GameCommand)
     case 'settle_player_auction': return settlePlayerAssetAuction(profile, command.args.listingId, command.args.customWinningAmount, command.args.customBuyerName);
     case 'cancel_player_auction': return cancelPlayerAssetAuction(profile, command.args.listingId);
     case 'claim_starter_mission': return claimStarterMission(profile, command.args.missionId);
+    case 'accept_bot_offer': return acceptBotMarketOffer(profile, command.args.offerId);
   }
 }
 
@@ -2595,3 +2706,12 @@ export {
   getCurrentStarterMissionStage,
   STARTER_MISSION_SPECS,
 } from './onboarding';
+
+export {
+  acceptBotMarketOffer,
+  generateBotMarketOffers,
+  getAdaptiveBots,
+  BASE_ECONOMIC_BOTS,
+  type EconomicBot,
+  type BotMarketOffer,
+} from './economyBots';
