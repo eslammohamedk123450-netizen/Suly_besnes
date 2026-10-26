@@ -11,7 +11,10 @@ const completedOrder = {
 };
 
 function profile() {
-  return createNewPlayer(findCountry('egypt')!, 'اختبار', new Date('2026-01-01T00:00:00.000Z'));
+  const base = createNewPlayer(findCountry('egypt')!, 'اختبار', new Date('2026-01-01T00:00:00.000Z'));
+  base.onboarding.introCompleted = true;
+  base.onboarding.countryIntroSeen = true;
+  return base;
 }
 
 describe('notification state and destinations', () => {
@@ -71,10 +74,11 @@ describe('notification state and destinations', () => {
     }));
   });
 
-  it('routes grouped alerts to the intended actionable screens', () => {
+  it('routes grouped alerts to the intended actionable screens once those sections are unlocked', () => {
     const base = profile();
     const alerts = selectNotifications({
       ...base,
+      level: 5,
       payables: 2_000,
       staff: [{ id: 'staff-1', name: 'موظف', role: 'accountant', dailySalary: 1_000, hiredOnDay: 1, nextPayDay: 2, status: 'active', unpaidSalary: 1_000 }],
       productionOrders: [completedOrder],

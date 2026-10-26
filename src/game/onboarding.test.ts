@@ -23,8 +23,11 @@ describe('progress-based unlocks', () => {
     expect(getSectionUnlockHint(profile, 'contracts')).not.toContain('اليوم');
   });
 
-  it('unlocks production after the first company, then contracts after production and a sale', () => {
+  it('unlocks production with a company, contracts after production and a sale, and bank after a contract', () => {
     const profile = newStartedProfile();
+    profile.companies = [];
+    expect(getUnlockedSectionIds(profile)).not.toContain('production');
+
     profile.companies.push({ id: 'company-1' } as PlayerProfile['companies'][number]);
     let unlocked = getUnlockedSectionIds(profile);
     expect(unlocked).toContain('production');
@@ -38,9 +41,8 @@ describe('progress-based unlocks', () => {
     expect(unlocked).not.toContain('bank');
   });
 
-  it('unlocks finance after a completed contract and derives level from accomplishments', () => {
+  it('unlocks banking after a completed contract and investments after a second contract or level 5', () => {
     const profile = newStartedProfile();
-    profile.companies.push({ id: 'company-1' } as PlayerProfile['companies'][number]);
     profile.productionOrders.push({ id: 'order-1', status: 'completed' } as PlayerProfile['productionOrders'][number]);
     profile.sales.push({ id: 'sale-1', productId: 'product-1', quantity: 1, unitPrice: 10, grossRevenue: 10, tax: 0, soldAt: '2026-01-01T00:00:00.000Z' });
     profile.contracts.push({
@@ -49,12 +51,20 @@ describe('progress-based unlocks', () => {
     });
 
     const progress = getPlayerProgress(profile);
-    const unlocked = getUnlockedSectionIds(profile);
+    let unlocked = getUnlockedSectionIds(profile);
     expect(progress.level).toBeGreaterThanOrEqual(2);
     expect(progress.totalExperience).toBeGreaterThan(0);
     expect(unlocked).toContain('bank');
-    expect(unlocked).toContain('investments');
     expect(unlocked).toContain('obligations');
+    expect(unlocked).not.toContain('investments');
+
+    profile.companies.push({ id: 'company-2' } as PlayerProfile['companies'][number]);
+    profile.contracts.push({
+      id: 'contract-2', clientName: 'عميل ٢', clientType: 'bulk', productId: 'product-1', productName: 'منتج', quantity: 2,
+      unitPrice: 10, reward: 10, reputationReward: 1, deadlineDay: 4, acceptedOnDay: 2, completedOnDay: 3, status: 'completed',
+    });
+    unlocked = getUnlockedSectionIds(profile);
+    expect(unlocked).toContain('investments');
   });
 
   it('reaches management systems through level or repeated business accomplishments, not day count', () => {

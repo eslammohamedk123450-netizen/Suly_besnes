@@ -1,23 +1,30 @@
-import { SpotlightWalkthrough } from "./components/SpotlightWalkthrough";
-import { WALKTHROUGH_STEPS, isWalkthroughCompleted, setWalkthroughCompleted } from "./game/walkthroughState";
+import { SpotlightWalkthrough } from './components/SpotlightWalkthrough';
+import {
+  WALKTHROUGH_STEPS,
+  isWalkthroughCompleted,
+  setWalkthroughCompleted,
+  getSavedWalkthroughStepIndex,
+  setSavedWalkthroughStepIndex,
+  resolveQuestWalkthroughTarget,
+  resetWalkthrough,
+  type WalkthroughStep,
+} from './game/walkthroughState';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { App as CapacitorApp } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
-import { Brand } from './components/Brand';
 import { AccountGate } from './components/AccountGate';
 import { CountrySelection } from './components/CountrySelection';
 import { Dashboard } from './components/Dashboard';
 import { ProfilePage } from './components/ProfilePage';
-import { GameDayTimer } from './components/GameDayTimer';
 import { Icon } from './components/Icon';
 import { FlyingToast, type ToastAlert } from './components/FlyingToast';
-import { NotificationBell } from './components/NotificationBell';
 import { NotificationModal } from './components/NotificationModal';
 import { selectNotifications, type GameNotification } from './game/notifications';
 import { SectionPage } from './components/SectionPage';
 import { COUNTRIES, findCountry } from './domain/countries';
 import type { CountryId } from './domain/countries';
-import { GAME_SECTIONS, getSection, SECTION_GROUPS, type SectionId } from './domain/navigation';
+import { DEFAULT_AVATAR_ID } from './domain/avatars';
+import { getSection, SECTION_GROUPS, type SectionId } from './domain/navigation';
 import { createNewPlayer } from './domain/player';
 import type { PlayerProfile } from './domain/player';
 import { formatMoney } from './domain/formatters';
@@ -31,8 +38,11 @@ import { executeRemoteGameCommand, loadRemoteGame, redeemRemoteReward, saveRemot
 import { PasswordResetGate } from './components/PasswordResetGate';
 import { supabase } from './storage/supabaseClient';
 import { StoryIntro } from './components/StoryIntro';
+import { StoryCampaignHub } from './components/StoryCampaignHub';
 import { SystemGuideModal } from './components/SystemGuideModal';
-import { chapterFor, getPlayerProgress, getSectionUnlockHint, getUnlockedSectionIds, isSectionUnlocked, getSectionRequiredLevel } from './game/onboarding';
+import { chapterFor, getSectionUnlockHint, getUnlockedSectionIds, isSectionUnlocked, getSectionRequiredLevel } from './game/onboarding';
+import { resolveSafeSection } from './game/progressionEngine';
+import { getCountryScenario, type CountryStoryQuest } from './game/countryScenarios';
 import { normalizeAccountFeatures } from './domain/accountFeatures';
 import { claimDailySeasonLogin, getVisibleSeasons, recordVerifiedGameTransaction } from './storage/leaderboardRepository';
 import { ResourceBar, type ResourceSyncState } from './components/ResourceBar';
@@ -40,7 +50,7 @@ import { acknowledgeGameCommand, blockGameCommand, createGameCommandKey, enqueue
 import { clearPendingInitialProfile, loadPendingInitialProfile, queueInitialProfile } from './storage/pendingInitialProfile';
 import { playSound } from './game/soundEffects';
 import { RightActionHub } from './components/RightActionHub';
-import { StoryEventPopup, GAME_STORY_EVENTS, type StoryEventAlert } from './components/StoryEventPopup';
+import { StoryEventPopup, getLocalizedStoryEventAlerts, type StoryEventAlert } from './components/StoryEventPopup';
 import { DynamicEconomyEvents } from './components/DynamicEconomyEvents';
 import { loadExpansionState } from './game/expansionEngine';
 import { DailyLuckySpinModal } from './components/DailyLuckySpinModal';
@@ -53,11 +63,6 @@ import { MorningAbsenceReportModal } from './components/MorningAbsenceReportModa
 import { CentralBankModal } from './components/CentralBankModal';
 import { PrestigeExpansionModal } from './components/PrestigeExpansionModal';
 import { triggerHaptic } from './services/nativeMobileService';
-import { StoryCampaignHub } from './components/StoryCampaignHub';
-import { StoryBriefingModal } from './components/StoryBriefingModal';
-import { filterSynchronizedNotifications } from './game/synchronizer';
-import { CENTRAL_MISSIONS_CATALOG } from './game/missionsEngine';
-import { getLeadAdvisor } from './game/campaignScenario';
 
 function getPendingSyncCount(accountId: string): number {
   return loadQueuedGameCommands(accountId).length + (loadPendingInitialProfile(accountId) ? 1 : 0);
@@ -76,13 +81,14 @@ export default function App() {
   const [profile, setProfile] = useState<PlayerProfile | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [selectedCountryId, setSelectedCountryId] = useState<CountryId>(() => profile?.countryId ?? COUNTRIES[0].id);
+  const [selectedAvatarId, setSelectedAvatarId] = useState<string>(() => profile?.avatarId ?? DEFAULT_AVATAR_ID);
   const [playerName, setPlayerName] = useState(() => profile?.name ?? '');
   const [activeSection, setActiveSection] = useState<SectionId>('home');
   const [sectionFocus, setSectionFocus] = useState<string | undefined>();
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [, setMobileMenuOpen] = useState(false);
   const [notificationTheme, setNotificationTheme] = useState(loadNotificationTheme);
   const [notice, setNotice] = useState('');
-  const [noticeTone, setNoticeTone] = useState<'success' | 'error'>('success');
+  const [, setNoticeTone] = useState<'success' | 'error'>('success');
   const [pendingGuide, setPendingGuide] = useState<SectionId | null>(null);
   const [linkingAccount, setLinkingAccount] = useState(false);
   const [syncState, setSyncState] = useState<ResourceSyncState>('synced');
@@ -90,12 +96,14 @@ export default function App() {
   const [passwordRecovery, setPasswordRecovery] = useState(false);
   const [recoveryError, setRecoveryError] = useState('');
   const [activeStoryEvent, setActiveStoryEvent] = useState<StoryEventAlert | null>(null);
-  const [expansion, setExpansion] = useState(() => profile ? loadExpansionState(profile) : null);
+  const [expansion, setExpansion] = useState(() => (profile ? loadExpansionState(profile) : null));
   const [isLuckyWheelOpen, setIsLuckyWheelOpen] = useState(false);
   const [isTutorialOpen, setIsTutorialOpen] = useState(false);
+  const [isCampaignHubOpen, setIsCampaignHubOpen] = useState(false);
   const [isAvatarWardrobeOpen, setIsAvatarWardrobeOpen] = useState(false);
-  const [isWalkthroughActive, setIsWalkthroughActive] = useState(() => !isWalkthroughCompleted());
+  const [isWalkthroughActive, setIsWalkthroughActive] = useState(false);
   const [walkthroughStepIndex, setWalkthroughStepIndex] = useState(0);
+  const [walkthroughOverrideStep, setWalkthroughOverrideStep] = useState<WalkthroughStep | null>(null);
   const [celebrationData, setCelebrationData] = useState<CelebrationData | null>(null);
   const [isNotificationModalOpen, setIsNotificationModalOpen] = useState(false);
   const [activeToastAlert, setActiveToastAlert] = useState<ToastAlert | null>(null);
@@ -105,17 +113,46 @@ export default function App() {
   const [offlineReport, setOfflineReport] = useState<OfflineIdleReport | null>(null);
   const [isCentralBankModalOpen, setIsCentralBankModalOpen] = useState(false);
   const [isPrestigeModalOpen, setIsPrestigeModalOpen] = useState(false);
-  const [isStoryCampaignOpen, setIsStoryCampaignOpen] = useState(false);
-  const [isStoryBriefingOpen, setIsStoryBriefingOpen] = useState(false);
   const syncLock = useRef(false);
   const remoteCommandAttempts = useRef(new Map<string, Promise<RemoteGameCommandAttempt>>());
+
+  const applyLoadedProfileState = (loadedProfile: PlayerProfile | null) => {
+    setProfile(loadedProfile);
+    if (!loadedProfile) {
+      setIsWalkthroughActive(false);
+      setWalkthroughOverrideStep(null);
+      return;
+    }
+    setSelectedCountryId(loadedProfile.countryId);
+    setSelectedAvatarId(loadedProfile.avatarId ?? DEFAULT_AVATAR_ID);
+    const introAlreadySeen = Boolean(
+      loadedProfile.onboarding?.countryIntroSeen || loadedProfile.onboarding?.introCompleted,
+    );
+    if (!introAlreadySeen) {
+      setIsTutorialOpen(true);
+      setIsWalkthroughActive(false);
+    } else {
+      setIsTutorialOpen(false);
+      const stepIdx = getSavedWalkthroughStepIndex(loadedProfile);
+      setWalkthroughStepIndex(stepIdx);
+      setIsWalkthroughActive(!isWalkthroughCompleted(loadedProfile));
+    }
+  };
+
+  useEffect(() => {
+    if (!profile) {
+      setExpansion(null);
+      return;
+    }
+    setExpansion(loadExpansionState(profile));
+  }, [profile?.id]);
 
   const triggerNotification = (
     message: string,
     tone: 'success' | 'warning' | 'info' | 'danger' = 'info',
     title?: string,
     section?: SectionId,
-    target?: string
+    target?: string,
   ) => {
     const id = `notif-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
     const inferredTitle = title || (
@@ -125,13 +162,18 @@ export default function App() {
       'إشعار إمبراطورية الأعمال'
     );
 
+    const safeSection: SectionId = profile
+      ? resolveSafeSection(profile, section)
+      : (section ?? 'home');
+    const safeTarget = safeSection === section ? target : undefined;
+
     setActiveToastAlert({
       id,
       title: inferredTitle,
       message,
       tone,
-      section,
-      target,
+      section: safeSection,
+      target: safeTarget,
     });
 
     const newNotif: GameNotification = {
@@ -139,8 +181,8 @@ export default function App() {
       title: inferredTitle,
       detail: message,
       tone,
-      section: (section ?? 'home') as any,
-      target,
+      section: safeSection,
+      target: safeTarget,
     };
 
     setCustomNotifications((prev) => [newNotif, ...prev.slice(0, 30)]);
@@ -149,14 +191,14 @@ export default function App() {
   };
 
   const showNotice = (
-    msg: string, 
-    tone: 'success' | 'warning' | 'info' | 'danger' = 'info', 
-    title?: string, 
-    sec?: SectionId, 
-    tgt?: string
+    msg: string,
+    tone: 'success' | 'warning' | 'info' | 'danger' = 'info',
+    title?: string,
+    sec?: SectionId,
+    tgt?: string,
   ) => {
     setNotice(msg);
-    setNoticeTone(tone === 'danger' ? 'error' : (tone as any));
+    setNoticeTone(tone === 'danger' ? 'error' : 'success');
     triggerNotification(msg, tone, title, sec, tgt);
   };
 
@@ -164,14 +206,17 @@ export default function App() {
     if (!profile) return customNotifications;
     const dynamic = selectNotifications(profile);
     const map = new Map<string, GameNotification>();
-    for (const item of [...customNotifications, ...dynamic]) {
+    for (const rawItem of [...customNotifications, ...dynamic]) {
+      const safeSec = resolveSafeSection(profile, rawItem.section);
+      const item: GameNotification = safeSec === rawItem.section
+        ? rawItem
+        : { ...rawItem, section: safeSec, target: undefined };
       if (!map.has(item.id)) {
         map.set(item.id, item);
       }
     }
     const dismissed = new Set(profile.dismissedNotificationIds ?? []);
-    const list = Array.from(map.values()).filter((n) => !dismissed.has(n.id));
-    return filterSynchronizedNotifications(list, profile);
+    return Array.from(map.values()).filter((n) => !dismissed.has(n.id));
   }, [profile, customNotifications]);
 
   const unreadNotificationsCount = useMemo(() => {
@@ -216,21 +261,33 @@ export default function App() {
 
   const handleLuckySpinReward = (reward: { type: 'cash' | 'gold' | 'diamonds' | 'speed_card'; amount: number; label: string; wasFree?: boolean }) => {
     if (!profile) return;
-    let next: any = { ...profile, lastSpinDay: profile.day };
-    if (reward.wasFree) {
-      next.lastSpinTimestamp = Date.now();
-    } else {
-      next.diamonds = Math.max(0, (next.diamonds ?? 0) - 2);
-    }
+    const next: PlayerProfile = {
+      ...profile,
+      lastSpinDay: profile.day,
+      lastSpinTimestamp: reward.wasFree ? Date.now() : profile.lastSpinTimestamp,
+      diamonds: reward.wasFree ? profile.diamonds : Math.max(0, (profile.diamonds ?? 0) - 2),
+      ledger: [...(profile.ledger ?? [])],
+      finances: { ...profile.finances },
+    };
     if (reward.type === 'cash') {
       next.bankBalance = (next.bankBalance ?? 0) + reward.amount;
+      next.finances.netProfit += reward.amount;
+      next.finances.totalRevenue += reward.amount;
+      next.ledger.push({
+        id: `spin-cash-${Date.now()}`,
+        category: 'revenue',
+        amount: reward.amount,
+        countryId: next.countryId,
+        occurredAt: new Date().toISOString(),
+        note: `مكافأة نقدية من عجلة الحظ (${reward.label})`,
+      });
     } else if (reward.type === 'gold') {
       next.goldGrams = Number(((next.goldGrams ?? 0) + reward.amount).toFixed(2));
     } else if (reward.type === 'diamonds') {
       next.diamonds = (next.diamonds ?? 0) + reward.amount;
     } else if (reward.type === 'speed_card') {
-      const existingCards = next.speedCards ? [...next.speedCards] : [];
-      const idx = existingCards.findIndex((c: any) => c.kind === 'production-instant');
+      const existingCards = next.speedCards ? next.speedCards.map((c) => ({ ...c })) : [];
+      const idx = existingCards.findIndex((c) => c.kind === 'production-instant');
       if (idx >= 0) existingCards[idx].quantity += 1;
       else existingCards.push({ kind: 'production-instant', quantity: 1 });
       next.speedCards = existingCards;
@@ -327,41 +384,39 @@ export default function App() {
         let current = await loadCurrentAccount();
         if (cancelled) return;
 
-        // Auto-create guest session if none exists so player can play immediately
         if (!current) {
           current = createGuestAccount();
         }
         setAccount(current);
 
-        let local = loadSavedGame(current.id) ?? loadPendingInitialProfile(current.id)?.profile ?? null;
-        
-        // Auto-create the initial struggle world if no save exists yet
-        if (!local) {
-          const egyptCountry = COUNTRIES[0];
-          local = normalizeAccountFeatures(createNewPlayer(egyptCountry, 'إسلام محمد'), current.id);
-          saveGame(local, current.id);
-        }
+        const local = loadSavedGame(current.id) ?? loadPendingInitialProfile(current.id)?.profile ?? null;
+        if (local) {
+          const loadedProfile = normalizeAccountFeatures(local, current.id);
+          applyLoadedProfileState(loadedProfile);
+          setAuthLoading(false);
 
-        const loadedProfile = normalizeAccountFeatures(local, current.id);
-        setProfile(loadedProfile);
-        setAuthLoading(false);
-
-        // Smart Offline Idle Engine: calculate goods and dividends during absence
-        try {
-          const idleRep = calculateOfflineIdleProgress(loadedProfile);
-          if (idleRep && (idleRep.elapsedSeconds >= 120 || idleRep.isTampered)) {
-            setOfflineReport(idleRep);
-            setIsMorningReportOpen(true);
+          try {
+            const idleRep = calculateOfflineIdleProgress(loadedProfile);
+            if (idleRep && (idleRep.elapsedSeconds >= 120 || idleRep.isTampered)) {
+              setOfflineReport(idleRep);
+              setIsMorningReportOpen(true);
+            }
+          } catch (e) {
+            console.error('Idle progress error', e);
           }
-        } catch (e) {
-          console.error('Idle progress error', e);
+          recordOfflineHeartbeat(current.id);
+        } else if (current.isGuest) {
+          // New player without a save: proceed through the 7-step CountrySelection & Character Setup flow!
+          applyLoadedProfileState(null);
+          setAuthLoading(false);
+          return;
         }
-        recordOfflineHeartbeat(current.id);
 
         if (current.isGuest) {
           void claimDailyLogin(current);
           return;
         }
+
         const localSnapshot = local ? JSON.stringify(local) : null;
         const remote = await loadRemoteGame(current.id);
         if (cancelled) return;
@@ -369,7 +424,11 @@ export default function App() {
         const queue = loadQueuedGameCommands(current.id);
         const initialPending = loadPendingInitialProfile(current.id);
         const localUnchanged = JSON.stringify(latestLocal) === localSnapshot;
-        if (remote && !queue.length && !initialPending && localUnchanged) setProfile(normalizeAccountFeatures(remote, current.id));
+        if (remote && !queue.length && !initialPending && localUnchanged) {
+          applyLoadedProfileState(normalizeAccountFeatures(remote, current.id));
+        } else if (!local && !remote) {
+          applyLoadedProfileState(null);
+        }
         setAuthLoading(false);
         void claimDailyLogin(current);
       } catch {
@@ -401,7 +460,6 @@ export default function App() {
       else if (pendingCount) setSyncState('syncing');
       else setSyncState('synced');
     };
-    // Sync silently when connectivity returns. Never interrupt gameplay with a toast.
     const handleOnline = () => { void synchronizePendingCommands(false); };
     const handleOffline = () => refreshStatus();
     window.addEventListener('online', handleOnline);
@@ -417,14 +475,18 @@ export default function App() {
   async function handleAuthenticated(nextAccount: LocalAccount) {
     setAccount(nextAccount);
     const local = loadSavedGame(nextAccount.id) ?? loadPendingInitialProfile(nextAccount.id)?.profile ?? null;
-    if (local) setProfile(normalizeAccountFeatures(local, nextAccount.id));
+    if (local) applyLoadedProfileState(normalizeAccountFeatures(local, nextAccount.id));
     const localSnapshot = local ? JSON.stringify(local) : null;
     const remote = nextAccount.isGuest ? null : await loadRemoteGame(nextAccount.id);
     const latestLocal = loadSavedGame(nextAccount.id);
     const hasPendingSync = getPendingSyncCount(nextAccount.id) > 0;
-    if (remote && !hasPendingSync && JSON.stringify(latestLocal) === localSnapshot) setProfile(normalizeAccountFeatures(remote, nextAccount.id));
-    else if (!local && remote) setProfile(normalizeAccountFeatures(remote, nextAccount.id));
-    else if (!local && !remote) setProfile(null);
+    if (remote && !hasPendingSync && JSON.stringify(latestLocal) === localSnapshot) {
+      applyLoadedProfileState(normalizeAccountFeatures(remote, nextAccount.id));
+    } else if (!local && remote) {
+      applyLoadedProfileState(normalizeAccountFeatures(remote, nextAccount.id));
+    } else if (!local && !remote) {
+      applyLoadedProfileState(null);
+    }
     setActiveSection('home');
     setNotice('تم تسجيل الدخول مباشرة.');
     setNoticeTone('success');
@@ -480,7 +542,7 @@ export default function App() {
     return attempt;
   }
 
-  async function synchronizePendingCommands(showNotice = false): Promise<boolean> {
+  async function synchronizePendingCommands(showSyncNotice = false): Promise<boolean> {
     if (!account || account.isGuest) return true;
     if (syncLock.current) return false;
     syncLock.current = true;
@@ -516,7 +578,7 @@ export default function App() {
         setPendingCommandCount(queue.length + (loadPendingInitialProfile(account.id) ? 1 : 0));
         if (!queue.length) {
           setSyncState('synced');
-          if (showNotice && synchronizedCount > 0) {
+          if (showSyncNotice && synchronizedCount > 0) {
             setNotice(`تمت مزامنة ${synchronizedCount} من خطوات عالمك.`);
             setNoticeTone('success');
           }
@@ -590,30 +652,35 @@ export default function App() {
     if (!guestProfile) {
       setPlayerName('');
       setSelectedCountryId(COUNTRIES[0].id);
+      setSelectedAvatarId(DEFAULT_AVATAR_ID);
     }
-    setProfile(guestProfile ? normalizeAccountFeatures(guestProfile, guest.id) : null);
+    applyLoadedProfileState(guestProfile ? normalizeAccountFeatures(guestProfile, guest.id) : null);
     setLinkingAccount(false);
-    setNotice(guestProfile ? 'أهلاً بك مجدداً في جلسة الضيف.' : 'جلسة ضيف جديدة. اختر اسمك ودولتك للبدء.');
+    setNotice(guestProfile ? 'أهلاً بك مجدداً في جلسة الضيف.' : 'جلسة ضيف جديدة. اختر اسمك وشخصيتك ودولتك للبدء.');
     setNoticeTone('success');
   }
 
   function handleResetToCountrySelection() {
-    setProfile(null);
+    resetWalkthrough();
+    applyLoadedProfileState(null);
     setPlayerName('');
     setSelectedCountryId(COUNTRIES[0].id);
-    setNotice('اختر دولتك واسمك الجديد للبدء.');
+    setSelectedAvatarId(DEFAULT_AVATAR_ID);
+    setNotice('اختر اسمك ومظهرك ودولتك لبدء عالم جديد مستقل.');
     setNoticeTone('success');
   }
 
   function handleAccountDeleted() {
-    setProfile(null);
+    resetWalkthrough();
+    applyLoadedProfileState(null);
     setPlayerName('');
     setSelectedCountryId(COUNTRIES[0].id);
+    setSelectedAvatarId(DEFAULT_AVATAR_ID);
     const freshGuest = createGuestAccount();
     setAccount(freshGuest);
     setNotice('تم مسح الحساب والبيانات بنجاح. مرحباً بك في بداية جديدة لإمبراطوريتك!');
     setNoticeTone('success');
-    navigate('home');
+    setActiveSection('home');
   }
 
   async function handleLinkedAccount(nextAccount: LocalAccount) {
@@ -626,14 +693,17 @@ export default function App() {
     let linkTone: 'success' | 'error' = 'success';
     const existingCloudProfile = await loadRemoteGame(nextAccount.id);
     if (existingCloudProfile) {
-      setProfile(existingCloudProfile ? normalizeAccountFeatures(existingCloudProfile, nextAccount.id) : null);
+      applyLoadedProfileState(normalizeAccountFeatures(existingCloudProfile, nextAccount.id));
       setNotice('تم فتح عالم الحساب الموجود. حفظ الضيف لم يُحذف من هذا الجهاز.');
     } else if (guestProfile) {
       const guestCountry = findCountry(guestProfile.countryId) ?? COUNTRIES[0];
-      const freshCloudProfile = normalizeAccountFeatures(createNewPlayer(guestCountry, guestProfile.name), nextAccount.id);
+      const freshCloudProfile = normalizeAccountFeatures(
+        createNewPlayer(guestCountry, guestProfile.name, new Date(), guestProfile.avatarId),
+        nextAccount.id,
+      );
       const localCreated = saveGame(freshCloudProfile, nextAccount.id);
       const queued = localCreated.ok && queueInitialProfile(nextAccount.id, freshCloudProfile);
-      setProfile(freshCloudProfile);
+      applyLoadedProfileState(freshCloudProfile);
       if (queued) setSyncState(typeof navigator !== 'undefined' && !navigator.onLine ? 'offline' : 'syncing');
       else {
         setSyncState('blocked');
@@ -643,7 +713,7 @@ export default function App() {
         ? 'تم ربط الحساب وبدأ عالم جديد لحماية الأرصدة. حفظ الضيف السابق ما زال على هذا الجهاز ولم يُنقل.'
         : 'تم ربط الحساب، لكن تعذر تجهيز مزامنة العالم الجديد. لم يُرفع حفظ الضيف؛ تحقق من مساحة التخزين ثم أعد المحاولة.');
     } else {
-      setProfile(null);
+      applyLoadedProfileState(null);
       setNotice('تم ربط الحساب. ابدأ عالمك الجديد الآن.');
     }
     setAccount(nextAccount);
@@ -653,8 +723,6 @@ export default function App() {
   }
 
   const country = findCountry(profile?.countryId ?? selectedCountryId) ?? COUNTRIES[0];
-  const active = getSection(activeSection);
-  const playerProgress = profile ? getPlayerProgress(profile) : null;
 
   useEffect(() => {
     if (!notice) return;
@@ -680,10 +748,15 @@ export default function App() {
   function startNewWorld() {
     const chosenCountry = findCountry(selectedCountryId);
     if (!chosenCountry) return;
-    const newProfile = normalizeAccountFeatures(createNewPlayer(chosenCountry, playerName), account?.id);
+    resetWalkthrough();
+    const newProfile = normalizeAccountFeatures(
+      createNewPlayer(chosenCountry, playerName, new Date(), selectedAvatarId),
+      account?.id,
+    );
     const result = saveGame(newProfile, account?.id);
+    recordOfflineHeartbeat(account?.id ?? newProfile.id);
     if (account && !account.isGuest) {
-    const queued = queueInitialProfile(account.id, newProfile);
+      const queued = queueInitialProfile(account.id, newProfile);
       setPendingCommandCount(getPendingSyncCount(account.id) + Number(Boolean(loadPendingInitialProfile(account.id))));
       setSyncState(queued ? (typeof navigator !== 'undefined' && !navigator.onLine ? 'offline' : 'syncing') : 'blocked');
       if (queued) void synchronizePendingCommands(false);
@@ -691,21 +764,52 @@ export default function App() {
     setProfile(newProfile);
     setActiveSection('home');
     setMobileMenuOpen(false);
+    // Step 5 of the 7-Step Flow: Open Country-Specific StoryIntro once!
+    setIsTutorialOpen(true);
+    setIsWalkthroughActive(false);
+    setWalkthroughOverrideStep(null);
+    setWalkthroughStepIndex(0);
     showNotice(
-      result.ok ? 'تم إنشاء عالمك وحفظه على هذا الجهاز بنجاح! 🌍' : 'تعذر حفظ البيانات محليًا؛ قد لا يستمر التقدم بعد إغلاق الصفحة.',
+      result.ok ? `تم استلام أصول البداية في ${chosenCountry.name} وحفظ عالمك بنجاح! 🌍` : 'تعذر حفظ البيانات محليًا؛ قد لا يستمر التقدم بعد إغلاق الصفحة.',
       result.ok ? 'success' : 'danger',
-      'بداية إمبراطورية جديدة'
+      'بداية إمبراطورية جديدة',
+      'home',
     );
   }
 
   function completeIntro() {
     if (!profile) return;
-    const nextProfile = { ...profile, onboarding: { ...profile.onboarding, introCompleted: true, chapter: 1 } };
+    const alreadyCompleted = Boolean(profile.onboarding.introCompleted && profile.onboarding.countryIntroSeen);
+    const nextProfile: PlayerProfile = {
+      ...profile,
+      onboarding: {
+        ...profile.onboarding,
+        introCompleted: true,
+        countryIntroSeen: true,
+        chapter: Math.max(1, profile.onboarding.chapter || 1),
+      },
+    };
     saveGame(nextProfile, account?.id);
     if (account && !account.isGuest) setSyncState('local');
     setProfile(nextProfile);
+    setIsTutorialOpen(false);
     playSound('success');
-    showNotice('بدأ الفصل الأول: خطة الإنقاذ. ابدأ بالأرض ثم أسس شركتك الأولى.', 'success', 'انطلاق الفصل الأول', 'lands');
+
+    // Step 7 of the 7-Step Flow: Begin Chapter 1 + First Main Quest + Interactive Spotlight Walkthrough
+    if (!isWalkthroughCompleted(nextProfile)) {
+      const stepIdx = getSavedWalkthroughStepIndex(nextProfile);
+      setWalkthroughStepIndex(stepIdx);
+      setWalkthroughOverrideStep(null);
+      setIsWalkthroughActive(true);
+    }
+    if (!alreadyCompleted) {
+      showNotice(
+        `انطلق الفصل الأول في ${country.name}: ابدأ بصيانة المصنع الموروث ومتابعة المهمة الرئيسية الأولى.`,
+        'success',
+        'انطلاق الفصل الأول',
+        'companies',
+      );
+    }
   }
 
   function handleGameResult<T>(result: GameResult<T>, options: { syncRemote?: boolean } = {}) {
@@ -723,13 +827,8 @@ export default function App() {
     showNotice(
       saved.ok ? `${result.message}${settlementNote}` : `${result.message}${settlementNote} تعذر تثبيت الحفظ على هذا الجهاز.`,
       saved.ok ? 'success' : 'danger',
-      'تحديث العملية'
+      'تحديث العملية',
     );
-  }
-
-  function runGameAction(action: (current: PlayerProfile) => GameResult<unknown>) {
-    if (!profile) return;
-    handleGameResult(action(profile));
   }
 
   async function executeCommandForProfile(
@@ -792,7 +891,6 @@ export default function App() {
     const previousProfile = profile;
     const execution = await executeCommandForProfile(profile, command, fallback);
     if (execution.source === 'remote' && execution.result.ok) void recordVerifiedTransactions(previousProfile, execution.result.profile);
-    // Sync failures are kept in the local outbox and must never interrupt gameplay.
     if (execution.source === 'blocked' && !execution.result.ok) return;
     handleGameResult(execution.result, { syncRemote: false });
   }
@@ -834,7 +932,6 @@ export default function App() {
     }
     if (completedDays === 0) return;
 
-    // Process Hybrid Dividends for stocks if player holds any
     const stockState = loadStockMarketState(current.id);
     const isSeasonalMilestone = current.day % 5 === 0;
     const dividendRes = disburseHybridDividends(current, stockState, isSeasonalMilestone);
@@ -852,9 +949,12 @@ export default function App() {
     setNotice(saved.ok ? summary : `${summary} تعذر تثبيت الحفظ على هذا الجهاز.`);
     setNoticeTone(saved.ok ? 'success' : 'error');
 
-    // Trigger dynamic advisor story popup
-    const eventIndex = Math.floor(Math.random() * GAME_STORY_EVENTS.length);
-    setActiveStoryEvent(GAME_STORY_EVENTS[eventIndex]);
+    // Trigger country-isolated, progression-gated advisor alert
+    const eligibleAlerts = getLocalizedStoryEventAlerts(current);
+    if (eligibleAlerts.length > 0) {
+      const alertIndex = current.day % eligibleAlerts.length;
+      setActiveStoryEvent(eligibleAlerts[alertIndex]);
+    }
   }
 
   function navigate(section: SectionId, focus?: string) {
@@ -866,7 +966,10 @@ export default function App() {
     }
     setActiveSection(section);
     setSectionFocus(focus);
-    if (!isWalkthroughActive && section !== 'home' && section !== 'profile' && !profile.onboarding.seenGuides.includes(section)) { setPendingGuide(section); playSound('unlock'); }
+    if (!isWalkthroughActive && section !== 'home' && section !== 'profile' && !profile.onboarding.seenGuides.includes(section)) {
+      setPendingGuide(section);
+      playSound('unlock');
+    }
     setMobileMenuOpen(false);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
@@ -874,9 +977,32 @@ export default function App() {
   function handleLogout() {
     if (account && !account.isGuest) void logoutAccount();
     setAccount(null);
-    setProfile(null);
+    applyLoadedProfileState(null);
     setLinkingAccount(false);
   }
+
+  const handleRestartWalkthrough = () => {
+    if (!profile) return;
+    resetWalkthrough();
+    const stepIdx = getSavedWalkthroughStepIndex({
+      ...profile,
+      onboarding: { ...profile.onboarding, walkthroughStepId: undefined },
+    });
+    const nextProfile: PlayerProfile = {
+      ...profile,
+      onboarding: {
+        ...profile.onboarding,
+        walkthroughCompleted: false,
+        walkthroughSkipped: false,
+        walkthroughStepId: WALKTHROUGH_STEPS[stepIdx]?.id ?? WALKTHROUGH_STEPS[0].id,
+      },
+    };
+    setProfile(nextProfile);
+    saveGame(nextProfile, account?.id);
+    setWalkthroughOverrideStep(null);
+    setWalkthroughStepIndex(stepIdx);
+    setIsWalkthroughActive(true);
+  };
 
   if (passwordRecovery) {
     return (
@@ -900,8 +1026,10 @@ export default function App() {
       <>
         <CountrySelection
           selectedCountryId={selectedCountryId}
+          selectedAvatarId={selectedAvatarId}
           playerName={playerName}
           onCountryChange={setSelectedCountryId}
+          onAvatarChange={setSelectedAvatarId}
           onPlayerNameChange={setPlayerName}
           onStart={startNewWorld}
         />
@@ -915,11 +1043,8 @@ export default function App() {
     );
   }
 
-  // StoryIntro is now displayed as a voluntary modal so it never blocks the real walkthrough
-
+  const showStoryIntroModal = isTutorialOpen || (!profile.onboarding.countryIntroSeen && !profile.onboarding.introCompleted);
   const unlockedSections = new Set(getUnlockedSectionIds(profile));
-  const fixedBottomItems: SectionId[] = ['home', 'companies', 'auctions', 'staff', 'profile'];
-  const otherSections = GAME_SECTIONS.filter((section) => !fixedBottomItems.includes(section.id));
 
   return (
     <div className="app-frame">
@@ -931,10 +1056,7 @@ export default function App() {
         pendingCommandCount={pendingCommandCount}
         onDaysElapsed={handleDaysElapsed}
         onOpenWardrobe={() => setIsAvatarWardrobeOpen(true)}
-        onOpenWalkthrough={() => {
-          setWalkthroughStepIndex(0);
-          setIsWalkthroughActive(true);
-        }}
+        onOpenWalkthrough={handleRestartWalkthrough}
         onOpenTutorial={() => setIsTutorialOpen(true)}
         unreadNotificationsCount={unreadNotificationsCount}
         onOpenNotifications={() => setIsNotificationModalOpen(true)}
@@ -956,6 +1078,7 @@ export default function App() {
                     className={`nav-item${activeSection === section.id ? ' is-active' : ''}${!unlocked ? ' is-locked' : ''}`}
                     type="button"
                     key={section.id}
+                    data-guide-nav={section.id}
                     onClick={() => navigate(section.id)}
                     aria-current={activeSection === section.id ? 'page' : undefined}
                     title={unlocked ? section.label : getSectionUnlockHint(profile, section.id)}
@@ -977,26 +1100,41 @@ export default function App() {
 
         <main className="main-content flex-1 w-full min-w-0 pb-24 md:pb-8">
           {activeSection === 'home' ? (
-            <Dashboard 
-              profile={profile} 
-              country={country} 
-              onNavigate={navigate} 
+            <Dashboard
+              profile={profile}
+              country={country}
+              onNavigate={navigate}
               onCommand={handleGameCommand}
               onOpenLuckyWheel={() => setIsLuckyWheelOpen(true)}
               onOpenTutorial={() => setIsTutorialOpen(true)}
+              onOpenCampaignHub={() => setIsCampaignHubOpen(true)}
               onOpenMorningReport={() => {
                 triggerHaptic('light');
-                const rep = offlineReport || calculateOfflineIdleProgress(profile, 8 * 3600);
-                if (rep) {
+                const rep = offlineReport || calculateOfflineIdleProgress(profile);
+                if (rep && (rep.elapsedSeconds >= 120 || rep.isTampered)) {
                   setOfflineReport(rep);
                   setIsMorningReportOpen(true);
+                } else {
+                  showNotice(
+                    'لا توجد أرباح غياب متراكمة حالياً؛ تُحتسب أرباح المصانع والأسهم تلقائياً عند إغلاق اللعبة لأكثر من دقيقتين.',
+                    'info',
+                    'تقرير الصباح لغياب المدير',
+                  );
                 }
               }}
               onOpenCentralBank={() => {
+                if (!isSectionUnlocked(profile, 'bank')) {
+                  showNotice(getSectionUnlockHint(profile, 'bank'), 'warning', 'البنك مقفل حالياً');
+                  return;
+                }
                 triggerHaptic('light');
                 setIsCentralBankModalOpen(true);
               }}
               onOpenPrestige={() => {
+                if (!isSectionUnlocked(profile, 'luxury')) {
+                  showNotice(getSectionUnlockHint(profile, 'luxury'), 'warning', 'نظام الهيبة مقفل حالياً');
+                  return;
+                }
                 triggerHaptic('light');
                 setIsPrestigeModalOpen(true);
               }}
@@ -1008,34 +1146,74 @@ export default function App() {
                   return next;
                 });
               }}
-              onClaimReward={(cash, diamonds) => {
+              onMarkBriefingSeen={(questId) => {
                 setProfile((prev) => {
                   if (!prev) return prev;
-                  const next = {
+                  if (prev.onboarding.seenQuestBriefings?.includes(questId)) return prev;
+                  const next: PlayerProfile = {
+                    ...prev,
+                    onboarding: {
+                      ...prev.onboarding,
+                      seenQuestBriefings: [...(prev.onboarding.seenQuestBriefings ?? []), questId],
+                    },
+                  };
+                  saveGame(next, account?.id);
+                  return next;
+                });
+              }}
+              onStartGuidedWalkthrough={(quest: CountryStoryQuest) => {
+                const resolved = resolveQuestWalkthroughTarget(quest, profile);
+                if (resolved.mode === 'core') {
+                  setWalkthroughOverrideStep(null);
+                  setWalkthroughStepIndex(resolved.stepIndex);
+                  setIsWalkthroughActive(true);
+                } else {
+                  setWalkthroughOverrideStep(resolved.step);
+                  setIsWalkthroughActive(true);
+                }
+              }}
+              onClaimReward={(cash, diamonds, questId) => {
+                let claimedOk = false;
+                setProfile((prev) => {
+                  if (!prev) return prev;
+                  const alreadyClaimed = prev.onboarding.claimedStoryQuestIds?.includes(questId);
+                  const scenarioQuest = getCountryScenario(prev.countryId).quests.find((q) => q.id === questId);
+                  if (alreadyClaimed || (scenarioQuest && !scenarioQuest.isCompleted(prev))) {
+                    return prev;
+                  }
+                  claimedOk = true;
+                  const nextLedger = [...(prev.ledger ?? [])];
+                  if (cash > 0) {
+                    nextLedger.push({
+                      id: `story-quest-${questId}-${prev.ledger.length}`,
+                      category: 'revenue',
+                      amount: cash,
+                      countryId: prev.countryId,
+                      occurredAt: new Date().toISOString(),
+                      note: `مكافأة إنجاز مهمة القصة: ${scenarioQuest?.title ?? questId}`,
+                    });
+                  }
+                  const next: PlayerProfile = {
                     ...prev,
                     bankBalance: prev.bankBalance + cash,
                     diamonds: prev.diamonds + diamonds,
+                    finances: {
+                      ...prev.finances,
+                      netProfit: prev.finances.netProfit + cash,
+                      totalRevenue: prev.finances.totalRevenue + cash,
+                    },
+                    ledger: nextLedger,
+                    onboarding: {
+                      ...prev.onboarding,
+                      claimedStoryQuestIds: [...(prev.onboarding.claimedStoryQuestIds ?? []), questId],
+                    },
                   };
                   saveGame(next, account?.id);
-                  showNotice(`تم استلام المكافأة: +${cash.toLocaleString()} $ و +${diamonds} ألماسة! 🎁`, 'success', 'مكافأة إنجاز');
                   return next;
                 });
-              }}
-              onRequestEmergencyLoan={() => {
-                setProfile((prev) => {
-                  if (!prev) return prev;
-                  const next = {
-                    ...prev,
-                    bankBalance: prev.bankBalance + 250000,
-                  };
-                  saveGame(next, account?.id);
-                  showNotice('تم إيداع تسهيل ائتماني طارئ بقيمة 250,000 $ من بنك مصر للأعمال! 🏦', 'success', 'تسهيل ائتماني طارئ', 'bank');
-                  return next;
-                });
-              }}
-              onOpenCampaign={() => {
-                triggerHaptic('light');
-                setIsStoryCampaignOpen(true);
+                if (claimedOk) {
+                  showNotice(`تم استلام مكافأة المهمة: +${cash.toLocaleString()} $ و +${diamonds} ألماسة! 🎁`, 'success', 'مكافأة مهمة القصة');
+                }
               }}
             />
           ) : activeSection === 'profile' ? (
@@ -1050,7 +1228,7 @@ export default function App() {
               onLogout={handleLogout}
               onResetWorld={handleResetToCountrySelection}
               onAccountDeleted={handleAccountDeleted}
-              onRestartWalkthrough={() => { setWalkthroughStepIndex(0); setIsWalkthroughActive(true); }}
+              onRestartWalkthrough={handleRestartWalkthrough}
               onOpenWardrobe={() => setIsAvatarWardrobeOpen(true)}
               onUpdateProfile={(updater) => {
                 setProfile((prev) => {
@@ -1094,7 +1272,7 @@ export default function App() {
         onNavigate={navigate}
         onOpenLuckyWheel={() => setIsLuckyWheelOpen(true)}
         onCollectActualProfit={(amount: number) => {
-          if (!profile) return;
+          if (!profile || amount <= 0) return;
           const nextBalance = profile.bankBalance + amount;
           const newEntry: FinanceLedgerEntry = {
             id: `ledger-actual-profit-${profile.day}-${Date.now()}`,
@@ -1117,7 +1295,12 @@ export default function App() {
           };
           saveGame(nextProfile, account?.id);
           setProfile(nextProfile);
-          showNotice(`تم تحصيل الأرباح الفعلية بنجاح! تم إيداع +${formatMoney(amount, country)} في حسابك البنكي.`, 'success', 'تحصيل أرباح الشركات', 'bank');
+          showNotice(
+            `تم تحصيل الأرباح الفعلية بنجاح! تم إيداع +${formatMoney(amount, country)} في خزينتك.`,
+            'success',
+            'تحصيل أرباح الشركات',
+            isSectionUnlocked(nextProfile, 'bank') ? 'bank' : 'home',
+          );
         }}
         onSellProduct={(productId: string, quantity: number) => {
           void handleGameCommand(
@@ -1145,7 +1328,25 @@ export default function App() {
         onMarkAllRead={handleMarkAllNotificationsRead}
         onClearAll={handleClearAllNotifications}
       />
-      {pendingGuide && <SystemGuideModal section={pendingGuide} onClose={() => { if (!profile) return; const seenGuides = profile.onboarding.seenGuides.includes(pendingGuide) ? profile.onboarding.seenGuides : [...profile.onboarding.seenGuides, pendingGuide]; const nextProfile = { ...profile, onboarding: { ...profile.onboarding, chapter: chapterFor(profile), seenGuides } }; saveGame(nextProfile, account?.id); if (account && !account.isGuest) setSyncState('local'); setProfile(nextProfile); setPendingGuide(null); }} />}
+      {pendingGuide && (
+        <SystemGuideModal
+          section={pendingGuide}
+          onClose={() => {
+            if (!profile) return;
+            const seenGuides = profile.onboarding.seenGuides.includes(pendingGuide)
+              ? profile.onboarding.seenGuides
+              : [...profile.onboarding.seenGuides, pendingGuide];
+            const nextProfile: PlayerProfile = {
+              ...profile,
+              onboarding: { ...profile.onboarding, chapter: chapterFor(profile), seenGuides },
+            };
+            saveGame(nextProfile, account?.id);
+            if (account && !account.isGuest) setSyncState('local');
+            setProfile(nextProfile);
+            setPendingGuide(null);
+          }}
+        />
+      )}
       {activeStoryEvent && (
         <StoryEventPopup
           event={activeStoryEvent}
@@ -1155,7 +1356,7 @@ export default function App() {
           onNavigate={(sec) => navigate(sec)}
         />
       )}
-      {expansion && (
+      {expansion && !showStoryIntroModal && (
         <DynamicEconomyEvents
           profile={profile}
           expansion={expansion}
@@ -1167,7 +1368,6 @@ export default function App() {
         />
       )}
 
-      {/* Interactive Daily Lucky Wheel */}
       <DailyLuckySpinModal
         isOpen={isLuckyWheelOpen}
         onClose={() => setIsLuckyWheelOpen(false)}
@@ -1175,13 +1375,11 @@ export default function App() {
         onRewardWon={handleLuckySpinReward}
       />
 
-      {/* Major Milestone Celebration Modal */}
       <CelebrationModal
         data={celebrationData}
         onClose={() => setCelebrationData(null)}
       />
 
-      {/* Streamlined Mobile Bottom Navigation */}
       <MobileBottomNav
         activeSection={activeSection}
         onNavigate={navigate}
@@ -1190,88 +1388,193 @@ export default function App() {
         profile={profile}
       />
 
-      
-      {/* Mandatory Interactive Spotlight Guided Walkthrough */}
-      {isWalkthroughActive && (
+      {/* Interactive Multi-Step Spotlight Guided Walkthrough (Never grants rewards on skip or arrow click) */}
+      {!showStoryIntroModal && isWalkthroughActive && (
         <SpotlightWalkthrough
           currentStepIndex={walkthroughStepIndex}
+          overrideStep={walkthroughOverrideStep}
           profile={profile}
           currentSection={activeSection}
           onNavigate={(sec) => navigate(sec)}
-          onOpenBriefing={() => setIsStoryBriefingOpen(true)}
           onStepComplete={() => {
+            if (walkthroughOverrideStep) {
+              setWalkthroughOverrideStep(null);
+              setIsWalkthroughActive(false);
+              playSound('success');
+              showNotice(
+                'أحسنت! أتممت خطوة المهمة بيدك — يمكنك استلام مكافأة المهمة من لوحة مهام القصة.',
+                'success',
+                'اكتمل الإرشاد العملي',
+                'home',
+              );
+              return;
+            }
             if (walkthroughStepIndex < WALKTHROUGH_STEPS.length - 1) {
-              setWalkthroughStepIndex((prev) => prev + 1);
+              const nextIdx = walkthroughStepIndex + 1;
+              const nextStepId = WALKTHROUGH_STEPS[nextIdx]?.id;
+              setWalkthroughStepIndex(nextIdx);
+              setSavedWalkthroughStepIndex(nextIdx);
+              setProfile((prev) => {
+                if (!prev) return prev;
+                const updated: PlayerProfile = {
+                  ...prev,
+                  onboarding: {
+                    ...prev.onboarding,
+                    walkthroughStepId: nextStepId,
+                  },
+                };
+                saveGame(updated, account?.id);
+                return updated;
+              });
             } else {
               setIsWalkthroughActive(false);
               setWalkthroughCompleted(true);
-              completeIntro();
-              playSound("levelUp");
+              setProfile((prev) => {
+                if (!prev) return prev;
+                const updated: PlayerProfile = {
+                  ...prev,
+                  onboarding: {
+                    ...prev.onboarding,
+                    walkthroughCompleted: true,
+                    walkthroughSkipped: false,
+                    walkthroughStepId: undefined,
+                  },
+                };
+                saveGame(updated, account?.id);
+                return updated;
+              });
+              playSound('levelUp');
               setCelebrationData({
-                title: "أكملت الجولة الإرشادية بنجاح! 👑",
-                subtitle: "تهانينا! لقد أتقنت أساسيات الإدارة وتعرفت على كيفية صيانة المعدات ورفع كفاءة المصانع، ودفع الرواتب والالتزامات، وتملك الأراضي الاستثمارية بنجاح.",
-                rewardText: "10,000 كاش + 5 ماسات مكافأة إتمام الشرح",
+                title: 'أكملت الجولة الإرشادية العملية بنجاح! 👑',
+                subtitle: 'أحسنت! أتقنت بيدك صيانة المصنع، وتسوية الالتزامات، وشراء الأراضي والخامات، وتشغيل الإنتاج وتحصيل المهام.',
+                rewardText: 'جاهزية قيادية كاملة · تابع مهام القصة في الرئيسية لاستلام مكافآتها الفعلية',
               });
             }
           }}
           onSkip={() => {
+            if (walkthroughOverrideStep) {
+              setWalkthroughOverrideStep(null);
+              setIsWalkthroughActive(false);
+              return;
+            }
             setIsWalkthroughActive(false);
             setWalkthroughCompleted(true);
-            completeIntro();
+            setProfile((prev) => {
+              if (!prev) return prev;
+              const updated: PlayerProfile = {
+                ...prev,
+                onboarding: {
+                  ...prev.onboarding,
+                  walkthroughSkipped: true,
+                  walkthroughStepId: WALKTHROUGH_STEPS[walkthroughStepIndex]?.id,
+                },
+              };
+              saveGame(updated, account?.id);
+              return updated;
+            });
           }}
         />
       )}
 
-      {/* Story Scenario Modal (Optional for Player Review) */}
-      {isTutorialOpen && (
+      {/* Country-Specific Story Intro Modal (Shown Once After Character/Country Creation, or On-Demand via Help) */}
+      {showStoryIntroModal && (
         <div className="fixed inset-0 z-[9999] bg-slate-950/90 backdrop-blur-md overflow-y-auto">
           <StoryIntro
             profile={profile}
-            onComplete={() => {
-              setIsTutorialOpen(false);
-              completeIntro();
-            }}
+            onComplete={completeIntro}
           />
         </div>
       )}
 
-      {/* Executive Avatar Wardrobe Modal */}
-      {profile && (
-        <AvatarWardrobeModal
+      {/* Country-Specific 4-Chapter Campaign & Rivals Hub */}
+      {isCampaignHubOpen && (
+        <StoryCampaignHub
           profile={profile}
-          isOpen={isAvatarWardrobeOpen}
-          onClose={() => setIsAvatarWardrobeOpen(false)}
-          onSelectAvatar={(avatarId) => {
+          country={country}
+          onClose={() => setIsCampaignHubOpen(false)}
+          onClaimReward={(diamonds, gold, money, reputationDelta = 0, chapterId = 1) => {
+            let rewarded = false;
             setProfile((prev) => {
               if (!prev) return prev;
-              const next = { ...prev, avatarId };
+              if (prev.onboarding.claimedCampaignChapters?.includes(chapterId)) return prev;
+              rewarded = true;
+              const nextLedger = [...(prev.ledger ?? [])];
+              if (money > 0) {
+                nextLedger.push({
+                  id: `campaign-chapter-${chapterId}-${prev.ledger.length}`,
+                  category: 'revenue',
+                  amount: money,
+                  countryId: prev.countryId,
+                  occurredAt: new Date().toISOString(),
+                  note: `مكافأة حسم الفصل ${chapterId} من سيناريو ${country.name}`,
+                });
+              }
+              const next: PlayerProfile = {
+                ...prev,
+                bankBalance: prev.bankBalance + money,
+                diamonds: prev.diamonds + diamonds,
+                goldGrams: Number(((prev.goldGrams ?? 0) + gold).toFixed(2)),
+                reputation: Math.max(0, Math.min(100, prev.reputation + reputationDelta)),
+                finances: {
+                  ...prev.finances,
+                  netProfit: prev.finances.netProfit + money,
+                  totalRevenue: prev.finances.totalRevenue + money,
+                },
+                ledger: nextLedger,
+                onboarding: {
+                  ...prev.onboarding,
+                  claimedCampaignChapters: [...(prev.onboarding.claimedCampaignChapters ?? []), chapterId],
+                  campaignChapterId: Math.min(4, chapterId + 1),
+                },
+              };
               saveGame(next, account?.id);
               return next;
             });
-            showNotice('تم اعتماد صورة الشخصية بنجاح! 👑', 'success', 'تغيير الصورة الرمزية');
-          }}
-          onUnlockAvatar={(avatar) => {
-            if (!profile) return false;
-            if ((profile.diamonds ?? 0) < avatar.priceDiamonds) {
-              showNotice(`رصيدك الحالي غير كافٍ لاقتناء هذه الشخصية. تحتاج إلى ${avatar.priceDiamonds} 💎`, 'danger', 'رصيد غير كافٍ');
-              return false;
+            if (rewarded) {
+              showNotice(
+                `تم توثيق قرار الفصل ${chapterId} واستلام مكافأة الإمبراطورية بنجاح! 🏆`,
+                'success',
+                'تقدم سيناريو القصة',
+              );
             }
-            const nextDiamonds = (profile.diamonds ?? 0) - avatar.priceDiamonds;
-            const nextUnlocked = Array.from(new Set([...(profile.unlockedAvatarIds || []), avatar.id]));
-            const nextProfile: PlayerProfile = {
-              ...profile,
-              diamonds: nextDiamonds,
-              unlockedAvatarIds: nextUnlocked,
-              avatarId: avatar.id,
-            };
-            setProfile(nextProfile);
-            saveGame(nextProfile, account?.id);
-            showNotice(`🎉 مبروك! تم اقتناء شخصية "${avatar.name}" بنجاح بـ ${avatar.priceDiamonds} 💎 وتفعيلها كصورتك المعتمدة.`, 'success', 'اقتناء شخصية فاخرة');
-            return true;
           }}
-          onOpenStore={() => navigate('store')}
         />
       )}
+
+      {/* Executive Avatar Wardrobe Modal */}
+      <AvatarWardrobeModal
+        profile={profile}
+        isOpen={isAvatarWardrobeOpen}
+        onClose={() => setIsAvatarWardrobeOpen(false)}
+        onSelectAvatar={(avatarId) => {
+          setProfile((prev) => {
+            if (!prev) return prev;
+            const next = { ...prev, avatarId };
+            saveGame(next, account?.id);
+            return next;
+          });
+          showNotice('تم اعتماد صورة الشخصية بنجاح! 👑', 'success', 'تغيير الصورة الرمزية');
+        }}
+        onUnlockAvatar={(avatar) => {
+          if ((profile.diamonds ?? 0) < avatar.priceDiamonds) {
+            showNotice(`رصيدك الحالي غير كافٍ لاقتناء هذه الشخصية. تحتاج إلى ${avatar.priceDiamonds} 💎`, 'danger', 'رصيد غير كافٍ');
+            return false;
+          }
+          const nextDiamonds = (profile.diamonds ?? 0) - avatar.priceDiamonds;
+          const nextUnlocked = Array.from(new Set([...(profile.unlockedAvatarIds || []), avatar.id]));
+          const nextProfile: PlayerProfile = {
+            ...profile,
+            diamonds: nextDiamonds,
+            unlockedAvatarIds: nextUnlocked,
+            avatarId: avatar.id,
+          };
+          setProfile(nextProfile);
+          saveGame(nextProfile, account?.id);
+          showNotice(`🎉 مبروك! تم اقتناء شخصية "${avatar.name}" بنجاح بـ ${avatar.priceDiamonds} 💎 وتفعيلها كصورتك المعتمدة.`, 'success', 'اقتناء شخصية فاخرة');
+          return true;
+        }}
+        onOpenStore={() => navigate('store')}
+      />
 
       {/* 1. Morning Absence Report Modal (Smart Offline Idle Engine) */}
       {offlineReport && (
@@ -1279,10 +1582,10 @@ export default function App() {
           isOpen={isMorningReportOpen}
           report={offlineReport}
           onClaim={() => {
-            if (!profile) return;
             const updated = applyOfflineReportToProfile(profile, offlineReport);
             setProfile(updated);
             saveGame(updated, account?.id);
+            recordOfflineHeartbeat(account?.id ?? updated.id);
             setIsMorningReportOpen(false);
             setOfflineReport(null);
             showNotice('تم استلام أرباح وسلع فترة الغياب بنجاح! 🌅', 'success', 'تقرير غياب المدير');
@@ -1292,7 +1595,7 @@ export default function App() {
       )}
 
       {/* 2. Central Bank Decrees & Macroeconomic Shocks Modal */}
-      {profile && (
+      {isSectionUnlocked(profile, 'bank') && (
         <CentralBankModal
           isOpen={isCentralBankModalOpen}
           onClose={() => setIsCentralBankModalOpen(false)}
@@ -1302,7 +1605,7 @@ export default function App() {
       )}
 
       {/* 3. Prestige & Global Sovereign Expansion Modal */}
-      {profile && (
+      {isSectionUnlocked(profile, 'luxury') && (
         <PrestigeExpansionModal
           isOpen={isPrestigeModalOpen}
           onClose={() => setIsPrestigeModalOpen(false)}
@@ -1316,57 +1619,6 @@ export default function App() {
               subtitle: 'انطلقت إمبراطوريتك نحو العواصم العالمية مع الاحتفاظ بكافة امتيازات وأوسمة الهيبة الدائمة.',
               rewardText: 'توسّع دولي مع نقاط هيبة ورصيد انطلاق جديد',
             });
-          }}
-        />
-      )}
-
-      {/* 4. Grand 10-Chapter Story Campaign Hub (Suly Business Empire: صعود الإمبراطورية) */}
-      {profile && isStoryCampaignOpen && (
-        <StoryCampaignHub
-          profile={profile}
-          country={country}
-          onClose={() => setIsStoryCampaignOpen(false)}
-          onNavigate={(sec) => {
-            setIsStoryCampaignOpen(false);
-            navigate(sec);
-          }}
-          onClaimReward={(diamonds, gold, money, rep, rewardKey) => {
-            setProfile((prev) => {
-              if (!prev) return prev;
-              const claimedRewardIds = prev.claimedRewardIds ? [...prev.claimedRewardIds] : [];
-              if (rewardKey && !claimedRewardIds.includes(rewardKey)) {
-                claimedRewardIds.push(rewardKey);
-              }
-              const next = {
-                ...prev,
-                bankBalance: prev.bankBalance + money,
-                diamonds: prev.diamonds + diamonds,
-                goldGrams: (prev.goldGrams ?? 0) + gold,
-                claimedRewardIds,
-              };
-              saveGame(next, account?.id);
-              showNotice(`تم استلام مكافأة الفصل: +${formatMoney(money, country)} و +${diamonds}💎 و +${gold}غ ذهب! 🏆`, 'success', 'مكافأة سيناريو القصة');
-              return next;
-            });
-          }}
-        />
-      )}
-
-      {/* 5. Guided Story Briefing Modal (شرح المهمة التفصيلي بدون حل تلقائي) */}
-      {profile && isStoryBriefingOpen && (
-        <StoryBriefingModal
-          mission={CENTRAL_MISSIONS_CATALOG[0]}
-          country={country}
-          character={{
-            name: getLeadAdvisor(profile.countryId).name,
-            title: getLeadAdvisor(profile.countryId).title,
-            avatar: getLeadAdvisor(profile.countryId).avatar,
-          }}
-          onClose={() => setIsStoryBriefingOpen(false)}
-          onSkipDialogue={() => setIsStoryBriefingOpen(false)}
-          onStartExecution={() => {
-            setIsStoryBriefingOpen(false);
-            navigate('companies');
           }}
         />
       )}

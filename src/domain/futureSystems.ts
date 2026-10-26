@@ -250,4 +250,52 @@ export interface OnboardingProgress {
   introCompleted: boolean;
   chapter: number;
   seenGuides: string[];
+  countryIntroSeen?: boolean;
+  walkthroughCompleted?: boolean;
+  walkthroughSkipped?: boolean;
+  walkthroughStepId?: string;
+  seenQuestBriefings?: string[];
+  claimedStoryQuestIds?: string[];
+  claimedCampaignChapters?: number[];
+  campaignChapterId?: number;
+}
+
+export type CommodityGrade = 'A+' | 'B' | 'C';
+export type GlobalShippingMode = 'spot-ddp' | 'sea-cif' | 'air-express';
+export type GlobalPaymentTerm = 'cash-spot' | 'lc-net2';
+
+export interface GlobalShipmentRecord {
+  id: string;
+  direction: 'import' | 'export';
+  itemId: string;
+  itemName: string;
+  quantity: number;
+  unit: string;
+  unitCostOrPrice: number;
+  freightCost: number;
+  customsDuty: number;
+  shippingMode: GlobalShippingMode;
+  originOrDestination: string;
+  partnerName: string;
+  qualityScore: number;
+  orderedOnDay: number;
+  arrivesOnDay: number;
+  deferredBalanceDue: number;
+  status: 'in-transit' | 'delivered';
+}
+
+export interface ForwardSupplyContract {
+  id: string;
+  materialId: string;
+  materialName: string;
+  supplierName: string;
+  originHub: string;
+  lockedUnitPrice: number;
+  dailyQuota: number;
+  remainingQuota: number;
+  marginPaid: number;
+  startedOnDay: number;
+  expiresOnDay: number;
+  qualityScore: number;
+  status: 'active' | 'completed' | 'expired';
 }

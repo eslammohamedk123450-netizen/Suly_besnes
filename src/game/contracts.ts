@@ -1,14 +1,8 @@
 import type { PlayerProfile } from '../domain/player';
 import type { BusinessContract } from '../domain/futureSystems';
-import { PRODUCT_CATALOG } from './catalog';
+import { findRecipeForIndustry, PRODUCT_CATALOG } from './catalog';
+import { getCountryScenario } from './countryScenarios';
 import { getMarketQuote } from './market';
-
-const CLIENTS: readonly { name: string; type: BusinessContract['clientType']; multiplier: number; minimumQuality: number; description: string }[] = [
-  { name: 'متجر المدينة الاقتصادي', type: 'budget', multiplier: 0.92, minimumQuality: 0, description: 'يركّز على السعر المنخفض والتوريد المنتظم.' },
-  { name: 'مؤسسة الجودة الأولى', type: 'quality', multiplier: 1.18, minimumQuality: 92, description: 'يدفع أكثر، لكنه لا يقبل منتجًا بجودة أقل من 92%.' },
-  { name: 'شركة التوزيع الكبرى', type: 'bulk', multiplier: 1.04, minimumQuality: 75, description: 'يطلب كميات كبيرة بمستوى جودة تجاري.' },
-  { name: 'عميل التوريد العاجل', type: 'urgent', multiplier: 1.28, minimumQuality: 70, description: 'مهلة قصيرة ومكافأة مرتفعة للمستعد.' },
-];
 
 function hash(value: string): number {
   let result = 2166136261;
@@ -21,10 +15,26 @@ export interface ContractOffer extends Omit<BusinessContract, 'status' | 'accept
 }
 
 export function getContractOffers(profile: PlayerProfile): ContractOffer[] {
-  return [0, 1, 2].map((slot) => {
+  const clients = getCountryScenario(profile.countryId).clients;
+  const ownedProductIds = (profile.companies ?? [])
+    .map((company) => findRecipeForIndustry(company.industryId)?.productId)
+    .filter((id): id is string => Boolean(id));
+
+  const rawProducts = [0, 1, 2].map((slot) => {
     const index = hash(`${profile.id}:${profile.day}:${slot}`) % PRODUCT_CATALOG.length;
-    const product = PRODUCT_CATALOG[index];
-    const client = CLIENTS[(hash(`${profile.id}:${profile.day}:client:${slot}`) % CLIENTS.length)];
+    return PRODUCT_CATALOG[index];
+  });
+
+  if (ownedProductIds.length > 0 && !rawProducts.some((p) => ownedProductIds.includes(p.id))) {
+    const ownedProduct = PRODUCT_CATALOG.find((p) => p.id === ownedProductIds[0]);
+    if (ownedProduct) {
+      rawProducts[0] = ownedProduct;
+    }
+  }
+
+  return [0, 1, 2].map((slot) => {
+    const product = rawProducts[slot];
+    const client = clients[hash(`${profile.id}:${profile.day}:client:${slot}`) % clients.length];
     const quote = getMarketQuote(profile, product.id) ?? { currentPrice: product.baseSellPrice, demandUnits: 12 };
     const quantity = client.type === 'bulk' ? 18 + (hash(`${profile.day}:${slot}`) % 12) : 5 + (hash(`${profile.day}:qty:${slot}`) % 8);
     const deadline = profile.day + (client.type === 'urgent' ? 1 : client.type === 'bulk' ? 4 : 3);

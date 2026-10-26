@@ -302,8 +302,8 @@ describe('Business Empire economy invariants', () => {
     const purchased = buyDirectLand(profile({ bankBalance: 1_000_000 }), 'starter-village-land');
     expect(purchased.ok).toBe(true);
     if (!purchased.ok) return;
-    const purchasedLand = purchased.profile.lands.find((l) => l.id === purchased.data.landId);
-    expect(purchasedLand?.availableForCompanyOnDay).toBe(2);
+    const boughtLand = purchased.profile.lands.find((land) => land.id === purchased.data.landId);
+    expect(boughtLand?.availableForCompanyOnDay).toBe(2);
     const premature = foundCompany(purchased.profile, 'food', purchased.data.landId, 'شركة مبكرة');
     expect(premature.ok).toBe(false);
     if (!premature.ok) expect(premature.reason).toBe('condition-not-met');

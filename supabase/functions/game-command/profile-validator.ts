@@ -8,18 +8,41 @@ const MAX_LEVEL = 1_000;
 const MAX_SEASON_POINTS = 1_000_000_000;
 const MAX_ENERGY = 100_000;
 
+const SUPPORTED_COUNTRY_IDS = new Set([
+  'egypt', 'saudi', 'uae', 'usa', 'kuwait', 'qatar', 'uk', 'germany', 'japan',
+]);
+
+const OPTIONAL_PROFILE_KEYS = new Set([
+  'season',
+  'warehouseLevel',
+  'activeDaySpeedMultiplier',
+  'readNotificationIds',
+  'dismissedNotificationIds',
+  'unreadProductionOrderIds',
+  'lastSpinTimestamp',
+  'lastSpinDay',
+  'avatarId',
+  'unlockedAvatarIds',
+  'bio',
+  'renameCountThisWeek',
+  'lastRenameWeekTimestamp',
+  'lastOfflineClaimAt',
+  'globalShipments',
+  'forwardContracts',
+  'supplierTrust',
+]);
+
 const PROFILE_KEYS = new Set([
   'id', 'accountCode', 'name', 'level', 'countryId', 'createdAt', 'bankBalance', 'payables',
   'goldGrams', 'goldCostBasis', 'diamonds', 'speedCards', 'badges', 'assets', 'lands', 'companies',
   'finances', 'day', 'warehouseLevel', 'activeDaySpeedMultiplier', 'inventory', 'licenses', 'investments', 'banking', 'staff', 'productionOrders',
   'auctionHistory', 'redeemedCodeIds', 'sales', 'ledger', 'events', 'tasks', 'completedTaskIds',
   'season', 'reputation', 'contracts', 'achievements', 'onboarding', 'readNotificationIds', 'dismissedNotificationIds', 'unreadProductionOrderIds',
-  'avatarId', 'unlockedAvatarIds', 'bio', 'renameCountThisWeek', 'lastRenameWeekTimestamp',
-  'campaignChapterId', 'completedMissionIds', 'claimedRewardIds', 'dismissedStoryEventIds',
-  'lastSpinTimestamp', 'lastSpinDay',
+  'lastSpinTimestamp', 'lastSpinDay', 'avatarId', 'unlockedAvatarIds', 'bio', 'renameCountThisWeek', 'lastRenameWeekTimestamp', 'lastOfflineClaimAt',
+  'globalShipments', 'forwardContracts', 'supplierTrust',
 ]);
 
-const REQUIRED_PROFILE_KEYS = [...PROFILE_KEYS].filter((key) => !['season', 'warehouseLevel', 'activeDaySpeedMultiplier', 'readNotificationIds', 'dismissedNotificationIds', 'unreadProductionOrderIds', 'avatarId', 'unlockedAvatarIds', 'bio', 'renameCountThisWeek', 'lastRenameWeekTimestamp', 'campaignChapterId', 'completedMissionIds', 'claimedRewardIds', 'dismissedStoryEventIds', 'lastSpinTimestamp', 'lastSpinDay'].includes(key));
+const REQUIRED_PROFILE_KEYS = [...PROFILE_KEYS].filter((key) => !OPTIONAL_PROFILE_KEYS.has(key));
 
 const MATERIAL_CAPACITY: Record<string, number> = {
   'crude-oil': 500, 'natural-gas': 500, water: 2_000, chemicals: 800, grain: 1_000,
@@ -191,8 +214,9 @@ export function validatePlayerProfile(profile: unknown, previousProfile?: unknow
   requireString(profile.id, 'profile.id', errors, 128);
   if (typeof profile.accountCode !== 'string' || profile.accountCode.length > 64) addError(errors, 'profile.accountCode:invalid_string');
   requireString(profile.name, 'profile.name', errors, 120);
-  const SUPPORTED_COUNTRIES = new Set(['egypt', 'jordan', 'saudi', 'uae', 'usa', 'kuwait', 'qatar', 'uk', 'germany', 'japan']);
-  if (!SUPPORTED_COUNTRIES.has(String(profile.countryId))) addError(errors, 'profile.countryId:unsupported_country');
+  if (typeof profile.countryId !== 'string' || !SUPPORTED_COUNTRY_IDS.has(profile.countryId)) {
+    addError(errors, 'profile.countryId:unsupported_country');
+  }
   validateTimestamp(profile.createdAt, 'profile.createdAt', errors);
   requireNumber(profile.level, 'profile.level', errors, { min: 1, max: MAX_LEVEL, integer: true });
   requireNumber(profile.day, 'profile.day', errors, { min: 1, max: MAX_GAME_DAY, integer: true });
@@ -395,7 +419,7 @@ export function validatePlayerProfile(profile: unknown, previousProfile?: unknow
     ['profile.sales', profile.sales, ['id', 'productId', 'quantity', 'unitPrice', 'grossRevenue', 'tax', 'costOfGoods', 'soldOnDay', 'contractId', 'soldAt']],
     ['profile.ledger', profile.ledger, ['id', 'category', 'amount', 'countryId', 'occurredAt', 'note']],
     ['profile.events', profile.events, ['id', 'day', 'title', 'description', 'cashImpact', 'occurredAt', 'industryId', 'materialId', 'productId', 'materialPriceMultiplier', 'demandMultiplier', 'effectExpiresOnDay']],
-    ['profile.contracts', profile.contracts, ['id', 'clientName', 'clientType', 'productId', 'productName', 'quantity', 'unitPrice', 'reward', 'reputationReward', 'minimumQuality', 'deadlineDay', 'acceptedOnDay', 'status', 'completedOnDay', 'failedOnDay', 'negotiated', 'negotiationNote']],
+    ['profile.contracts', profile.contracts, ['id', 'clientName', 'clientType', 'productId', 'productName', 'quantity', 'unitPrice', 'reward', 'reputationReward', 'minimumQuality', 'deadlineDay', 'acceptedOnDay', 'status', 'completedOnDay', 'failedOnDay', 'negotiated', 'negotiationNote', 'description']],
     ['profile.achievements', profile.achievements, ['id', 'earnedAtDay', 'title']],
   ];
   const collectionIds = new Map<string, Set<string>>();
@@ -456,10 +480,38 @@ export function validatePlayerProfile(profile: unknown, previousProfile?: unknow
   void collectionIds;
 
   const onboarding = requireRecord(profile.onboarding, 'profile.onboarding', errors);
-  checkAllowedKeys(onboarding, ['introCompleted', 'chapter', 'seenGuides'], 'profile.onboarding', errors);
+  checkAllowedKeys(
+    onboarding,
+    [
+      'introCompleted',
+      'chapter',
+      'seenGuides',
+      'countryIntroSeen',
+      'walkthroughCompleted',
+      'walkthroughSkipped',
+      'walkthroughStepId',
+      'seenQuestBriefings',
+      'claimedStoryQuestIds',
+      'claimedCampaignChapters',
+      'campaignChapterId',
+    ],
+    'profile.onboarding',
+    errors,
+  );
   if (typeof onboarding.introCompleted !== 'boolean') addError(errors, 'profile.onboarding.introCompleted:invalid_boolean');
   requireNumber(onboarding.chapter, 'profile.onboarding.chapter', errors, { min: 0, max: 100, integer: true });
   uniqueStrings(requireArray(onboarding.seenGuides, 'profile.onboarding.seenGuides', errors), 'profile.onboarding.seenGuides', errors);
+  if (onboarding.countryIntroSeen !== undefined && typeof onboarding.countryIntroSeen !== 'boolean') addError(errors, 'profile.onboarding.countryIntroSeen:invalid_boolean');
+  if (onboarding.walkthroughCompleted !== undefined && typeof onboarding.walkthroughCompleted !== 'boolean') addError(errors, 'profile.onboarding.walkthroughCompleted:invalid_boolean');
+  if (onboarding.walkthroughSkipped !== undefined && typeof onboarding.walkthroughSkipped !== 'boolean') addError(errors, 'profile.onboarding.walkthroughSkipped:invalid_boolean');
+  if (onboarding.walkthroughStepId !== undefined) requireString(onboarding.walkthroughStepId, 'profile.onboarding.walkthroughStepId', errors, 128);
+  if (onboarding.seenQuestBriefings !== undefined) uniqueStrings(requireArray(onboarding.seenQuestBriefings, 'profile.onboarding.seenQuestBriefings', errors), 'profile.onboarding.seenQuestBriefings', errors);
+  if (onboarding.claimedStoryQuestIds !== undefined) uniqueStrings(requireArray(onboarding.claimedStoryQuestIds, 'profile.onboarding.claimedStoryQuestIds', errors), 'profile.onboarding.claimedStoryQuestIds', errors);
+  if (onboarding.campaignChapterId !== undefined) requireNumber(onboarding.campaignChapterId, 'profile.onboarding.campaignChapterId', errors, { min: 1, max: 20, integer: true });
+  if (onboarding.claimedCampaignChapters !== undefined) {
+    const claimedCh = requireArray(onboarding.claimedCampaignChapters, 'profile.onboarding.claimedCampaignChapters', errors);
+    claimedCh.forEach((ch, idx) => requireNumber(ch, `profile.onboarding.claimedCampaignChapters[${idx}]`, errors, { min: 1, max: 20, integer: true }));
+  }
 
   if (profile.season !== undefined) {
     const season = requireRecord(profile.season, 'profile.season', errors);
@@ -472,6 +524,58 @@ export function validatePlayerProfile(profile: unknown, previousProfile?: unknow
     if (season.claimedLoginRewardDay !== undefined) requireNumber(season.claimedLoginRewardDay, 'profile.season.claimedLoginRewardDay', errors, { min: 1, max: MAX_GAME_DAY, integer: true });
   }
 
+  if (profile.globalShipments !== undefined) {
+    const shipments = requireArray(profile.globalShipments, 'profile.globalShipments', errors);
+    validateEntityIds(
+      shipments,
+      'profile.globalShipments',
+      errors,
+      ['id', 'direction', 'itemId', 'itemName', 'quantity', 'unit', 'unitCostOrPrice', 'freightCost', 'customsDuty', 'shippingMode', 'originOrDestination', 'partnerName', 'qualityScore', 'orderedOnDay', 'arrivesOnDay', 'deferredBalanceDue', 'status'],
+    );
+    shipments.forEach((entry, idx) => {
+      const sh = requireRecord(entry, `profile.globalShipments[${idx}]`, errors);
+      if (!['import', 'export'].includes(String(sh.direction))) addError(errors, `profile.globalShipments[${idx}].direction:invalid_value`);
+      requireNumber(sh.quantity, `profile.globalShipments[${idx}].quantity`, errors, { min: 1, max: MAX_MONEY, integer: true });
+      requireNumber(sh.unitCostOrPrice, `profile.globalShipments[${idx}].unitCostOrPrice`, errors, { min: 0, max: MAX_MONEY });
+      requireNumber(sh.freightCost, `profile.globalShipments[${idx}].freightCost`, errors, { min: 0, max: MAX_MONEY });
+      requireNumber(sh.customsDuty, `profile.globalShipments[${idx}].customsDuty`, errors, { min: 0, max: MAX_MONEY });
+      if (!['spot-ddp', 'sea-cif', 'air-express'].includes(String(sh.shippingMode))) addError(errors, `profile.globalShipments[${idx}].shippingMode:invalid_value`);
+      requireNumber(sh.qualityScore, `profile.globalShipments[${idx}].qualityScore`, errors, { min: 0, max: 100 });
+      requireNumber(sh.orderedOnDay, `profile.globalShipments[${idx}].orderedOnDay`, errors, { min: 1, max: MAX_GAME_DAY, integer: true });
+      requireNumber(sh.arrivesOnDay, `profile.globalShipments[${idx}].arrivesOnDay`, errors, { min: 1, max: MAX_GAME_DAY, integer: true });
+      requireNumber(sh.deferredBalanceDue, `profile.globalShipments[${idx}].deferredBalanceDue`, errors, { min: 0, max: MAX_MONEY });
+      if (!['in-transit', 'delivered'].includes(String(sh.status))) addError(errors, `profile.globalShipments[${idx}].status:invalid_value`);
+    });
+  }
+
+  if (profile.forwardContracts !== undefined) {
+    const forwards = requireArray(profile.forwardContracts, 'profile.forwardContracts', errors);
+    validateEntityIds(
+      forwards,
+      'profile.forwardContracts',
+      errors,
+      ['id', 'materialId', 'materialName', 'supplierName', 'originHub', 'lockedUnitPrice', 'dailyQuota', 'remainingQuota', 'marginPaid', 'startedOnDay', 'expiresOnDay', 'qualityScore', 'status'],
+    );
+    forwards.forEach((entry, idx) => {
+      const fw = requireRecord(entry, `profile.forwardContracts[${idx}]`, errors);
+      requireNumber(fw.lockedUnitPrice, `profile.forwardContracts[${idx}].lockedUnitPrice`, errors, { min: 0, max: MAX_MONEY });
+      requireNumber(fw.dailyQuota, `profile.forwardContracts[${idx}].dailyQuota`, errors, { min: 1, max: MAX_MONEY, integer: true });
+      requireNumber(fw.remainingQuota, `profile.forwardContracts[${idx}].remainingQuota`, errors, { min: 0, max: MAX_MONEY, integer: true });
+      requireNumber(fw.marginPaid, `profile.forwardContracts[${idx}].marginPaid`, errors, { min: 0, max: MAX_MONEY });
+      requireNumber(fw.startedOnDay, `profile.forwardContracts[${idx}].startedOnDay`, errors, { min: 1, max: MAX_GAME_DAY, integer: true });
+      requireNumber(fw.expiresOnDay, `profile.forwardContracts[${idx}].expiresOnDay`, errors, { min: 1, max: MAX_GAME_DAY, integer: true });
+      requireNumber(fw.qualityScore, `profile.forwardContracts[${idx}].qualityScore`, errors, { min: 0, max: 100 });
+      if (!['active', 'completed', 'expired'].includes(String(fw.status))) addError(errors, `profile.forwardContracts[${idx}].status:invalid_value`);
+    });
+  }
+
+  if (profile.supplierTrust !== undefined) {
+    const trustMap = requireRecord(profile.supplierTrust, 'profile.supplierTrust', errors);
+    for (const [supplierKey, score] of Object.entries(trustMap)) {
+      if (supplierKey.length > 128) addError(errors, 'profile.supplierTrust:key_too_long');
+      requireNumber(score, `profile.supplierTrust.${supplierKey}`, errors, { min: 0, max: 100 });
+    }
+  }
   if (previousProfile !== undefined) {
     if (!isRecord(previousProfile) || typeof previousProfile.day !== 'number' || typeof profile.day !== 'number') {
       addError(errors, 'profile.day:cannot_validate_previous_day');

@@ -7,30 +7,31 @@ import { type GameCommand, type GameResult } from '../game/engine';
 import { playSound } from '../game/soundEffects';
 import { LeaderboardModal } from './LeaderboardModal';
 import { FinanceReportModal } from './FinanceReportModal';
+import { SmartOnboardingQuests } from './SmartOnboardingQuests';
 import { getLuckySpinState } from '../game/luckyWheelService';
+import { getCountryScenario, type CountryStoryQuest } from '../game/countryScenarios';
 import {
   isSectionUnlocked,
   getSectionRequiredLevel,
   getSectionUnlockHint,
 } from '../game/onboarding';
-import { 
-  Trophy, 
-  FileText, 
-  Sparkles, 
-  Building2, 
-  Factory, 
-  TrendingUp, 
-  Gavel, 
-  Map, 
-  Landmark, 
-  Gem, 
-  Crown, 
-  Coins, 
-  Wallet, 
-  ArrowUpRight, 
-  ArrowDownLeft, 
-  Plus, 
-  Flame, 
+import {
+  Trophy,
+  FileText,
+  Sparkles,
+  Building2,
+  Factory,
+  TrendingUp,
+  Gavel,
+  Map,
+  Landmark,
+  Gem,
+  Crown,
+  Coins,
+  Wallet,
+  ArrowUpRight,
+  ArrowDownLeft,
+  Flame,
   ChevronLeft,
   Briefcase,
   Users,
@@ -42,16 +43,8 @@ import {
   Anchor,
   Rocket,
   Lock,
-  X,
-  Compass,
   BookOpen,
-  ArrowLeft,
-  Swords,
-  Globe2,
-  Clock,
 } from 'lucide-react';
-import { getCurrentCentralBankShock } from '../game/centralBankEngine';
-import { loadPrestigeData } from '../game/prestigeEngine';
 
 interface DashboardProps {
   profile: PlayerProfile;
@@ -59,14 +52,15 @@ interface DashboardProps {
   onNavigate: (section: SectionId, target?: string) => void;
   onCommand: (command: GameCommand, fallback: (current: PlayerProfile) => GameResult<unknown>) => void;
   onClaimReward?: (cash: number, diamonds: number, questId: string) => void;
-  onRequestEmergencyLoan?: () => void;
   onUpdateProfile?: (updater: (prev: PlayerProfile) => PlayerProfile) => void;
   onOpenLuckyWheel?: () => void;
   onOpenTutorial?: () => void;
+  onOpenCampaignHub?: () => void;
   onOpenMorningReport?: () => void;
   onOpenCentralBank?: () => void;
   onOpenPrestige?: () => void;
-  onOpenCampaign?: () => void;
+  onMarkBriefingSeen?: (questId: string) => void;
+  onStartGuidedWalkthrough?: (quest: CountryStoryQuest) => void;
 }
 
 interface CommandItem {
@@ -81,17 +75,19 @@ interface CommandItem {
   hint: string;
 }
 
-export function Dashboard({ 
-  profile, 
-  country, 
-  onNavigate, 
-  onCommand,
+export function Dashboard({
+  profile,
+  country,
+  onNavigate,
+  onClaimReward,
   onOpenLuckyWheel,
   onOpenTutorial,
+  onOpenCampaignHub,
   onOpenMorningReport,
   onOpenCentralBank,
   onOpenPrestige,
-  onOpenCampaign,
+  onMarkBriefingSeen,
+  onStartGuidedWalkthrough,
 }: DashboardProps) {
   const [isLeaderboardOpen, setIsLeaderboardOpen] = useState(false);
   const [isFinanceModalOpen, setIsFinanceModalOpen] = useState(false);
@@ -103,6 +99,8 @@ export function Dashboard({
     requiredLevel: number;
     hint: string;
   } | null>(null);
+
+  const scenario = getCountryScenario(country.id);
 
   // Keep countdown updated
   useEffect(() => {
@@ -124,20 +122,38 @@ export function Dashboard({
         {
           id: 'initial-setup',
           category: 'revenue',
-          amount: profile.bankBalance || 50000,
+          amount: profile.bankBalance || 25_000,
           occurredAt: new Date().toISOString(),
           note: 'رأس مال التأسيس والتشغيل الأولي',
         },
       ];
 
+  const openLockedGate = (title: string, sectionId: SectionId) => {
+    playSound('click');
+    setLockedGateModal({
+      title,
+      sectionId,
+      requiredLevel: getSectionRequiredLevel(sectionId),
+      hint: getSectionUnlockHint(profile, sectionId),
+    });
+  };
+
   const handleNav = (section: SectionId, target?: string) => {
+    if (!isSectionUnlocked(profile, section)) {
+      openLockedGate(section, section);
+      return;
+    }
     playSound('click');
     onNavigate(section, target);
   };
 
+  const bankUnlocked = isSectionUnlocked(profile, 'bank');
+  const territoryUnlocked = isSectionUnlocked(profile, 'territory');
+  const prestigeUnlocked = isSectionUnlocked(profile, 'luxury');
+  const reportsUnlocked = isSectionUnlocked(profile, 'reports');
+
   // Build the complete Command Operations items with story unlock levels
   const commandItems: CommandItem[] = [
-    // 1. المتصدرون (دائماً متاح)
     {
       id: 'leaderboard',
       title: 'المتصدرين',
@@ -148,7 +164,6 @@ export function Dashboard({
       isUnlocked: true,
       hint: 'متاح للجميع لمتابعة تصنيف كبار المستثمرين عالمياً.',
     },
-    // 2. عجلة الحظ (دائماً متاح)
     {
       id: 'lucky_wheel',
       title: 'عجلة الحظ',
@@ -159,7 +174,6 @@ export function Dashboard({
       isUnlocked: true,
       hint: 'فرصة دوران مجانية كل 50 دقيقة لدعم السيولة والذهب.',
     },
-    // 3. الشركات (المستوى 1)
     {
       id: 'companies',
       title: 'الشركات',
@@ -169,9 +183,8 @@ export function Dashboard({
       gradient: 'bg-gradient-to-tr from-blue-600 to-indigo-500',
       requiredLevel: 1,
       isUnlocked: isSectionUnlocked(profile, 'companies'),
-      hint: 'تأسيس وإدارة أولى شركاتك الصناعية والخدمية.',
+      hint: getSectionUnlockHint(profile, 'companies'),
     },
-    // 4. الأراضي (المستوى 1)
     {
       id: 'lands',
       title: 'الأراضي',
@@ -181,9 +194,8 @@ export function Dashboard({
       gradient: 'bg-gradient-to-tr from-green-600 to-emerald-600',
       requiredLevel: 1,
       isUnlocked: isSectionUnlocked(profile, 'lands'),
-      hint: 'شراء وتطوير الأراضي الاستثمارية لإقامة المصانع والشركات.',
+      hint: getSectionUnlockHint(profile, 'lands'),
     },
-    // 5. المزادات (المستوى 1)
     {
       id: 'auctions',
       title: 'المزادات',
@@ -193,9 +205,8 @@ export function Dashboard({
       gradient: 'bg-gradient-to-tr from-amber-700 to-orange-500',
       requiredLevel: 1,
       isUnlocked: isSectionUnlocked(profile, 'auctions'),
-      hint: 'المزايدة على الأصول المتعثرة والصفقات الاستثمارية النادرة.',
+      hint: getSectionUnlockHint(profile, 'auctions'),
     },
-    // 5.1 المهام اليومية (المستوى 1)
     {
       id: 'tasks',
       title: 'المهام اليومية',
@@ -204,10 +215,9 @@ export function Dashboard({
       icon: <Trophy className="w-5 h-5 sm:w-6 sm:h-6 text-white" />,
       gradient: 'bg-gradient-to-tr from-yellow-600 to-amber-500',
       requiredLevel: 1,
-      isUnlocked: true,
-      hint: 'مهام القصة والإنجازات اليومية لجني الكاش والماس.',
+      isUnlocked: isSectionUnlocked(profile, 'tasks'),
+      hint: getSectionUnlockHint(profile, 'tasks'),
     },
-    // 5.2 الالتزامات والرواتب (المستوى 1)
     {
       id: 'obligations',
       title: 'الالتزامات والرواتب',
@@ -216,10 +226,9 @@ export function Dashboard({
       icon: <Shield className="w-5 h-5 sm:w-6 sm:h-6 text-white" />,
       gradient: 'bg-gradient-to-tr from-rose-600 to-orange-500',
       requiredLevel: 1,
-      isUnlocked: true,
-      hint: 'سداد رواتب العمال وأقساط القروض لتفادي التجميد البنكي.',
+      isUnlocked: isSectionUnlocked(profile, 'obligations'),
+      hint: getSectionUnlockHint(profile, 'obligations'),
     },
-    // 6. المتجر (المستوى 1)
     {
       id: 'store',
       title: 'المتجر',
@@ -229,9 +238,8 @@ export function Dashboard({
       gradient: 'bg-gradient-to-tr from-cyan-600 to-blue-400',
       requiredLevel: 1,
       isUnlocked: isSectionUnlocked(profile, 'store'),
-      hint: 'متجر الماس وبطاقات التسريع والحزم الاستثمارية.',
+      hint: getSectionUnlockHint(profile, 'store'),
     },
-    // 7. المصانع والإنتاج (المستوى 2)
     {
       id: 'production',
       title: 'الإنتاج والمصانع',
@@ -241,9 +249,8 @@ export function Dashboard({
       gradient: 'bg-gradient-to-tr from-teal-600 to-emerald-500',
       requiredLevel: 2,
       isUnlocked: isSectionUnlocked(profile, 'production'),
-      hint: 'يفتح بعد تأسيس أول شركة وبلوغ المستوى 2 لبدء تشغيل خطوط الإنتاج والتصنيع.',
+      hint: getSectionUnlockHint(profile, 'production'),
     },
-    // 8. المواد الخام والمخازن (المستوى 2)
     {
       id: 'inventory',
       title: 'المخازن والخامات',
@@ -253,9 +260,8 @@ export function Dashboard({
       gradient: 'bg-gradient-to-tr from-amber-600 to-yellow-600',
       requiredLevel: 2,
       isUnlocked: isSectionUnlocked(profile, 'inventory'),
-      hint: 'يفتح في المستوى 2 لتأمين المواد الخام وتخزين المنتجات الجاهزة للبيع.',
+      hint: getSectionUnlockHint(profile, 'inventory'),
     },
-    // 9. العقود والعملاء (المستوى 3)
     {
       id: 'contracts',
       title: 'العقود والعملاء',
@@ -265,9 +271,8 @@ export function Dashboard({
       gradient: 'bg-gradient-to-tr from-emerald-600 to-green-500',
       requiredLevel: 3,
       isUnlocked: isSectionUnlocked(profile, 'contracts'),
-      hint: 'يفتح في المستوى 3 بعد إنتاج أول شحنة ناجحة لاستعادة ثقة كبار التجار والعملاء.',
+      hint: getSectionUnlockHint(profile, 'contracts'),
     },
-    // 10. البنك والتمويل (المستوى 4)
     {
       id: 'bank',
       title: 'البنك والتمويل',
@@ -276,10 +281,9 @@ export function Dashboard({
       icon: <Landmark className="w-5 h-5 sm:w-6 sm:h-6 text-white" />,
       gradient: 'bg-gradient-to-tr from-sky-600 to-blue-500',
       requiredLevel: 4,
-      isUnlocked: isSectionUnlocked(profile, 'bank'),
-      hint: 'يفتح في المستوى 4 بعد تسليم أول عقد تجاري للحصول على تسهيلات بنكية وقروض استثمارية.',
+      isUnlocked: bankUnlocked,
+      hint: getSectionUnlockHint(profile, 'bank'),
     },
-    // 11. البورصة والاستثمار (المستوى 5)
     {
       id: 'investments',
       title: 'البورصة والأسهم',
@@ -289,9 +293,8 @@ export function Dashboard({
       gradient: 'bg-gradient-to-tr from-purple-600 to-pink-500',
       requiredLevel: 5,
       isUnlocked: isSectionUnlocked(profile, 'investments'),
-      hint: 'يفتح في المستوى 5 (الفصل الثاني) للتداول بالأسهم والاكتتاب العام بالبورصة.',
+      hint: getSectionUnlockHint(profile, 'investments'),
     },
-    // 12. التقارير المالية (المستوى 5)
     {
       id: 'finance_modal',
       title: 'التقارير المالية',
@@ -300,10 +303,9 @@ export function Dashboard({
       icon: <FileText className="w-5 h-5 sm:w-6 sm:h-6 text-white" />,
       gradient: 'bg-gradient-to-tr from-emerald-600 to-teal-400',
       requiredLevel: 5,
-      isUnlocked: isSectionUnlocked(profile, 'reports'),
-      hint: 'يفتح في المستوى 5 لتحليل القوائم المالية والأرباح التشغيلية وضريبة المبيعات.',
+      isUnlocked: reportsUnlocked,
+      hint: getSectionUnlockHint(profile, 'reports'),
     },
-    // 13. الموظفون والإدارة (المستوى 5)
     {
       id: 'staff',
       title: 'الموظفون والإدارة',
@@ -313,9 +315,8 @@ export function Dashboard({
       gradient: 'bg-gradient-to-tr from-violet-600 to-indigo-500',
       requiredLevel: 5,
       isUnlocked: isSectionUnlocked(profile, 'staff'),
-      hint: 'يفتح في المستوى 5 لتعيين المديرين والمحاسبين وخبراء التشغيل لرفع الكفاءة.',
+      hint: getSectionUnlockHint(profile, 'staff'),
     },
-    // 14. الأبحاث والتكنولوجيا (المستوى 6)
     {
       id: 'tech_tree',
       title: 'الأبحاث والأتمتة',
@@ -325,9 +326,8 @@ export function Dashboard({
       gradient: 'bg-gradient-to-tr from-cyan-600 to-teal-500',
       requiredLevel: 6,
       isUnlocked: isSectionUnlocked(profile, 'tech_tree'),
-      hint: 'يفتح في المستوى 6 لتطوير شجرة التكنولوجيا وأبحاث الأتمتة الذكية لتقليل تكاليف المصانع.',
+      hint: getSectionUnlockHint(profile, 'tech_tree'),
     },
-    // 15. السيطرة الإقليمية (المستوى 7)
     {
       id: 'territory',
       title: 'السيطرة الإقليمية',
@@ -336,10 +336,9 @@ export function Dashboard({
       icon: <Globe className="w-5 h-5 sm:w-6 sm:h-6 text-white" />,
       gradient: 'bg-gradient-to-tr from-blue-700 to-cyan-500',
       requiredLevel: 7,
-      isUnlocked: isSectionUnlocked(profile, 'territory'),
-      hint: 'يفتح في المستوى 7 للسيطرة على حصص الأسواق والتوسع في المحافظات والمدن.',
+      isUnlocked: territoryUnlocked,
+      hint: getSectionUnlockHint(profile, 'territory'),
     },
-    // 16. الهيبة والرفاهية (المستوى 8)
     {
       id: 'luxury',
       title: 'الهيبة والرفاهية',
@@ -348,10 +347,9 @@ export function Dashboard({
       icon: <Award className="w-5 h-5 sm:w-6 sm:h-6 text-slate-950" />,
       gradient: 'bg-gradient-to-tr from-yellow-500 to-amber-300',
       requiredLevel: 8,
-      isUnlocked: isSectionUnlocked(profile, 'luxury'),
-      hint: 'يفتح في المستوى 8 لاقتناء القصور والسيارات الفاخرة ورفع هيبة ونفوذ المدير التنفيذي.',
+      isUnlocked: prestigeUnlocked,
+      hint: getSectionUnlockHint(profile, 'luxury'),
     },
-    // 17. الكارتيل والتحالفات (المستوى 9)
     {
       id: 'cartel',
       title: 'الكارتيل والتحالف',
@@ -361,9 +359,8 @@ export function Dashboard({
       gradient: 'bg-gradient-to-tr from-rose-700 to-red-500',
       requiredLevel: 9,
       isUnlocked: isSectionUnlocked(profile, 'cartel'),
-      hint: 'يفتح في المستوى 9 لتأسيس التكتلات التجارية والتحالفات وسحق المنافسين في حرب الأسعار.',
+      hint: getSectionUnlockHint(profile, 'cartel'),
     },
-    // 18. الشحن الملاحي والموانئ (المستوى 10 - الفصل الثالث)
     {
       id: 'maritime',
       title: 'الأسطول والشحن',
@@ -373,9 +370,8 @@ export function Dashboard({
       gradient: 'bg-gradient-to-tr from-indigo-700 to-blue-600',
       requiredLevel: 10,
       isUnlocked: isSectionUnlocked(profile, 'maritime'),
-      hint: 'يفتح في المستوى 10 (الفصل الثالث) لبناء أسطول الشحن البحري وفتح الموانئ الدولية للتصدير.',
+      hint: getSectionUnlockHint(profile, 'maritime'),
     },
-    // 19. المناقصات الحكومية (المستوى 12)
     {
       id: 'megaprojects',
       title: 'المناقصات الكبرى',
@@ -385,9 +381,8 @@ export function Dashboard({
       gradient: 'bg-gradient-to-tr from-emerald-700 to-teal-600',
       requiredLevel: 12,
       isUnlocked: isSectionUnlocked(profile, 'megaprojects'),
-      hint: 'يفتح في المستوى 12 للمنافسة في مشاريع الدولة القومية والظفر بإعفاءات ضريبية سيادية.',
+      hint: getSectionUnlockHint(profile, 'megaprojects'),
     },
-    // 20. حاضنات الـ VC (المستوى 15 - الفصل الرابع)
     {
       id: 'incubator',
       title: 'حاضنات الـ VC',
@@ -397,7 +392,7 @@ export function Dashboard({
       gradient: 'bg-gradient-to-tr from-purple-700 to-pink-600',
       requiredLevel: 15,
       isUnlocked: isSectionUnlocked(profile, 'incubator'),
-      hint: 'يفتح في المستوى 15 (عرش الإمبراطورية) للاستثمار الجريء ورعاية شركات اليونيكورن المليارية.',
+      hint: getSectionUnlockHint(profile, 'incubator'),
     },
   ];
 
@@ -412,70 +407,56 @@ export function Dashboard({
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-12 animate-fade-in" dir="rtl">
-      {/* 1. Sleek News & Market Ticker Bar */}
-      <div className="bg-gradient-to-r from-slate-900 via-amber-950/40 to-slate-900 border border-amber-500/30 rounded-2xl p-2.5 sm:p-3 flex items-center justify-between gap-3 shadow-lg">
-        <div className="flex items-center gap-2 overflow-hidden text-xs sm:text-sm">
+      {/* 1. Sleek News, Country Scenario & Campaign Map Bar */}
+      <div className="bg-gradient-to-r from-slate-900 via-amber-950/40 to-slate-900 border border-amber-500/30 rounded-2xl p-2.5 sm:p-3 flex flex-wrap items-center justify-between gap-3 shadow-lg">
+        <div className="flex items-center gap-2 overflow-hidden text-xs sm:text-sm min-w-0">
           <span className="px-2 py-0.5 rounded-lg bg-amber-500 text-slate-950 font-black text-[11px] shrink-0 flex items-center gap-1">
             <Flame className="w-3.5 h-3.5 fill-slate-950" />
-            عاجل الأسواق
+            {scenario.scenarioTitle}
           </span>
           <span className="text-slate-200 truncate">
-            ارتفاع الطلب على المواد الأولية في {country.name} · دورة اليوم {profile.day} بدأت الآن بعوائد استثمارية واعدة
+            {scenario.economicProfile.headline} · دورة اليوم {profile.day} في أسواق {country.name}
           </span>
         </div>
-        <div className="text-[11px] text-amber-300 font-bold shrink-0 hidden sm:block">
-          {country.flag} {country.name}
+        <div className="flex items-center gap-2 shrink-0">
+          {onOpenCampaignHub && (
+            <button
+              type="button"
+              onClick={() => {
+                playSound('click');
+                onOpenCampaignHub();
+              }}
+              className="px-3 py-1 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/40 text-xs font-extrabold flex items-center gap-1.5 transition cursor-pointer whitespace-nowrap"
+            >
+              <BookOpen className="w-3.5 h-3.5" />
+              <span>فصول القصة والمنافسون</span>
+            </button>
+          )}
+          {onOpenTutorial && (
+            <button
+              type="button"
+              onClick={() => {
+                playSound('click');
+                onOpenTutorial();
+              }}
+              className="px-2.5 py-1 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-bold transition cursor-pointer whitespace-nowrap"
+            >
+              مقدمة {country.name}
+            </button>
+          )}
         </div>
-      </div>
-
-      {/* Story Campaign & Horizon Secrets Master Banner */}
-      <div className="bg-gradient-to-r from-amber-950/70 via-slate-900 to-amber-950/70 border-2 border-amber-500/60 rounded-3xl p-4 sm:p-5 shadow-2xl flex flex-col sm:flex-row items-center justify-between gap-4">
-        <div className="flex items-center gap-3 w-full sm:w-auto">
-          <div className="w-12 h-12 rounded-2xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-2xl shadow-inner shrink-0">
-            📜
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                سيناريو القصة الرئيسي · الفصل {profile.campaignChapterId ?? 1}
-              </span>
-              <span className="text-xs text-slate-400 font-bold">
-                {country.flag} {country.name}
-              </span>
-            </div>
-            <h3 className="text-base sm:text-lg font-black text-white mt-0.5">
-              Suly Business Empire: صعود الإمبراطورية
-            </h3>
-            <p className="text-xs text-slate-300 mt-0.5 line-clamp-1">
-              أسرار مجموعة الأفق العالمية، قرارات التوسع الاستراتيجي، والمنافسون المحليون.
-            </p>
-          </div>
-        </div>
-
-        {onOpenCampaign && (
-          <button
-            type="button"
-            onClick={onOpenCampaign}
-            className="w-full sm:w-auto px-5 py-2.5 rounded-2xl bg-gradient-to-r from-amber-500 to-yellow-400 hover:from-amber-400 hover:to-yellow-300 text-slate-950 font-black text-xs shadow-lg transition active:scale-95 flex items-center justify-center gap-2 cursor-pointer shrink-0"
-          >
-            <span>خريطة القصة والقرارات</span>
-            <ChevronLeft className="w-4 h-4" />
-          </button>
-        )}
       </div>
 
       {/* 2. Executive Wealth Overview (4 Premium Cards) */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        {/* Total Net Worth */}
         <div className="bg-slate-900/90 border border-amber-500/40 rounded-2xl p-4 shadow-xl shadow-amber-950/20 relative overflow-hidden group hover:border-amber-400/80 transition">
-          <div className="absolute top-0 right-0 w-24 h-24 bg-amber-500/10 rounded-full blur-2xl group-hover:bg-amber-500/20 transition" />
           <div className="flex items-center justify-between text-slate-400 text-xs mb-1">
             <span className="font-semibold">صافي الثروة الإجمالية</span>
             <div className="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-300 flex items-center justify-center font-bold">
               <Crown className="w-4 h-4 text-amber-400" />
             </div>
           </div>
-          <strong className="text-lg sm:text-xl font-black text-amber-400 block tracking-tight">
+          <strong className="text-lg sm:text-xl font-black text-amber-400 block tracking-tight tabular-nums">
             {formatMoney(totalAssets, country)}
           </strong>
           <span className="text-[10px] text-slate-400 mt-1 block">
@@ -483,33 +464,29 @@ export function Dashboard({
           </span>
         </div>
 
-        {/* Bank Cash Balance */}
         <div className="bg-slate-900/90 border border-emerald-500/40 rounded-2xl p-4 shadow-xl shadow-emerald-950/20 relative overflow-hidden group hover:border-emerald-400/80 transition">
-          <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/10 rounded-full blur-2xl group-hover:bg-emerald-500/20 transition" />
           <div className="flex items-center justify-between text-slate-400 text-xs mb-1">
             <span className="font-semibold">السيولة النقدية المتاحة</span>
             <div className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-300 flex items-center justify-center font-bold">
               <Wallet className="w-4 h-4 text-emerald-400" />
             </div>
           </div>
-          <strong className="text-lg sm:text-xl font-black text-emerald-400 block tracking-tight">
+          <strong className="text-lg sm:text-xl font-black text-emerald-400 block tracking-tight tabular-nums">
             {formatMoney(profile.bankBalance, country)}
           </strong>
           <span className="text-[10px] text-slate-400 mt-1 block">
-            جاهزة للمزايدة والتوسع الفوري
+            جاهزة للتشغيل والتوسع الفوري
           </span>
         </div>
 
-        {/* Pure Gold Bullion */}
         <div className="bg-slate-900/90 border border-yellow-500/40 rounded-2xl p-4 shadow-xl shadow-yellow-950/20 relative overflow-hidden group hover:border-yellow-400/80 transition">
-          <div className="absolute top-0 right-0 w-24 h-24 bg-yellow-500/10 rounded-full blur-2xl group-hover:bg-yellow-500/20 transition" />
           <div className="flex items-center justify-between text-slate-400 text-xs mb-1">
             <span className="font-semibold">احتياطي الذهب الخالص</span>
             <div className="w-8 h-8 rounded-xl bg-yellow-500/20 text-yellow-300 flex items-center justify-center font-bold">
               <Coins className="w-4 h-4 text-yellow-400" />
             </div>
           </div>
-          <strong className="text-lg sm:text-xl font-black text-yellow-300 block tracking-tight">
+          <strong className="text-lg sm:text-xl font-black text-yellow-300 block tracking-tight tabular-nums">
             {(profile.goldGrams ?? 0).toFixed(2)} غرام
           </strong>
           <span className="text-[10px] text-slate-400 mt-1 block">
@@ -517,16 +494,14 @@ export function Dashboard({
           </span>
         </div>
 
-        {/* Diamonds */}
         <div className="bg-slate-900/90 border border-cyan-500/40 rounded-2xl p-4 shadow-xl shadow-cyan-950/20 relative overflow-hidden group hover:border-cyan-400/80 transition">
-          <div className="absolute top-0 right-0 w-24 h-24 bg-cyan-500/10 rounded-full blur-2xl group-hover:bg-cyan-500/20 transition" />
           <div className="flex items-center justify-between text-slate-400 text-xs mb-1">
             <span className="font-semibold">رصيد الماس الإمبراطوري</span>
             <div className="w-8 h-8 rounded-xl bg-cyan-500/20 text-cyan-300 flex items-center justify-center font-bold">
               <Gem className="w-4 h-4 text-cyan-400" />
             </div>
           </div>
-          <strong className="text-lg sm:text-xl font-black text-cyan-300 block tracking-tight">
+          <strong className="text-lg sm:text-xl font-black text-cyan-300 block tracking-tight tabular-nums">
             {profile.diamonds ?? 0} 💎
           </strong>
           <span className="text-[10px] text-slate-400 mt-1 block">
@@ -535,21 +510,26 @@ export function Dashboard({
         </div>
       </div>
 
-      {/* 2.2. Offline Mobile Strategic Hub (Phases 1 - 5 Core Modules) */}
+      {/* 2.1. Country-Specific Story Quests & Practical Guidance */}
+      <SmartOnboardingQuests
+        profile={profile}
+        onNavigate={handleNav}
+        onClaimReward={(cash, diamonds, questId) => onClaimReward?.(cash, diamonds, questId)}
+        onMarkBriefingSeen={onMarkBriefingSeen}
+        onStartGuidedWalkthrough={onStartGuidedWalkthrough}
+      />
+
+      {/* 2.2. Strategic Systems Hub (Gated by Progression Rules) */}
       <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-4 sm:p-5 shadow-2xl backdrop-blur-md space-y-3">
         <div className="flex items-center justify-between pb-2.5 border-b border-slate-800/80">
           <div className="flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
             <h3 className="font-extrabold text-sm sm:text-base text-white">
-              محاور تطوير إمبراطورية الأعمال (Offline Mobile)
+              المحاور الاستراتيجية لإدارة الإمبراطورية
             </h3>
-            <span className="text-[11px] font-extrabold px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40">
-              أوفلاين بالكامل
+            <span className="text-xs text-slate-400 hidden sm:inline">
+              · أرباح الغياب · السياسة النقدية · التنافس الإقليمي · الصندوق السيادي
             </span>
           </div>
-          <span className="text-[11px] text-slate-400 hidden sm:inline">
-            أرباح الغياب • صدمات البنك المركزي • حروب الكارتيل • الهيبة والتوسع
-          </span>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
@@ -557,160 +537,193 @@ export function Dashboard({
           <button
             type="button"
             onClick={() => onOpenMorningReport?.()}
-            className="p-3.5 rounded-2xl bg-slate-950/70 border border-amber-500/30 hover:border-amber-400/80 hover:bg-slate-950 transition text-right flex flex-col justify-between group active:scale-95"
+            className="p-3.5 rounded-2xl bg-slate-950/70 border border-amber-500/30 hover:border-amber-400/80 hover:bg-slate-950 transition text-right flex flex-col justify-between group active:scale-95 cursor-pointer"
           >
             <div>
               <div className="flex items-center justify-between mb-1.5">
                 <span className="text-xl">🌅</span>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-500/20 text-amber-300">
-                  المرحلة 1
+                <span className="text-[10px] font-bold text-amber-300">
+                  متاح دائماً
                 </span>
               </div>
               <h4 className="text-xs font-black text-white group-hover:text-amber-300 transition">
                 تقرير الصباح لغياب المدير
               </h4>
               <p className="text-[11px] text-slate-400 mt-1 line-clamp-2">
-                حساب سلع المصانع وتوزيعات الأسهم أثناء غيابك عن اللعبة.
+                حساب سلع المصانع وتوزيعات الأسهم المتراكمة فعلياً أثناء غيابك عن اللعبة.
               </p>
             </div>
             <div className="mt-2 pt-2 border-t border-slate-800/60 flex items-center justify-between text-[11px] font-bold text-amber-400">
-              <span>معاينة الأرباح الآن</span>
+              <span>فحص حصيلة الغياب</span>
               <ChevronLeft className="w-3.5 h-3.5 group-hover:-translate-x-1 transition" />
             </div>
           </button>
 
-          {/* Phase 3: Central Bank & Macroeconomic Shocks */}
+          {/* Phase 3: Central Bank & Macroeconomic Shocks (Gated by Bank Unlock) */}
           <button
             type="button"
-            onClick={() => onOpenCentralBank?.()}
-            className="p-3.5 rounded-2xl bg-slate-950/70 border border-emerald-500/30 hover:border-emerald-400/80 hover:bg-slate-950 transition text-right flex flex-col justify-between group active:scale-95"
+            onClick={() => {
+              if (!bankUnlocked) {
+                openLockedGate('بيان البنك المركزي والتمويل', 'bank');
+                return;
+              }
+              onOpenCentralBank?.();
+            }}
+            className={`p-3.5 rounded-2xl bg-slate-950/70 border transition text-right flex flex-col justify-between group active:scale-95 cursor-pointer ${
+              bankUnlocked
+                ? 'border-emerald-500/30 hover:border-emerald-400/80 hover:bg-slate-950'
+                : 'border-slate-800 opacity-80 hover:border-amber-500/50'
+            }`}
           >
             <div>
               <div className="flex items-center justify-between mb-1.5">
-                <span className="text-xl">🏛️</span>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300">
-                  المرحلة 3
+                <span className="text-xl">{bankUnlocked ? '🏛️' : '🔒'}</span>
+                <span className={`text-[10px] font-bold ${bankUnlocked ? 'text-emerald-300' : 'text-amber-300'}`}>
+                  {bankUnlocked ? 'نشط ومتاح ✓' : 'يفتح مع البنك (مستوى 4)'}
                 </span>
               </div>
               <h4 className="text-xs font-black text-white group-hover:text-emerald-300 transition">
-                بيان البنك المركزي العاجل
+                بيان {scenario.economicProfile.bankName}
               </h4>
               <p className="text-[11px] text-slate-400 mt-1 line-clamp-2">
-                قرارات الفائدة والتضخم وصدمات العرض والطلب وتقلبات البورصة.
+                قرارات الفائدة والتضخم وتأثير السياسة النقدية على الودائع والقروض.
               </p>
             </div>
             <div className="mt-2 pt-2 border-t border-slate-800/60 flex items-center justify-between text-[11px] font-bold text-emerald-400">
-              <span>نشرة الفائدة والأسعار</span>
+              <span>{bankUnlocked ? 'نشرة الفائدة والأسعار' : 'شروط رفع التجميد البنكي'}</span>
               <ChevronLeft className="w-3.5 h-3.5 group-hover:-translate-x-1 transition" />
             </div>
           </button>
 
-          {/* Phase 4: Regional Syndicate Wars */}
+          {/* Phase 4: Regional Syndicate Wars (Gated by Territory Unlock) */}
           <button
             type="button"
-            onClick={() => handleNav('territory')}
-            className="p-3.5 rounded-2xl bg-slate-950/70 border border-indigo-500/30 hover:border-indigo-400/80 hover:bg-slate-950 transition text-right flex flex-col justify-between group active:scale-95"
+            onClick={() => {
+              if (!territoryUnlocked) {
+                openLockedGate('السيطرة الإقليمية', 'territory');
+                return;
+              }
+              handleNav('territory');
+            }}
+            className={`p-3.5 rounded-2xl bg-slate-950/70 border transition text-right flex flex-col justify-between group active:scale-95 cursor-pointer ${
+              territoryUnlocked
+                ? 'border-indigo-500/30 hover:border-indigo-400/80 hover:bg-slate-950'
+                : 'border-slate-800 opacity-80 hover:border-amber-500/50'
+            }`}
           >
             <div>
               <div className="flex items-center justify-between mb-1.5">
-                <span className="text-xl">⚔️</span>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300">
-                  المرحلة 4
+                <span className="text-xl">{territoryUnlocked ? '⚔️' : '🔒'}</span>
+                <span className={`text-[10px] font-bold ${territoryUnlocked ? 'text-indigo-300' : 'text-amber-300'}`}>
+                  {territoryUnlocked ? 'نشط ومتاح ✓' : 'يفتح في مستوى 7'}
                 </span>
               </div>
               <h4 className="text-xs font-black text-white group-hover:text-indigo-300 transition">
-                حروب الكارتيل والسيطرة
+                السيطرة الإقليمية وحصص السوق
               </h4>
               <p className="text-[11px] text-slate-400 mt-1 line-clamp-2">
-                حرب الأسعار والمراكز اللوجستية لبلوغ 60% احتكار في المحافظات.
+                توسيع المراكز اللوجستية ورفع حصتك السوقية في أقاليم {country.name}.
               </p>
             </div>
             <div className="mt-2 pt-2 border-t border-slate-800/60 flex items-center justify-between text-[11px] font-bold text-indigo-400">
-              <span>خريطة الأقاليم</span>
+              <span>{territoryUnlocked ? 'خريطة الأقاليم' : 'شروط الفتح'}</span>
               <ChevronLeft className="w-3.5 h-3.5 group-hover:-translate-x-1 transition" />
             </div>
           </button>
 
-          {/* Phase 5: Prestige System & International Expansion */}
+          {/* Phase 5: Prestige System & International Expansion (Gated by Luxury/Prestige Unlock) */}
           <button
             type="button"
-            onClick={() => onOpenPrestige?.()}
-            className="p-3.5 rounded-2xl bg-slate-950/70 border border-purple-500/30 hover:border-purple-400/80 hover:bg-slate-950 transition text-right flex flex-col justify-between group active:scale-95"
+            onClick={() => {
+              if (!prestigeUnlocked) {
+                openLockedGate('نظام الهيبة والتوسع الدولي', 'luxury');
+                return;
+              }
+              onOpenPrestige?.();
+            }}
+            className={`p-3.5 rounded-2xl bg-slate-950/70 border transition text-right flex flex-col justify-between group active:scale-95 cursor-pointer ${
+              prestigeUnlocked
+                ? 'border-purple-500/30 hover:border-purple-400/80 hover:bg-slate-950'
+                : 'border-slate-800 opacity-80 hover:border-amber-500/50'
+            }`}
           >
             <div>
               <div className="flex items-center justify-between mb-1.5">
-                <span className="text-xl">👑</span>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-purple-500/20 text-purple-300">
-                  المرحلة 5
+                <span className="text-xl">{prestigeUnlocked ? '👑' : '🔒'}</span>
+                <span className={`text-[10px] font-bold ${prestigeUnlocked ? 'text-purple-300' : 'text-amber-300'}`}>
+                  {prestigeUnlocked ? 'نشط ومتاح ✓' : 'يفتح في مستوى 8'}
                 </span>
               </div>
               <h4 className="text-xs font-black text-white group-hover:text-purple-300 transition">
-                نظام الهيبة والتوسع الدولي
+                نظام الهيبة والصندوق السيادي
               </h4>
               <p className="text-[11px] text-slate-400 mt-1 line-clamp-2">
-                تأسيس صندوق سيادي عابر للقارات (الرياض، دبي، لندن، نيويورك).
+                تأسيس صندوق استثماري عابر للقارات مع امتيازات دائمة دون خلط حفظ دولتك.
               </p>
             </div>
             <div className="mt-2 pt-2 border-t border-slate-800/60 flex items-center justify-between text-[11px] font-bold text-purple-400">
-              <span>الصندوق والامتيازات</span>
+              <span>{prestigeUnlocked ? 'الصندوق والامتيازات' : 'شروط الفتح'}</span>
               <ChevronLeft className="w-3.5 h-3.5 group-hover:-translate-x-1 transition" />
             </div>
           </button>
         </div>
       </div>
+
       {/* 3. Executive Command Operations Bar with explicit unlock levels & lock badges */}
       <div className="bg-slate-900/95 border border-slate-800 rounded-3xl p-4 sm:p-6 shadow-2xl backdrop-blur-md">
         <div className="flex flex-wrap items-center justify-between gap-3 mb-4 pb-3 border-b border-slate-800/80">
           <div className="flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping" />
             <h3 className="font-extrabold text-sm sm:text-base text-white">
               غرفة العمليات المركزية
             </h3>
             <span className="text-xs text-slate-400 hidden sm:inline">
-              (أنظمة مقفلة تفتح تدريجياً حسب سيناريو القصة ومستوى اللاعب)
+              · تفتح الأقسام تدريجياً وفق تقدمك في القصة والمستوى
             </span>
           </div>
 
-          <div className="flex items-center gap-2">
-            {/* Category Filter Pills */}
+          <div className="flex flex-wrap items-center gap-2">
             <div className="flex items-center bg-slate-950/80 border border-slate-800 p-1 rounded-xl text-[11px] font-bold">
               <button
+                type="button"
                 onClick={() => setOpsFilter('all')}
-                className={`px-2.5 py-1 rounded-lg transition ${opsFilter === 'all' ? 'bg-amber-500 text-slate-950 font-black shadow' : 'text-slate-400 hover:text-white'}`}
+                className={`px-2.5 py-1 rounded-lg transition cursor-pointer whitespace-nowrap ${opsFilter === 'all' ? 'bg-amber-500 text-slate-950 font-black shadow' : 'text-slate-400 hover:text-white'}`}
               >
                 الكل ({commandItems.length})
               </button>
               <button
+                type="button"
                 onClick={() => setOpsFilter('available')}
-                className={`px-2.5 py-1 rounded-lg transition ${opsFilter === 'available' ? 'bg-amber-500 text-slate-950 font-black shadow' : 'text-slate-400 hover:text-white'}`}
+                className={`px-2.5 py-1 rounded-lg transition cursor-pointer whitespace-nowrap ${opsFilter === 'available' ? 'bg-amber-500 text-slate-950 font-black shadow' : 'text-slate-400 hover:text-white'}`}
               >
                 المتاح ({availableCount})
               </button>
               <button
+                type="button"
                 onClick={() => setOpsFilter('core')}
-                className={`px-2.5 py-1 rounded-lg transition ${opsFilter === 'core' ? 'bg-amber-500 text-slate-950 font-black shadow' : 'text-slate-400 hover:text-white'}`}
+                className={`px-2.5 py-1 rounded-lg transition cursor-pointer whitespace-nowrap ${opsFilter === 'core' ? 'bg-amber-500 text-slate-950 font-black shadow' : 'text-slate-400 hover:text-white'}`}
               >
                 الأساسية
               </button>
               <button
+                type="button"
                 onClick={() => setOpsFilter('expansion')}
-                className={`px-2.5 py-1 rounded-lg transition ${opsFilter === 'expansion' ? 'bg-amber-500 text-slate-950 font-black shadow' : 'text-slate-400 hover:text-white'}`}
+                className={`px-2.5 py-1 rounded-lg transition cursor-pointer whitespace-nowrap ${opsFilter === 'expansion' ? 'bg-amber-500 text-slate-950 font-black shadow' : 'text-slate-400 hover:text-white'}`}
               >
-                التوسع 🚀
+                التوسع
               </button>
             </div>
 
-            <span className="text-xs text-amber-400/90 font-bold bg-amber-500/10 px-3 py-1 rounded-full border border-amber-500/30">
+            <span className="text-xs text-amber-300 font-bold px-2.5 py-1">
               مستواك الحالي: {profile.level ?? 1}
             </span>
           </div>
         </div>
 
-        {/* Icons Grid with Names & Story Lock Labels */}
         <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-10 gap-2 sm:gap-2.5">
           {filteredItems.map((item) => {
             return (
               <button
+                type="button"
                 key={item.id}
                 onClick={() => {
                   if (!item.isUnlocked) {
@@ -744,10 +757,9 @@ export function Dashboard({
                 }`}
                 title={item.isUnlocked ? item.title : `يفتح في مستوى ${item.requiredLevel} · ${item.hint}`}
               >
-                {/* Lucky wheel free badge */}
                 {item.id === 'lucky_wheel' && (
                   spinState.isFree ? (
-                    <span className="absolute -top-1.5 -right-1.5 px-1.5 py-0.5 rounded-full bg-emerald-500 text-white font-extrabold text-[9px] shadow-sm animate-pulse z-10">
+                    <span className="absolute -top-1.5 -right-1.5 px-1.5 py-0.5 rounded-full bg-emerald-500 text-white font-extrabold text-[9px] shadow-sm z-10">
                       مجاناً
                     </span>
                   ) : (
@@ -772,12 +784,7 @@ export function Dashboard({
                   {item.title}
                 </span>
 
-                {/* Explicit Lock Level Badge as requested by the user */}
-                {opsFilter === 'available' ? (
-                  <span className="text-[9px] text-emerald-400 font-bold mt-1 bg-emerald-500/10 px-1.5 py-0.5 rounded-md border border-emerald-500/30">
-                    نشط ومتاح ✓
-                  </span>
-                ) : !item.isUnlocked ? (
+                {!item.isUnlocked ? (
                   <span className="text-[9px] font-black text-amber-300 bg-amber-950/90 px-1.5 py-0.5 rounded-md border border-amber-500/40 mt-1 flex items-center gap-0.5 shadow-sm whitespace-nowrap">
                     <Lock className="w-2.5 h-2.5 text-amber-400 shrink-0" />
                     <span>يفتح في مستوى {item.requiredLevel}</span>
@@ -814,21 +821,21 @@ export function Dashboard({
               </div>
 
               <button
+                type="button"
                 onClick={() => handleNav('companies')}
-                className="text-xs text-amber-400 hover:text-amber-300 font-bold flex items-center gap-1 transition"
+                className="text-xs text-amber-400 hover:text-amber-300 font-bold flex items-center gap-1 transition cursor-pointer"
               >
                 <span>إدارة الكل</span>
                 <ChevronLeft className="w-4 h-4" />
               </button>
             </div>
 
-            {/* Featured Active Company or Get Started Callout */}
             {profile.companies.length > 0 ? (
               (() => {
                 const featured = profile.companies[0];
                 const condition = featured.maintenanceCondition ?? 100;
                 const level = featured.upgradeLevel ?? 1;
-                const cost = featured.operatingCostPerDay ?? 15000;
+                const cost = featured.operatingCostPerDay ?? 80;
                 return (
                   <div className="bg-slate-950/70 border border-slate-800 rounded-2xl p-4 mb-4">
                     <div className="flex items-center justify-between mb-3">
@@ -845,8 +852,8 @@ export function Dashboard({
                           </span>
                         </div>
                       </div>
-                      <span className={`text-xs px-2.5 py-1 rounded-full font-bold border ${
-                        condition >= 70 ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40' : 'bg-rose-500/20 text-rose-300 border-rose-500/40'
+                      <span className={`text-xs font-bold ${
+                        condition >= 70 ? 'text-emerald-300' : 'text-rose-300'
                       }`}>
                         كفاءة {condition}%
                       </span>
@@ -855,7 +862,7 @@ export function Dashboard({
                     <div className="grid grid-cols-3 gap-2 text-center text-xs my-3 p-2.5 bg-slate-900 rounded-xl border border-slate-800/80">
                       <div>
                         <span className="text-[10px] text-slate-400 block">التكلفة اليومية</span>
-                        <strong className="text-slate-200">{cost.toLocaleString()} {country.currency.code}</strong>
+                        <strong className="text-slate-200 tabular-nums">{formatMoney(cost, country)}</strong>
                       </div>
                       <div>
                         <span className="text-[10px] text-slate-400 block">حالة الماكينات</span>
@@ -869,14 +876,16 @@ export function Dashboard({
 
                     <div className="flex items-center gap-2 pt-1">
                       <button
+                        type="button"
                         onClick={() => handleNav('production')}
-                        className="flex-1 py-2.5 px-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs shadow-md transition text-center"
+                        className="flex-1 py-2.5 px-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs shadow-md transition text-center cursor-pointer"
                       >
                         تشغيل خط الإنتاج ⚡
                       </button>
                       <button
+                        type="button"
                         onClick={() => handleNav('companies')}
-                        className="py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs transition border border-slate-700"
+                        className="py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs transition border border-slate-700 cursor-pointer"
                       >
                         تطوير وصيانة ⚙️
                       </button>
@@ -894,8 +903,9 @@ export function Dashboard({
                   ابدأ مسار استعادة الإرث: اشترِ أول قطعة أرض صناعية وأسس شركتك الأولى لتبدأ دورة الإنتاج.
                 </p>
                 <button
+                  type="button"
                   onClick={() => handleNav('companies')}
-                  className="py-2.5 px-5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs shadow-lg shadow-amber-500/20 transition active:scale-95"
+                  className="py-2.5 px-5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs shadow-lg shadow-amber-500/20 transition active:scale-95 cursor-pointer"
                 >
                   تأسيس شركتك الأولى الآن 🚀
                 </button>
@@ -903,14 +913,14 @@ export function Dashboard({
             )}
           </div>
 
-          {/* Quick Production Status Bar */}
           <div className="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs">
             <span className="text-slate-400">
               الإنتاج الفعال: <strong className="text-white">{profile.productionOrders.filter((o) => o.status === 'active').length} دفعات</strong>
             </span>
             <button
+              type="button"
               onClick={() => handleNav('production')}
-              className="text-emerald-400 hover:text-emerald-300 font-bold flex items-center gap-1"
+              className="text-emerald-400 hover:text-emerald-300 font-bold flex items-center gap-1 cursor-pointer"
             >
               <span>متابعة خطوط الإنتاج</span>
               <ChevronLeft className="w-3.5 h-3.5" />
@@ -937,18 +947,22 @@ export function Dashboard({
               </div>
 
               <button
+                type="button"
                 onClick={() => {
+                  if (!reportsUnlocked) {
+                    openLockedGate('التقارير المالية المتقدمة', 'reports');
+                    return;
+                  }
                   playSound('click');
                   setIsFinanceModalOpen(true);
                 }}
-                className="text-xs text-emerald-400 hover:text-emerald-300 font-bold flex items-center gap-1 transition"
+                className="text-xs text-emerald-400 hover:text-emerald-300 font-bold flex items-center gap-1 transition cursor-pointer"
               >
-                <span>التقرير المفصل</span>
+                <span>{reportsUnlocked ? 'التقرير المفصل' : 'التقارير (مستوى 5)'}</span>
                 <ChevronLeft className="w-3.5 h-3.5" />
               </button>
             </div>
 
-            {/* List of 4 recent transactions */}
             <div className="space-y-2.5 mb-4">
               {recentTransactions.map((tx, idx) => {
                 const isPositive = tx.category === 'revenue';
@@ -972,7 +986,7 @@ export function Dashboard({
                         </span>
                       </div>
                     </div>
-                    <strong className={`text-xs font-black dir-ltr ${
+                    <strong className={`text-xs font-black dir-ltr tabular-nums ${
                       isPositive ? 'text-emerald-400' : 'text-rose-400'
                     }`}>
                       {isPositive ? '+' : '-'}{formatMoney(Math.abs(tx.amount), country)}
@@ -983,14 +997,14 @@ export function Dashboard({
             </div>
           </div>
 
-          {/* Quick Lands Asset Summary */}
           <div className="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs">
             <span className="text-slate-400">
               الأراضي المسجلة: <strong className="text-white">{landsCount} قطعة</strong>
             </span>
             <button
+              type="button"
               onClick={() => handleNav('lands')}
-              className="text-amber-400 hover:text-amber-300 font-bold flex items-center gap-1"
+              className="text-amber-400 hover:text-amber-300 font-bold flex items-center gap-1 cursor-pointer"
             >
               <span>معاينة الأراضي</span>
               <ChevronLeft className="w-3.5 h-3.5" />
@@ -1007,27 +1021,29 @@ export function Dashboard({
         country={country}
       />
 
-      <FinanceReportModal
-        isOpen={isFinanceModalOpen}
-        onClose={() => setIsFinanceModalOpen(false)}
-        profile={profile}
-        country={country}
-        onNavigate={handleNav}
-      />
+      {reportsUnlocked && (
+        <FinanceReportModal
+          isOpen={isFinanceModalOpen}
+          onClose={() => setIsFinanceModalOpen(false)}
+          profile={profile}
+          country={country}
+          onNavigate={handleNav}
+        />
+      )}
 
       {/* 6. Story Level Locked Gate Modal */}
       {lockedGateModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fade-in" dir="rtl">
           <div className="bg-slate-900 border border-amber-500/50 rounded-3xl w-full max-w-sm p-6 shadow-2xl space-y-4 text-center">
-            <div className="w-16 h-16 rounded-2xl bg-amber-500/15 border-2 border-amber-500/50 text-amber-400 mx-auto flex items-center justify-center text-3xl shadow-xl shadow-amber-500/20 animate-pulse">
+            <div className="w-16 h-16 rounded-2xl bg-amber-500/15 border-2 border-amber-500/50 text-amber-400 mx-auto flex items-center justify-center text-3xl shadow-xl shadow-amber-500/20">
               🔒
             </div>
             <div>
               <h3 className="text-lg font-black text-white">
                 نظام {lockedGateModal.title} مقفل
               </h3>
-              <span className="inline-block mt-1 px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 text-xs font-black border border-amber-500/40">
-                يفتح عند بلوغ المستوى {lockedGateModal.requiredLevel}
+              <span className="inline-block mt-1 text-amber-300 text-xs font-black">
+                يفتح عند بلوغ المستوى {lockedGateModal.requiredLevel} أو تحقق شرط القصة
               </span>
             </div>
             <p className="text-xs text-slate-300 leading-relaxed bg-slate-950/80 p-3.5 rounded-xl border border-slate-800 text-right">
@@ -1039,17 +1055,19 @@ export function Dashboard({
             </p>
             <div className="flex gap-2 pt-1">
               <button
+                type="button"
                 onClick={() => {
                   setLockedGateModal(null);
                   handleNav('tasks');
                 }}
-                className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-500 text-slate-950 font-black text-xs shadow-md hover:brightness-110 transition active:scale-95"
+                className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-500 text-slate-950 font-black text-xs shadow-md hover:brightness-110 transition active:scale-95 cursor-pointer"
               >
                 عرض مهام القصة 📜
               </button>
               <button
+                type="button"
                 onClick={() => setLockedGateModal(null)}
-                className="py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs border border-slate-700 transition"
+                className="py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs border border-slate-700 transition cursor-pointer"
               >
                 إغلاق
               </button>

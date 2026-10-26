@@ -1,11 +1,11 @@
 import { findCountry, type CountryId, type IndustryId } from '../domain/countries';
 import type { PlayerAsset, PlayerCompany, PlayerLand, PlayerProfile } from '../domain/player';
-import type { AchievementRecord, AuctionBidRecord, BusinessContract, DepositRecord, FinanceLedgerEntry, InventoryLot, InvestmentRecord, LicenseRecord, LoanRecord, OnboardingProgress, ProductSale, ProductionOrder, StaffContract, TaskProgress } from '../domain/futureSystems';
+import type { AchievementRecord, AuctionBidRecord, BusinessContract, DepositRecord, FinanceLedgerEntry, ForwardSupplyContract, GlobalShipmentRecord, InventoryLot, InvestmentRecord, LicenseRecord, LoanRecord, OnboardingProgress, ProductSale, ProductionOrder, StaffContract, TaskProgress } from '../domain/futureSystems';
 import { findIndustry, GOLD_PRICE_PER_GRAM } from '../game/catalog';
 import { normalizeAccountFeatures } from '../domain/accountFeatures';
 
 const SAVE_KEY = 'business-empire.save.v1';
-const SAVE_VERSION = 6;
+const SAVE_VERSION = 7;
 
 function saveKey(accountId?: string): string {
   return accountId ? `${SAVE_KEY}.${accountId}` : SAVE_KEY;
@@ -189,9 +189,81 @@ function isAchievement(value: unknown): value is AchievementRecord {
     && Number.isInteger(value.earnedAtDay) && (value.earnedAtDay as number) >= 1;
 }
 
-function isOnboardingProgress(value: unknown): value is OnboardingProgress {
-  return isRecord(value) && typeof value.introCompleted === 'boolean' && Number.isInteger(value.chapter)
-    && (value.chapter as number) >= 0 && Array.isArray(value.seenGuides) && value.seenGuides.every(isNonEmptyString);
+function normalizeOnboarding(value: unknown): OnboardingProgress {
+  if (!isRecord(value) || typeof value.introCompleted !== 'boolean' || !Number.isInteger(value.chapter) || (value.chapter as number) < 0 || !Array.isArray(value.seenGuides)) {
+    return {
+      introCompleted: true,
+      chapter: 1,
+      seenGuides: [],
+      countryIntroSeen: true,
+      walkthroughCompleted: true,
+      seenQuestBriefings: [],
+      claimedStoryQuestIds: [],
+      claimedCampaignChapters: [],
+      campaignChapterId: 1,
+    };
+  }
+  const seenGuides = Array.from(new Set(value.seenGuides.filter(isNonEmptyString)));
+  const seenQuestBriefings = Array.isArray(value.seenQuestBriefings)
+    ? Array.from(new Set(value.seenQuestBriefings.filter(isNonEmptyString)))
+    : [];
+  const claimedStoryQuestIds = Array.isArray(value.claimedStoryQuestIds)
+    ? Array.from(new Set(value.claimedStoryQuestIds.filter(isNonEmptyString)))
+    : [];
+  const claimedCampaignChapters = Array.isArray(value.claimedCampaignChapters)
+    ? Array.from(new Set(value.claimedCampaignChapters.filter((n): n is number => typeof n === 'number' && Number.isInteger(n) && n >= 1 && n <= 20)))
+    : [];
+  return {
+    introCompleted: value.introCompleted,
+    chapter: value.chapter as number,
+    seenGuides,
+    countryIntroSeen: typeof value.countryIntroSeen === 'boolean' ? value.countryIntroSeen : value.introCompleted,
+    ...(typeof value.walkthroughCompleted === 'boolean' ? { walkthroughCompleted: value.walkthroughCompleted } : {}),
+    ...(typeof value.walkthroughSkipped === 'boolean' ? { walkthroughSkipped: value.walkthroughSkipped } : {}),
+    ...(isNonEmptyString(value.walkthroughStepId) ? { walkthroughStepId: value.walkthroughStepId } : {}),
+    ...(seenQuestBriefings.length > 0 || Array.isArray(value.seenQuestBriefings) ? { seenQuestBriefings } : {}),
+    ...(claimedStoryQuestIds.length > 0 || Array.isArray(value.claimedStoryQuestIds) ? { claimedStoryQuestIds } : {}),
+    ...(claimedCampaignChapters.length > 0 || Array.isArray(value.claimedCampaignChapters) ? { claimedCampaignChapters } : {}),
+    ...(typeof value.campaignChapterId === 'number' && Number.isInteger(value.campaignChapterId) && value.campaignChapterId >= 1 ? { campaignChapterId: value.campaignChapterId } : {}),
+  };
+}
+
+function isGlobalShipment(value: unknown): value is GlobalShipmentRecord {
+  return isRecord(value)
+    && isNonEmptyString(value.id)
+    && (value.direction === 'import' || value.direction === 'export')
+    && isNonEmptyString(value.itemId)
+    && isNonEmptyString(value.itemName)
+    && Number.isInteger(value.quantity) && (value.quantity as number) >= 1
+    && isNonEmptyString(value.unit)
+    && isFiniteNonNegative(value.unitCostOrPrice)
+    && isFiniteNonNegative(value.freightCost)
+    && isFiniteNonNegative(value.customsDuty)
+    && (value.shippingMode === 'spot-ddp' || value.shippingMode === 'sea-cif' || value.shippingMode === 'air-express')
+    && isNonEmptyString(value.originOrDestination)
+    && isNonEmptyString(value.partnerName)
+    && isFiniteNonNegative(value.qualityScore) && value.qualityScore <= 100
+    && Number.isInteger(value.orderedOnDay) && (value.orderedOnDay as number) >= 1
+    && Number.isInteger(value.arrivesOnDay) && (value.arrivesOnDay as number) >= 1
+    && isFiniteNonNegative(value.deferredBalanceDue)
+    && (value.status === 'in-transit' || value.status === 'delivered');
+}
+
+function isForwardContract(value: unknown): value is ForwardSupplyContract {
+  return isRecord(value)
+    && isNonEmptyString(value.id)
+    && isNonEmptyString(value.materialId)
+    && isNonEmptyString(value.materialName)
+    && isNonEmptyString(value.supplierName)
+    && isNonEmptyString(value.originHub)
+    && isFiniteNonNegative(value.lockedUnitPrice)
+    && Number.isInteger(value.dailyQuota) && (value.dailyQuota as number) >= 1
+    && Number.isInteger(value.remainingQuota) && (value.remainingQuota as number) >= 0
+    && isFiniteNonNegative(value.marginPaid)
+    && Number.isInteger(value.startedOnDay) && (value.startedOnDay as number) >= 1
+    && Number.isInteger(value.expiresOnDay) && (value.expiresOnDay as number) >= 1
+    && isFiniteNonNegative(value.qualityScore) && value.qualityScore <= 100
+    && (value.status === 'active' || value.status === 'completed' || value.status === 'expired');
 }
 
 function inferLandType(label: string): PlayerLand['landType'] | undefined {
@@ -227,7 +299,7 @@ function isLegacyProfile(value: unknown): value is Record<string, unknown> {
 }
 
 /** Converts older profiles into one canonical shape without dropping ownership or financial history. */
-export function migrateProfile(value: unknown): PlayerProfile | null {
+function migrateProfile(value: unknown): PlayerProfile | null {
   if (!isLegacyProfile(value)) return null;
   const rawFinances = value.finances as { netProfit: number; totalRevenue?: number; totalExpenses?: number };
   const countryId = value.countryId as CountryId;
@@ -334,7 +406,31 @@ export function migrateProfile(value: unknown): PlayerProfile | null {
     reputation: isFiniteNonNegative(value.reputation) ? Math.min(100, value.reputation as number) : 50,
     contracts: Array.isArray(value.contracts) && value.contracts.every(isBusinessContract) ? value.contracts : [],
     achievements: Array.isArray(value.achievements) && value.achievements.every(isAchievement) ? value.achievements : [],
-    onboarding: isOnboardingProgress(value.onboarding) ? value.onboarding : { introCompleted: true, chapter: 1, seenGuides: [] },
+    onboarding: normalizeOnboarding(value.onboarding),
+    ...(isRecord(value.season) && isNonEmptyString(value.season.seasonId) && Number.isInteger(value.season.startedOnDay) && Number.isInteger(value.season.endsOnDay) && isFiniteNonNegative(value.season.points) && Array.isArray(value.season.claimedChallengeKeys)
+      ? {
+          season: {
+            seasonId: value.season.seasonId,
+            startedOnDay: value.season.startedOnDay as number,
+            endsOnDay: value.season.endsOnDay as number,
+            points: Math.floor(value.season.points),
+            claimedChallengeKeys: Array.from(new Set(value.season.claimedChallengeKeys.filter(isNonEmptyString))),
+            ...(Number.isInteger(value.season.claimedLoginRewardDay) ? { claimedLoginRewardDay: value.season.claimedLoginRewardDay as number } : {}),
+          },
+        }
+      : {}),
+    ...(typeof value.lastSpinTimestamp === 'number' && Number.isFinite(value.lastSpinTimestamp) ? { lastSpinTimestamp: value.lastSpinTimestamp } : {}),
+    ...(typeof value.lastSpinDay === 'number' && Number.isInteger(value.lastSpinDay) ? { lastSpinDay: value.lastSpinDay } : {}),
+    ...(typeof value.lastOfflineClaimAt === 'number' && Number.isFinite(value.lastOfflineClaimAt) ? { lastOfflineClaimAt: value.lastOfflineClaimAt } : {}),
+    ...(Array.isArray(value.globalShipments) && value.globalShipments.every(isGlobalShipment) ? { globalShipments: value.globalShipments } : {}),
+    ...(Array.isArray(value.forwardContracts) && value.forwardContracts.every(isForwardContract) ? { forwardContracts: value.forwardContracts } : {}),
+    ...(isRecord(value.supplierTrust) ? {
+      supplierTrust: Object.fromEntries(
+        Object.entries(value.supplierTrust)
+          .filter(([k, v]) => isNonEmptyString(k) && isFiniteNonNegative(v))
+          .map(([k, v]) => [k, Math.min(100, Math.round(v as number))]),
+      ),
+    } : {}),
     avatarId: typeof value.avatarId === 'string' && value.avatarId ? value.avatarId : 'avatar_free_male_1',
     unlockedAvatarIds: Array.isArray(value.unlockedAvatarIds) && value.unlockedAvatarIds.length > 0
       ? Array.from(new Set(['avatar_free_male_1', 'avatar_free_male_2', 'avatar_free_female_1', 'avatar_free_female_2', ...value.unlockedAvatarIds.filter(isNonEmptyString)]))
@@ -342,10 +438,6 @@ export function migrateProfile(value: unknown): PlayerProfile | null {
     bio: typeof value.bio === 'string' && value.bio.trim().length > 0 ? value.bio : 'ابنِ إمبراطوريتك الاستثمارية بعزيمة لا تلين ورؤية لا تعرف المستحيل.',
     renameCountThisWeek: typeof value.renameCountThisWeek === 'number' && Number.isInteger(value.renameCountThisWeek) ? value.renameCountThisWeek : 0,
     lastRenameWeekTimestamp: typeof value.lastRenameWeekTimestamp === 'number' ? value.lastRenameWeekTimestamp : Date.now(),
-    campaignChapterId: typeof value.campaignChapterId === 'number' && Number.isInteger(value.campaignChapterId) && value.campaignChapterId >= 1 ? value.campaignChapterId : 1,
-    completedMissionIds: Array.isArray(value.completedMissionIds) ? value.completedMissionIds.filter(isNonEmptyString) : [],
-    claimedRewardIds: Array.isArray(value.claimedRewardIds) ? value.claimedRewardIds.filter(isNonEmptyString) : [],
-    dismissedStoryEventIds: Array.isArray(value.dismissedStoryEventIds) ? value.dismissedStoryEventIds.filter(isNonEmptyString) : [],
   }, typeof value.accountCode === 'string' ? value.accountCode : value.id as string);
 }
 

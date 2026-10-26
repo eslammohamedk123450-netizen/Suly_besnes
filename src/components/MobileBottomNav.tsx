@@ -4,7 +4,7 @@ import type { PlayerProfile } from '../domain/player';
 import { Home, Factory, ShoppingCart, Landmark, Sparkles, Lock } from 'lucide-react';
 import { playSound } from '../game/soundEffects';
 import { triggerHaptic } from '../services/nativeMobileService';
-import { isSectionUnlocked, getSectionRequiredLevel } from '../game/onboarding';
+import { isSectionUnlocked } from '../game/onboarding';
 
 interface MobileBottomNavProps {
   activeSection: SectionId;
@@ -92,6 +92,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
       {/* 4. Market / Inventory */}
       <button
         onClick={() => handleNav('inventory')}
+        data-guide-nav="inventory"
         className={`flex flex-col items-center gap-1 py-1 px-2 rounded-xl transition relative ${
           activeSection === 'inventory' || activeSection === 'auctions' || activeSection === 'lands'
             ? 'text-blue-400 font-bold'
@@ -112,6 +113,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
       {/* 5. Bank / Gold */}
       <button
         onClick={() => handleNav('bank')}
+        data-guide-nav="bank"
         className={`flex flex-col items-center gap-1 py-1 px-2 rounded-xl transition relative ${
           activeSection === 'bank' || activeSection === 'investments' || activeSection === 'tasks'
             ? 'text-purple-400 font-bold'

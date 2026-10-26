@@ -61,7 +61,7 @@ export function EconomyPanel({ id, title, description, aside, children, classNam
   if (compact) {
     return (
       <section id={id} className={`economy-panel economy-panel--compact${expanded ? ' is-expanded' : ''}${className ? ` ${className}` : ''} ${autoVariant}`}>
-        <button className="economy-panel-tile" type="button" aria-expanded={expanded} aria-controls={contentId} onClick={onToggle}>
+        <button className="economy-panel-tile" type="button" data-guide-panel={id} aria-expanded={expanded} aria-controls={contentId} onClick={onToggle}>
           <div className="economy-panel-tile-top">
             <span className={`economy-panel-tile-icon icon-glow--${icon}`}>
               <Icon name={icon} size={25} />
