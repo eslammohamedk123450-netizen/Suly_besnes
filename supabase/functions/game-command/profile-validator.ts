@@ -33,6 +33,7 @@ const OPTIONAL_PROFILE_KEYS = new Set([
   'playerAuctions',
   'soldAssetIds',
   'processedAuctionSaleIds',
+  'automationDirectives',
 ]);
 
 const PROFILE_KEYS = new Set([
@@ -44,6 +45,7 @@ const PROFILE_KEYS = new Set([
   'lastSpinTimestamp', 'lastSpinDay', 'avatarId', 'unlockedAvatarIds', 'bio', 'renameCountThisWeek', 'lastRenameWeekTimestamp', 'lastOfflineClaimAt',
   'globalShipments', 'forwardContracts', 'supplierTrust',
   'playerAuctions', 'soldAssetIds', 'processedAuctionSaleIds',
+  'automationDirectives',
 ]);
 
 const REQUIRED_PROFILE_KEYS = [...PROFILE_KEYS].filter((key) => !OPTIONAL_PROFILE_KEYS.has(key));
@@ -584,6 +586,32 @@ export function validatePlayerProfile(profile: unknown, previousProfile?: unknow
     for (const [supplierKey, score] of Object.entries(trustMap)) {
       if (supplierKey.length > 128) addError(errors, 'profile.supplierTrust:key_too_long');
       requireNumber(score, `profile.supplierTrust.${supplierKey}`, errors, { min: 0, max: 100 });
+    }
+  }
+
+  if (profile.automationDirectives !== undefined) {
+    const directives = requireRecord(profile.automationDirectives, 'profile.automationDirectives', errors);
+    checkAllowedKeys(directives, ['autoPaySalaries', 'autoPurchaseMaterials', 'autoPurchaseThreshold', 'autoPurchaseBudget', 'autoRunProduction', 'autoProduceCompanyIds'], 'profile.automationDirectives', errors);
+    if (directives.autoPaySalaries !== undefined && typeof directives.autoPaySalaries !== 'boolean') {
+      addError(errors, 'profile.automationDirectives.autoPaySalaries:invalid_boolean');
+    }
+    if (directives.autoPurchaseMaterials !== undefined && typeof directives.autoPurchaseMaterials !== 'boolean') {
+      addError(errors, 'profile.automationDirectives.autoPurchaseMaterials:invalid_boolean');
+    }
+    if (directives.autoPurchaseThreshold !== undefined) {
+      requireNumber(directives.autoPurchaseThreshold, 'profile.automationDirectives.autoPurchaseThreshold', errors, { min: 0, max: 1_000_000, integer: true });
+    }
+    if (directives.autoPurchaseBudget !== undefined) {
+      requireNumber(directives.autoPurchaseBudget, 'profile.automationDirectives.autoPurchaseBudget', errors, { min: 0, max: MAX_MONEY });
+    }
+    if (directives.autoRunProduction !== undefined && typeof directives.autoRunProduction !== 'boolean') {
+      addError(errors, 'profile.automationDirectives.autoRunProduction:invalid_boolean');
+    }
+    if (directives.autoProduceCompanyIds !== undefined) {
+      const companyIds = requireArray(directives.autoProduceCompanyIds, 'profile.automationDirectives.autoProduceCompanyIds', errors);
+      companyIds.forEach((cId, idx) => {
+        requireString(cId, `profile.automationDirectives.autoProduceCompanyIds[${idx}]`, errors, 128);
+      });
     }
   }
   if (previousProfile !== undefined) {

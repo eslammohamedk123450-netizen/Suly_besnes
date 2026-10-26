@@ -364,4 +364,51 @@ describe('Business Empire economy invariants', () => {
     expect(nextDay.ok).toBe(true);
     if (nextDay.ok) expect(nextDay.profile.activeDaySpeedMultiplier).toBe(1);
   });
+
+  it('supports expanded staff roles and automated salary delegation', () => {
+    const base = profile({
+      bankBalance: 500_000,
+      staff: [
+        { id: 'gm-1', role: 'general_manager', name: 'المدير التنفيذي', dailySalary: 12_000, hiredOnDay: 1, nextPayDay: 2, status: 'active' },
+        { id: 'foreman-1', role: 'foreman', name: 'رئيس العمال', companyId: 'inherited-food-company', dailySalary: 3_200, hiredOnDay: 1, nextPayDay: 2, status: 'active' },
+      ],
+      automationDirectives: {
+        autoPaySalaries: true,
+        autoPurchaseMaterials: false,
+        autoPurchaseThreshold: 50,
+        autoPurchaseBudget: 50_000,
+        autoRunProduction: false,
+      },
+    });
+    const next = advanceDay(base);
+    expect(next.ok).toBe(true);
+    if (!next.ok) return;
+    expect(next.profile.staff.every((s) => (s.unpaidSalary ?? 0) === 0)).toBe(true);
+    expect(next.profile.ledger.some((e) => e.note.includes('سداد رواتب تلقائي بتفويض المدير التنفيذي'))).toBe(true);
+  });
+
+  it('applies foreman perks in production reducing waste and boosting quality', () => {
+    const baseWithout = profile({
+      bankBalance: 500_000,
+      companies: [{ id: 'company-1', name: 'شركة اختبار', industryId: 'food', countryId: 'egypt', foundedAt: '2026-01-01T00:00:00.000Z', foundedOnDay: 1, energyUnits: 60, energyCapacity: 60, operatingCostPerDay: 100, maintenanceCondition: 100 }],
+      inventory: [
+        { id: 'grain-lot', materialOrProductId: 'grain', quantity: 200, unit: 'طن', unitCost: 100, qualityScore: 88 },
+        { id: 'packaging-lot', materialOrProductId: 'packaging', quantity: 200, unit: 'وحدة', unitCost: 50, qualityScore: 88 },
+      ],
+    });
+    const baseWith = {
+      ...baseWithout,
+      staff: [{ id: 'foreman-1', role: 'foreman' as const, name: 'رئيس العمال', companyId: 'company-1', dailySalary: 3_200, hiredOnDay: 1, nextPayDay: 2, status: 'active' as const, level: 3 }],
+    };
+    const resWithout = runProduction(baseWithout, 'company-1', 2);
+    const resWith = runProduction(baseWith, 'company-1', 2);
+    expect(resWithout.ok).toBe(true);
+    expect(resWith.ok).toBe(true);
+    if (resWithout.ok && resWith.ok) {
+      const orderWithout = resWithout.profile.productionOrders[0];
+      const orderWith = resWith.profile.productionOrders[0];
+      expect(orderWith.qualityScore).toBeGreaterThan(orderWithout.qualityScore);
+      expect(orderWith.materialCost).toBeLessThan(orderWithout.materialCost);
+    }
+  });
 });

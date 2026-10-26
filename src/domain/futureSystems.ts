@@ -165,7 +165,24 @@ export interface LoanRecord {
   status: 'active' | 'paid' | 'defaulted';
 }
 
-export type StaffRole = 'manager' | 'accountant' | 'lawyer' | 'hr';
+export type StaffRole =
+  | 'manager'
+  | 'accountant'
+  | 'lawyer'
+  | 'hr'
+  | 'foreman'
+  | 'cfo'
+  | 'general_manager'
+  | 'operations_director';
+
+export interface AutomationDirectives {
+  autoPaySalaries: boolean;
+  autoPurchaseMaterials: boolean;
+  autoPurchaseThreshold: number;
+  autoPurchaseBudget: number;
+  autoRunProduction: boolean;
+  autoProduceCompanyIds?: string[];
+}
 
 export interface StaffContract {
   id: string;

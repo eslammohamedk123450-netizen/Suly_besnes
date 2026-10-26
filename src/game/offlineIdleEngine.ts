@@ -152,9 +152,14 @@ export function calculateOfflineIdleProgress(
 
     const level = Math.max(1, company.upgradeLevel || 1);
     const conditionFactor = (company.maintenanceCondition ?? 100) / 100;
-    const unitsPerHour = Math.max(1, Math.round(level * 2 * conditionFactor));
+    const hasOperationsDirector = (profile.staff || []).some(
+      (s) => s.status === 'active' && s.role === 'operations_director',
+    );
+    const opsSpeedMultiplier = hasOperationsDirector ? 1.35 : 1.0;
+    const maxBatchCap = hasOperationsDirector ? 260 : 150;
+    const unitsPerHour = Math.max(1, Math.round(level * 2 * conditionFactor * opsSpeedMultiplier));
     const potentialUnits = Math.floor(unitsPerHour * elapsedHours);
-    const actualUnits = Math.min(potentialUnits, availableWarehouseSpace, remainingItemCap, 150);
+    const actualUnits = Math.min(potentialUnits, availableWarehouseSpace, remainingItemCap, maxBatchCap);
 
     if (actualUnits > 0) {
       availableWarehouseSpace -= actualUnits;
@@ -171,11 +176,12 @@ export function calculateOfflineIdleProgress(
     }
   }
 
-  // 2. Bank Interest Earned from Active Deposits
+  // 2. Bank Interest Earned from Active Deposits (boosted if CFO is active)
   const totalDeposits = (profile.banking?.deposits || [])
     .filter((d) => d.status === 'active')
     .reduce((sum, d) => sum + (d.principal || 0), 0);
-  const annualInterestRate = 0.12;
+  const hasCfo = (profile.staff || []).some((s) => s.status === 'active' && s.role === 'cfo');
+  const annualInterestRate = hasCfo ? 0.16 : 0.12;
   const dailyInterest = (totalDeposits * annualInterestRate) / 365;
   const bankInterestEarned = Math.round(dailyInterest * activeFractionOfDays);
 
