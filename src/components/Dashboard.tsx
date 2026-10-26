@@ -66,6 +66,7 @@ interface DashboardProps {
   onOpenMorningReport?: () => void;
   onOpenCentralBank?: () => void;
   onOpenPrestige?: () => void;
+  onOpenCampaign?: () => void;
 }
 
 interface CommandItem {
@@ -90,6 +91,7 @@ export function Dashboard({
   onOpenMorningReport,
   onOpenCentralBank,
   onOpenPrestige,
+  onOpenCampaign,
 }: DashboardProps) {
   const [isLeaderboardOpen, setIsLeaderboardOpen] = useState(false);
   const [isFinanceModalOpen, setIsFinanceModalOpen] = useState(false);
@@ -424,6 +426,42 @@ export function Dashboard({
         <div className="text-[11px] text-amber-300 font-bold shrink-0 hidden sm:block">
           {country.flag} {country.name}
         </div>
+      </div>
+
+      {/* Story Campaign & Horizon Secrets Master Banner */}
+      <div className="bg-gradient-to-r from-amber-950/70 via-slate-900 to-amber-950/70 border-2 border-amber-500/60 rounded-3xl p-4 sm:p-5 shadow-2xl flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div className="flex items-center gap-3 w-full sm:w-auto">
+          <div className="w-12 h-12 rounded-2xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-2xl shadow-inner shrink-0">
+            📜
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                سيناريو القصة الرئيسي · الفصل {profile.campaignChapterId ?? 1}
+              </span>
+              <span className="text-xs text-slate-400 font-bold">
+                {country.flag} {country.name}
+              </span>
+            </div>
+            <h3 className="text-base sm:text-lg font-black text-white mt-0.5">
+              Suly Business Empire: صعود الإمبراطورية
+            </h3>
+            <p className="text-xs text-slate-300 mt-0.5 line-clamp-1">
+              أسرار مجموعة الأفق العالمية، قرارات التوسع الاستراتيجي، والمنافسون المحليون.
+            </p>
+          </div>
+        </div>
+
+        {onOpenCampaign && (
+          <button
+            type="button"
+            onClick={onOpenCampaign}
+            className="w-full sm:w-auto px-5 py-2.5 rounded-2xl bg-gradient-to-r from-amber-500 to-yellow-400 hover:from-amber-400 hover:to-yellow-300 text-slate-950 font-black text-xs shadow-lg transition active:scale-95 flex items-center justify-center gap-2 cursor-pointer shrink-0"
+          >
+            <span>خريطة القصة والقرارات</span>
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+        )}
       </div>
 
       {/* 2. Executive Wealth Overview (4 Premium Cards) */}

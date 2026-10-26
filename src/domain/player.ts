@@ -116,6 +116,10 @@ export interface PlayerProfile {
   bio?: string;
   renameCountThisWeek?: number;
   lastRenameWeekTimestamp?: number;
+  campaignChapterId?: number;
+  completedMissionIds?: string[];
+  claimedRewardIds?: string[];
+  dismissedStoryEventIds?: string[];
 }
 
 function createId(): string {
@@ -137,6 +141,7 @@ export function createNewPlayer(
 
   const countryLandNames: Record<string, string> = {
     egypt: 'أرض مجمع العاشر من رمضان الصناعي (ميراث مهدد)',
+    jordan: 'أرض مدينة الملك عبدالله الثاني الصناعية · سحاب (ميراث مهدد)',
     saudi: 'أرض المدينة الصناعية الثانية بالرياض (ميراث مهدد)',
     uae: 'أرض منطقة جبل علي الحرة JAFZA بدبي (ميراث مهدد)',
     usa: 'أرض مجمع كوينز الصناعي واللوجستي · نيويورك (ميراث مهدد)',
@@ -149,6 +154,7 @@ export function createNewPlayer(
 
   const countryCompanyNames: Record<string, string> = {
     egypt: 'مصنع الأغذية النموذجي · العاشر من رمضان',
+    jordan: 'مصنع البتراء للأغذية والسلع الاستهلاكية · سحاب',
     saudi: 'مصنع نجد للأغذية والتموين · الرياض',
     uae: 'مصنع دبي للأغذية والضيافة · جبل علي',
     usa: 'مصنع مانهاتن للسلع الغذائية · نيويورك',
@@ -161,6 +167,7 @@ export function createNewPlayer(
 
   const countryBankNames: Record<string, string> = {
     egypt: 'بنك مصر',
+    jordan: 'البنك العربي · الأردن',
     saudi: 'مصرف الراجحي',
     uae: 'بنك الإمارات دبي الوطني',
     usa: 'جي بي مورغان تشيس',
@@ -294,6 +301,10 @@ export function createNewPlayer(
     bio: 'ابنِ إمبراطوريتك الاستثمارية بعزيمة لا تلين ورؤية لا تعرف المستحيل.',
     renameCountThisWeek: 0,
     lastRenameWeekTimestamp: Date.now(),
+    campaignChapterId: 1,
+    completedMissionIds: [],
+    claimedRewardIds: [],
+    dismissedStoryEventIds: [],
   };
 }
 

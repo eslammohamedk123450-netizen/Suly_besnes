@@ -111,9 +111,13 @@ export function getPlayerProgress(profile: PlayerProfile): PlayerProgress {
 }
 
 export function getUnlockedSectionIds(profile: PlayerProfile): SectionId[] {
-  if (!profile.onboarding?.introCompleted) return INTRO_UNLOCKS;
-
   const unlocked = new Set<SectionId>(INTRO_UNLOCKS);
+  if (profile.companies.length >= 1) {
+    unlocked.add('production');
+    unlocked.add('inventory');
+  }
+  if (!profile.onboarding?.introCompleted) return [...unlocked];
+
   const progress = getPlayerProgress(profile);
   const level = progress.level;
   const completedProduction = profile.productionOrders.some((order) => order.status === 'completed');
@@ -131,12 +135,13 @@ export function getUnlockedSectionIds(profile: PlayerProfile): SectionId[] {
     unlocked.add('contracts');
   }
 
-  // Level 4: Bank (رفع الحظر البنكي)
+  // Level 4: Bank & Investments (رفع الحظر البنكي)
   if (completedContracts >= 1 || level >= 4) {
     unlocked.add('bank');
+    unlocked.add('investments');
   }
 
-  // Level 5: Investments, Staff, Reports
+  // Level 5: Staff, Reports
   if (level >= 5 || (completedContracts >= 2 && profile.companies.length >= 2)) {
     unlocked.add('investments');
     unlocked.add('staff');
@@ -201,12 +206,21 @@ export function getSystemGuide(section: SectionId): SystemGuide {
 }
 
 export function chapterFor(profile: PlayerProfile): number {
-  if (!profile.onboarding?.introCompleted) return 0;
+  if (profile.campaignChapterId && profile.campaignChapterId >= 1) {
+    return Math.min(10, Math.max(1, profile.campaignChapterId));
+  }
+  if (!profile.onboarding?.introCompleted) return 1;
   const progress = getPlayerProgress(profile);
   const completedContracts = profile.contracts.filter((contract) => contract.status === 'completed').length;
   const completedProduction = profile.productionOrders.some((order) => order.status === 'completed');
-  if (progress.level >= 5 || profile.companies.length >= 3) return 4;
-  if (completedContracts >= 1) return 3;
+  if (progress.level >= 12 || profile.finances.netProfit >= 10_000_000) return 10;
+  if (progress.level >= 10 || profile.finances.netProfit >= 5_000_000) return 9;
+  if (progress.level >= 8 || profile.finances.netProfit >= 2_000_000) return 8;
+  if (progress.level >= 6 || profile.finances.netProfit >= 1_000_000) return 7;
+  if (progress.level >= 5 || profile.auctionHistory.length >= 1) return 6;
+  if (progress.level >= 4 || profile.companies.length >= 2) return 5;
+  if (completedContracts >= 1) return 4;
+  if (completedProduction && profile.sales.length > 0) return 3;
   if (completedProduction) return 2;
   return 1;
 }

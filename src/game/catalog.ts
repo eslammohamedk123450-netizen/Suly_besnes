@@ -186,6 +186,27 @@ export const COUNTRY_REAL_ASSETS: Record<CountryId, {
       { id: 'bulk-crude-oil', lotType: 'raw-material', label: 'شحنة خام نفط كبرى من حقل بلاعيم', landType: 'industrial', areaSquareMeters: 0, minimumBid: 600, bidIncrement: 80, closesAt: '2099-12-31T00:00:00.000Z', status: 'open', materialId: 'crude-oil', quantity: 15 },
     ],
   },
+  jordan: {
+    starterLand: 'مدينة الملك عبدالله الثاني الصناعية · سحاب',
+    directLands: [
+      { id: 'starter-village-land', label: 'مدينة الملك عبدالله الثاني الصناعية · سحاب', landType: 'agricultural', areaSquareMeters: 520, price: 3_600 },
+      { id: 'direct-land-port-said', label: 'مجمع منطقة العقبة الاقتصادية الخاصة اللوجستي', landType: 'commercial', areaSquareMeters: 420, price: 5_700 },
+      { id: 'direct-land-minya-farm', label: 'مزارع غور الأردن ووادي الأردن الخصبة', landType: 'agricultural', areaSquareMeters: 900, price: 4_800 },
+      { id: 'direct-land-sokhna-industrial', label: 'موقع الزرقاء للكيماويات والصناعات الثقيلة', landType: 'industrial', areaSquareMeters: 520, price: 7_200 },
+    ],
+    directCompanies: [
+      { id: 'direct-company-food', name: 'شركة البتراء للصناعات الغذائية والتجهيز', industryId: 'food', landType: 'agricultural', areaSquareMeters: 650, price: 8_600 },
+      { id: 'direct-company-logistics', name: 'شركة العقبة للخدمات اللوجستية والشحن الإقليمي', industryId: 'transport', landType: 'commercial', areaSquareMeters: 500, price: 10_400 },
+      { id: 'direct-company-energy', name: 'شركة فيلادلفيا لتوليد وتوزيع الطاقة النظيفة', industryId: 'electricity', landType: 'industrial', areaSquareMeters: 600, price: 13_600 },
+    ],
+    auctions: [
+      { id: 'land-cairo-industrial', lotType: 'land', label: 'قطعة مجمع المفرق التنموي الصناعي', landType: 'industrial', areaSquareMeters: 400, minimumBid: 3_200, bidIncrement: 200, closesAt: '2099-12-31T00:00:00.000Z', status: 'open' },
+      { id: 'land-alexandria-farm', lotType: 'land', label: 'أراضي الديسي والسهول الزراعية الجنوبية', landType: 'agricultural', areaSquareMeters: 650, minimumBid: 2_700, bidIncrement: 200, closesAt: '2099-12-31T00:00:00.000Z', status: 'open' },
+      { id: 'land-suez-commerce', lotType: 'land', label: 'موقع ميناء العقبة التجاري والحاويات', landType: 'commercial', areaSquareMeters: 300, minimumBid: 4_200, bidIncrement: 300, closesAt: '2099-12-31T00:00:00.000Z', status: 'open' },
+      { id: 'factory-petroleum-expansion', lotType: 'factory', label: 'خط معالجة وتكرير إضافي بمجمع الزرقاء', landType: 'industrial', areaSquareMeters: 0, minimumBid: 4_800, bidIncrement: 400, closesAt: '2099-12-31T00:00:00.000Z', status: 'open', energyCapacityBonus: 40 },
+      { id: 'bulk-crude-oil', lotType: 'raw-material', label: 'شحنة وقود وطاقة من ميناء العقبة', landType: 'industrial', areaSquareMeters: 0, minimumBid: 600, bidIncrement: 80, closesAt: '2099-12-31T00:00:00.000Z', status: 'open', materialId: 'crude-oil', quantity: 15 },
+    ],
+  },
   saudi: {
     starterLand: 'أرض المدينة الصناعية الثانية · الرياض',
     directLands: [

@@ -53,6 +53,11 @@ import { MorningAbsenceReportModal } from './components/MorningAbsenceReportModa
 import { CentralBankModal } from './components/CentralBankModal';
 import { PrestigeExpansionModal } from './components/PrestigeExpansionModal';
 import { triggerHaptic } from './services/nativeMobileService';
+import { StoryCampaignHub } from './components/StoryCampaignHub';
+import { StoryBriefingModal } from './components/StoryBriefingModal';
+import { filterSynchronizedNotifications } from './game/synchronizer';
+import { CENTRAL_MISSIONS_CATALOG } from './game/missionsEngine';
+import { getLeadAdvisor } from './game/campaignScenario';
 
 function getPendingSyncCount(accountId: string): number {
   return loadQueuedGameCommands(accountId).length + (loadPendingInitialProfile(accountId) ? 1 : 0);
@@ -100,6 +105,8 @@ export default function App() {
   const [offlineReport, setOfflineReport] = useState<OfflineIdleReport | null>(null);
   const [isCentralBankModalOpen, setIsCentralBankModalOpen] = useState(false);
   const [isPrestigeModalOpen, setIsPrestigeModalOpen] = useState(false);
+  const [isStoryCampaignOpen, setIsStoryCampaignOpen] = useState(false);
+  const [isStoryBriefingOpen, setIsStoryBriefingOpen] = useState(false);
   const syncLock = useRef(false);
   const remoteCommandAttempts = useRef(new Map<string, Promise<RemoteGameCommandAttempt>>());
 
@@ -163,7 +170,8 @@ export default function App() {
       }
     }
     const dismissed = new Set(profile.dismissedNotificationIds ?? []);
-    return Array.from(map.values()).filter((n) => !dismissed.has(n.id));
+    const list = Array.from(map.values()).filter((n) => !dismissed.has(n.id));
+    return filterSynchronizedNotifications(list, profile);
   }, [profile, customNotifications]);
 
   const unreadNotificationsCount = useMemo(() => {
@@ -1025,6 +1033,10 @@ export default function App() {
                   return next;
                 });
               }}
+              onOpenCampaign={() => {
+                triggerHaptic('light');
+                setIsStoryCampaignOpen(true);
+              }}
             />
           ) : activeSection === 'profile' ? (
             <ProfilePage
@@ -1186,6 +1198,7 @@ export default function App() {
           profile={profile}
           currentSection={activeSection}
           onNavigate={(sec) => navigate(sec)}
+          onOpenBriefing={() => setIsStoryBriefingOpen(true)}
           onStepComplete={() => {
             if (walkthroughStepIndex < WALKTHROUGH_STEPS.length - 1) {
               setWalkthroughStepIndex((prev) => prev + 1);
@@ -1303,6 +1316,57 @@ export default function App() {
               subtitle: 'انطلقت إمبراطوريتك نحو العواصم العالمية مع الاحتفاظ بكافة امتيازات وأوسمة الهيبة الدائمة.',
               rewardText: 'توسّع دولي مع نقاط هيبة ورصيد انطلاق جديد',
             });
+          }}
+        />
+      )}
+
+      {/* 4. Grand 10-Chapter Story Campaign Hub (Suly Business Empire: صعود الإمبراطورية) */}
+      {profile && isStoryCampaignOpen && (
+        <StoryCampaignHub
+          profile={profile}
+          country={country}
+          onClose={() => setIsStoryCampaignOpen(false)}
+          onNavigate={(sec) => {
+            setIsStoryCampaignOpen(false);
+            navigate(sec);
+          }}
+          onClaimReward={(diamonds, gold, money, rep, rewardKey) => {
+            setProfile((prev) => {
+              if (!prev) return prev;
+              const claimedRewardIds = prev.claimedRewardIds ? [...prev.claimedRewardIds] : [];
+              if (rewardKey && !claimedRewardIds.includes(rewardKey)) {
+                claimedRewardIds.push(rewardKey);
+              }
+              const next = {
+                ...prev,
+                bankBalance: prev.bankBalance + money,
+                diamonds: prev.diamonds + diamonds,
+                goldGrams: (prev.goldGrams ?? 0) + gold,
+                claimedRewardIds,
+              };
+              saveGame(next, account?.id);
+              showNotice(`تم استلام مكافأة الفصل: +${formatMoney(money, country)} و +${diamonds}💎 و +${gold}غ ذهب! 🏆`, 'success', 'مكافأة سيناريو القصة');
+              return next;
+            });
+          }}
+        />
+      )}
+
+      {/* 5. Guided Story Briefing Modal (شرح المهمة التفصيلي بدون حل تلقائي) */}
+      {profile && isStoryBriefingOpen && (
+        <StoryBriefingModal
+          mission={CENTRAL_MISSIONS_CATALOG[0]}
+          country={country}
+          character={{
+            name: getLeadAdvisor(profile.countryId).name,
+            title: getLeadAdvisor(profile.countryId).title,
+            avatar: getLeadAdvisor(profile.countryId).avatar,
+          }}
+          onClose={() => setIsStoryBriefingOpen(false)}
+          onSkipDialogue={() => setIsStoryBriefingOpen(false)}
+          onStartExecution={() => {
+            setIsStoryBriefingOpen(false);
+            navigate('companies');
           }}
         />
       )}

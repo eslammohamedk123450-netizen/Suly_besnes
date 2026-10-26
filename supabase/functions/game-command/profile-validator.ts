@@ -14,9 +14,12 @@ const PROFILE_KEYS = new Set([
   'finances', 'day', 'warehouseLevel', 'activeDaySpeedMultiplier', 'inventory', 'licenses', 'investments', 'banking', 'staff', 'productionOrders',
   'auctionHistory', 'redeemedCodeIds', 'sales', 'ledger', 'events', 'tasks', 'completedTaskIds',
   'season', 'reputation', 'contracts', 'achievements', 'onboarding', 'readNotificationIds', 'dismissedNotificationIds', 'unreadProductionOrderIds',
+  'avatarId', 'unlockedAvatarIds', 'bio', 'renameCountThisWeek', 'lastRenameWeekTimestamp',
+  'campaignChapterId', 'completedMissionIds', 'claimedRewardIds', 'dismissedStoryEventIds',
+  'lastSpinTimestamp', 'lastSpinDay',
 ]);
 
-const REQUIRED_PROFILE_KEYS = [...PROFILE_KEYS].filter((key) => !['season', 'warehouseLevel', 'activeDaySpeedMultiplier', 'readNotificationIds', 'dismissedNotificationIds', 'unreadProductionOrderIds'].includes(key));
+const REQUIRED_PROFILE_KEYS = [...PROFILE_KEYS].filter((key) => !['season', 'warehouseLevel', 'activeDaySpeedMultiplier', 'readNotificationIds', 'dismissedNotificationIds', 'unreadProductionOrderIds', 'avatarId', 'unlockedAvatarIds', 'bio', 'renameCountThisWeek', 'lastRenameWeekTimestamp', 'campaignChapterId', 'completedMissionIds', 'claimedRewardIds', 'dismissedStoryEventIds', 'lastSpinTimestamp', 'lastSpinDay'].includes(key));
 
 const MATERIAL_CAPACITY: Record<string, number> = {
   'crude-oil': 500, 'natural-gas': 500, water: 2_000, chemicals: 800, grain: 1_000,
@@ -188,7 +191,8 @@ export function validatePlayerProfile(profile: unknown, previousProfile?: unknow
   requireString(profile.id, 'profile.id', errors, 128);
   if (typeof profile.accountCode !== 'string' || profile.accountCode.length > 64) addError(errors, 'profile.accountCode:invalid_string');
   requireString(profile.name, 'profile.name', errors, 120);
-  if (profile.countryId !== 'egypt') addError(errors, 'profile.countryId:unsupported_country');
+  const SUPPORTED_COUNTRIES = new Set(['egypt', 'jordan', 'saudi', 'uae', 'usa', 'kuwait', 'qatar', 'uk', 'germany', 'japan']);
+  if (!SUPPORTED_COUNTRIES.has(String(profile.countryId))) addError(errors, 'profile.countryId:unsupported_country');
   validateTimestamp(profile.createdAt, 'profile.createdAt', errors);
   requireNumber(profile.level, 'profile.level', errors, { min: 1, max: MAX_LEVEL, integer: true });
   requireNumber(profile.day, 'profile.day', errors, { min: 1, max: MAX_GAME_DAY, integer: true });

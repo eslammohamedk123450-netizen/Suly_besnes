@@ -13,7 +13,8 @@ import {
   LocateFixed,
   AlertTriangle,
   Flame,
-  Check
+  Check,
+  FastForward,
 } from 'lucide-react';
 
 interface SpotlightWalkthroughProps {
@@ -23,6 +24,7 @@ interface SpotlightWalkthroughProps {
   onSkip: () => void;
   onNavigate: (section: SectionId) => void;
   currentSection: SectionId;
+  onOpenBriefing?: () => void;
 }
 
 interface TargetRect {
@@ -39,6 +41,7 @@ export function SpotlightWalkthrough({
   onSkip,
   onNavigate,
   currentSection,
+  onOpenBriefing,
 }: SpotlightWalkthroughProps) {
   const currentStep = WALKTHROUGH_STEPS[currentStepIndex];
   const [targetRect, setTargetRect] = useState<TargetRect | null>(null);
@@ -341,12 +344,28 @@ export function SpotlightWalkthrough({
                 {currentStepIndex + 1}/{totalSteps}
               </span>
             </div>
-            <button
-              type="button"
-              className="p-1 rounded-lg bg-slate-800 text-slate-300 hover:text-white"
-            >
-              <Maximize2 className="w-4 h-4" />
-            </button>
+            <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+              <button
+                type="button"
+                onClick={() => {
+                  playSound('click');
+                  onSkip();
+                }}
+                className="px-2.5 py-1 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-400 hover:text-amber-300 border border-amber-500/30 text-xs font-black transition cursor-pointer flex items-center gap-1"
+                title="تخطي الإرشاد (تجاوز النصوص دون إنجاز المهام تلقائياً)"
+              >
+                <FastForward className="w-3 h-3" />
+                <span>تخطي</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsCollapsed(false)}
+                className="p-1.5 rounded-xl bg-slate-800 text-slate-300 hover:text-white"
+                title="تكبير"
+              >
+                <Maximize2 className="w-4 h-4" />
+              </button>
+            </div>
           </div>
         ) : (
           /* Full Rich Interactive Directive Bar */
@@ -355,7 +374,7 @@ export function SpotlightWalkthrough({
             <div className="absolute top-0 inset-x-0 h-1.5 bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-600" />
             <div className="absolute -top-12 -right-12 w-44 h-44 bg-amber-500/15 rounded-full blur-3xl pointer-events-none" />
 
-            {/* Header: Title, Step Counter & Minimize */}
+            {/* Header: Title, Step Counter, Skip & Minimize */}
             <div className="flex items-center justify-between border-b border-slate-800/80 pb-2.5 relative z-10">
               <div className="flex items-center gap-2">
                 <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping" />
@@ -374,11 +393,36 @@ export function SpotlightWalkthrough({
                 </div>
               </div>
 
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-2">
+                {onOpenBriefing && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      playSound('click');
+                      onOpenBriefing();
+                    }}
+                    className="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-400 border border-amber-500/30 text-xs font-bold transition flex items-center gap-1 cursor-pointer"
+                    title="عرض الشرح التوجيهي للمهمة"
+                  >
+                    <span>الشرح 📖</span>
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    playSound('click');
+                    onSkip();
+                  }}
+                  className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-400 hover:text-amber-300 border border-amber-500/40 text-xs font-black transition flex items-center gap-1.5 cursor-pointer shadow-sm"
+                  title="تخطي الإرشاد (يتجاوز النصوص فقط دون تنفيذ أو مكافآت)"
+                >
+                  <FastForward className="w-3.5 h-3.5" />
+                  <span>تخطي</span>
+                </button>
                 <button
                   type="button"
                   onClick={() => setIsCollapsed(true)}
-                  className="p-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-white transition"
+                  className="p-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-white transition cursor-pointer"
                   title="تصغير الإرشاد"
                 >
                   <Minimize2 className="w-3.5 h-3.5" />

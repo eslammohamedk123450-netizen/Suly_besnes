@@ -227,7 +227,7 @@ function isLegacyProfile(value: unknown): value is Record<string, unknown> {
 }
 
 /** Converts older profiles into one canonical shape without dropping ownership or financial history. */
-function migrateProfile(value: unknown): PlayerProfile | null {
+export function migrateProfile(value: unknown): PlayerProfile | null {
   if (!isLegacyProfile(value)) return null;
   const rawFinances = value.finances as { netProfit: number; totalRevenue?: number; totalExpenses?: number };
   const countryId = value.countryId as CountryId;
@@ -342,6 +342,10 @@ function migrateProfile(value: unknown): PlayerProfile | null {
     bio: typeof value.bio === 'string' && value.bio.trim().length > 0 ? value.bio : 'ابنِ إمبراطوريتك الاستثمارية بعزيمة لا تلين ورؤية لا تعرف المستحيل.',
     renameCountThisWeek: typeof value.renameCountThisWeek === 'number' && Number.isInteger(value.renameCountThisWeek) ? value.renameCountThisWeek : 0,
     lastRenameWeekTimestamp: typeof value.lastRenameWeekTimestamp === 'number' ? value.lastRenameWeekTimestamp : Date.now(),
+    campaignChapterId: typeof value.campaignChapterId === 'number' && Number.isInteger(value.campaignChapterId) && value.campaignChapterId >= 1 ? value.campaignChapterId : 1,
+    completedMissionIds: Array.isArray(value.completedMissionIds) ? value.completedMissionIds.filter(isNonEmptyString) : [],
+    claimedRewardIds: Array.isArray(value.claimedRewardIds) ? value.claimedRewardIds.filter(isNonEmptyString) : [],
+    dismissedStoryEventIds: Array.isArray(value.dismissedStoryEventIds) ? value.dismissedStoryEventIds.filter(isNonEmptyString) : [],
   }, typeof value.accountCode === 'string' ? value.accountCode : value.id as string);
 }
 
