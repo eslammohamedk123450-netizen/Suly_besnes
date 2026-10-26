@@ -34,6 +34,40 @@ export interface BotBid {
   placedAt: string;
 }
 
+export interface PlayerAuctionBid {
+  investorId: string;
+  investorName: string;
+  investorType: string;
+  avatarColor: string;
+  amount: number;
+  timestamp: number;
+  note?: string;
+}
+
+export interface PlayerAuctionListing {
+  id: string;
+  assetType: 'land' | 'company';
+  assetId: string;
+  assetName: string;
+  assetSpecs: string;
+  originalValue: number;
+  startingBid: number;
+  currentBid: number;
+  status: 'active' | 'sold' | 'cancelled';
+  leadingBidderName: string;
+  leadingBidderType: string;
+  totalBidsCount: number;
+  closesAtMs: number;
+  listedAt: string;
+  listedOnDay: number;
+  soldAt?: string;
+  soldOnDay?: number;
+  finalSalePrice?: number;
+  profitDifference?: number;
+  profitPercent?: number;
+  bidsHistory: PlayerAuctionBid[];
+}
+
 export interface CompanyRecord {
   id: string;
   name: string;
@@ -250,4 +284,55 @@ export interface OnboardingProgress {
   introCompleted: boolean;
   chapter: number;
   seenGuides: string[];
+  countryIntroSeen?: boolean;
+  walkthroughCompleted?: boolean;
+  walkthroughSkipped?: boolean;
+  walkthroughStepId?: string;
+  seenQuestBriefings?: string[];
+  claimedStoryQuestIds?: string[];
+  claimedCampaignChapters?: number[];
+  campaignChapterId?: number;
+  starterMissionStage?: number;
+  claimedStarterMissionIds?: string[];
+  completedStarterMissionIds?: string[];
+}
+
+export type CommodityGrade = 'A+' | 'B' | 'C';
+export type GlobalShippingMode = 'spot-ddp' | 'sea-cif' | 'air-express';
+export type GlobalPaymentTerm = 'cash-spot' | 'lc-net2';
+
+export interface GlobalShipmentRecord {
+  id: string;
+  direction: 'import' | 'export';
+  itemId: string;
+  itemName: string;
+  quantity: number;
+  unit: string;
+  unitCostOrPrice: number;
+  freightCost: number;
+  customsDuty: number;
+  shippingMode: GlobalShippingMode;
+  originOrDestination: string;
+  partnerName: string;
+  qualityScore: number;
+  orderedOnDay: number;
+  arrivesOnDay: number;
+  deferredBalanceDue: number;
+  status: 'in-transit' | 'delivered';
+}
+
+export interface ForwardSupplyContract {
+  id: string;
+  materialId: string;
+  materialName: string;
+  supplierName: string;
+  originHub: string;
+  lockedUnitPrice: number;
+  dailyQuota: number;
+  remainingQuota: number;
+  marginPaid: number;
+  startedOnDay: number;
+  expiresOnDay: number;
+  qualityScore: number;
+  status: 'active' | 'completed' | 'expired';
 }

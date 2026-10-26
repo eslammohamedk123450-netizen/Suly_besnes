@@ -6,7 +6,8 @@ import { playSound } from '../game/soundEffects';
 import {
   calculatePlayerAssetValuation,
   simulatePlayerAssetAuction,
-  executeSellPlayerAsset,
+  listPlayerAssetForAuction,
+  settlePlayerAssetAuction,
   RIVAL_INVESTORS,
   type RivalInvestor,
   type LiveAuctionItem,
@@ -35,6 +36,9 @@ export function ListAssetAuctionModal({
   const [startingBid, setStartingBid] = useState<number>(0);
   const [isLiveBiddingActive, setIsLiveBiddingActive] = useState<boolean>(false);
   const [biddingStage, setBiddingStage] = useState<'selection' | 'live' | 'finished'>('selection');
+  const [createdListingId, setCreatedListingId] = useState<string>('');
+  const [liveProfile, setLiveProfile] = useState<PlayerProfile | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string>('');
 
   // Live auction state
   const [currentBid, setCurrentBid] = useState<number>(0);
@@ -43,8 +47,34 @@ export function ListAssetAuctionModal({
   const [remainingSeconds, setRemainingSeconds] = useState<number>(10);
   const [simulationData, setSimulationData] = useState<ReturnType<typeof simulatePlayerAssetAuction> | null>(null);
 
-  const availableLands = profile.lands;
-  const availableCompanies = profile.companies;
+  // Available owned assets (filtering out any assets already active in auctions or sold)
+  const activeAuctionAssetIds = new Set(
+    (profile.playerAuctions ?? [])
+      .filter((a) => a.status === 'active')
+      .map((a) => a.assetId),
+  );
+  const soldAssetIds = new Set(profile.soldAssetIds ?? []);
+
+  const availableLands = profile.lands.filter(
+    (l) => !activeAuctionAssetIds.has(l.id) && !soldAssetIds.has(l.id),
+  );
+  const availableCompanies = profile.companies.filter(
+    (c) => !activeAuctionAssetIds.has(c.id) && !soldAssetIds.has(c.id),
+  );
+
+  // Reset modal state every time it is freshly opened
+  useEffect(() => {
+    if (isOpen) {
+      setBiddingStage('selection');
+      setIsLiveBiddingActive(false);
+      setSimulationData(null);
+      setBidHistory([]);
+      setLeadingBidder(null);
+      setCreatedListingId('');
+      setLiveProfile(null);
+      setErrorMessage('');
+    }
+  }, [isOpen]);
 
   // Auto-select first asset when switching tabs
   useEffect(() => {
@@ -92,7 +122,7 @@ export function ListAssetAuctionModal({
     return () => clearInterval(timer);
   }, [isLiveBiddingActive, biddingStage]);
 
-  // Simulate progressive bids arriving during the 10-second round
+  // Simulate progressive bids arriving during the round
   useEffect(() => {
     if (!isLiveBiddingActive || biddingStage !== 'live' || !simulationData) return;
 
@@ -124,8 +154,22 @@ export function ListAssetAuctionModal({
 
   const handleStartAuction = () => {
     if (!selectedItem || !valuation) return;
+    setErrorMessage('');
+
+    // Create the independent auction listing inside the player profile first
+    const listRes = listPlayerAssetForAuction(profile, assetType, selectedItem.id, startingBid);
+    if (!listRes.ok) {
+      setErrorMessage(listRes.message);
+      playSound('error');
+      return;
+    }
 
     playSound('click');
+    const created = listRes.data;
+    setCreatedListingId(created.id);
+    setLiveProfile(listRes.profile);
+
+    // Prepare simulation
     const sim = simulatePlayerAssetAuction(valuation.fairValue, startingBid);
     setSimulationData(sim);
     setCurrentBid(startingBid);
@@ -143,22 +187,38 @@ export function ListAssetAuctionModal({
   };
 
   const handleConfirmSale = () => {
-    if (!selectedItem || !leadingBidder) return;
+    if (!selectedItem || !leadingBidder || !createdListingId) return;
 
+    const currentProfileToSettle = liveProfile || profile;
     const finalAmount = currentBid;
-    const { updatedProfile } = executeSellPlayerAsset(
-      profile,
-      assetType,
-      selectedItem.id,
+
+    // Execute safe, deduplicated settlement
+    const settleRes = settlePlayerAssetAuction(
+      currentProfileToSettle,
+      createdListingId,
       finalAmount,
       leadingBidder.name,
     );
+
+    if (!settleRes.ok) {
+      setErrorMessage(settleRes.message);
+      playSound('error');
+      return;
+    }
 
     const profitDifference = finalAmount - (valuation?.fairValue || finalAmount);
     const profitPercent = valuation?.fairValue ? Math.round((profitDifference / valuation.fairValue) * 100) : 0;
     const message = `تهانينا! تم بيع [${valuation?.name}] إلى [${leadingBidder.name}] بسعر ${formatMoney(finalAmount, country)} (فارق ربح ${profitPercent > 0 ? `+${profitPercent}%` : '0%'})! 🏛️`;
 
-    onAssetSold(updatedProfile, message);
+    // Notify parent with the authoritative updated profile
+    onAssetSold(settleRes.profile, message);
+
+    // Completely reset all modal states before closing
+    setBiddingStage('selection');
+    setCreatedListingId('');
+    setSimulationData(null);
+    setIsLiveBiddingActive(false);
+    setLiveProfile(null);
     onClose();
   };
 
@@ -192,6 +252,12 @@ export function ListAssetAuctionModal({
 
         {/* Body content based on stage */}
         <div className="p-4 sm:p-6 flex-1 space-y-5">
+          {errorMessage && (
+            <div className="p-3 rounded-xl bg-rose-950/80 border border-rose-500/50 text-rose-200 text-xs flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+              <span>{errorMessage}</span>
+            </div>
+          )}
           {biddingStage === 'selection' && (
             <>
               {/* Type Switcher */}

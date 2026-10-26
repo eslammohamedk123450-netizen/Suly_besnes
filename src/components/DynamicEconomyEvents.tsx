@@ -3,7 +3,7 @@ import type { PlayerProfile } from '../domain/player';
 import type { ExpansionState } from '../game/expansionEngine';
 import { resolveDilemmaOption } from '../game/expansionEngine';
 import type { EconomicDilemmaOption } from '../domain/expansionSystems';
-import { formatCurrency } from '../domain/formatters';
+import { formatMoney } from '../domain/formatters';
 import './DynamicEconomyEvents.css';
 
 interface Props {
@@ -65,7 +65,7 @@ export const DynamicEconomyEvents: React.FC<Props> = ({ profile, expansion, onUp
                   {option.moneyChange !== 0 && (
                     <span className={option.moneyChange > 0 ? 'text-emerald-400' : 'text-rose-400'}>
                       {option.moneyChange > 0 ? '+' : ''}
-                      {formatCurrency(option.moneyChange, 'EGP')}
+                      {formatMoney(option.moneyChange, profile.countryId)}
                     </span>
                   )}
                   {option.reputationChange !== 0 && (

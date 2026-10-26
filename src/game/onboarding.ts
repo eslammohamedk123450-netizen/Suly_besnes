@@ -1,18 +1,39 @@
 import type { SectionId } from '../domain/navigation';
 import type { PlayerProfile } from '../domain/player';
+import {
+  calculatePlayerProgress,
+  computeUnlockedSections,
+  SECTION_DEPENDENCY_MAP,
+} from './progressionEngine';
+
+import type { FinanceLedgerEntry } from '../domain/futureSystems';
+import type { GameResult } from './engine';
 
 export interface StarterMission {
   id: string;
+  stage: number;
+  stageName: string;
   title: string;
   description: string;
   section: SectionId;
+  cashReward: number;
+  diamondReward: number;
   completed: boolean;
+  claimed: boolean;
+  claimedAt?: string;
 }
 
 export interface SystemGuide {
   title: string;
   description: string;
+  functionSummary: string;
+  economicBenefit: string;
   steps: string[];
+  keyControls: string[];
+  risksToWatch: string;
+  relatedSystems: string;
+  practicalTip: string;
+  suggestedNextStep: string;
 }
 
 export interface PlayerProgress {
@@ -30,197 +51,729 @@ export interface SectionUnlockRequirement {
   chapterNumber: number;
 }
 
-export const SECTION_UNLOCK_CONFIG: Record<SectionId, SectionUnlockRequirement> = {
-  home: { sectionId: 'home', requiredLevel: 1, storyHint: 'مقر القيادة متاح دائماً', badgeLabel: 'متاح', chapterNumber: 1 },
-  profile: { sectionId: 'profile', requiredLevel: 1, storyHint: 'الملف الشخصي وإعداداتك', badgeLabel: 'متاح', chapterNumber: 1 },
-  store: { sectionId: 'store', requiredLevel: 1, storyHint: 'متجر الماس والباقات الحصرية', badgeLabel: 'متاح', chapterNumber: 1 },
-  tasks: { sectionId: 'tasks', requiredLevel: 1, storyHint: 'مهام القصة والإنجازات الوطنية', badgeLabel: 'متاح', chapterNumber: 1 },
-  lands: { sectionId: 'lands', requiredLevel: 1, storyHint: 'شراء وتطوير الأراضي الاستثمارية (الفصل الأول)', badgeLabel: 'متاح', chapterNumber: 1 },
-  companies: { sectionId: 'companies', requiredLevel: 1, storyHint: 'تأسيس أول شركة في مسار الإنقاذ (الفصل الأول)', badgeLabel: 'متاح', chapterNumber: 1 },
-  auctions: { sectionId: 'auctions', requiredLevel: 1, storyHint: 'المزادات العلنية على الأصول والمصانع المتعثرة', badgeLabel: 'متاح', chapterNumber: 1 },
-
-  // المستوى 1: الأساسيات والرقابة على الالتزامات
-  obligations: { sectionId: 'obligations', requiredLevel: 1, storyHint: 'متابعة الديون والالتزامات وفترة السماح القضائية', badgeLabel: 'متاح للرقابة', chapterNumber: 1 },
-
-  // المستوى 2: الإنتاج والتصنيع والمخازن
-  production: { sectionId: 'production', requiredLevel: 2, storyHint: 'تشغيل خطوط المصانع وتحويل الخامات إلى منتجات', badgeLabel: 'يفتح في مستوى 2', chapterNumber: 1 },
-  inventory: { sectionId: 'inventory', requiredLevel: 2, storyHint: 'المستودعات وسلاسل إمداد المواد الخام', badgeLabel: 'يفتح في مستوى 2', chapterNumber: 1 },
-
-  // المستوى 3: العقود والعملاء
-  contracts: { sectionId: 'contracts', requiredLevel: 3, storyHint: 'عقود التوريد واستعادة ثقة كبار التجار', badgeLabel: 'يفتح في مستوى 3', chapterNumber: 1 },
-
-  // المستوى 4: رفع الحظر البنكي واستعادة التسهيلات والودائع
-  bank: { sectionId: 'bank', requiredLevel: 4, storyHint: 'رفع التجميد البنكي واستعادة التسهيلات والقروض والودائع', badgeLabel: 'يفتح في مستوى 4', chapterNumber: 1 },
-
-  // المستوى 5: البورصة والتقارير والموظفون (الفصل الثاني)
-  investments: { sectionId: 'investments', requiredLevel: 5, storyHint: 'البورصة والتداول في الأسواق المالية والاكتتاب العام', badgeLabel: 'يفتح في مستوى 5', chapterNumber: 2 },
-  staff: { sectionId: 'staff', requiredLevel: 5, storyHint: 'توظيف المديرين والمحاسبين والخبراء التنفيذيين', badgeLabel: 'يفتح في مستوى 5', chapterNumber: 2 },
-  reports: { sectionId: 'reports', requiredLevel: 5, storyHint: 'التقارير المالية المتقدمة وتحليل الأداء والربحية', badgeLabel: 'يفتح في مستوى 5', chapterNumber: 2 },
-
-  // المستوى 6: الأبحاث والتكنولوجيا
-  tech_tree: { sectionId: 'tech_tree', requiredLevel: 6, storyHint: 'شجرة التكنولوجيا وأبحاث الأتمتة الذكية للمصانع', badgeLabel: 'يفتح في مستوى 6', chapterNumber: 2 },
-
-  // المستوى 7: السيطرة الإقليمية
-  territory: { sectionId: 'territory', requiredLevel: 7, storyHint: 'خريطة السيطرة والتوسع الجغرافي وحصص الأسواق', badgeLabel: 'يفتح في مستوى 7', chapterNumber: 2 },
-
-  // المستوى 8: الهيبة والرفاهية
-  luxury: { sectionId: 'luxury', requiredLevel: 8, storyHint: 'أصول الهيبة والسيارات الفارهة ونفوذ المدير التنفيذي', badgeLabel: 'يفتح في مستوى 8', chapterNumber: 2 },
-
-  // المستوى 9: الكارتيل والتحالفات
-  cartel: { sectionId: 'cartel', requiredLevel: 9, storyHint: 'تأسيس الكارتيل والتحالفات التجارية وحرب الأسعار', badgeLabel: 'يفتح في مستوى 9', chapterNumber: 3 },
-
-  // المستوى 10: الشحن الملاحي والتصدير الدولي (الفصل الثالث)
-  maritime: { sectionId: 'maritime', requiredLevel: 10, storyHint: 'الأسطول التجاري البحري والشحن الدولي للموانئ', badgeLabel: 'يفتح في مستوى 10', chapterNumber: 3 },
-
-  // المستوى 12: المناقصات ونفوذ الدولة
-  megaprojects: { sectionId: 'megaprojects', requiredLevel: 12, storyHint: 'المشاريع القومية العملاقة والمناقصات السيادية', badgeLabel: 'يفتح في مستوى 12', chapterNumber: 3 },
-
-  // المستوى 15: حاضنات الأعمال والـ VC (الفصل الرابع)
-  incubator: { sectionId: 'incubator', requiredLevel: 15, storyHint: 'الاستثمار الجريء ورعاية شركات اليونيكورن الناشئة', badgeLabel: 'يفتح في مستوى 15', chapterNumber: 4 },
-};
+export const SECTION_UNLOCK_CONFIG: Record<SectionId, SectionUnlockRequirement> = Object.fromEntries(
+  (Object.keys(SECTION_DEPENDENCY_MAP) as SectionId[]).map((key) => {
+    const spec = SECTION_DEPENDENCY_MAP[key];
+    return [
+      key,
+      {
+        sectionId: spec.sectionId,
+        requiredLevel: spec.requiredLevel,
+        storyHint: spec.storyHint,
+        badgeLabel: spec.badgeLabel,
+        chapterNumber: spec.chapterNumber,
+      },
+    ];
+  }),
+) as Record<SectionId, SectionUnlockRequirement>;
 
 export function getSectionRequiredLevel(section: SectionId): number {
-  return SECTION_UNLOCK_CONFIG[section]?.requiredLevel ?? 1;
+  return SECTION_DEPENDENCY_MAP[section]?.requiredLevel ?? 1;
 }
 
 export function getSectionUnlockBadge(section: SectionId): string {
-  return SECTION_UNLOCK_CONFIG[section]?.badgeLabel ?? 'متاح';
+  return SECTION_DEPENDENCY_MAP[section]?.badgeLabel ?? 'متاح';
 }
 
-const EXPERIENCE_PER_LEVEL = 150;
-const INTRO_UNLOCKS: SectionId[] = ['home', 'store', 'profile', 'lands', 'companies', 'tasks', 'auctions', 'obligations'];
-
-/** Experience is derived from durable accomplishments so old saves migrate without data loss. */
+/** Experience is derived from durable accomplishments via the central progression engine. */
 export function getPlayerProgress(profile: PlayerProfile): PlayerProgress {
-  const completedProduction = profile.productionOrders.filter((order) => order.status === 'completed').length;
-  const completedContracts = profile.contracts.filter((contract) => contract.status === 'completed').length;
-  const totalExperience =
-    profile.lands.length * 35
-    + profile.companies.length * 75
-    + Math.min(completedProduction, 20) * 22
-    + Math.min(profile.sales.length, 30) * 12
-    + Math.min(completedContracts, 20) * 45
-    + Math.min(profile.completedTaskIds.length, 30) * 22
-    + Math.min(profile.achievements.length, 30) * 30
-    + Math.min(profile.investments.length, 20) * 15
-    + Math.min(profile.staff.length, 15) * 8;
-  const activityLevel = 1 + Math.floor(totalExperience / EXPERIENCE_PER_LEVEL);
-  const level = Math.max(1, profile.level || 1, activityLevel);
-  const experienceInLevel = level > activityLevel ? 0 : totalExperience % EXPERIENCE_PER_LEVEL;
-  return { level, totalExperience, experienceInLevel, experienceForNextLevel: EXPERIENCE_PER_LEVEL };
+  const summary = calculatePlayerProgress(profile);
+  return {
+    level: summary.level,
+    totalExperience: summary.totalExperience,
+    experienceInLevel: summary.experienceInLevel,
+    experienceForNextLevel: summary.experienceForNextLevel,
+  };
 }
 
 export function getUnlockedSectionIds(profile: PlayerProfile): SectionId[] {
-  const unlocked = new Set<SectionId>(INTRO_UNLOCKS);
-  if (profile.companies.length >= 1) {
-    unlocked.add('production');
-    unlocked.add('inventory');
-  }
-  if (!profile.onboarding?.introCompleted) return [...unlocked];
-
-  const progress = getPlayerProgress(profile);
-  const level = progress.level;
-  const completedProduction = profile.productionOrders.some((order) => order.status === 'completed');
-  const completedSales = profile.sales.length > 0;
-  const completedContracts = profile.contracts.filter((contract) => contract.status === 'completed').length;
-
-  // Level 2: Production & Inventory
-  if (profile.companies.length >= 1 || level >= 2) {
-    unlocked.add('production');
-    unlocked.add('inventory');
-  }
-
-  // Level 3: Contracts
-  if ((completedProduction && completedSales) || level >= 3) {
-    unlocked.add('contracts');
-  }
-
-  // Level 4: Bank & Investments (رفع الحظر البنكي)
-  if (completedContracts >= 1 || level >= 4) {
-    unlocked.add('bank');
-    unlocked.add('investments');
-  }
-
-  // Level 5: Staff, Reports
-  if (level >= 5 || (completedContracts >= 2 && profile.companies.length >= 2)) {
-    unlocked.add('investments');
-    unlocked.add('staff');
-    unlocked.add('reports');
-  }
-
-  // Expansion systems
-  if (level >= 6) unlocked.add('tech_tree');
-  if (level >= 7) unlocked.add('territory');
-  if (level >= 8) unlocked.add('luxury');
-  if (level >= 9) unlocked.add('cartel');
-  if (level >= 10) unlocked.add('maritime');
-  if (level >= 12) unlocked.add('megaprojects');
-  if (level >= 15) unlocked.add('incubator');
-
-  return [...unlocked];
+  return computeUnlockedSections(profile);
 }
 
 export function isSectionUnlocked(profile: PlayerProfile, section: SectionId): boolean {
-  return getUnlockedSectionIds(profile).includes(section);
+  return computeUnlockedSections(profile).includes(section);
 }
 
 export function getSectionUnlockHint(profile: PlayerProfile, section: SectionId): string {
   if (isSectionUnlocked(profile, section)) return '';
-  const config = SECTION_UNLOCK_CONFIG[section];
-  if (!config) return 'أكمل خطوات في سيناريو القصة لفتح هذا النظام.';
-  return `يفتح في مستوى ${config.requiredLevel} · ${config.storyHint}`;
+  const spec = SECTION_DEPENDENCY_MAP[section];
+  if (!spec) return 'أكمل خطوات في سيناريو القصة لفتح هذا النظام.';
+  return `يفتح في مستوى ${spec.requiredLevel} · ${spec.storyHint}`;
 }
 
-export function getStarterMissions(profile: PlayerProfile): StarterMission[] {
-  return [
-    { id: 'intro-land', title: 'استعد إرث العائلة', description: 'اشترِ أول قطعة أرض لتبدأ إعادة بناء الإمبراطورية.', section: 'lands', completed: profile.lands.length >= 1 },
-    { id: 'intro-company', title: 'أعد تشغيل أول شركة', description: 'أسس شركتك الأولى واختر قطاعًا مناسبًا لرأس مالك.', section: 'companies', completed: profile.companies.length >= 1 },
-    { id: 'intro-production', title: 'أثبت أن العائلة ما زالت قادرة', description: 'أكمل أمر إنتاج وحوّل المواد الخام إلى منتج قابل للبيع.', section: 'production', completed: profile.productionOrders.some((order) => order.status === 'completed') },
-    { id: 'intro-contract', title: 'استعد ثقة السوق', description: 'سلّم أول طلب تجاري في موعده وابنِ سمعة العائلة.', section: 'contracts', completed: profile.contracts.some((contract) => contract.status === 'completed') },
-  ];
+export interface StarterMissionSpec {
+  id: string;
+  stage: number;
+  stageName: string;
+  title: string;
+  description: string;
+  section: SectionId;
+  cashReward: number;
+  diamondReward: number;
+  checkCompleted: (profile: PlayerProfile) => boolean;
 }
+
+export const STARTER_MISSION_SPECS: readonly StarterMissionSpec[] = [
+  // المرحلة 1: التأسيس والإنقاذ
+  {
+    id: 'starter-m1-repair',
+    stage: 1,
+    stageName: 'المرحلة 1: التأسيس والإنقاذ',
+    title: 'صيانة وتأهيل المصنع',
+    description: 'ارفع كفاءة المصنع الموروث إلى 90% على الأقل لتأمين خطوط الإنتاج وجودة المنتجات.',
+    section: 'companies',
+    cashReward: 5_000,
+    diamondReward: 10,
+    checkCompleted: (p) => p.companies.some((c) => (c.maintenanceCondition ?? 100) >= 90),
+  },
+  {
+    id: 'starter-m1-production',
+    stage: 1,
+    stageName: 'المرحلة 1: التأسيس والإنقاذ',
+    title: 'تشغيل خط الإنتاج الأول',
+    description: 'أكمل أول دفعة تصنيع منتجات غذائية أو صناعية لتوفير مخزون تجاري جاهز للبيع.',
+    section: 'production',
+    cashReward: 6_000,
+    diamondReward: 10,
+    checkCompleted: (p) => p.productionOrders.some((order) => order.status === 'completed'),
+  },
+  {
+    id: 'starter-m1-contract',
+    stage: 1,
+    stageName: 'المرحلة 1: التأسيس والإنقاذ',
+    title: 'استعادة ثقة السوق',
+    description: 'سلّم أول عقد تجاري في موعده لرفع التجميد واستعادة ثقة العملاء بالسوق.',
+    section: 'contracts',
+    cashReward: 8_000,
+    diamondReward: 15,
+    checkCompleted: (p) => p.contracts.some((contract) => contract.status === 'completed'),
+  },
+
+  // المرحلة 2: التوسع والاستثمار
+  {
+    id: 'starter-m2-land',
+    stage: 2,
+    stageName: 'المرحلة 2: التوسع والاستثمار',
+    title: 'التوسع العقاري والاستثماري',
+    description: 'امتلك قطعتي أرض استثمارية على الأقل لتجهيز مواقع المصانع والمجمعات التوسعية.',
+    section: 'lands',
+    cashReward: 12_000,
+    diamondReward: 20,
+    checkCompleted: (p) => p.lands.length >= 2,
+  },
+  {
+    id: 'starter-m2-company',
+    stage: 2,
+    stageName: 'المرحلة 2: التوسع والاستثمار',
+    title: 'تطوير المصنع أو تأسيس شركة ثانية',
+    description: 'طوّر المصنع لمستوى أعلى أو أسس شركة ثانية لتنويع مصادر التدفقات المالية.',
+    section: 'companies',
+    cashReward: 15_000,
+    diamondReward: 20,
+    checkCompleted: (p) => p.companies.length >= 2 || p.companies.some((c) => (c.upgradeLevel ?? 1) >= 2 || (c.energyCapacity ?? 100) > 100),
+  },
+  {
+    id: 'starter-m2-market',
+    stage: 2,
+    stageName: 'المرحلة 2: التوسع والاستثمار',
+    title: 'دخول سوق المزادات أو البيع المباشر',
+    description: 'قم ببيع أول شحنة منتجات في السوق أو شارك في جلسات المزاد العلني.',
+    section: 'auctions',
+    cashReward: 18_000,
+    diamondReward: 25,
+    checkCompleted: (p) => p.sales.length > 0 || (p.playerAuctions ?? []).length > 0 || p.auctionHistory.length > 0,
+  },
+
+  // المرحلة 3: بناء الإمبراطورية
+  {
+    id: 'starter-m3-staff',
+    stage: 3,
+    stageName: 'المرحلة 3: بناء الإمبراطورية',
+    title: 'بناء الفريق الإداري',
+    description: 'عيّن مديرًا تنفيذيًا أو محاسبًا في قسم الإدارة والرواتب لقيادة النمو.',
+    section: 'staff',
+    cashReward: 25_000,
+    diamondReward: 30,
+    checkCompleted: (p) => p.staff.some((m) => m.status === 'active'),
+  },
+  {
+    id: 'starter-m3-wealth',
+    stage: 3,
+    stageName: 'المرحلة 3: بناء الإمبراطورية',
+    title: 'الاستقرار المالي والسيولة',
+    description: 'حقق رصيدًا بنكيًا نقدياً لا يقل عن 50,000 $ لضمان تمويل الاستحواذات الكبرى.',
+    section: 'bank',
+    cashReward: 30_000,
+    diamondReward: 40,
+    checkCompleted: (p) => p.bankBalance >= 50_000,
+  },
+  {
+    id: 'starter-m3-contracts',
+    stage: 3,
+    stageName: 'المرحلة 3: بناء الإمبراطورية',
+    title: 'شراكات التوريد الكبرى',
+    description: 'سلّم 3 عقود تجارية بنجاح لبناء سمعة اقتصادية راسخة تفتح أبواب الصفقات السيادية.',
+    section: 'contracts',
+    cashReward: 40_000,
+    diamondReward: 50,
+    checkCompleted: (p) => p.contracts.filter((c) => c.status === 'completed').length >= 3,
+  },
+];
+
+/**
+ * Determines current active stage based on claimed missions
+ */
+export function getCurrentStarterMissionStage(profile: PlayerProfile): number {
+  const claimedSet = new Set([
+    ...(profile.onboarding?.claimedStarterMissionIds ?? []),
+    ...(profile.completedTaskIds ?? []),
+  ]);
+
+  const stage1Specs = STARTER_MISSION_SPECS.filter((s) => s.stage === 1);
+  const stage1Finished = stage1Specs.every((s) => claimedSet.has(s.id));
+  if (!stage1Finished) return 1;
+
+  const stage2Specs = STARTER_MISSION_SPECS.filter((s) => s.stage === 2);
+  const stage2Finished = stage2Specs.every((s) => claimedSet.has(s.id));
+  if (!stage2Finished) return 2;
+
+  const stage3Specs = STARTER_MISSION_SPECS.filter((s) => s.stage === 3);
+  const stage3Finished = stage3Specs.every((s) => claimedSet.has(s.id));
+  if (!stage3Finished) return 3;
+
+  return 4; // All stages completed!
+}
+
+/**
+ * Returns active missions for current stage. Completed & claimed missions disappear.
+ */
+export function getStarterMissions(profile: PlayerProfile): StarterMission[] {
+  const currentStage = getCurrentStarterMissionStage(profile);
+  const claimedSet = new Set([
+    ...(profile.onboarding?.claimedStarterMissionIds ?? []),
+    ...(profile.completedTaskIds ?? []),
+  ]);
+
+  if (currentStage > 3) return [];
+
+  // Filter to current stage missions that are NOT claimed yet
+  return STARTER_MISSION_SPECS
+    .filter((spec) => spec.stage === currentStage && !claimedSet.has(spec.id))
+    .map((spec) => ({
+      id: spec.id,
+      stage: spec.stage,
+      stageName: spec.stageName,
+      title: spec.title,
+      description: spec.description,
+      section: spec.section,
+      cashReward: spec.cashReward,
+      diamondReward: spec.diamondReward,
+      completed: spec.checkCompleted(profile),
+      claimed: false,
+    }));
+}
+
+/**
+ * Returns archive of all completed and claimed starter missions across stages
+ */
+export function getCompletedStarterMissions(profile: PlayerProfile): StarterMission[] {
+  const claimedSet = new Set([
+    ...(profile.onboarding?.claimedStarterMissionIds ?? []),
+    ...(profile.completedTaskIds ?? []),
+  ]);
+
+  return STARTER_MISSION_SPECS
+    .filter((spec) => claimedSet.has(spec.id))
+    .map((spec) => ({
+      id: spec.id,
+      stage: spec.stage,
+      stageName: spec.stageName,
+      title: spec.title,
+      description: spec.description,
+      section: spec.section,
+      cashReward: spec.cashReward,
+      diamondReward: spec.diamondReward,
+      completed: true,
+      claimed: true,
+    }));
+}
+
+/**
+ * Claims a starter mission reward, records it permanently, prevents duplicate payouts,
+ * and automatically unlocks the next stage.
+ */
+export function claimStarterMission(
+  profile: PlayerProfile,
+  missionId: string,
+): GameResult<{ missionId: string; cashReward: number; diamondReward: number }> {
+  // Support legacy mission ID mapping
+  const normalizedId =
+    missionId === 'intro-repair' ? 'starter-m1-repair'
+    : missionId === 'intro-production' ? 'starter-m1-production'
+    : missionId === 'intro-contract' ? 'starter-m1-contract'
+    : missionId === 'intro-land' ? 'starter-m2-land'
+    : missionId;
+
+  const spec = STARTER_MISSION_SPECS.find((s) => s.id === normalizedId);
+  if (!spec) {
+    return {
+      ok: false,
+      profile,
+      reason: 'not-found',
+      message: 'المهمة الأولية غير موجودة.',
+    };
+  }
+
+  const claimedSet = new Set([
+    ...(profile.onboarding?.claimedStarterMissionIds ?? []),
+    ...(profile.completedTaskIds ?? []),
+  ]);
+
+  if (claimedSet.has(spec.id)) {
+    return {
+      ok: false,
+      profile,
+      reason: 'already-claimed',
+      message: 'تم تحصيل مكافأة هذه المهمة مسبقاً ولا يمكن صرفها مرة أخرى.',
+    };
+  }
+
+  if (!spec.checkCompleted(profile)) {
+    return {
+      ok: false,
+      profile,
+      reason: 'condition-not-met',
+      message: 'لم يتم استيفاء شروط إنجاز هذه المهمة بعد.',
+    };
+  }
+
+  const nowIso = new Date().toISOString();
+  const entry: FinanceLedgerEntry = {
+    id: `starter-mission-${spec.id}-${Date.now()}`,
+    category: 'revenue',
+    amount: spec.cashReward,
+    countryId: profile.countryId,
+    occurredAt: nowIso,
+    note: `مكافأة المهمة الأولية: [${spec.title}]`,
+  };
+
+  const updatedClaimedStarterIds = Array.from(new Set([
+    ...(profile.onboarding?.claimedStarterMissionIds ?? []),
+    spec.id,
+    missionId, // record both in case legacy
+  ]));
+
+  const updatedCompletedStarterIds = Array.from(new Set([
+    ...(profile.onboarding?.completedStarterMissionIds ?? []),
+    spec.id,
+    missionId,
+  ]));
+
+  const updatedCompletedTaskIds = Array.from(new Set([
+    ...(profile.completedTaskIds ?? []),
+    spec.id,
+    missionId,
+  ]));
+
+  const tempProfile: PlayerProfile = {
+    ...profile,
+    bankBalance: profile.bankBalance + spec.cashReward,
+    diamonds: profile.diamonds + spec.diamondReward,
+    finances: {
+      ...profile.finances,
+      totalRevenue: (profile.finances?.totalRevenue ?? 0) + spec.cashReward,
+      netProfit: (profile.finances?.netProfit ?? 0) + spec.cashReward,
+    },
+    ledger: [entry, ...(profile.ledger || [])],
+    completedTaskIds: updatedCompletedTaskIds,
+    onboarding: {
+      ...profile.onboarding,
+      claimedStarterMissionIds: updatedClaimedStarterIds,
+      completedStarterMissionIds: updatedCompletedStarterIds,
+    },
+  };
+
+  // Recalculate next stage
+  const nextStage = getCurrentStarterMissionStage(tempProfile);
+  const nextProfile: PlayerProfile = {
+    ...tempProfile,
+    onboarding: {
+      ...tempProfile.onboarding,
+      starterMissionStage: nextStage,
+    },
+  };
+
+  return {
+    ok: true,
+    profile: nextProfile,
+    message: `تهانينا! تم استلام مكافأة مهمة «${spec.title}»: +${spec.cashReward.toLocaleString()} $ و +${spec.diamondReward} ماسة، ونقلت إلى سجل المهام المكتملة.`,
+    data: {
+      missionId: spec.id,
+      cashReward: spec.cashReward,
+      diamondReward: spec.diamondReward,
+    },
+  };
+}
+
+const SYSTEM_GUIDES: Record<SectionId, SystemGuide> = {
+  home: {
+    title: 'مقر القيادة الرئيسي: بوصلة الإمبراطورية',
+    description: 'مركز متابعة السيولة، المهام القصصية، الفصول، والوصول السريع إلى قطاعات الأعمال المفتوحة.',
+    functionSummary: 'يعرض ملخص صافي الثروة، المهام النشطة لمستشاريك، وحالة قطاعات الإمبراطورية لحظة بلحظة.',
+    economicBenefit: 'يمنع القرارات العشوائية عبر جمع السيولة والالتزامات والفرص العاجلة في شاشة واحدة.',
+    steps: [
+      'راجع بطاقة مهام القصة في أعلى لوحة القيادة واقرأ إيجاز المستشار.',
+      'افحص مؤشرات الكاش والالتزامات قبل اتخاذ أي قرار توسع.',
+      'انتقل إلى القسم المستهدف مباشرة لتنفيذ خطوتك التالية.',
+    ],
+    keyControls: ['بطاقة مهام القصة والإرشاد التفاعلي', 'ملحمة الإمبراطورية والفصول', 'بطاقات الوصول السريع للقطاعات المفتوحة'],
+    risksToWatch: 'تجاهل تنبيهات الالتزامات أو كفاءة المصنع يؤدي إلى تراجع الطاقة وجودة المنتجات.',
+    relatedSystems: 'يرتبط مباشرة بالمهام، الشركات، الالتزامات، والتقارير المالية.',
+    practicalTip: 'ابدأ كل يوم داخل اللعبة بمراجعة المهمة القصصية النشطة قبل إنفاق السيولة.',
+    suggestedNextStep: 'افتح مهمة القصة الأولى وابدأ بصيانة المصنع الموروث.',
+  },
+  profile: {
+    title: 'الملف الشخصي: هوية المؤسس وسجل الإنجاز',
+    description: 'إدارة اسم الشخصية، المظهر، النبذة التعريفية، ومراجعة الدولة المختارة وشارات الإمبراطورية.',
+    functionSummary: 'يحفظ هويتك التجارية، مستواك الحالي، الشارات المكتسبة، وحالة المزامنة والحفظ.',
+    economicBenefit: 'يوثق سمعتك التجارية وإنجازاتك التي تفتح مزايا الهيبة والتصنيف التنافسي.',
+    steps: [
+      'راجع مستواك ونقاط الخبرة المتبقية للمستوى القادم.',
+      'اختر الصورة الرمزية المتاحة أو افتح مظاهر جديدة مع تقدمك.',
+      'تحقق من الشارات المكتسبة وسجل تقدمك في الدولة المختارة.',
+    ],
+    keyControls: ['تعديل المظهر والنبذة', 'شريط المستوى والخبرة', 'سجل الشارات والأوسمة'],
+    risksToWatch: 'الدولة المختارة مرتبطة بسيناريو حفظك وأصولك الحالية ولا تتغير عشوائياً أثناء الحفظ.',
+    relatedSystems: 'يتكامل مع المهام والإنجازات ونظام الهيبة.',
+    practicalTip: 'راقب شريط الخبرة لمعرفة مدى قربك من فتح الأنظمة المتقدمة.',
+    suggestedNextStep: 'عد إلى مقر القيادة لمتابعة مهام الفصل الحالي.',
+  },
+  store: {
+    title: 'متجر المشتريات: الذهب وبطاقات التسريع',
+    description: 'شراء وتداول سبائك الذهب بالرصيد أو الماس، واقتناء بطاقات تسريع الإنتاج واليوم الاختيارية.',
+    functionSummary: 'يوفر أدوات التحوط بالذهب وبطاقات تسريع دورات الإنتاج ومضاعفة سرعة اليوم.',
+    economicBenefit: 'يساعدك على حفظ القيمة في الذهب أو تسريع طلبيات الإنتاج الحرجة قبل مواعيد العقود.',
+    steps: [
+      'قارن رصيدك من الكاش والماس قبل الشراء.',
+      'اشترِ الذهب للتحوط أو بطاقات التسريع عند الحاجة التشغيلية فقط.',
+      'استخدم بطاقات التسريع من قسم الإنتاج عندما يكون لديك عقد عاجل.',
+    ],
+    keyControls: ['تداول سبائك الذهب بيعاً وشراءً', 'بطاقات تسريع الإنتاج (25% / 50% / فوري)', 'بطاقات تسريع اليوم'],
+    risksToWatch: 'بيع الذهب يخضع لفارق تداول 3%، فلا تشتريه وتبعه فوراً دون هدف واضح.',
+    relatedSystems: 'يدعم قسم الإنتاج والمخازن والسيولة النقدية.',
+    practicalTip: 'احتفظ برصيد الماس لتسريع الدفعات المرتبطة بالعقود العاجلة عالية الربح.',
+    suggestedNextStep: 'استثمر سيولتك الأساسية في تشغيل المصانع أولاً قبل الكماليات.',
+  },
+  tasks: {
+    title: 'المهام والإنجازات: خارطة التقدم والمكافآت',
+    description: 'قائمة الأهداف التشغيلية وتحديات الموسم التي تكافئك عند تحقيق شروط حقيقية داخل اقتصادك.',
+    functionSummary: 'يتتبع إنجازاتك الفعلية في التملك والإنتاج والبيع ويمنحك مكافآت نقدية ونقاط موسم.',
+    economicBenefit: 'يوفر دفعات سيولة نظيفة وخبرة إضافية تسرّع رفع مستواك وفتح الأقسام المتقدمة.',
+    steps: [
+      'افتح لوحة المهام لقراءة الشرط المطلوب لكل مهمة.',
+      'نفّذ الإجراء الحقيقي في القسم المختص (شراء خام، إنتاج، بيع، أرض).',
+      'اضغط زر استلام المكافأة بعد استيفاء الشرط فعلياً.',
+    ],
+    keyControls: ['زر استلام مكافأة المهمة المكتملة', 'تحديات الموسم اليومية', 'سجل المهام المنجزة'],
+    risksToWatch: 'لا تُحتسب المكافأة تلقائياً في الرصيد إلا بعد الضغط على استلامها عند اكتمال الشرط.',
+    relatedSystems: 'يرتبط بجميع أقسام التشغيل (الأراضي، الشركات، المخازن، الإنتاج، العقود).',
+    practicalTip: 'اجمع مكافآت المهام المكتملة فور إنجازها لتمويل دفعات المواد الخام التالية.',
+    suggestedNextStep: 'تحقق من المهام الجاهزة للاستلام ثم عد لتوسيع إنتاجك.',
+  },
+  lands: {
+    title: 'الأراضي العقارية: قاعدة التأسيس والتوسع',
+    description: 'شراء وتطوير الأراضي الزراعية والصناعية والتجارية في المواقع الحقيقية لدولتك.',
+    functionSummary: 'يتيح شراء الأراضي المباشرة وتطوير مساحتها لتأسيس شركات جديدة أو استخدامها كضمان تمويلي.',
+    economicBenefit: 'كل شركة جديدة تتطلب أرضاً مطابقة لنوع قطاعها، كما ترفع الأراضي قيمة أصولك الصافية.',
+    steps: [
+      'طابق نوع الأرض (زراعية / صناعية / تجارية) مع القطاع الذي تخطط لتأسيسه.',
+      'تأكد من كفاية السيولة مع إبقاء احتياطي للتشغيل وشراء الخامات.',
+      'انتظر إتمام نقل الملكية في اليوم التالي لتأسيس شركة جديدة عليها.',
+    ],
+    keyControls: ['عرض الأرض التمهيدية والعروض المباشرة', 'زر الشراء النقدي أو بالماس', 'زر ترقية مساحة الأرض'],
+    risksToWatch: 'الأرض المشتراة حديثاً تصبح متاحة لتأسيس شركة في اليوم التالي لنقل الملكية.',
+    relatedSystems: 'تغذي قسم الشركات بالمواقع المطلوبة وتصلح ضماناً في قسم البنك لاحقاً.',
+    practicalTip: 'ابدأ بالأرض الزراعية أو الصناعية منخفضة التكلفة لتأسيس خط إنتاج غذائي مربح.',
+    suggestedNextStep: 'بعد شراء الأرض، خطط لتأسيس شركتك الثانية في اليوم التالي.',
+  },
+  companies: {
+    title: 'الشركات والمنشآت: قلب القوة الصناعية',
+    description: 'صيانة مصنعك الموروث، متابعة الطاقة والمعدات، وتأسيس أو شراء شركات في قطاعات جديدة.',
+    functionSummary: 'يدير كفاءة المعدات، سعة الطاقة اليومية، وتأسيس الشركات على الأراضي المتاحة.',
+    economicBenefit: 'الشركة ذات الكفاءة 100% تنتج سلعاً عالية الجودة مقبولة لدى جميع العملاء والعقود.',
+    steps: [
+      'افحص نسبة كفاءة المعدات في مصنعك الحالي واضغط صيانة إذا انخفضت.',
+      'راقب وحدات الطاقة المتاحة والتكلفة التشغيلية اليومية لكل شركة.',
+      'عند امتلاك أرض شاغرة ومطابقة، أسس شركة جديدة لتنويع مصادر الدخل.',
+    ],
+    keyControls: ['زر صيانة المعدات لرفع الكفاءة إلى 100%', 'نموذج تأسيس شركة جديدة على أرض مملوكة', 'عروض الشركات الجاهزة'],
+    risksToWatch: 'هبوط كفاءة المعدات إلى 20% أو أقل يوقف خط الإنتاج تماماً ويخفض جودة البضائع.',
+    relatedSystems: 'يعتمد على الأراضي والالتزامات (توقف الطاقة عند الديون) ويغذي قسم الإنتاج.',
+    practicalTip: 'صيانة المصنع الموروث هي دائماً أفضل خطوة أولى لأن تكلفتها زهيدة وأثرها فوري.',
+    suggestedNextStep: 'بعد رفع الكفاءة، انتقل إلى المخازن لشراء المواد الخام لخط إنتاجك.',
+  },
+  obligations: {
+    title: 'الالتزامات والديون: درع حماية الطاقة والسيولة',
+    description: 'مراقبة وسداد المستحقات المتأخرة، فترة سماح القرض الموروث، والرواتب غير المسددة.',
+    functionSummary: 'يعرض خريطة الالتزامات واجبة السداد ومواعيد استحقاق الأقساط لتفادي شلل الطاقة.',
+    economicBenefit: 'سداد الالتزامات يحافظ على تدفق الطاقة اليومية لمصانعك ويحميك من تراكم الغرامات.',
+    steps: [
+      'افحص إجمالي الالتزامات المتأخرة وموعد القسط القادم للقرض الموروث.',
+      'استخدم زر السداد الفوري أو سداد قسط القرض عندما تتوفر السيولة.',
+      'احتفظ دائماً بهامش نقدي يغطي مصروفات التشغيل اليومية.',
+    ],
+    keyControls: ['عداد الالتزامات غير المسددة', 'سجل القرض الموروث ومهلة السماح', 'زر سداد القسط أو المتأخرات'],
+    risksToWatch: 'وجود أي التزامات غير مسددة عند ترحيل اليوم يوقف إمداد الطاقة اليومي لجميع شركاتك!',
+    relatedSystems: 'يؤثر مباشرة على طاقة الشركات والسمعة الائتمانية قبل فتح البنك.',
+    practicalTip: 'سدّد قسطاً مبكراً من القرض الموروث لتخفيف العبء المالي قبل حلول اليوم الثامن.',
+    suggestedNextStep: 'بعد تأمين التزاماتك، ركز على دورة الشراء والإنتاج لتحقيق تدفق نقدي موجب.',
+  },
+  auctions: {
+    title: 'المزادات العلنية: اقتناص الصفقات الاستراتيجية',
+    description: 'المنافسة ضد المستثمرين الآليين على أراضٍ نادرة، خطوط توسعة مصانع، وشحنات مواد خام.',
+    functionSummary: 'يطرح صفقات يومية بحد أدنى للمزايدة وسعر آمن تقديري للفوز بالأصل فوراً.',
+    economicBenefit: 'يمنحك أصولاً وشحنات خام ومصانع توسعة تزيد سعة الطاقة بتكلفة تنافسية.',
+    steps: [
+      'استعرض نوع الأصل المطروح (أرض، توسعة مصنع، شحنة مواد خام).',
+      'راجع الحد الأدنى والزيادة المتوقعة للمنافسين قبل تحديد عرضك.',
+      'قدم عرضاً مدروساً مع ترك سيولة كافية لتشغيل الأصل بعد الفوز.',
+    ],
+    keyControls: ['قائمة المزادات المفتوحة', 'حقل قيمة المزايدة', 'زر دخول المزاد وتأكيد العرض'],
+    risksToWatch: 'المزايدة بكل سيولتك النقدية قد تترك مصانعك بلا أموال لشراء الخامات.',
+    relatedSystems: 'يضيف أصولاً مباشرة إلى الأراضي أو الشركات أو المخازن عند الفوز.',
+    practicalTip: 'مزادات شحنات المواد الخام فرصة ممتازة لخفض متوسط تكلفة الوحدة في مستودعك.',
+    suggestedNextStep: 'راقب سعة المخزن والسيولة قبل دخول أي مزاد كبير.',
+  },
+  inventory: {
+    title: 'المواد الخام والمخازن: شريان الإمداد والتجارة',
+    description: 'شراء المواد الخام من تجار السوق العالمي، التفاوض على الأسعار، بيع المنتجات، وترقية المستودع.',
+    functionSummary: 'يدير مخزون المدخلات الصناعية والسلع التامة الصنع وسعة التخزين المتاحة.',
+    economicBenefit: 'الشراء بسعر منخفض والبيع في أوقات ذروة الطلب يصنع هامش الربح الأساسي لإمبراطوريتك.',
+    steps: [
+      'افتح عروض السوق العالمي واشترِ المواد الخام اللازمة لوصفة مصنعك (مثل الحبوب والتغليف للأغذية).',
+      'راقب عداد سعة المستودع للمواد الخام والمنتجات التامة.',
+      'بعد انتهاء الإنتاج، بع الفائض هنا أو احتفظ به لتسليم العقود الأعلى سعراً.',
+    ],
+    keyControls: ['عروض السوق العالمي والتفاوض', 'عداد سعة المخزن وزر الترقية', 'لوحة بيع المنتجات التامة في السوق'],
+    risksToWatch: 'امتلاء المخزن يمنع بدء أوامر إنتاج جديدة حتى تبيع جزءاً من البضاعة أو ترقّي المستودع.',
+    relatedSystems: 'يزود قسم الإنتاج بالمدخلات، ويغذي قسم العقود بالمنتجات الجاهزة للتسليم.',
+    practicalTip: 'لوصفة الأغذية، كل دفعة إنتاج تحتاج 4 حبوب زراعية + 1 مواد تغليف وتنتج 8 عبوات.',
+    suggestedNextStep: 'اشترِ الخامات المطلوبة ثم توجه فوراً إلى قسم المصانع والإنتاج.',
+  },
+  production: {
+    title: 'المصانع والإنتاج: ماكينة خلق القيمة المضافة',
+    description: 'تشغيل دفعات الإنتاج لتحويل المواد الخام والطاقة إلى منتجات عالية القيمة قابلة للبيع والتصدير.',
+    functionSummary: 'يحسب تكلفة الخامات والطاقة والجودة المتوقعة ويطلق أوامر التصنيع لكل شركة.',
+    economicBenefit: 'يحول الخامات منخفضة السعر إلى سلع تامة تحقق أرباحاً صافية وتفتح نظام العقود.',
+    steps: [
+      'اختر الشركة التي تملك كفاءة معدات جيدة وطاقة كافية.',
+      'حدد عدد الدفعات بما يتناسب مع المواد الخام المتوفرة في مخزنك.',
+      'اضغط بدء الإنتاج وتابع اكتمال الدفعة مع تقدم اليوم أو باستخدام بطاقة تسريع.',
+    ],
+    keyControls: ['اختيار الشركة والوصفة', 'تحديد عدد الدفعات ومعاينة الربح التقديري', 'زر بدء الإنتاج ومتابعة الطابور النشط'],
+    risksToWatch: 'نقص المواد الخام أو الطاقة أو تدهور الصيانة يمنع بدء الدفعة ويظهر سبب المنع بوضوح.',
+    relatedSystems: 'يستهلك خامات المخازن وطاقة الشركات، ويغذي المبيعات والعقود.',
+    practicalTip: 'تأكد من رفع صيانة المصنع قبل التشغيل للحصول على جودة فوق 90% تلائم جميع العقود.',
+    suggestedNextStep: 'عند اكتمال الإنتاج، بع أول شحنة في المخازن لفتح قسم العقود والعملاء.',
+  },
+  contracts: {
+    title: 'العقود والعملاء: بوابة الثقة ورفع الحظر البنكي',
+    description: 'قبول طلبات التوريد من كبار عملاء دولتك وتسليم البضائع في موعدها لكسب علاوات نقدية وسمعة.',
+    functionSummary: 'يعرض عقود توريد يومية بكميات وجودة ومواعيد محددة مع إمكانية التفاوض لمرة واحدة.',
+    economicBenefit: 'يمنح سعر بيع مميزاً + مكافأة التزام + نقاط سمعة، ويُعد إتمام أول عقد مفتاح فتح البنك.',
+    steps: [
+      'اقرأ المنتج المطلوب، الكمية، الحد الأدنى للجودة، وموعد التسليم النهائي.',
+      'اقبل العقد الذي تستطيع إنتاجه أو تملكه بالفعل في مستودعك.',
+      'اضغط زر تسليم العقد يدوياً قبل انتهاء المهلة لاستلام قيمة الصفقة والعلاوة.',
+    ],
+    keyControls: ['عروض العقود اليومية', 'زر التفاوض على السعر أو المهلة', 'زر تسليم العقد في قائمة العقود النشطة'],
+    risksToWatch: 'التأخر عن يوم التسليم المحدد يوقع غرامة مالية ويخصم من سمعتك التجارية.',
+    relatedSystems: 'يعتمد على منتجات قسم الإنتاج والمخازن، وإتمامه يفتح قسم البنك والتمويل.',
+    practicalTip: 'أنتج الكمية المطلوبة أو جزءاً كبيراً منها قبل قبول العقود العاجلة ذات المهلة القصيرة.',
+    suggestedNextStep: 'سلّم أول عقد تجاري بنجاح لرفع التجميد البنكي وفتح التسهيلات المصرفية.',
+  },
+  bank: {
+    title: 'البنك والتمويل: الرافعة المالية والودائع الآمنة',
+    description: 'إنشاء ودائع مصرفية بعائد ثابت وطلب قروض بضمان الأراضي أو الشركات بعد استعادة الثقة الائتمانية.',
+    functionSummary: 'يدير الودائع لأجل، دمج الشرائح الادخارية، والقروض المضمونة بالأصول.',
+    economicBenefit: 'يتيح تمويل التوسعات الكبرى دون انتظار تراكم الأرباح البطيء، أو تنمية فائض الكاش بأمان.',
+    steps: [
+      'راجع سقف التمويل المتاح مقابل ضماناتك العقارية أو الصناعية.',
+      'قارن قيمة القسط اليومي بصافي تدفقك النقدي قبل طلب أي قرض.',
+      'ضع السيولة الفائضة عن حاجة التشغيل في ودائع قصيرة أو متوسطة الأجل.',
+    ],
+    keyControls: ['فتح وديعة مصرفية ودمج الودائع', 'طلب قرض بضمان أصل', 'سداد الأقساط أو إغلاق القرض مبكراً'],
+    risksToWatch: 'استخدام أصل كضمان لقرض نشط يمنع رهنه مرة أخرى حتى سداد القرض بالكامل.',
+    relatedSystems: 'يرتبط بالأراضي والشركات (كضمانات) وبقسم الالتزامات عند حلول مواعيد الأقساط.',
+    practicalTip: 'لا تقترض لشراء كماليات؛ اقترض فقط لتأسيس أصل يدر عائداً يومياً يفوق قسط القرض.',
+    suggestedNextStep: 'استخدم التمويل المدروس لتأسيس شركتك الثانية والوصول إلى المستوى 5.',
+  },
+  investments: {
+    title: 'الاستثمارات والبورصة: تنويع المحفظة المالية',
+    description: 'استثمار السيولة الفائضة في سندات الخزينة، الصناديق اللوجستية، وأسهم الشركات المدرجة.',
+    functionSummary: 'يوفر أوعية استثمارية بعوائد ومستويات مخاطرة متفاوتة وتداولاً حياً في سوق الأسهم.',
+    economicBenefit: 'يخلق دخلاً سلبياً مستمراً ويعظم العائد على الكاش غير المستخدم في المصانع.',
+    steps: [
+      'افصل أولاً سيولة التشغيل والالتزامات عن الفائض المتاح للاستثمار.',
+      'اختر بين السندات عديمة المخاطرة أو الصناديق والأسهم ذات العائد الأعلى.',
+      'تابع مواعيد استحقاق الصناديق وتوزيعات الأرباح الدورية.',
+    ],
+    keyControls: ['إنشاء سند خزينة أو صندوق لوجستي', 'شاشة تداول الأسهم والمحفظة', 'متابعة يوم الاستحقاق والعائد'],
+    risksToWatch: 'تجميد كامل سيولتك في استثمارات طويلة الأجل قد يعرض مصانعك لنقص الكاش التشغيلي.',
+    relatedSystems: 'يتكامل مع البنك والتقارير المالية لتعظيم صافي الثروة.',
+    practicalTip: 'ابدأ بسندات الخزينة الحكومية لبناء عائد آمن قبل المغامرة في الأسهم المتقلبة.',
+    suggestedNextStep: 'وازن بين التوسع الصناعي والمحفظة المالية للوصول إلى فصول السيادة.',
+  },
+  staff: {
+    title: 'الإدارة والرواتب: بناء الفريق التنفيذي',
+    description: 'توظيف وتطوير مديري الشركات والمحاسبين والمحامين ومسؤولي الموارد البشرية.',
+    functionSummary: 'يمنح شركاتك خصومات تشغيلية وحماية قانونية وكفاءة توظيف تتزايد مع ارتفاع خبرة الموظفين.',
+    economicBenefit: 'المدير يخفض مصروفات تشغيل الشركة، والمحامي يقلل كلفة الصدمات التنظيمية، وHR يخفض عقود التوظيف.',
+    steps: [
+      'حدد الدور الأكثر فائدة لمرحلتك الحالية (مدير شركة، محاسب، محامٍ، أو موارد بشرية).',
+      'اربِط مدير الشركة بالمنشأة الأعلى تكلفة لخفض مصروفاتها اليومية.',
+      'راقب الرواتب المستحقة وسددها بانتظام وتابع ترقية مستويات فريقك.',
+    ],
+    keyControls: ['توظيف كادر جديد واختيار الشركة', 'ترقية مستوى الموظف', 'سداد الرواتب المتأخرة أو إنهاء التعاقد'],
+    risksToWatch: 'تأخر سداد الرواتب يوقف الطاقة عن المصانع تماماً مثل الديون المتأخرة!',
+    relatedSystems: 'يخفض تكاليف قسم الشركات والأحداث الاقتصادية، ويظهر في قسم الالتزامات.',
+    practicalTip: 'عيّن مسؤول موارد بشرية أولاً إذا كنت تخطط لتوظيف عدة مديرين للحصول على خصم تعاقد فوري.',
+    suggestedNextStep: 'وظف مديراً لمصنعك الرئيسي لرفع هامش الربح اليومي.',
+  },
+  reports: {
+    title: 'التقارير المالية: غرفة التحليل والمحاسبة',
+    description: 'قراءة دفتر الأستاذ العام، صافي الأرباح، الإيرادات والمصروفات، وسجل الأحداث الاقتصادية.',
+    functionSummary: 'يعرض القوائم المالية التفصيلية وحركة كل دولار دخل أو خرج من خزينة الإمبراطورية.',
+    economicBenefit: 'يكشف مواطن الهدر التشغيلي ويقيس ربحيتك الصافية المطلوبة لإتمام فصول القصة.',
+    steps: [
+      'افحص ملخص إجمالي الإيرادات مقابل المصروفات وصافي الربح.',
+      'راجع دفتر القيود لمعرفة أثر المبيعات والعقود والأحداث السوقية.',
+      'تابع الأحداث الاقتصادية النشطة وتاريخ انتهاء أثرها على الأسعار والطلب.',
+    ],
+    keyControls: ['ملخص الإيرادات والمصروفات وصافي الربح', 'سجل دفتر الأستاذ التفصيلي', 'سجل الأحداث الاقتصادية النشطة'],
+    risksToWatch: 'ارتفاع الإيرادات مع إهمال المصروفات اليومية قد يخفي تآكل صافي الربح.',
+    relatedSystems: 'يجمع البيانات الحقيقية من كافة أقسام اللعبة دون استثناء.',
+    practicalTip: 'راجع التقارير قبل التوسع في قطاع جديد للتأكد من أن شركاتك الحالية تحقق تدفقاً موجباً.',
+    suggestedNextStep: 'استهدف رفع صافي الربح التراكمي لاستيفاء شروط الفصل القادم من الحملة.',
+  },
+  tech_tree: {
+    title: 'الأبحاث والأتمتة: ثورة المصانع الذكية',
+    description: 'تطوير تقنيات الإنتاج المتقدم والأتمتة والطاقة المستدامة لمضاعفة كفاءة إمبراطوريتك.',
+    functionSummary: 'يفتح ترقيات تكنولوجية دائمة تخفض الهدر وترفع سرعة وجودة خطوط التصنيع.',
+    economicBenefit: 'يمنح تفوقاً تنافسياً دائماً يرفع هوامش الربح دون زيادة موازية في العمالة.',
+    steps: [
+      'استعرض شجرة التقنيات المتاحة وتكلفة كل بحث ومتطلباته.',
+      'ابدأ بأبحاث كفاءة خطوط الإنتاج وتقليل استهلاك الطاقة.',
+      'طبّق مخرجات البحث لتعزيز أداء جميع شركاتك الصناعية.',
+    ],
+    keyControls: ['عقد شجرة التكنولوجيا', 'زر تمويل وبدء البحث', 'مؤشر المكافآت التقنية النشطة'],
+    risksToWatch: 'الأبحاث استثمار طويل الأجل؛ لا تمولها من السيولة المخصصة لسداد التزامات الغد.',
+    relatedSystems: 'يعزز أداء قسم الشركات والإنتاج ويقوي موقفك في العقود عالية الجودة.',
+    practicalTip: 'ركز على فرع الأتمتة أولاً لتحقيق أسرع استرداد لتكلفة البحث.',
+    suggestedNextStep: 'استثمر وفورات الأتمتة في التوسع الجغرافي عبر خريطة السيطرة الإقليمية.',
+  },
+  territory: {
+    title: 'السيطرة الإقليمية: التوسع الجغرافي وحصص السوق',
+    description: 'التوسع في الأقاليم والمناطق الاقتصادية الحيوية لرفع حصتك السوقية وعوائد التوزيع.',
+    functionSummary: 'يتيح ضخ استثمارات إقليمية للسيطرة على مراكز التجارة والمدن الصناعية الكبرى.',
+    economicBenefit: 'يولد عوائد نفوذ دورية ويمنحك أفضلية تسعيرية في أسواق الدولة.',
+    steps: [
+      'اختر الإقليم ذا العائد المتناسب مع ميزانيتك التوسعية.',
+      'عزّز حضورك التجاري تدريجياً لرفع نسبة السيطرة السوقية.',
+      'اجمع عوائد النفوذ الإقليمي وأعد ضخها في الأقاليم الأعلى قيمة.',
+    ],
+    keyControls: ['خريطة الأقاليم والمحاور الاقتصادية', 'نسب الحصة السوقية', 'زر التوسع والاستحواذ الإقليمي'],
+    risksToWatch: 'تشتيت رأس المال على عدة أقاليم دفعة واحدة يبطئ الوصول إلى حصة الأغلبية.',
+    relatedSystems: 'يتكامل مع الشركات واللوجستيات ويمهد لمرحلة التحالفات والكارتيل.',
+    practicalTip: 'أحكم سيطرتك على محور صناعي واحد قبل فتح جبهة توسع جديدة.',
+    suggestedNextStep: 'استكمل بناء نفوذك للوصول إلى أصول الهيبة والتحالفات الكبرى.',
+  },
+  luxury: {
+    title: 'الهيبة والرفاهية: نفوذ المدير التنفيذي',
+    description: 'اقتناء المقرات الفاخرة واليخوت والطائرات الخاصة التي تعكس مكانة إمبراطوريتك المالية.',
+    functionSummary: 'يحول فوائض الثروة الكبرى إلى نقاط هيبة ترفع مكانتك في مجتمع الأعمال.',
+    economicBenefit: 'يعزز نقاط الهيبة والسمعة اللازمة لفتح دوائر النفوذ العليا والتصنيف النخبوي.',
+    steps: [
+      'تأكد أولاً من استقرار كافة خطوط إنتاجك وخلو سجلك من المتأخرات.',
+      'اقتنِ أصول الهيبة من فائض الأرباح الصافية وليس من رأس مال التشغيل.',
+      'تابع أثر نقاط الهيبة على تصنيفك ومزاياك التنفيذية.',
+    ],
+    keyControls: ['معرض أصول النخبة والهيبة', 'عداد نقاط الهيبة', 'زر الاقتناء الفوري'],
+    risksToWatch: 'شراء أصول الرفاهية مبكراً يجمد سيولة كان يمكن مضاعفتها في المصانع.',
+    relatedSystems: 'يرتبط بالملف الشخصي والسمعة والتوسع الدولي (البرستيج).',
+    practicalTip: 'لا تخصص أكثر من 15% من سيولتك الحرة لأصول الهيبة في المراحل المتوسطة.',
+    suggestedNextStep: 'استعد لدخول عالم التكتلات الكبرى في قسم الكارتيل عند المستوى 9.',
+  },
+  cartel: {
+    title: 'الكارتيل والتحالفات: غرفة التكتلات الكبرى',
+    description: 'تأسيس أو قيادة تحالفات تجارية استراتيجية لتنسيق الأسعار ومواجهة التكتلات المنافسة.',
+    functionSummary: 'يدير عمليات التحالف التجاري، حروب الحصص السوقية، والعمليات المشتركة عالية العائد.',
+    economicBenefit: 'يمنح مزايا تسعيرية جماعية وحماية أمام حروب الأسعار في الأسواق المتقدمة.',
+    steps: [
+      'اختر استراتيجية التحالف المتوافقة مع قطاعات شركاتك الرئيسية.',
+      'ساهم في عمليات التكتل لرفع قوة التحالف وعوائده.',
+      'راقب تحركات التكتلات المنافسة وحافظ على احتياطي سيولة قوي.',
+    ],
+    keyControls: ['لوحة عمليات التحالف', 'مؤشر القوة السوقية', 'قرارات التسعير والمواجهة'],
+    risksToWatch: 'حروب الأسعار غير المحسوبة قد تضغط هوامش الربح مؤقتاً إن لم تملك مخزوناً كافياً.',
+    relatedSystems: 'يتكامل مع السيطرة الإقليمية والعقود والشحن البحري.',
+    practicalTip: 'ادخل مفاوضات التحالف وأنت تملك مخزوناً قوياً من السلع الاستراتيجية.',
+    suggestedNextStep: 'افتح خطوط التصدير العابرة للبحار في قسم الشحن الملاحي عند المستوى 10.',
+  },
+  maritime: {
+    title: 'الشحن الملاحي والأسطول: بوابة التجارة الدولية',
+    description: 'بناء أسطول سفن الشحن وإرسال رحلات تصدير بحرية عبر كبرى الموانئ العالمية.',
+    functionSummary: 'يدير شراء سفن الحاويات والناقلات وتشغيل خطوط التصدير البحري عالية القيمة.',
+    economicBenefit: 'يفتح هوامش ربح تصديرية تتجاوز أسعار السوق المحلي بكثير.',
+    steps: [
+      'اشترِ سفينة شحن مناسبة لحجم إنتاجك الفائض.',
+      'جهّز شحنة التصدير واختر مسار الميناء الدولي الأعلى عائداً.',
+      'تابع وصول الرحلة البحرية وتحصيل عوائد التصدير بالعملة الصعبة.',
+    ],
+    keyControls: ['حوض شراء وتجهيز السفن', 'مسارات الموانئ الدولية', 'إرسال واستلام الشحنات البحرية'],
+    risksToWatch: 'تشغيل سفينة فارغة أو بنصف حمولتها يقلل العائد الصافي للرحلة.',
+    relatedSystems: 'يعتمد على فائض قسم الإنتاج والمخازن ويدعم الفصل الثالث من الحملة.',
+    practicalTip: 'نسّق دورات الإنتاج الكبيرة لتتزامن مع موعد إبحار أسطولك.',
+    suggestedNextStep: 'استخدم عوائد التصدير للتأهل إلى المناقصات السيادية الكبرى عند المستوى 12.',
+  },
+  megaprojects: {
+    title: 'المشاريع القومية والمناقصات: عقود السيادة',
+    description: 'المنافسة على مشاريع البنية التحتية العملاقة ومناقصات الدولة ذات العوائد المليونية.',
+    functionSummary: 'يتيح تمويل وتنفيذ المشاريع الاستراتيجية الكبرى على مراحل مقابل مكافآت وامتيازات ضخمة.',
+    economicBenefit: 'يحقق قفزات هائلة في الأرباح والسمعة السيادية والإعفاءات التحفيزية.',
+    steps: [
+      'افحص متطلبات المناقصة من السيولة والمواد الصناعية والسمعة.',
+      'خصّص الموارد المطلوبة لكل مرحلة تنفيذية دون الإخلال بمصانعك.',
+      'أكمل المشروع لاستلام العائد السيادي واللقب الشرفي.',
+    ],
+    keyControls: ['قائمة المناقصات القومية', 'تمويل مراحل التنفيذ', 'تحصيل العوائد السيادية'],
+    risksToWatch: 'المشاريع العملاقة تتطلب سيولة ضخمة؛ تأكد من قوة تدفقاتك النقدية قبل الالتزام.',
+    relatedSystems: 'يجمع ثمار الإنتاج الثقيل، البنك، والأسطول البحري.',
+    practicalTip: 'امتلاك مصنع مواد بناء وطاقة يدعم قدرتك على تمويل المشاريع الكبرى بسهولة.',
+    suggestedNextStep: 'توج مسيرتك الاقتصادية بفتح حاضنات الأعمال والـ VC عند المستوى 15.',
+  },
+  incubator: {
+    title: 'حاضنات الأعمال والـ VC: صناعة شركات اليونيكورن',
+    description: 'ضخ رأس المال الجريء في الشركات التكنولوجية الناشئة ومرافقتها حتى التخارج الملياري أو الطرح العام.',
+    functionSummary: 'يدير محفظة الاستثمار الجريء (Venture Capital) وجولات التمويل التأسيسي والتخارج.',
+    economicBenefit: 'يمنح أعلى مضاعفات العائد في اللعبة عند نجاح شركة ناشئة في التحول إلى يونيكورن.',
+    steps: [
+      'قيّم الشركات الناشئة المعروضة من حيث القطاع وفرص النمو والمخاطرة.',
+      'وزّع استثماراتك الجريئة على أكثر من شركة ناشئة لتوزيع المخاطر.',
+      'راقب جولات التقييم واحصد أرباح التخارج الكبرى عند النضج.',
+    ],
+    keyControls: ['عروض الشركات الناشئة', 'جولات التمويل والاستحواذ', 'حصاد عوائد الطرح والتخارج'],
+    risksToWatch: 'الاستثمار الجريء عالي المخاطرة بطبيعته؛ استثمر فقط من فائض ثروتك الإمبراطورية.',
+    relatedSystems: 'يمثل قمة التوسع المالي في الفصل الرابع جنباً إلى جنب مع البورصة.',
+    practicalTip: 'تنويع المحفظة بين 3 شركات ناشئة يضمن أن تغطي شركة رابحة واحدة تكلفة البقية بأضعاف.',
+    suggestedNextStep: 'واصل تنمية صافي ثروتك لتصدر قائمة أباطرة الاقتصاد واستكشاف التوسع الدولي.',
+  },
+};
 
 export function getSystemGuide(section: SectionId): SystemGuide {
-  const guides: Partial<Record<SectionId, SystemGuide>> = {
-    lands: { title: 'الأراضي: أول حجر في الإمبراطورية', description: 'كل شركة تحتاج موقعًا مناسبًا. طابق نوع الأرض مع القطاع قبل الشراء.', steps: ['قارن نوع الأرض بالقطاع المطلوب.', 'راقب السعر والمساحة قبل تأكيد الشراء.', 'اترك جزءًا من السيولة للتراخيص والتشغيل.'] },
-    companies: { title: 'الشركات: حوّل الإرث إلى نشاط', description: 'أسس شركة واحدة أولًا، ثم تعلّم الإنتاج قبل التوسع.', steps: ['اختر اسمًا واضحًا للشركة.', 'اختر قطاعًا يناسب الأرض والمواد المتاحة.', 'لا تستهلك كل رأس المال في التأسيس.'] },
-    production: { title: 'الإنتاج: هنا يبدأ الدخل الحقيقي', description: 'حوّل المواد إلى منتجات، ثم تابع الجودة والطاقة ووقت الإنجاز.', steps: ['اشترِ المواد المطلوبة.', 'راجع الطلب والسعر قبل تشغيل الدفعة.', 'انتظر اكتمال الإنتاج ثم بع أو سلّم عقدًا.'] },
-    inventory: { title: 'المخازن: سيولتك المجمّدة', description: 'المخزون أصل مفيد لكنه يستهلك رأس المال ومساحة التخزين.', steps: ['راقب الكميات بدل الشراء العشوائي.', 'استخدم المخزون للعقود ذات الهامش الأفضل.', 'بع الفائض عندما تكون الأسعار مناسبة.'] },
-    contracts: { title: 'العقود: ابنِ سمعة العائلة', description: 'كل طلب فرصة للربح والثقة، لكنه يحمل موعدًا نهائيًا وغرامة عند الفشل.', steps: ['اقبل عقدًا تستطيع إنتاجه.', 'افحص الكمية والموعد قبل القبول.', 'سلّم المنتج يدويًا من صفحة العقود.'] },
-    auctions: { title: 'المزادات: توسع محسوب', description: 'المزاد قد يمنحك أصلًا مهمًا، لكنه قد يستهلك سيولتك بسرعة.', steps: ['حدد سقفًا قبل دخول المزاد.', 'لا تزايد بدافع المنافسة فقط.', 'احتفظ بسيولة للتشغيل بعد الفوز.'] },
-    bank: { title: 'البنك والتمويل: استخدم الدين بحذر', description: 'التمويل يساعد على التوسع، لكنه يضيف التزامات يومية.', steps: ['قارن القسط بالسيولة اليومية.', 'استخدم أصلًا مؤهلًا كضمان.', 'اترك هامش أمان قبل طلب القرض.'] },
-    investments: { title: 'الاستثمارات: نوّع المخاطر', description: 'ضع الفائض الذي لا تحتاجه للتشغيل في استثمار بمدة واضحة.', steps: ['لا تستثمر رأس مال التشغيل.', 'قارن المدة بالعائد والمخاطرة.', 'خطط مسبقًا ليوم الاستحقاق.'] },
-    obligations: { title: 'الالتزامات: لا تتركها للمفاجآت', description: 'هنا ترى ما سيُخصم من سيولتك ومتى.', steps: ['راجع الأقساط والرواتب يوميًا.', 'سدّد المتأخرات قبل أن توقف الطاقة.', 'احتفظ باحتياطي نقدي.'] },
-    staff: { title: 'الإدارة والرواتب: كفاءتك البشرية', description: 'الموظفون يضيفون قدرات، لكن رواتبهم التزام متكرر.', steps: ['وظّف الدور الذي تحتاجه فعلًا.', 'طابق الموظف مع الشركة المناسبة.', 'تابع الرواتب قبل ترحيل اليوم.'] },
-    reports: { title: 'التقارير: قرارات على أرقام', description: 'اقرأ دفتر الحساب لتعرف هل تكبر أم تستهلك رأس المال.', steps: ['راجع الإيرادات والمصروفات.', 'قارن الربح بين القطاعات.', 'استخدم التقرير قبل أي توسع كبير.'] },
-    tasks: { title: 'المهام والإنجازات: مكافآت التقدم', description: 'المهام تحول الخطوات الأولى إلى أهداف واضحة ومكافآت.', steps: ['افتح المهمة لمعرفة الشرط.', 'نفذها أثناء لعبك الطبيعي.', 'استلم المكافأة بعد تحقق الشرط.'] },
-    tech_tree: { title: 'الأبحاث والأتمتة: ثورة الإنتاج الذكي', description: 'طوّر تقنيات الذكاء الاصطناعي والأتمتة لخفض تكاليف المصانع وزيادة الإنتاجية.', steps: ['استثمر نقاط الأبحاث في الفروع الأساسية.', 'ركز على أتمتة خطوط الإنتاج أولاً.', 'افتح تقنيات الطاقة المستدامة.'] },
-    territory: { title: 'السيطرة الإقليمية: التوسع الجغرافي', description: 'افتح فروعاً وامتلك حصصاً سوقية في المدن والمحافظات الرئيسية.', steps: ['اختر المحافظة المناسبة لرأس مالك.', 'ضخ استثمارات لرفع حصتك السوقية.', 'حقق السيطرة الإقليمية لجني عوائد يومية.'] },
-    luxury: { title: 'الهيبة والرفاهية: أصول المدير التنفيذي', description: 'امتلك القصور والسيارات الفاخرة والطائرات لرفع نقاط الهيبة ونفوذك التجاري.', steps: ['اشترِ أصول الهيبة تدريجياً.', 'كل أصل يرفع نقاط الهيبة وسقف التسهيلات.', 'تباهَ بإمبراطوريتك أمام المنافسين.'] },
-    cartel: { title: 'الكارتيل والتحالفات: قوة التكتلات', description: 'أنشئ تحالفات تجارية مع كبار رجال الأعمال للسيطرة على الأسعار وسحق المنافسين.', steps: ['انضم إلى كارتيل أو أسس تحالفك الخاص.', 'شارك في حروب الأسعار لانتزاع العقود.', 'استفد من الحماية المتبادلة والخصومات.'] },
-    maritime: { title: 'الشحن الملاحي: أسطول البحار والموانئ', description: 'امتلك سفن الشحن العملاقة وافتح خطوط التصدير عبر كبرى الموانئ الدولية.', steps: ['اشترِ أول سفينة شحن بضائع.', 'عيّن أطقماً ملاحية ذات خبرة.', 'صدّر منتجاتك للأسواق العالمية بأعلى عائد.'] },
-    megaprojects: { title: 'المشاريع القومية: مناقصات السيادة', description: 'شارك في مناقصات الدولة للمشاريع الكبرى ونل إعفاءات ضريبية ونفوذاً هائلاً.', steps: ['راجع شروط المناقصات الحكومية المتاحة.', 'قدّم عطاءك المالي المدعوم بضمان بنكي.', 'أنجز المشروع لرفع تصنيفك السيادي.'] },
-    incubator: { title: 'حاضنات الأعمال: استثمار الـ VC واليونيكورن', description: 'استثمر في الشركات الناشئة الواعدة وحوّلها إلى مليارات عند الطرح العام.', steps: ['افحص طلبات التمويل من رواد الأعمال.', 'ضخ رأس المال الجريء في شركات التكنولوجيا.', 'احصد عوائد مضاعفة عند استحواذ الكيانات الكبرى.'] },
-  };
-  return guides[section] ?? { title: 'نظام جديد في الإمبراطورية', description: 'استخدم هذا القسم بحذر وتابع أثر قراراتك على السيولة.', steps: ['اقرأ الأرقام قبل التأكيد.', 'ابدأ بعملية صغيرة.', 'ارجع إلى التقارير لقياس النتيجة.'] };
+  return SYSTEM_GUIDES[section] ?? SYSTEM_GUIDES.home;
 }
 
 export function chapterFor(profile: PlayerProfile): number {
-  if (profile.campaignChapterId && profile.campaignChapterId >= 1) {
-    return Math.min(10, Math.max(1, profile.campaignChapterId));
-  }
-  if (!profile.onboarding?.introCompleted) return 1;
-  const progress = getPlayerProgress(profile);
-  const completedContracts = profile.contracts.filter((contract) => contract.status === 'completed').length;
-  const completedProduction = profile.productionOrders.some((order) => order.status === 'completed');
-  if (progress.level >= 12 || profile.finances.netProfit >= 10_000_000) return 10;
-  if (progress.level >= 10 || profile.finances.netProfit >= 5_000_000) return 9;
-  if (progress.level >= 8 || profile.finances.netProfit >= 2_000_000) return 8;
-  if (progress.level >= 6 || profile.finances.netProfit >= 1_000_000) return 7;
-  if (progress.level >= 5 || profile.auctionHistory.length >= 1) return 6;
-  if (progress.level >= 4 || profile.companies.length >= 2) return 5;
-  if (completedContracts >= 1) return 4;
-  if (completedProduction && profile.sales.length > 0) return 3;
-  if (completedProduction) return 2;
-  return 1;
+  return calculatePlayerProgress(profile).currentChapter;
 }

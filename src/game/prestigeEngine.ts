@@ -172,7 +172,7 @@ export function checkPrestigeEligibility(profile: PlayerProfile): {
   reason?: string;
 } {
   const currentAssets = calculateTotalAssets(profile);
-  const requiredAssets = 25000000; // 25 Million EGP minimum
+  const requiredAssets = 500_000; // $500,000 USD minimum in normalized economy
   const requiredLevel = 8; // Level 8+
 
   if (profile.level < requiredLevel) {
@@ -191,12 +191,12 @@ export function checkPrestigeEligibility(profile: PlayerProfile): {
       requiredAssets,
       currentAssets,
       earnedTokens: 0,
-      reason: `يتطلب صافي ثروة يتجاوز 25,000,000 ج.م (ثروتك الحالية ${currentAssets.toLocaleString('ar-EG')} ج.م)`,
+      reason: `يتطلب صافي ثروة يتجاوز 500,000 $ (ثروتك الحالية ${currentAssets.toLocaleString('ar-EG')} $)`,
     };
   }
 
-  // Calculate earned tokens: 2 tokens base + 1 token for each 20M above 25M
-  const extraTokens = Math.floor((currentAssets - requiredAssets) / 20000000);
+  // Calculate earned tokens: 2 tokens base + 1 token for each $250k above $500k
+  const extraTokens = Math.floor((currentAssets - requiredAssets) / 250_000);
   const earnedTokens = Math.min(10, 2 + extraTokens);
 
   return {
@@ -209,6 +209,7 @@ export function checkPrestigeEligibility(profile: PlayerProfile): {
 
 /**
  * Executes the Prestige Expansion to a new global capital.
+ * Independent system: keeps profile.countryId and scenario intact.
  */
 export function executePrestigeExpansion(
   profile: PlayerProfile,
@@ -239,12 +240,12 @@ export function executePrestigeExpansion(
 
   savePrestigeData(profile.id, updatedPrestige);
 
-  // Reset domestic businesses & loans for New Game+, but give generous starter cash & retain inventory/prestige
-  const starterCash = 5000000 + nextPrestigeLevel * 2000000;
+  const starterCash = 100_000 + nextPrestigeLevel * 50_000;
 
   const updatedProfile: PlayerProfile = {
     ...profile,
-    level: Math.max(5, profile.level - 3), // Soft reset level for progression loop
+    countryId: profile.countryId,
+    level: Math.max(5, profile.level - 3),
     bankBalance: starterCash,
     banking: {
       deposits: [],
@@ -252,14 +253,14 @@ export function executePrestigeExpansion(
     },
     companies: [],
     lands: [],
-    day: 1, // Reset game day
+    day: 1,
     reputation: Math.min(100, profile.reputation + 15),
   };
 
   return {
     updatedProfile,
     updatedPrestige,
-    message: `🎉 تهانينا! تم تأسيس صندوق استثماري عابر للقارات بنجاح في ${capital.name}! حصلت على ${eligibility.earnedTokens} نقطة هيبة سيادية و${starterCash.toLocaleString('ar-EG')} رصيد انطلاق.`,
+    message: `🎉 تهانينا! تم تأسيس صندوق استثماري عابر للقارات بنجاح في ${capital.name}! حصلت على ${eligibility.earnedTokens} نقطة هيبة سيادية و${starterCash.toLocaleString('ar-EG')} $ رصيد انطلاق.`,
   };
 }
 

@@ -16,8 +16,12 @@ import type {
   BusinessContract,
   AchievementRecord,
   OnboardingProgress,
+  GlobalShipmentRecord,
+  ForwardSupplyContract,
+  PlayerAuctionListing,
 } from './futureSystems';
 import type { SpeedCardStack } from './accountFeatures';
+import { FREE_AVATAR_IDS, DEFAULT_AVATAR_ID } from './avatars';
 
 export interface PlayerAsset {
   id: string;
@@ -116,10 +120,13 @@ export interface PlayerProfile {
   bio?: string;
   renameCountThisWeek?: number;
   lastRenameWeekTimestamp?: number;
-  campaignChapterId?: number;
-  completedMissionIds?: string[];
-  claimedRewardIds?: string[];
-  dismissedStoryEventIds?: string[];
+  lastOfflineClaimAt?: number;
+  globalShipments?: GlobalShipmentRecord[];
+  forwardContracts?: ForwardSupplyContract[];
+  supplierTrust?: Record<string, number>;
+  playerAuctions?: PlayerAuctionListing[];
+  soldAssetIds?: string[];
+  processedAuctionSaleIds?: string[];
 }
 
 function createId(): string {
@@ -130,6 +137,7 @@ export function createNewPlayer(
   country: CountryDefinition,
   playerName: string,
   now: Date = new Date(),
+  avatarId?: string,
 ): PlayerProfile {
   const createdAt = now.toISOString();
 
@@ -141,7 +149,6 @@ export function createNewPlayer(
 
   const countryLandNames: Record<string, string> = {
     egypt: 'أرض مجمع العاشر من رمضان الصناعي (ميراث مهدد)',
-    jordan: 'أرض مدينة الملك عبدالله الثاني الصناعية · سحاب (ميراث مهدد)',
     saudi: 'أرض المدينة الصناعية الثانية بالرياض (ميراث مهدد)',
     uae: 'أرض منطقة جبل علي الحرة JAFZA بدبي (ميراث مهدد)',
     usa: 'أرض مجمع كوينز الصناعي واللوجستي · نيويورك (ميراث مهدد)',
@@ -154,7 +161,6 @@ export function createNewPlayer(
 
   const countryCompanyNames: Record<string, string> = {
     egypt: 'مصنع الأغذية النموذجي · العاشر من رمضان',
-    jordan: 'مصنع البتراء للأغذية والسلع الاستهلاكية · سحاب',
     saudi: 'مصنع نجد للأغذية والتموين · الرياض',
     uae: 'مصنع دبي للأغذية والضيافة · جبل علي',
     usa: 'مصنع مانهاتن للسلع الغذائية · نيويورك',
@@ -167,7 +173,6 @@ export function createNewPlayer(
 
   const countryBankNames: Record<string, string> = {
     egypt: 'بنك مصر',
-    jordan: 'البنك العربي · الأردن',
     saudi: 'مصرف الراجحي',
     uae: 'بنك الإمارات دبي الوطني',
     usa: 'جي بي مورغان تشيس',
@@ -279,7 +284,7 @@ export function createNewPlayer(
       {
         id: createId(),
         category: 'liability',
-        amount: -initialLoanRepay,
+        amount: initialLoanRepay,
         countryId: country.id,
         occurredAt: createdAt,
         note: `قيد مديونية موروثة: مهلة سماح قضائية 7 أيام لقرض ${bankName} (${initialLoanRepay}$)`,
@@ -294,17 +299,25 @@ export function createNewPlayer(
     reputation: 35,
     contracts: [],
     achievements: [],
-    onboarding: { introCompleted: false, chapter: 1, seenGuides: [] },
+    onboarding: {
+      introCompleted: false,
+      chapter: 1,
+      seenGuides: [],
+      countryIntroSeen: false,
+      walkthroughCompleted: false,
+      walkthroughSkipped: false,
+      walkthroughStepId: 'service_equipment',
+      seenQuestBriefings: [],
+      claimedStoryQuestIds: [],
+      claimedCampaignChapters: [],
+      campaignChapterId: 1,
+    },
     season: { seasonId: 'expansion-season-1', startedOnDay: 1, endsOnDay: 30, points: 0, claimedChallengeKeys: [] },
-    avatarId: 'avatar_free_male_1',
-    unlockedAvatarIds: ['avatar_free_male_1', 'avatar_free_male_2', 'avatar_free_female_1', 'avatar_free_female_2'],
+    avatarId: avatarId && FREE_AVATAR_IDS.includes(avatarId) ? avatarId : DEFAULT_AVATAR_ID,
+    unlockedAvatarIds: [...FREE_AVATAR_IDS],
     bio: 'ابنِ إمبراطوريتك الاستثمارية بعزيمة لا تلين ورؤية لا تعرف المستحيل.',
     renameCountThisWeek: 0,
-    lastRenameWeekTimestamp: Date.now(),
-    campaignChapterId: 1,
-    completedMissionIds: [],
-    claimedRewardIds: [],
-    dismissedStoryEventIds: [],
+    lastRenameWeekTimestamp: now.getTime(),
   };
 }
 

@@ -1,4 +1,5 @@
-import type { IndustryId } from '../domain/countries';
+import type { CountryId, IndustryId } from '../domain/countries';
+import { getCountryEconomicEvent } from './countryScenarios';
 
 export interface EconomicEventTemplate {
   title: string;
@@ -23,7 +24,10 @@ export const ECONOMIC_EVENT_TEMPLATES: readonly EconomicEventTemplate[] = [
   { title: 'موسم تجاري قوي', description: 'موسم بيع قوي يرفع الطلب على عبوات الأغذية بنسبة ٢٥٪ لمدة ٥ أيام.', cashImpact: 42_000, industryId: 'food', productId: 'food-pack', demandMultiplier: 1.25, durationDays: 5 },
 ];
 
-export function getEconomicEventTemplate(day: number): EconomicEventTemplate {
+export function getEconomicEventTemplate(day: number, countryId?: CountryId): EconomicEventTemplate {
+  if (countryId) {
+    return getCountryEconomicEvent(day, countryId);
+  }
   const index = Math.max(0, Math.floor(day) - 1) % ECONOMIC_EVENT_TEMPLATES.length;
   return ECONOMIC_EVENT_TEMPLATES[index];
 }

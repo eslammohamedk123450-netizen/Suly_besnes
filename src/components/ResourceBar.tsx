@@ -3,7 +3,7 @@ import type { CountryDefinition } from '../domain/countries';
 import type { PlayerProfile } from '../domain/player';
 import type { SectionId } from '../domain/navigation';
 import { formatGold, formatMoney, formatNumber } from '../domain/formatters';
-import { getPlayerProgress } from '../game/onboarding';
+import { getPlayerProgress, isSectionUnlocked } from '../game/onboarding';
 import { AvatarPortrait } from './AvatarPortrait';
 import { GameDayTimer } from './GameDayTimer';
 import { NotificationBell } from './NotificationBell';
@@ -41,6 +41,7 @@ export function ResourceBar({
   forceBellVibrate = false,
 }: ResourceBarProps) {
   const progress = getPlayerProgress(profile);
+  const cashTargetSection: SectionId = isSectionUnlocked(profile, 'bank') ? 'bank' : 'obligations';
 
   return (
     <header
@@ -95,11 +96,11 @@ export function ResourceBar({
             <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
               {/* Cash Balance (السيولة النقدية) */}
               <div
-                onClick={() => onNavigate('bank')}
+                onClick={() => onNavigate(cashTargetSection)}
                 role="button"
                 tabIndex={0}
                 className="flex items-center gap-1.5 sm:gap-2 px-2.5 py-1.5 rounded-xl bg-slate-900/90 border border-emerald-500/35 hover:border-emerald-400 hover:bg-slate-800/90 transition shadow-sm cursor-pointer group shrink-0"
-                title="السيولة البنكية المتاحة - انقر لإدارة البنك"
+                title="السيولة البنكية المتاحة - انقر لإدارة السيولة والالتزامات"
               >
                 <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-xs sm:text-sm group-hover:scale-110 transition-transform">
                   💵
@@ -116,10 +117,10 @@ export function ResourceBar({
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation();
-                    onNavigate('bank');
+                    onNavigate(cashTargetSection);
                   }}
                   className="w-4 h-4 rounded-md bg-emerald-600/80 hover:bg-emerald-500 text-white flex items-center justify-center text-[10px] font-black transition active:scale-95"
-                  title="إدارة البنك والسيولة"
+                  title="إدارة السيولة والالتزامات"
                 >
                   +
                 </button>

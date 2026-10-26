@@ -1,6 +1,6 @@
 import { findCountry, type IndustryId } from '../domain/countries';
 import type { PlayerAsset, PlayerCompany, PlayerLand, PlayerProfile } from '../domain/player';
-import type { AuctionBidRecord, BusinessContract, DepositRecord, DepositTranche, FinanceLedgerEntry, GameEventRecord, InventoryLot, InvestmentRecord, LoanRecord, ProductSale, ProductionOrder, StaffContract, StaffRole, AchievementRecord } from '../domain/futureSystems';
+import type { AuctionBidRecord, BusinessContract, DepositRecord, DepositTranche, FinanceLedgerEntry, ForwardSupplyContract, GameEventRecord, GlobalPaymentTerm, GlobalShipmentRecord, GlobalShippingMode, InventoryLot, InvestmentRecord, LoanRecord, ProductSale, ProductionOrder, StaffContract, StaffRole, AchievementRecord } from '../domain/futureSystems';
 import {
   DIRECT_COMPANY_CATALOG,
   DIRECT_LAND_CATALOG,
@@ -21,7 +21,12 @@ import { getInvestmentPayoutRate, getOperatingCostProgression } from './economyB
 import { GAME_DAY_MS } from './time';
 import { getContractOffers } from './contracts';
 import { getSynergyOperatingMultiplier, getSynergyProductionMultiplier } from './synergy';
-import { resolveGlobalMarketOffer } from './globalMarket';
+import {
+  calculateImportQuote,
+  getForwardContractTemplates,
+  getGlobalExportBids,
+  resolveGlobalMarketOffer,
+} from './globalMarket';
 import { getEconomicEventTemplate, type EconomicEventTemplate } from './economicEvents';
 import { SPEED_CARD_DIAMOND_COSTS, SPEED_CARD_LABELS, type SpeedCardKind } from '../domain/accountFeatures';
 import { getWarehouseCapacity, getWarehouseItemCapacity, getWarehouseMaterialQuantity, getWarehouseUsage, normalizeWarehouseLevel, removeWarehouseMaterials, WAREHOUSE_UPGRADE_REQUIREMENTS } from './warehouse';
@@ -420,38 +425,469 @@ export function buyMaterial(profile: PlayerProfile, _materialId: string, _quanti
   return failure(profile, 'condition-not-met', 'الشراء المباشر للمواد الخام غير متاح. استخدم عروض السوق أو المزاد.');
 }
 
-export function buyGlobalMaterial(profile: PlayerProfile, offerId: string, quantity: number, negotiatedUnitPrice?: number, paymentMethod: PurchasePaymentMethod = 'cash'): GameResult<{ materialId: string; quantity: number; totalCost: number; unitPrice: number; diamondsSpent: number }> {
+export interface GlobalTradePurchaseOptions {
+  shippingMode?: GlobalShippingMode;
+  paymentTerm?: GlobalPaymentTerm;
+  fleetCount?: number;
+}
+
+export function buyGlobalMaterial(
+  profile: PlayerProfile,
+  offerId: string,
+  quantity: number,
+  negotiatedUnitPrice?: number,
+  paymentMethod: PurchasePaymentMethod = 'cash',
+  tradeOptions?: GlobalTradePurchaseOptions,
+): GameResult<{ materialId: string; quantity: number; totalCost: number; unitPrice: number; diamondsSpent: number; inTransit?: boolean; arrivesOnDay?: number }> {
   const countryError = ensureEgypt(profile);
   if (countryError) return countryError;
   if (!isPositiveInteger(quantity)) return failure(profile, 'invalid-input', 'الكمية يجب أن تكون عددًا صحيحًا موجبًا.');
   const offer = resolveGlobalMarketOffer(profile, offerId);
   const material = offer ? findMaterial(offer.materialId) : undefined;
   if (!offer || !material) return failure(profile, 'not-found', 'عرض السوق العالمي لم يعد متاحًا.');
+  const minAllowedFloor = Math.max(1, Math.round(offer.floorPrice * 0.88));
   const unitPrice = negotiatedUnitPrice ?? offer.unitPrice;
-  if (!Number.isInteger(unitPrice) || unitPrice < offer.floorPrice || unitPrice > offer.unitPrice || (!offer.negotiable && unitPrice !== offer.unitPrice)) {
+  if (!Number.isInteger(unitPrice) || unitPrice < minAllowedFloor || unitPrice > offer.unitPrice || (!offer.negotiable && unitPrice !== offer.unitPrice)) {
     return failure(profile, 'invalid-input', 'السعر لا يطابق شروط العرض أو التفاوض.');
   }
-  const totalCost = quantity * unitPrice;
-  const payment = resolvePurchaseDebit(profile, totalCost, paymentMethod);
-  if ('message' in payment) return failure(profile, 'insufficient-funds', payment.message);
+
+  const shippingMode: GlobalShippingMode = tradeOptions?.shippingMode ?? 'spot-ddp';
+  const quote = calculateImportQuote(profile, offer, quantity, {
+    negotiatedUnitPrice: unitPrice,
+    shippingMode,
+    paymentTerm: tradeOptions?.paymentTerm ?? 'cash-spot',
+    fleetCount: tradeOptions?.fleetCount,
+  });
+
   const existing = profile.inventory.find((lot) => lot.materialOrProductId === material.id);
   const level = normalizeWarehouseLevel(profile.warehouseLevel);
   const itemLimit = getWarehouseItemCapacity(material.id, level) ?? material.storageLimit;
   const warehouseUsage = getWarehouseUsage(profile.inventory, profile.productionOrders);
   const warehouseCapacity = getWarehouseCapacity(level);
-  if ((existing?.quantity ?? 0) + quantity > itemLimit || warehouseUsage.materials + quantity > warehouseCapacity.materials) return failure(profile, 'storage-limit', `لا تتسع سعة المخزن للكمية المطلوبة. المتاح ${Math.max(0, Math.min(itemLimit - (existing?.quantity ?? 0), warehouseCapacity.materials - warehouseUsage.materials))} ${material.unit}.`);
+  const inTransitMatQty = (profile.globalShipments ?? [])
+    .filter((s) => s.status === 'in-transit' && s.direction === 'import')
+    .reduce((sum, s) => sum + s.quantity, 0);
+  const inTransitSameItem = (profile.globalShipments ?? [])
+    .filter((s) => s.status === 'in-transit' && s.direction === 'import' && s.itemId === material.id)
+    .reduce((sum, s) => sum + s.quantity, 0);
+
+  if (
+    (existing?.quantity ?? 0) + inTransitSameItem + quantity > itemLimit ||
+    warehouseUsage.materials + inTransitMatQty + quantity > warehouseCapacity.materials
+  ) {
+    const availItem = itemLimit - (existing?.quantity ?? 0) - inTransitSameItem;
+    const availTotal = warehouseCapacity.materials - warehouseUsage.materials - inTransitMatQty;
+    return failure(
+      profile,
+      'storage-limit',
+      `لا تتسع سعة المخزن للكمية المطلوبة. المتاح ${Math.max(0, Math.min(availItem, availTotal))} ${material.unit}.`,
+    );
+  }
+
+  const chargeAmount = paymentMethod === 'diamonds' ? quote.totalLandedCost : quote.upfrontCashDue;
+  const payment = resolvePurchaseDebit(profile, chargeAmount, paymentMethod);
+  if ('message' in payment) return failure(profile, 'insufficient-funds', payment.message);
+
+  const prevTrust = profile.supplierTrust?.[offer.supplierId] ?? 0;
+  const nextSupplierTrust = {
+    ...(profile.supplierTrust ?? {}),
+    [offer.supplierId]: Math.min(100, prevTrust + (quantity >= 25 ? 16 : 10)),
+  };
+
+  if (shippingMode === 'sea-cif') {
+    const shipmentId = nextId(profile, 'shipment', (profile.globalShipments ?? []).length);
+    const shipment: GlobalShipmentRecord = {
+      id: shipmentId,
+      direction: 'import',
+      itemId: material.id,
+      itemName: material.name,
+      quantity,
+      unit: material.unit,
+      unitCostOrPrice: quote.effectiveUnitCost,
+      freightCost: quote.freightCost,
+      customsDuty: quote.customsDuty + quote.insuranceCost,
+      shippingMode: 'sea-cif',
+      originOrDestination: `${offer.originFlag} ${offer.originPort} · ${offer.originCountry}`,
+      partnerName: offer.sellerName,
+      qualityScore: offer.qualityScore,
+      orderedOnDay: profile.day,
+      arrivesOnDay: quote.arrivesOnDay,
+      deferredBalanceDue: paymentMethod === 'diamonds' ? 0 : quote.deferredBalanceDue,
+      status: 'in-transit',
+    };
+    const entries: FinanceLedgerEntry[] = [
+      ledgerEntry(
+        profile,
+        'asset',
+        chargeAmount,
+        `استيراد بحري CIF (${quantity} ${material.unit} ${material.name}) من ${offer.originPort}`,
+        0,
+      ),
+    ];
+    const nextProfile = addLedger(
+      {
+        ...profile,
+        globalShipments: [...(profile.globalShipments ?? []), shipment],
+        supplierTrust: nextSupplierTrust,
+      },
+      entries,
+      payment.bankBalance,
+      { diamonds: payment.diamonds },
+    );
+    const lcNote =
+      shipment.deferredBalanceDue > 0
+        ? ` بنظام الاعتماد المستندي (سُدد 30% والباقي ${shipment.deferredBalanceDue.toLocaleString('ar-EG')} $ عند الوصول)`
+        : '';
+    return success(
+      syncTasks(nextProfile),
+      `أبحرت شحنة ${quantity} ${material.unit} من ${material.name} (${offer.originPort})${lcNote}؛ تصل للميناء في اليوم ${shipment.arrivesOnDay}.`,
+      {
+        materialId: material.id,
+        quantity,
+        totalCost: quote.totalLandedCost,
+        unitPrice: quote.effectiveUnitCost,
+        diamondsSpent: payment.diamondsSpent,
+        inTransit: true,
+        arrivesOnDay: shipment.arrivesOnDay,
+      },
+    );
+  }
+
+  const landedTotal = quote.totalLandedCost;
+  const landedUnitCost = landedTotal / quantity;
   const inventory = existing
-    ? profile.inventory.map((lot) => lot.materialOrProductId === material.id
-      ? { ...lot, quantity: lot.quantity + quantity, unitCost: (lot.quantity * lot.unitCost + totalCost) / (lot.quantity + quantity) }
-      : lot)
-    : [...profile.inventory, { id: nextId(profile, 'inventory', profile.inventory.length), materialOrProductId: material.id, quantity, unit: material.unit, unitCost: unitPrice }];
+    ? profile.inventory.map((lot) =>
+        lot.materialOrProductId === material.id
+          ? {
+              ...lot,
+              quantity: lot.quantity + quantity,
+              unitCost: (lot.quantity * lot.unitCost + landedTotal) / (lot.quantity + quantity),
+              qualityScore: Math.round(
+                (((lot.qualityScore ?? 88) * lot.quantity + offer.qualityScore * quantity) /
+                  (lot.quantity + quantity)) *
+                  10,
+              ) / 10,
+            }
+          : lot,
+      )
+    : [
+        ...profile.inventory,
+        {
+          id: nextId(profile, 'inventory', profile.inventory.length),
+          materialOrProductId: material.id,
+          quantity,
+          unit: material.unit,
+          unitCost: landedUnitCost,
+          qualityScore: offer.qualityScore,
+        },
+      ];
+
+  const entries: FinanceLedgerEntry[] = [
+    ledgerEntry(
+      profile,
+      'asset',
+      landedTotal,
+      shippingMode === 'air-express'
+        ? `استيراد جوي سريع (${quantity} ${material.unit} ${material.name}) من ${offer.originPort}`
+        : `شراء عالمي ${quantity} ${material.unit} من ${offer.sellerName}`,
+      0,
+    ),
+  ];
+
   const nextProfile = addLedger(
-    { ...profile, inventory },
-    [ledgerEntry(profile, 'asset', totalCost, `شراء عالمي ${quantity} ${material.unit} من ${offer.sellerName}`, 0)],
+    { ...profile, inventory, supplierTrust: nextSupplierTrust },
+    entries,
     payment.bankBalance,
     { diamonds: payment.diamonds },
   );
-  return success(syncTasks(nextProfile), `تم قبول عرض ${offer.sellerName} وشراء ${quantity} ${material.name} وإضافتها إلى المخزن ${paymentMethod === 'diamonds' ? `مقابل ${payment.diamondsSpent} ماسة` : 'نقدًا'}.`, { materialId: material.id, quantity, totalCost, unitPrice, diamondsSpent: payment.diamondsSpent });
+  return success(
+    syncTasks(nextProfile),
+    `تم قبول عرض ${offer.sellerName} واستلام ${quantity} ${material.name} (درجة ${offer.grade}) في المخزن ${paymentMethod === 'diamonds' ? `مقابل ${payment.diamondsSpent} ماسة` : 'نقدًا'}.`,
+    {
+      materialId: material.id,
+      quantity,
+      totalCost: landedTotal,
+      unitPrice: landedUnitCost,
+      diamondsSpent: payment.diamondsSpent,
+      inTransit: false,
+      arrivesOnDay: profile.day,
+    },
+  );
+}
+
+export function exportGlobalProduct(
+  profile: PlayerProfile,
+  bidId: string,
+  quantity: number,
+): GameResult<{ productId: string; quantity: number; netProceeds: number; reputationEarned: number }> {
+  const countryError = ensureEgypt(profile);
+  if (countryError) return countryError;
+  if (!isPositiveInteger(quantity)) {
+    return failure(profile, 'invalid-input', 'كمية التصدير يجب أن تكون عددًا صحيحًا موجبًا.');
+  }
+  const bid = getGlobalExportBids(profile).find((item) => item.id === bidId);
+  if (!bid) {
+    return failure(profile, 'not-found', 'انتهت صلاحية طلب التصدير الدولي؛ راجع دفتر الطلبات المحدث.');
+  }
+  if (quantity < bid.minQuantity || quantity > bid.maxQuantity) {
+    return failure(
+      profile,
+      'market-limit',
+      `حجم الحاوية المطلوب لدى ${bid.buyerName} يتراوح بين ${bid.minQuantity} و${bid.maxQuantity} ${bid.unit}.`,
+    );
+  }
+  const lot = profile.inventory.find((item) => item.materialOrProductId === bid.productId);
+  if (!lot || lot.quantity < quantity) {
+    return failure(profile, 'insufficient-materials', `لا تملك ${quantity} ${bid.unit} من ${bid.productName} في المخزن للتصدير.`);
+  }
+  const actualQuality = lot.qualityScore ?? 88;
+  if (actualQuality < bid.minimumQuality) {
+    return failure(
+      profile,
+      'condition-not-met',
+      `جودة الشحنة الحالية (${Math.round(actualQuality)}%) أقل من معيار الاستيراد الدولي لدى ${bid.destinationPort} (${bid.minimumQuality}%). استخدم خامات Grade A+ أو عيّن مديراً لرفع الجودة.`,
+    );
+  }
+
+  const grossRevenue = quantity * bid.unitPrice;
+  const clearanceFee = Math.round(grossRevenue * bid.exportClearanceRate);
+  const costOfGoods = Math.round(lot.unitCost * quantity);
+  const netProceeds = grossRevenue - clearanceFee;
+
+  const nextInventory = profile.inventory.flatMap((item) =>
+    item.id !== lot.id
+      ? [item]
+      : item.quantity === quantity
+        ? []
+        : [{ ...item, quantity: item.quantity - quantity }],
+  );
+
+  const sale: ProductSale = {
+    id: nextId(profile, 'sale', profile.sales.length),
+    productId: bid.productId,
+    quantity,
+    unitPrice: bid.unitPrice,
+    grossRevenue,
+    tax: clearanceFee,
+    costOfGoods,
+    soldOnDay: profile.day,
+    soldAt: timestampFor(profile),
+  };
+
+  const exportShipment: GlobalShipmentRecord = {
+    id: nextId(profile, 'shipment', (profile.globalShipments ?? []).length),
+    direction: 'export',
+    itemId: bid.productId,
+    itemName: bid.productName,
+    quantity,
+    unit: bid.unit,
+    unitCostOrPrice: bid.unitPrice,
+    freightCost: 0,
+    customsDuty: clearanceFee,
+    shippingMode: 'spot-ddp',
+    originOrDestination: `${bid.destinationFlag} ${bid.destinationPort}`,
+    partnerName: bid.buyerName,
+    qualityScore: actualQuality,
+    orderedOnDay: profile.day,
+    arrivesOnDay: profile.day,
+    deferredBalanceDue: 0,
+    status: 'delivered',
+  };
+
+  const nextReputation = Math.min(100, (profile.reputation ?? 50) + bid.reputationReward);
+  const nextProfile = addLedger(
+    {
+      ...profile,
+      inventory: nextInventory,
+      sales: [...profile.sales, sale],
+      reputation: nextReputation,
+      globalShipments: [...(profile.globalShipments ?? []).slice(-60), exportShipment],
+    },
+    [
+      ledgerEntry(profile, 'revenue', grossRevenue, `تصدير دولي (${bid.incotermLabel}) إلى ${bid.destinationPort}: ${quantity} ${bid.productName}`, 0),
+      ...(clearanceFee > 0 ? [ledgerEntry(profile, 'expense', clearanceFee, `رسوم تخليص وشحن تصديري (${bid.destinationPort})`, 1)] : []),
+      ...(costOfGoods > 0 ? [ledgerEntry(profile, 'expense', costOfGoods, `تكلفة البضاعة المصدرة: ${bid.productName}`, 2)] : []),
+    ],
+    profile.bankBalance + netProceeds,
+  );
+
+  return success(
+    syncTasks(nextProfile),
+    `تم تصدير حاوية ${quantity} ${bid.unit} من ${bid.productName} إلى ${bid.destinationPort} بصافي عائد ${netProceeds.toLocaleString('ar-EG')} $ (+${bid.reputationReward} سمعة دولية).`,
+    { productId: bid.productId, quantity, netProceeds, reputationEarned: bid.reputationReward },
+  );
+}
+
+export function signForwardContract(
+  profile: PlayerProfile,
+  templateId: string,
+): GameResult<ForwardSupplyContract> {
+  const countryError = ensureEgypt(profile);
+  if (countryError) return countryError;
+  const template = getForwardContractTemplates(profile).find((item) => item.id === templateId);
+  if (!template) {
+    return failure(profile, 'not-found', 'عقد التحوط الآجل غير متاح في هذه الجلسة.');
+  }
+  const activeCount = (profile.forwardContracts ?? []).filter((c) => c.status === 'active').length;
+  if (activeCount >= 4) {
+    return failure(profile, 'condition-not-met', 'لا يمكنك الاحتفاظ بأكثر من 4 عقود توريد آجلة نشطة في نفس الوقت.');
+  }
+  if ((profile.forwardContracts ?? []).some((c) => c.status === 'active' && c.materialId === template.materialId)) {
+    return failure(profile, 'already-owned', `لديك عقد توريد آجل نشط بالفعل لمادة ${template.materialName}.`);
+  }
+  if (profile.bankBalance < template.marginDeposit) {
+    return failure(
+      profile,
+      'insufficient-funds',
+      `تحتاج إلى ${template.marginDeposit.toLocaleString('ar-EG')} $ كهامش تأمين (15%) لتثبيت سعر ${template.materialName}.`,
+    );
+  }
+
+  const contract: ForwardSupplyContract = {
+    id: nextId(profile, 'fwd', (profile.forwardContracts ?? []).length),
+    materialId: template.materialId,
+    materialName: template.materialName,
+    supplierName: template.supplierName,
+    originHub: template.originHub,
+    lockedUnitPrice: template.lockedUnitPrice,
+    dailyQuota: template.dailyQuota,
+    remainingQuota: template.totalContractUnits,
+    marginPaid: template.marginDeposit,
+    startedOnDay: profile.day,
+    expiresOnDay: profile.day + template.durationDays,
+    qualityScore: template.qualityScore,
+    status: 'active',
+  };
+
+  const prevTrust = profile.supplierTrust?.[template.supplierId] ?? 0;
+  const nextProfile = addLedger(
+    {
+      ...profile,
+      forwardContracts: [...(profile.forwardContracts ?? []), contract],
+      supplierTrust: {
+        ...(profile.supplierTrust ?? {}),
+        [template.supplierId]: Math.min(100, prevTrust + 15),
+      },
+    },
+    [
+      ledgerEntry(
+        profile,
+        'asset',
+        template.marginDeposit,
+        `هامش تأمين عقد توريد آجل (15%) · ${template.materialName} بسعر مثبت ${template.lockedUnitPrice} $`,
+        0,
+      ),
+    ],
+    profile.bankBalance - template.marginDeposit,
+  );
+
+  return success(
+    nextProfile,
+    `تم توقيع عقد التوريد الآجل لمادة ${template.materialName} بسعر مثبت ${template.lockedUnitPrice.toLocaleString('ar-EG')} $ حتى اليوم ${contract.expiresOnDay}.`,
+    contract,
+  );
+}
+
+export function drawFromForwardContract(
+  profile: PlayerProfile,
+  contractId: string,
+  quantity: number,
+): GameResult<{ contractId: string; materialId: string; quantity: number; cashPaid: number }> {
+  const countryError = ensureEgypt(profile);
+  if (countryError) return countryError;
+  if (!isPositiveInteger(quantity)) {
+    return failure(profile, 'invalid-input', 'الكمية المسحوبة يجب أن تكون عددًا صحيحًا موجبًا.');
+  }
+  const contract = (profile.forwardContracts ?? []).find((c) => c.id === contractId && c.status === 'active');
+  if (!contract) {
+    return failure(profile, 'not-found', 'العقد الآجل غير موجود أو انتهت صلاحيته.');
+  }
+  if (profile.day > contract.expiresOnDay) {
+    return failure(profile, 'condition-not-met', 'انتهت صلاحية هذا العقد الآجل.');
+  }
+  if (quantity > contract.remainingQuota) {
+    return failure(
+      profile,
+      'market-limit',
+      `الرصيد المتبقي في العقد الآجل هو ${contract.remainingQuota} وحدة فقط.`,
+    );
+  }
+  const material = findMaterial(contract.materialId);
+  if (!material) return failure(profile, 'not-found', 'المادة الخام غير معروفة.');
+
+  const existing = profile.inventory.find((lot) => lot.materialOrProductId === material.id);
+  const level = normalizeWarehouseLevel(profile.warehouseLevel);
+  const itemLimit = getWarehouseItemCapacity(material.id, level) ?? material.storageLimit;
+  const warehouseUsage = getWarehouseUsage(profile.inventory, profile.productionOrders);
+  const warehouseCapacity = getWarehouseCapacity(level);
+  if ((existing?.quantity ?? 0) + quantity > itemLimit || warehouseUsage.materials + quantity > warehouseCapacity.materials) {
+    return failure(profile, 'storage-limit', 'سعة المخزن لا تكفي لاستلام الدفعة المسحوبة من العقد الآجل.');
+  }
+
+  // 15% was already paid as margin deposit upon signing; player pays the remaining 85% upon delivery
+  const settlementDue = Math.max(1, Math.round(quantity * contract.lockedUnitPrice * 0.85));
+  if (profile.bankBalance < settlementDue) {
+    return failure(
+      profile,
+      'insufficient-funds',
+      `تحتاج إلى ${settlementDue.toLocaleString('ar-EG')} $ لتسوية 85% المتبقية من قيمة الدفعة المسحوبة.`,
+    );
+  }
+
+  const totalLotValue = quantity * contract.lockedUnitPrice;
+  const inventory = existing
+    ? profile.inventory.map((lot) =>
+        lot.materialOrProductId === material.id
+          ? {
+              ...lot,
+              quantity: lot.quantity + quantity,
+              unitCost: (lot.quantity * lot.unitCost + totalLotValue) / (lot.quantity + quantity),
+              qualityScore: Math.round(
+                (((lot.qualityScore ?? 88) * lot.quantity + contract.qualityScore * quantity) /
+                  (lot.quantity + quantity)) *
+                  10,
+              ) / 10,
+            }
+          : lot,
+      )
+    : [
+        ...profile.inventory,
+        {
+          id: nextId(profile, 'inventory', profile.inventory.length),
+          materialOrProductId: material.id,
+          quantity,
+          unit: material.unit,
+          unitCost: contract.lockedUnitPrice,
+          qualityScore: contract.qualityScore,
+        },
+      ];
+
+  const remainingQuota = contract.remainingQuota - quantity;
+  const updatedContracts = (profile.forwardContracts ?? []).map((c) =>
+    c.id === contract.id
+      ? { ...c, remainingQuota, status: remainingQuota === 0 ? ('completed' as const) : ('active' as const) }
+      : c,
+  );
+
+  const nextProfile = addLedger(
+    { ...profile, inventory, forwardContracts: updatedContracts },
+    [
+      ledgerEntry(
+        profile,
+        'asset',
+        settlementDue,
+        `سحب ${quantity} ${material.unit} ${material.name} من عقد التحوط الآجل بسعر مثبت ${contract.lockedUnitPrice} $`,
+        0,
+      ),
+    ],
+    profile.bankBalance - settlementDue,
+  );
+
+  return success(
+    syncTasks(nextProfile),
+    `تم استلام ${quantity} ${material.unit} من ${material.name} بالسعر المثبت (${contract.lockedUnitPrice} $ / ${material.unit}).`,
+    { contractId: contract.id, materialId: material.id, quantity, cashPaid: settlementDue },
+  );
 }
 
 export function upgradeWarehouse(profile: PlayerProfile, paymentMethod: PurchasePaymentMethod = 'cash'): GameResult<{ level: number; cost: number; diamondsSpent: number; capacity: ReturnType<typeof getWarehouseCapacity> }> {
@@ -598,8 +1034,17 @@ export function runProduction(profile: PlayerProfile, companyId: string, batches
   const manager = profile.staff.find((member) => member.status === 'active' && member.role === 'manager' && member.companyId === companyId);
   const managerLevel = staffLevel(manager);
   const durationDays = Math.min(3, Math.max(1, Math.ceil(batches / 3) - (manager ? 1 : 0)));
+  const inputQualities = recipe.inputs.map((input) => {
+    const lot = profile.inventory.find((item) => item.materialOrProductId === input.materialId);
+    return lot?.qualityScore ?? 88;
+  });
+  const avgInputQuality =
+    inputQualities.length > 0
+      ? inputQualities.reduce((sum, q) => sum + q, 0) / inputQualities.length
+      : 88;
+  const materialQualityDelta = Math.round((avgInputQuality - 88) * 0.7);
   const marketForecast = getMarketQuote(profile, recipe.productId, profile.day + durationDays);
-  const qualityScore = Math.max(70, Math.min(100, 86 + (manager ? 10 + (managerLevel - 1) * 3 : 0) - (maintenanceCondition < 60 ? 10 : 0)));
+  const qualityScore = Math.max(70, Math.min(100, 86 + materialQualityDelta + (manager ? 10 + (managerLevel - 1) * 3 : 0) - (maintenanceCondition < 60 ? 10 : 0)));
   const expectedUnitCost = (materialCost + energyCost + maintenanceCost) / outputQuantity;
   const nextMaintenanceCondition = Math.max(0, maintenanceCondition - Math.max(8, Math.ceil(batches / 2)));
   const order: ProductionOrder = { id: nextId(profile, 'production', profile.productionOrders.length), companyId, productId: recipe.productId, productName: recipe.productName, batches, outputQuantity, outputUnit: recipe.outputUnit, materialCost, energyCost, expectedUnitCost, demandForecast: marketForecast?.demandUnits ?? 0, qualityScore, maintenanceCost, startedOnDay: profile.day, completesOnDay: profile.day + durationDays, status: 'active' };
@@ -876,7 +1321,7 @@ export function getDayBriefing(profile: PlayerProfile): DayBriefing {
   const maturingInvestments = profile.investments
     .filter((investment) => investment.status === 'active' && investment.maturityDay <= day)
     .map((investment) => ({ id: investment.id, name: findInvestment(investment.investmentTypeId)?.name ?? investment.investmentTypeId }));
-  const event = getEconomicEventTemplate(day);
+  const event = getEconomicEventTemplate(day, profile.countryId);
   const availableEnergy = profile.companies.reduce((sum, company) => sum + (company.energyUnits ?? 0), 0);
   const outstandingSalary = unpaidSalaryTotal(profile);
   return { day, operatingCost, existingPayables: profile.payables + outstandingSalary, maturingInvestments, event, availableEnergy, energyPaused: profile.payables > 0 || outstandingSalary > 0 };
@@ -1194,6 +1639,68 @@ export function advanceDay(profile: PlayerProfile): GameResult<DayOutcome> {
     entries.push(ledgerEntry(profile, 'asset', order.materialCost, `اكتمل أمر إنتاج ${order.productName}`, entries.length));
     return { ...order, status: 'completed' as const };
   });
+
+  // Settle arriving international CIF shipments & forward contracts
+  const warehouseLevel = normalizeWarehouseLevel(profile.warehouseLevel);
+  const warehouseCapacity = getWarehouseCapacity(warehouseLevel);
+  const globalShipments = (profile.globalShipments ?? []).map((shipment) => {
+    if (shipment.status !== 'in-transit' || shipment.direction !== 'import' || shipment.arrivesOnDay > nextDay) {
+      return shipment;
+    }
+    const itemLimit = getWarehouseItemCapacity(shipment.itemId, warehouseLevel) ?? (findMaterial(shipment.itemId)?.storageLimit ?? 1_000);
+    const existingLot = inventory.find((lot) => lot.materialOrProductId === shipment.itemId);
+    const currentMaterialsUsed = getWarehouseUsage(inventory, productionOrders).materials;
+    if ((existingLot?.quantity ?? 0) + shipment.quantity > itemLimit || currentMaterialsUsed + shipment.quantity > warehouseCapacity.materials) {
+      return { ...shipment, arrivesOnDay: nextDay + 1 };
+    }
+    const shipmentValue = Math.round(shipment.quantity * shipment.unitCostOrPrice);
+    inventory = existingLot
+      ? inventory.map((lot) =>
+          lot.materialOrProductId === shipment.itemId
+            ? {
+                ...lot,
+                quantity: lot.quantity + shipment.quantity,
+                unitCost: (lot.quantity * lot.unitCost + shipmentValue) / (lot.quantity + shipment.quantity),
+                qualityScore: Math.round(
+                  (((lot.qualityScore ?? 88) * lot.quantity + shipment.qualityScore * shipment.quantity) /
+                    (lot.quantity + shipment.quantity)) *
+                    10,
+                ) / 10,
+              }
+            : lot,
+        )
+      : [
+          ...inventory,
+          {
+            id: nextId(profile, 'inventory', inventory.length),
+            materialOrProductId: shipment.itemId,
+            quantity: shipment.quantity,
+            unit: shipment.unit,
+            unitCost: shipment.unitCostOrPrice,
+            qualityScore: shipment.qualityScore,
+          },
+        ];
+
+    if (shipment.deferredBalanceDue > 0) {
+      const paidLC = Math.min(balance, shipment.deferredBalanceDue);
+      balance -= paidLC;
+      const unpaidLC = shipment.deferredBalanceDue - paidLC;
+      if (paidLC > 0) {
+        entries.push(ledgerEntry(profile, 'asset', paidLC, `تسوية اعتماد مستندي لوصول شحنة ${shipment.itemName}`, entries.length));
+      }
+      if (unpaidLC > 0) {
+        payables += unpaidLC;
+        entries.push(ledgerEntry(profile, 'liability', unpaidLC, `متبقي اعتماد مستندي غير مسدد لشحنة ${shipment.itemName}`, entries.length));
+      }
+    }
+    return { ...shipment, deferredBalanceDue: 0, status: 'delivered' as const };
+  });
+
+  const forwardContracts = (profile.forwardContracts ?? []).map((fw) =>
+    fw.status === 'active' && fw.expiresOnDay < nextDay
+      ? { ...fw, status: 'expired' as const }
+      : fw,
+  );
   const paidOperatingCost = Math.min(balance, operatingCost);
   balance -= paidOperatingCost;
   if (operatingCost > 0) entries.push(ledgerEntry(profile, 'expense', operatingCost, 'مصروفات التشغيل اليومية المستحقة', entries.length));
@@ -1220,11 +1727,13 @@ export function advanceDay(profile: PlayerProfile): GameResult<DayOutcome> {
     return { ...investment, status: hadLoss ? 'loss' as const : 'paid' as const, settledAmount: payout };
   });
 
-  let eventImpact = briefing.event.cashImpact;
-  if (briefing.event.cashImpact > 0) {
+  const ownsEventIndustry = !briefing.event.industryId
+    || profile.companies.some((company) => company.industryId === briefing.event.industryId);
+  let eventImpact = ownsEventIndustry ? briefing.event.cashImpact : 0;
+  if (ownsEventIndustry && briefing.event.cashImpact > 0) {
     balance += briefing.event.cashImpact;
     entries.push(ledgerEntry(profile, 'revenue', briefing.event.cashImpact, briefing.event.title, entries.length));
-  } else if (briefing.event.cashImpact < 0) {
+  } else if (ownsEventIndustry && briefing.event.cashImpact < 0) {
     const lawyer = profile.staff.find((member) => member.status === 'active' && member.role === 'lawyer');
     const eventCost = Math.round(Math.abs(briefing.event.cashImpact) * (lawyer ? Math.max(0.73, 0.85 - (staffLevel(lawyer) - 1) * 0.03) : 1));
     const paidEventCost = Math.min(balance, eventCost);
@@ -1272,7 +1781,24 @@ export function advanceDay(profile: PlayerProfile): GameResult<DayOutcome> {
     occurredAt: now,
   };
   const nextProfile = addLedger(
-    { ...profile, day: nextDay, activeDaySpeedMultiplier: 1, companies, investments, banking: { ...profile.banking, loans }, staff, productionOrders, inventory, unreadProductionOrderIds: [...new Set([...(profile.unreadProductionOrderIds ?? []), ...newlyCompletedProductionIds])].slice(-500), events: [...profile.events, event], payables, contracts, reputation },
+    {
+      ...profile,
+      day: nextDay,
+      activeDaySpeedMultiplier: 1,
+      companies,
+      investments,
+      banking: { ...profile.banking, loans },
+      staff,
+      productionOrders,
+      inventory,
+      unreadProductionOrderIds: [...new Set([...(profile.unreadProductionOrderIds ?? []), ...newlyCompletedProductionIds])].slice(-500),
+      events: [...profile.events, event],
+      payables,
+      contracts,
+      reputation,
+      ...(profile.globalShipments !== undefined ? { globalShipments } : {}),
+      ...(profile.forwardContracts !== undefined ? { forwardContracts } : {}),
+    },
     entries,
     balance,
   );
@@ -1303,7 +1829,8 @@ export function acceptContract(profile: PlayerProfile, offerId: string): GameRes
   if (previousContract?.status === 'completed') return failure(profile, 'already-owned', 'تم تنفيذ هذا العرض من قبل ولا يمكن تكراره.');
   if (previousContract?.status === 'failed') return failure(profile, 'already-owned', 'انتهى هذا العرض بعد فشله ولا يمكن إعادة استخدامه.');
   if ((profile.contracts ?? []).filter((contract) => contract.status === 'active').length >= 3) return failure(profile, 'condition-not-met', 'لا يمكنك إدارة أكثر من ثلاثة عقود نشطة في وقت واحد.');
-  const contract: BusinessContract = { ...offer, status: 'active', acceptedOnDay: profile.day };
+  const { description: _offerDescription, ...contractOffer } = offer;
+  const contract: BusinessContract = { ...contractOffer, status: 'active', acceptedOnDay: profile.day };
   return success({ ...profile, contracts: [...(profile.contracts ?? []), contract] }, `تم قبول عقد ${contract.clientName} حتى اليوم ${contract.deadlineDay}.`, contract);
 }
 
@@ -1408,7 +1935,10 @@ export type GameCommand =
   | { name: 'sell_company'; args: { companyId: string } }
   | { name: 'sell_asset'; args: { assetId: string } }
   | { name: 'buy_material'; args: { materialId: string; quantity: number } }
-  | { name: 'buy_global_material'; args: { offerId: string; quantity: number; negotiatedUnitPrice?: number; paymentMethod?: PurchasePaymentMethod } }
+  | { name: 'buy_global_material'; args: { offerId: string; quantity: number; negotiatedUnitPrice?: number; paymentMethod?: PurchasePaymentMethod; shippingMode?: GlobalShippingMode; paymentTerm?: GlobalPaymentTerm; fleetCount?: number } }
+  | { name: 'export_global_product'; args: { bidId: string; quantity: number } }
+  | { name: 'sign_forward_contract'; args: { templateId: string } }
+  | { name: 'draw_forward_contract'; args: { contractId: string; quantity: number } }
   | { name: 'found_company'; args: { industryId: IndustryId; landId: string; name: string; paymentMethod?: PurchasePaymentMethod } }
   | { name: 'upgrade_company'; args: { companyId: string; paymentMethod?: PurchasePaymentMethod } }
   | { name: 'run_production'; args: { companyId: string; batches: number } }
@@ -1441,7 +1971,11 @@ export type GameCommand =
   | { name: 'claim_season_challenge'; args: { challengeId: string } }
   | { name: 'claim_login_reward'; args: { rewardId: (typeof LOGIN_REWARDS)[number]['id'] } }
   | { name: 'choose_season_event'; args: { choiceId: string } }
-  | { name: 'update_notification_state'; args: { action: 'read' | 'dismiss'; notificationIds: string[] } };
+  | { name: 'update_notification_state'; args: { action: 'read' | 'dismiss'; notificationIds: string[] } }
+  | { name: 'list_player_asset'; args: { assetType: 'land' | 'company'; assetId: string; startingBid: number } }
+  | { name: 'settle_player_auction'; args: { listingId: string; customWinningAmount?: number; customBuyerName?: string } }
+  | { name: 'cancel_player_auction'; args: { listingId: string } }
+  | { name: 'claim_starter_mission'; args: { missionId: string } };
 
 export type GameCommandHandler = (command: GameCommand, fallback: (profile: PlayerProfile) => GameResult<unknown>) => void | Promise<void>;
 
@@ -1456,7 +1990,10 @@ export function executeGameCommand(profile: PlayerProfile, command: GameCommand)
     case 'sell_company': return sellCompany(profile, command.args.companyId);
     case 'sell_asset': return sellAsset(profile, command.args.assetId);
     case 'buy_material': return buyMaterial(profile, command.args.materialId, command.args.quantity);
-    case 'buy_global_material': return buyGlobalMaterial(profile, command.args.offerId, command.args.quantity, command.args.negotiatedUnitPrice, command.args.paymentMethod);
+    case 'buy_global_material': return buyGlobalMaterial(profile, command.args.offerId, command.args.quantity, command.args.negotiatedUnitPrice, command.args.paymentMethod, { shippingMode: command.args.shippingMode, paymentTerm: command.args.paymentTerm, fleetCount: command.args.fleetCount });
+    case 'export_global_product': return exportGlobalProduct(profile, command.args.bidId, command.args.quantity);
+    case 'sign_forward_contract': return signForwardContract(profile, command.args.templateId);
+    case 'draw_forward_contract': return drawFromForwardContract(profile, command.args.contractId, command.args.quantity);
     case 'found_company': return foundCompany(profile, command.args.industryId, command.args.landId, command.args.name, command.args.paymentMethod);
     case 'upgrade_company': return upgradeCompany(profile, command.args.companyId, command.args.paymentMethod);
     case 'run_production': return runProduction(profile, command.args.companyId, command.args.batches);
@@ -1490,5 +2027,24 @@ export function executeGameCommand(profile: PlayerProfile, command: GameCommand)
     case 'claim_login_reward': return claimLoginReward(profile, command.args.rewardId);
     case 'choose_season_event': return chooseSeasonEvent(profile, command.args.choiceId);
     case 'update_notification_state': return updateNotificationState(profile, command.args.action, command.args.notificationIds);
+    case 'list_player_asset': return listPlayerAssetForAuction(profile, command.args.assetType, command.args.assetId, command.args.startingBid);
+    case 'settle_player_auction': return settlePlayerAssetAuction(profile, command.args.listingId, command.args.customWinningAmount, command.args.customBuyerName);
+    case 'cancel_player_auction': return cancelPlayerAssetAuction(profile, command.args.listingId);
+    case 'claim_starter_mission': return claimStarterMission(profile, command.args.missionId);
   }
 }
+
+export {
+  listPlayerAssetForAuction,
+  settlePlayerAssetAuction,
+  cancelPlayerAssetAuction,
+  executeSellPlayerAsset,
+} from './dynamicAuctions';
+
+export {
+  claimStarterMission,
+  getStarterMissions,
+  getCompletedStarterMissions,
+  getCurrentStarterMissionStage,
+  STARTER_MISSION_SPECS,
+} from './onboarding';

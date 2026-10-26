@@ -12,7 +12,8 @@
     "cap:sync": "vite build && npx cap sync android",
     "cap:open": "npx cap open android",
     "cap:build-debug": "vite build && npx cap sync android && cd android && ./gradlew assembleDebug",
-    "cap:build-release": "vite build && npx cap sync android && cd android && ./gradlew assembleRelease"
+    "cap:build-release": "vite build && npx cap sync android && cd android && ./gradlew assembleRelease",
+    "test": "vitest run"
   },
   "dependencies": {
     "@capacitor/app": "^8.1.2",

@@ -1,14 +1,18 @@
 import React, { useState } from 'react';
-import type { PlayerProfile } from '../domain/player';
+import { findCountry } from '../domain/countries';
 import type { SectionId } from '../domain/navigation';
-import { formatMoney } from '../domain/formatters';
+import type { PlayerProfile } from '../domain/player';
+import { getCountryScenario, type CountryStoryQuest } from '../game/countryScenarios';
+import { isSectionUnlocked } from '../game/onboarding';
 import { playSound } from '../game/soundEffects';
+import { QuestBriefingModal } from './QuestBriefingModal';
 
 interface SmartOnboardingQuestsProps {
   profile: PlayerProfile;
   onNavigate: (section: SectionId, target?: string) => void;
   onClaimReward: (cash: number, diamonds: number, questId: string) => void;
-  onRequestEmergencyLoan?: () => void;
+  onMarkBriefingSeen?: (questId: string) => void;
+  onStartGuidedWalkthrough?: (quest: CountryStoryQuest) => void;
 }
 
 export interface QuestStep {
@@ -23,157 +27,83 @@ export interface QuestStep {
   isCompleted: (p: PlayerProfile) => boolean;
 }
 
-export const QUEST_STEPS: QuestStep[] = [
-  {
-    id: 'quest-buy-land',
-    stepNumber: 1,
-    title: 'الاستحواذ على أول قطعة أرض',
-    desc: 'اشترِ أول أرض (صناعية أو زراعية) في القاهرة من سوق الأراضي لتضع عليها حجر الأساس لمصانعك.',
-    icon: '🗺️',
-    targetSection: 'lands',
-    cashReward: 60000,
-    diamondReward: 5,
-    isCompleted: (p) => (p.lands?.length ?? 0) > 0,
-  },
-  {
-    id: 'quest-found-company',
-    stepNumber: 2,
-    title: 'تأسيس أول منشأة صناعية',
-    desc: 'قم بترخيص وبناء مصنع في قطاع آمن للمبتدئين (مثل المواد الغذائية أو المنظفات) على أرضك.',
-    icon: '🏭',
-    targetSection: 'companies',
-    cashReward: 80000,
-    diamondReward: 10,
-    isCompleted: (p) => (p.companies?.length ?? 0) > 0,
-  },
-  {
-    id: 'quest-buy-materials',
-    stepNumber: 3,
-    title: 'تأمين المواد الخام للإنتاج',
-    desc: 'ادخل إلى سوق الخامات واشترِ المواد الأساسية التي يحتاجها مصنعك لبدء التصنيع.',
-    icon: '📦',
-    targetSection: 'inventory',
-    cashReward: 50000,
-    diamondReward: 5,
-    isCompleted: (p) => {
-      return (p.inventory?.length ?? 0) > 0;
-    },
-  },
-  {
-    id: 'quest-start-production',
-    stepNumber: 4,
-    title: 'تشغيل خط الإنتاج الأول',
-    desc: 'شغّل الماكينات وحوّل المواد الخام إلى منتجات تامة الصنع قابلة للبيع في المستودع.',
-    icon: '⚙️',
-    targetSection: 'production',
-    cashReward: 120000,
-    diamondReward: 15,
-    isCompleted: (p) => {
-      return (p.productionOrders?.length ?? 0) > 0;
-    },
-  },
-  {
-    id: 'quest-sell-market',
-    stepNumber: 5,
-    title: 'بيع أول شحنة وتحقيق الأرباح',
-    desc: 'اعرض منتجاتك في السوق المحلي وجني أول إيراد نقدي لتبدأ أرباح إمبراطوريتك بالتدفق!',
-    icon: '💰',
-    targetSection: 'store',
-    cashReward: 180000,
-    diamondReward: 25,
-    isCompleted: (p) => {
-      return (p.sales?.length ?? 0) > 0 || (p.finances?.totalRevenue ?? 0) > 0 || p.ledger.some((l) => l.category === 'revenue' && l.amount > 120000);
-    },
-  },
-];
-
 export const SmartOnboardingQuests: React.FC<SmartOnboardingQuestsProps> = ({
   profile,
   onNavigate,
   onClaimReward,
-  onRequestEmergencyLoan,
+  onMarkBriefingSeen,
+  onStartGuidedWalkthrough,
 }) => {
-  const [claimedQuests, setClaimedQuests] = useState<string[]>(() => {
-    try {
-      const saved = localStorage.getItem(`suly-claimed-quests-${profile.id}`);
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
-  });
-
   const [collapsed, setCollapsed] = useState(false);
+  const [activeBriefingQuest, setActiveBriefingQuest] = useState<{
+    quest: CountryStoryQuest;
+    isReplay: boolean;
+  } | null>(null);
 
-  const completedCount = QUEST_STEPS.filter((q) => q.isCompleted(profile)).length;
-  const currentStep = QUEST_STEPS.find((q) => !q.isCompleted(profile)) || QUEST_STEPS[QUEST_STEPS.length - 1];
-  const allCompleted = completedCount === QUEST_STEPS.length;
+  const country = findCountry(profile.countryId) ?? findCountry('egypt')!;
+  const scenario = getCountryScenario(country.id);
+  const quests = scenario.quests;
 
-  const handleClaim = (quest: QuestStep) => {
+  const claimedSet = new Set<string>([
+    ...(profile.onboarding?.claimedStoryQuestIds ?? []),
+  ]);
+  const seenBriefings = new Set<string>(profile.onboarding?.seenQuestBriefings ?? []);
+
+  const completedCount = quests.filter((q) => q.isCompleted(profile)).length;
+  const currentQuest =
+    quests.find((q) => q.isAvailable(profile) && !q.isCompleted(profile))
+    ?? quests.find((q) => !claimedSet.has(q.id))
+    ?? quests[quests.length - 1];
+
+  const handleClaim = (quest: CountryStoryQuest) => {
+    if (!quest.isCompleted(profile) || claimedSet.has(quest.id)) return;
     playSound('cash');
     playSound('levelUp');
-    const updated = [...claimedQuests, quest.id];
-    setClaimedQuests(updated);
-    try {
-      localStorage.setItem(`suly-claimed-quests-${profile.id}`, JSON.stringify(updated));
-    } catch {
-      // ignore
-    }
     onClaimReward(quest.cashReward, quest.diamondReward, quest.id);
   };
 
-  const isLowBalance = (profile.bankBalance ?? 0) < 65000 && (profile.day ?? 1) <= 15;
+  const handleOpenBriefing = (quest: CountryStoryQuest, isReplay: boolean) => {
+    playSound('click');
+    setActiveBriefingQuest({ quest, isReplay });
+  };
+
+  const handleExecuteQuest = (quest: CountryStoryQuest) => {
+    playSound('click');
+    if (!seenBriefings.has(quest.id)) {
+      setActiveBriefingQuest({ quest, isReplay: false });
+      return;
+    }
+    if (isSectionUnlocked(profile, quest.targetSection)) {
+      onStartGuidedWalkthrough?.(quest);
+      onNavigate(quest.targetSection);
+    }
+  };
 
   return (
     <div className="space-y-3" dir="rtl">
-      {/* Emergency Bank Loan Alert if Balance is Dangerously Low */}
-      {isLowBalance && onRequestEmergencyLoan && (
-        <div className="p-4 rounded-2xl bg-gradient-to-r from-rose-950/80 via-amber-950/70 to-slate-900 border border-amber-500/50 shadow-xl flex flex-col sm:flex-row items-center justify-between gap-3 animate-pulse">
-          <div className="flex items-center gap-3">
-            <span className="text-3xl">🏦</span>
-            <div className="text-right">
-              <h4 className="text-sm font-bold text-amber-300">
-                تسهيل ائتماني طارئ من «بنك مصر للأعمال»
-              </h4>
-              <p className="text-xs text-amber-200/90 mt-0.5">
-                رصيدك الحالي ({formatMoney(profile.bankBalance, profile.countryId)}) قارب على النفاد! اسحب 250,000 $ لحماية مصانعك من التوقف.
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={() => {
-              playSound('loan');
-              onRequestEmergencyLoan();
-            }}
-            className="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-emerald-500 hover:from-amber-400 hover:to-emerald-400 text-slate-950 font-bold text-xs shadow-lg transition-transform active:scale-95 shrink-0"
-          >
-            سحب 250,000 $ قرض إنقاذ
-          </button>
-        </div>
-      )}
-
-      {/* Main Guided Quests Panel */}
       <div className="bg-slate-900/90 border border-emerald-500/40 rounded-2xl p-4 shadow-xl backdrop-blur-md">
-        <div className="flex items-center justify-between border-b border-slate-800 pb-3 mb-3">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-3 mb-3">
           <div className="flex items-center gap-2.5">
-            <span className="text-2xl">🏆</span>
+            <span className="text-2xl">{country.flag}</span>
             <div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <h3 className="text-sm font-bold text-white">
-                  مسار الانطلاق السريع للإمبراطورية (دليل المبتدئ)
+                  مهام القصة والإنقاذ الاقتصادي · {country.name}
                 </h3>
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30 font-mono">
-                  {completedCount} / {QUEST_STEPS.length} مكتمل
+                <span className="text-[11px] text-emerald-300 font-bold font-mono">
+                  ({completedCount} / {quests.length} مكتمل)
                 </span>
               </div>
               <p className="text-[11px] text-slate-400 mt-0.5">
-                اتبع هذه الخطوات الـ 5 الذهبية لتأسيس أول دورة إنتاج وربح حقيقي في القاهرة
+                {scenario.scenarioTitle} — اقرأ إيجاز المستشار ثم نفّذ الخطوات بيدك داخل الأقسام المفتوحة
               </p>
             </div>
           </div>
 
           <button
+            type="button"
             onClick={() => setCollapsed(!collapsed)}
-            className="text-xs text-emerald-400 hover:text-emerald-300 p-1.5 rounded-lg bg-slate-800 border border-slate-700"
+            className="text-xs text-emerald-400 hover:text-emerald-300 px-2.5 py-1.5 rounded-lg bg-slate-800 border border-slate-700 cursor-pointer"
           >
             {collapsed ? 'عرض المهام ▼' : 'طي ▲'}
           </button>
@@ -183,16 +113,18 @@ export const SmartOnboardingQuests: React.FC<SmartOnboardingQuestsProps> = ({
         <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden mb-3">
           <div
             className="bg-gradient-to-r from-emerald-500 via-teal-400 to-lime-400 h-full transition-all duration-500"
-            style={{ width: `${(completedCount / QUEST_STEPS.length) * 100}%` }}
+            style={{ width: `${(completedCount / Math.max(1, quests.length)) * 100}%` }}
           />
         </div>
 
         {!collapsed && (
           <div className="space-y-2.5">
-            {QUEST_STEPS.map((quest) => {
+            {quests.map((quest) => {
+              const available = quest.isAvailable(profile);
               const completed = quest.isCompleted(profile);
-              const claimed = claimedQuests.includes(quest.id);
-              const isCurrent = currentStep?.id === quest.id && !completed;
+              const claimed = claimedSet.has(quest.id);
+              const isCurrent = currentQuest?.id === quest.id && !completed && available;
+              const advisor = scenario.advisors[quest.briefing.advisorRole];
 
               return (
                 <div
@@ -202,74 +134,102 @@ export const SmartOnboardingQuests: React.FC<SmartOnboardingQuestsProps> = ({
                       ? 'bg-emerald-950/20 border-emerald-500/30'
                       : isCurrent
                       ? 'bg-slate-800/90 border-amber-500/50 shadow-md ring-1 ring-amber-500/30'
-                      : 'bg-slate-950/40 border-slate-800 opacity-75'
+                      : available
+                      ? 'bg-slate-900/70 border-slate-800'
+                      : 'bg-slate-950/40 border-slate-800/70 opacity-65'
                   }`}
                 >
-                  <div className="flex items-start gap-3">
+                  <div className="flex items-start gap-3 min-w-0">
                     <span className="text-xl p-2 rounded-xl bg-slate-800 border border-slate-700 shrink-0">
-                      {quest.icon}
+                      {available || completed ? quest.icon : '🔒'}
                     </span>
-                    <div>
-                      <div className="flex items-center gap-2">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
                         <span className="text-xs font-bold text-white">
-                          الخطوة {quest.stepNumber}: {quest.title}
+                          المهمة {quest.stepNumber}: {quest.title}
+                        </span>
+                        <span className="text-[11px] text-slate-400">
+                          · {advisor.name}
                         </span>
                         {completed && (
-                          <span className="text-[10px] text-emerald-400 font-bold bg-emerald-500/10 px-1.5 py-0.5 rounded">
+                          <span className="text-[10px] text-emerald-400 font-bold">
                             ✓ مكتملة
                           </span>
                         )}
                         {isCurrent && (
-                          <span className="text-[10px] text-amber-300 font-bold bg-amber-500/20 px-1.5 py-0.5 rounded animate-pulse">
-                            ◀ الخطوة التالية
+                          <span className="text-[10px] text-amber-300 font-bold">
+                            ◀ نشطة الآن
+                          </span>
+                        )}
+                        {!available && !completed && (
+                          <span className="text-[10px] text-slate-400">
+                            · تفتح في المرحلة {quest.stageNumber}
                           </span>
                         )}
                       </div>
+
                       <p className="text-[11px] text-slate-300 mt-1 max-w-xl leading-relaxed">
-                        {quest.desc}
+                        {quest.shortDescription}
                       </p>
-                      <div className="flex items-center gap-2 mt-1.5 text-[10px] text-slate-400">
-                        <span className="text-emerald-400 font-mono">
-                          مكافأة: +{quest.cashReward.toLocaleString()} $
+
+                      <div className="flex flex-wrap items-center gap-2 mt-1.5 text-[10px] text-slate-400">
+                        <span className="text-amber-300 font-semibold">
+                          الحالة: {quest.getProgressText(profile)}
                         </span>
-                        <span>•</span>
+                        <span>·</span>
+                        <span className="text-emerald-400 font-mono">
+                          مكافأة: +{quest.cashReward.toLocaleString('ar-EG')} $
+                        </span>
+                        <span>·</span>
                         <span className="text-cyan-300 font-mono">
-                          +{quest.diamondReward} ألماسة 💎
+                          +{quest.diamondReward} ماسة
                         </span>
                       </div>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
+                  <div className="flex flex-wrap items-center gap-2 self-end sm:self-center shrink-0">
+                    {(available || completed) && (
+                      <button
+                        type="button"
+                        onClick={() => handleOpenBriefing(quest, seenBriefings.has(quest.id))}
+                        className="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-[11px] font-bold border border-slate-700 cursor-pointer"
+                        title="قراءة أو إعادة عرض حوار المستشار وخطة التنفيذ"
+                      >
+                        {seenBriefings.has(quest.id) ? 'إعادة الحوار 📖' : 'قصة المهمة 📖'}
+                      </button>
+                    )}
+
                     {completed ? (
                       claimed ? (
                         <span className="text-xs font-bold text-slate-400 px-3 py-1.5 rounded-lg bg-slate-800/80 border border-slate-700">
-                          تم استلام الجائزة ✓
+                          تم استلام المكافأة ✓
                         </span>
                       ) : (
                         <button
-                          data-guide-target="claim-task-btn"
+                          type="button"
+                          data-guide-target="claim-story-quest-btn"
                           onClick={() => handleClaim(quest)}
-                          className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-white font-bold text-xs shadow-lg shadow-emerald-950/40 animate-bounce"
+                          className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black text-xs shadow-lg cursor-pointer"
                         >
                           استلم المكافأة 🎁
                         </button>
                       )
-                    ) : (
+                    ) : available ? (
                       <button
-                        onClick={() => {
-                          playSound('click');
-                          onNavigate(quest.targetSection);
-                        }}
-                        className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1 ${
+                        type="button"
+                        onClick={() => handleExecuteQuest(quest)}
+                        className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${
                           isCurrent
                             ? 'bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-md font-extrabold'
                             : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700'
                         }`}
                       >
-                        <span>انتقل للخطوة</span>
+                        <span>{seenBriefings.has(quest.id) ? 'انتقل للتنفيذ' : 'ابدأ المهمة'}</span>
                         <span>←</span>
                       </button>
+                    ) : (
+                      <span className="text-[11px] text-slate-500 px-2.5 py-1">مغلقة حالياً</span>
                     )}
                   </div>
                 </div>
@@ -278,6 +238,29 @@ export const SmartOnboardingQuests: React.FC<SmartOnboardingQuestsProps> = ({
           </div>
         )}
       </div>
+
+      {activeBriefingQuest && (
+        <QuestBriefingModal
+          quest={activeBriefingQuest.quest}
+          advisor={scenario.advisors[activeBriefingQuest.quest.briefing.advisorRole]}
+          countryName={country.name}
+          countryFlag={country.flag}
+          isReplay={activeBriefingQuest.isReplay}
+          onSkip={() => {
+            onMarkBriefingSeen?.(activeBriefingQuest.quest.id);
+            setActiveBriefingQuest(null);
+          }}
+          onStartExecution={() => {
+            const q = activeBriefingQuest.quest;
+            onMarkBriefingSeen?.(q.id);
+            setActiveBriefingQuest(null);
+            if (isSectionUnlocked(profile, q.targetSection)) {
+              onStartGuidedWalkthrough?.(q);
+              onNavigate(q.targetSection);
+            }
+          }}
+        />
+      )}
     </div>
   );
 };

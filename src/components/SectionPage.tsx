@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import type { CountryDefinition, IndustryId } from '../domain/countries';
 import type { PlayerProfile } from '../domain/player';
 import type { GameCommand } from '../game/engine';
@@ -14,6 +14,8 @@ import { getInvestmentPayoutRate, getOperatingCostProgression } from '../game/ec
 import { getContractOffers, getCustomerSegmentLabel } from '../game/contracts';
 import { selectActiveInvestments, selectAdvancedStatistics, selectAvailableAuctions, selectCompanyPerformance, selectEmpirePoints, selectFinancialReport, selectInventorySummary, selectObligations, selectSalesSummary, selectTaskBoard } from '../game/selectors';
 import { Icon, type IconName } from './Icon';
+import { Warehouse, Boxes, ShoppingBag, Store } from 'lucide-react';
+import { triggerHaptic } from '../services/nativeMobileService';
 import { isSoundEnabled, setSoundEnabled, playSound } from '../game/soundEffects';
 import { EconomyEmpty, EconomyPageShell, EconomyPanel as BaseEconomyPanel, EconomyStat, type EconomyPanelProps } from './EconomyUI';
 import { DiamondStore } from './DiamondStore';
@@ -39,8 +41,10 @@ import { HubSubNav } from './HubSubNav';
 import { ItemImage } from './ItemImage';
 import { BankTerminal } from './BankTerminal';
 import { getPlayerProgress, getSectionRequiredLevel, getSectionUnlockHint, isSectionUnlocked } from '../game/onboarding';
+import { getCountryScenario } from '../game/countryScenarios';
 import { ListAssetAuctionModal } from './DynamicAuctionModal';
-import { generateLiveAuctions, RIVAL_INVESTORS } from '../game/dynamicAuctions';
+import { generateLiveAuctions, RIVAL_INVESTORS, settlePlayerAssetAuction, cancelPlayerAssetAuction } from '../game/dynamicAuctions';
+import { GlobalMarketTerminal } from './GlobalMarketTerminal';
 
 interface SectionPageProps {
   section: SectionItem;
@@ -104,6 +108,36 @@ function economicEventDetails(event: PlayerProfile['events'][number], currentDay
   return details;
 }
 
+interface SectionPageContextValue {
+  compactPage: boolean;
+  activePanelId: string | null;
+  sectionId: SectionId;
+  onTogglePanel: (key: string) => void;
+}
+
+const SectionPageContext = createContext<SectionPageContextValue>({
+  compactPage: false,
+  activePanelId: null,
+  sectionId: 'home',
+  onTogglePanel: () => {},
+});
+
+export function SectionPanel(props: EconomyPanelProps) {
+  const { compactPage, activePanelId, sectionId, onTogglePanel } = useContext(SectionPageContext);
+  const panelKey = props.id ?? props.title;
+  const expanded = compactPage && (activePanelId === '__all__' || activePanelId === panelKey);
+  const resolvedIcon = props.icon ?? panelIconFor(sectionId, props.title);
+  return (
+    <BaseEconomyPanel
+      {...props}
+      compact={compactPage}
+      icon={resolvedIcon}
+      expanded={expanded}
+      onToggle={() => onTogglePanel(panelKey)}
+    />
+  );
+}
+
 export function SectionPage({ section, profile, country, focus, notificationTheme, isGuest, onNotificationThemeChange, onHome, onNavigate, onAction, onCommand, onRedeemed, onRefreshProfile, onLinkAccount, onLogout, onShowGuide, onProfileUpdate }: SectionPageProps) {
   const playerProgress = getPlayerProgress(profile);
   const [bidAmounts, setBidAmounts] = useState<Record<string, string>>({});
@@ -140,10 +174,12 @@ export function SectionPage({ section, profile, country, focus, notificationThem
   const [landTypeFilter, setLandTypeFilter] = useState<'all' | 'industrial' | 'agricultural' | 'commercial'>('all');
   const [landSort, setLandSort] = useState<'price' | 'area' | 'type'>('price');
   const [auctionCategoryTab, setAuctionCategoryTab] = useState<'all' | 'land' | 'factory' | 'material'>('all');
+  const [auctionViewMode, setAuctionViewMode] = useState<'market' | 'my_listings' | 'history'>('market');
   const [isListAssetModalOpen, setIsListAssetModalOpen] = useState(false);
   const [activePanelId, setActivePanelId] = useState<string | null>(null);
   const [expansionState, setExpansionState] = useState(() => loadExpansionState(profile));
   const [megaExpState, setMegaExpState] = useState(() => loadMegaExpansionState(profile));
+  const lastScrolledFocusRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (compactSectionIds.has(section.id)) setActivePanelId(focus ? '__all__' : null);
@@ -155,6 +191,9 @@ export function SectionPage({ section, profile, country, focus, notificationThem
   useEffect(() => {
     if (section.id === 'bank' && focus === 'loans') setBankTab('loans');
     if (!focus) return;
+    const focusKey = `${section.id}:${focus}`;
+    if (lastScrolledFocusRef.current === focusKey) return;
+    lastScrolledFocusRef.current = focusKey;
     const timer = window.setTimeout(() => document.getElementById(focus)?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 80);
     return () => window.clearTimeout(timer);
   }, [section.id, focus]);
@@ -166,17 +205,21 @@ export function SectionPage({ section, profile, country, focus, notificationThem
   const compactPage = compactSectionIds.has(section.id);
   const run = (action: (current: PlayerProfile) => GameResult<unknown>) => onAction(action(profile));
   const runCommand = (command: GameCommand, fallback: (current: PlayerProfile) => GameResult<unknown>) => onCommand(command, fallback);
+
+  const contextValue = useMemo<SectionPageContextValue>(() => ({
+    compactPage,
+    activePanelId,
+    sectionId: section.id,
+    onTogglePanel: (key: string) => setActivePanelId((current) => (current === key ? null : key)),
+  }), [compactPage, activePanelId, section.id]);
+
   const pageShell = (children: ReactNode) => (
-    <EconomyPageShell dayLabel={dayLabel} balanceLabel={balanceLabel} dayDurationMinutes={dayDurationMinutes} daySpeedMultiplier={daySpeedMultiplier} compact={compactPage}>
-      {children}
-    </EconomyPageShell>
+    <SectionPageContext.Provider value={contextValue}>
+      <EconomyPageShell dayLabel={dayLabel} balanceLabel={balanceLabel} dayDurationMinutes={dayDurationMinutes} daySpeedMultiplier={daySpeedMultiplier} compact={compactPage}>
+        {children}
+      </EconomyPageShell>
+    </SectionPageContext.Provider>
   );
-  const SectionPanel = (props: EconomyPanelProps) => {
-    const panelKey = props.id ?? props.title;
-    const expanded = compactPage && (activePanelId === '__all__' || activePanelId === panelKey);
-    const resolvedIcon = props.icon ?? panelIconFor(section.id, props.title);
-    return <BaseEconomyPanel {...props} compact={compactPage} icon={resolvedIcon} expanded={expanded} onToggle={() => setActivePanelId((current) => current === panelKey ? null : panelKey)} />;
-  };
 
   const heading = (
     <>
@@ -184,7 +227,7 @@ export function SectionPage({ section, profile, country, focus, notificationThem
       <div className="page-heading">
         <span className="heading-icon"><Icon name={section.icon} size={23} /></span>
         <div className="page-heading-copy"><span className="section-kicker">إدارة الإمبراطورية</span><h1>{section.label}</h1><p className="page-subtitle">{section.subtitle}</p></div>
-        <button className="page-help-button" type="button" onClick={onShowGuide}><Icon name="target" size={15} /> شرح للمبتدئين</button>
+        <button className="page-help-button" type="button" onClick={onShowGuide}><Icon name="target" size={15} /> شرح هذا القسم</button>
       </div>
     </>
   );
@@ -266,7 +309,7 @@ export function SectionPage({ section, profile, country, focus, notificationThem
             <span>إشعار الحماية القضائية ومهلة السماح للديون الموروثة</span>
           </div>
           <p className="text-slate-300 text-xs sm:text-sm leading-relaxed mb-2">
-            وفقاً لسيناريو قصة إفلاس العائلة، أصدرت المحكمة حماية قانونية للمصنع المتبقي مع <strong>مهلة سماح لمدة 7 أيام</strong> على القرض الموروث البالغ <strong>5,250 $</strong>. البنوك جمّدت فتح تسهيلات وقروض جديدة حتى ترفع مستواك إلى <strong>المستوى 4</strong>.
+            وفقاً لسيناريو التأسيس في <strong>{country.name}</strong>، صدرت حماية قانونية للمنشأة الموروثة مع <strong>مهلة سماح لمدة 7 أيام</strong> على قرض <strong>{getCountryScenario(country.id).economicProfile.bankName}</strong> الموروث البالغ <strong>5,250 $</strong>. التسهيلات والقروض الجديدة تفتح عند بلوغ <strong>المستوى 4</strong> أو تسليم أول عقد رسمي.
           </p>
           <div className="flex flex-wrap gap-2 text-xs">
             <span className="px-2.5 py-1 rounded-lg bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 font-bold">
@@ -341,7 +384,7 @@ export function SectionPage({ section, profile, country, focus, notificationThem
   if (section.id === 'bank') {
     return (
       <div className="section-page bank-page w-full min-w-0">
-        <HubSubNav currentSection={section.id} onNavigate={onNavigate} />
+        {heading}
         <BankTerminal
           profile={profile}
           country={country}
@@ -360,7 +403,7 @@ export function SectionPage({ section, profile, country, focus, notificationThem
     const dueSoonCount = activeStaff.filter((member) => member.nextPayDay <= profile.day + 1).length;
     const employeeInitials = (name: string) => name.trim().split(/\s+/).slice(0, 2).map((part) => part[0] ?? '').join('');
     const companyNameFor = (companyId?: string) => profile.companies.find((company) => company.id === companyId)?.name ?? 'الإدارة الرئيسية';
-    return <div className="section-page staff-section-page">{pageShell(
+    return <div className="section-page staff-section-page">{heading}{pageShell(
       <>
         <div className="staff-command-surface">
           <div className="staff-command-head">
@@ -429,8 +472,13 @@ export function SectionPage({ section, profile, country, focus, notificationThem
       return true;
     });
 
+    const myActiveAuctions = (profile.playerAuctions ?? []).filter((a) => a.status === 'active');
+    const mySoldAuctions = (profile.playerAuctions ?? []).filter((a) => a.status === 'sold');
+    const catalogWins = profile.auctionHistory.filter((b) => b.bidder === 'player');
+
     return (
       <div className="section-page auctions-view-page" dir="rtl">
+        {heading}
         {/* Auctions Hero Banner with 'List Asset in Auction' Button */}
         <div className="auctions-hero-banner">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4 w-full">
@@ -438,7 +486,7 @@ export function SectionPage({ section, profile, country, focus, notificationThem
               <div className="auctions-hero-gavel">🔨</div>
               <div>
                 <h1>سوق المزادات الحية الذكية</h1>
-                <p>تنافس مع كبرى الصناديق والمستثمرين على الأصول النادرة · أراضٍ متعثرة وتوسعات مصانع</p>
+                <p>تنافس مع كبرى الصناديق والمستثمرين على الأصول النادرة · اطرح أصولك أو نافس على الفرص</p>
               </div>
             </div>
             <button
@@ -452,163 +500,400 @@ export function SectionPage({ section, profile, country, focus, notificationThem
           </div>
         </div>
 
-        {/* Category Segment Tabs */}
-        <div className="auctions-category-tabs" role="tablist">
+        {/* Main Auction Navigation Tabs */}
+        <div className="flex gap-2 p-1.5 bg-slate-950/90 rounded-2xl mb-4 border border-slate-800 text-xs sm:text-sm">
           <button
             type="button"
-            className={`auction-tab-btn ${auctionCategoryTab === 'all' ? 'is-active' : ''}`}
-            onClick={() => setAuctionCategoryTab('all')}
+            onClick={() => setAuctionViewMode('market')}
+            className={`flex-1 py-2.5 px-3 rounded-xl font-bold transition flex items-center justify-center gap-2 cursor-pointer ${
+              auctionViewMode === 'market'
+                ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 shadow-lg font-black'
+                : 'text-slate-400 hover:text-white'
+            }`}
           >
-            الكل
+            <span>🏛️ مزادات السوق الحية</span>
           </button>
           <button
             type="button"
-            className={`auction-tab-btn ${auctionCategoryTab === 'land' ? 'is-active' : ''}`}
-            onClick={() => setAuctionCategoryTab('land')}
+            onClick={() => setAuctionViewMode('my_listings')}
+            className={`flex-1 py-2.5 px-3 rounded-xl font-bold transition flex items-center justify-center gap-2 cursor-pointer ${
+              auctionViewMode === 'my_listings'
+                ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 shadow-lg font-black'
+                : 'text-slate-400 hover:text-white'
+            }`}
           >
-            <Icon name="land" size={18} /> أراضي
+            <span>🔨 مزاداتي المعروضة</span>
+            {myActiveAuctions.length > 0 && (
+              <span className="bg-slate-950 text-amber-400 px-2 py-0.5 rounded-full text-[11px] font-mono font-black">
+                {myActiveAuctions.length}
+              </span>
+            )}
           </button>
           <button
             type="button"
-            className={`auction-tab-btn ${auctionCategoryTab === 'factory' ? 'is-active' : ''}`}
-            onClick={() => setAuctionCategoryTab('factory')}
+            onClick={() => setAuctionViewMode('history')}
+            className={`flex-1 py-2.5 px-3 rounded-xl font-bold transition flex items-center justify-center gap-2 cursor-pointer ${
+              auctionViewMode === 'history'
+                ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 shadow-lg font-black'
+                : 'text-slate-400 hover:text-white'
+            }`}
           >
-            <Icon name="factory" size={18} /> مصانع
-          </button>
-          <button
-            type="button"
-            className={`auction-tab-btn ${auctionCategoryTab === 'material' ? 'is-active' : ''}`}
-            onClick={() => setAuctionCategoryTab('material')}
-          >
-            <Icon name="warehouse" size={18} /> مواد خام
+            <span>📜 سجل المبيعات والمزادات</span>
+            {mySoldAuctions.length > 0 && (
+              <span className="bg-slate-950 text-emerald-400 px-2 py-0.5 rounded-full text-[11px] font-mono font-black">
+                {mySoldAuctions.length}
+              </span>
+            )}
           </button>
         </div>
 
-        {/* Fair Bidding Guarantee Banner */}
-        <div className="auctions-fair-banner">
-          <div className="fair-banner-icon">⚖️</div>
-          <div className="fair-banner-text">
-            <h3>مزايدة عادلة وشفافة بمشاركة 30 صندوق ومستثمر إقليمي</h3>
-            <p>جميع الصفقات معتمدة قضائياً وبضمان تحصيل وتسجيل رسمي فوري للأصول.</p>
+        {/* VIEW 1: MARKET AUCTIONS */}
+        {auctionViewMode === 'market' && (
+          <>
+            {/* Category Segment Tabs */}
+            <div className="auctions-category-tabs" role="tablist">
+              <button
+                type="button"
+                className={`auction-tab-btn ${auctionCategoryTab === 'all' ? 'is-active' : ''}`}
+                onClick={() => setAuctionCategoryTab('all')}
+              >
+                الكل
+              </button>
+              <button
+                type="button"
+                className={`auction-tab-btn ${auctionCategoryTab === 'land' ? 'is-active' : ''}`}
+                onClick={() => setAuctionCategoryTab('land')}
+              >
+                <Icon name="land" size={18} /> أراضي
+              </button>
+              <button
+                type="button"
+                className={`auction-tab-btn ${auctionCategoryTab === 'factory' ? 'is-active' : ''}`}
+                onClick={() => setAuctionCategoryTab('factory')}
+              >
+                <Icon name="factory" size={18} /> مصانع
+              </button>
+              <button
+                type="button"
+                className={`auction-tab-btn ${auctionCategoryTab === 'material' ? 'is-active' : ''}`}
+                onClick={() => setAuctionCategoryTab('material')}
+              >
+                <Icon name="warehouse" size={18} /> مواد خام
+              </button>
+            </div>
+
+            {/* Fair Bidding Guarantee Banner */}
+            <div className="auctions-fair-banner">
+              <div className="fair-banner-icon">⚖️</div>
+              <div className="fair-banner-text">
+                <h3>مزايدة عادلة وشفافة بمشاركة 30 صندوق ومستثمر إقليمي</h3>
+                <p>جميع الصفقات معتمدة قضائياً وبضمان تحصيل وتسجيل رسمي فوري للأصول.</p>
+              </div>
+              <div className="fair-banner-gavel">🔨</div>
+            </div>
+
+            {/* Auction Items Cards List */}
+            <div className="auctions-items-list">
+              {/* 1. Dynamic Live Distressed Auctions */}
+              {filteredLive.map((item) => {
+                const remainingMins = Math.max(1, Math.round((item.closesAtMs - Date.now()) / 60000));
+                const hours = Math.floor(remainingMins / 60);
+                const mins = remainingMins % 60;
+                const timeLabel = hours > 0 ? `${hours}س ${mins}د` : `${mins}د`;
+
+                return (
+                  <article className="auction-item-card" key={item.id}>
+                    {item.lotType === 'land' ? (
+                      <ItemImage type="land" landType={item.landType || 'industrial'} name={item.title} size="md" className="auction-card-thumb-wrap" />
+                    ) : item.lotType === 'factory' ? (
+                      <ItemImage type="industry" id="electricity" name={item.title} size="md" className="auction-card-thumb-wrap" />
+                    ) : (
+                      <ItemImage type="material" id={item.materialId || 'steel'} name={item.title} size="md" className="auction-card-thumb-wrap" />
+                    )}
+
+                    <div className="auction-card-body">
+                      <div className="auction-card-top">
+                        <div>
+                          <span className="inline-block text-[10px] font-bold text-amber-400 bg-amber-500/15 px-2 py-0.5 rounded-full border border-amber-500/30 mb-1">
+                            جهة الطرح: {item.authority}
+                          </span>
+                          <h3>{item.title}</h3>
+                        </div>
+                        <span className="auction-location">📍 {item.location}</span>
+                      </div>
+
+                      <p className="auction-desc">{item.description}</p>
+
+                      <div className="bg-slate-950/70 p-2 rounded-xl border border-slate-800 text-[11px] flex items-center justify-between mb-2">
+                        <span className="text-slate-400">العرض المتصدر حالياً:</span>
+                        <span className="font-bold text-slate-200">
+                          {item.leadingInvestor.name} <span className="text-[10px] text-amber-400">({item.leadingInvestor.type})</span>
+                        </span>
+                      </div>
+
+                      <div className="auction-card-footer">
+                        <div className="auction-meta-info">
+                          <div>
+                            <small>العرض الحالي</small>
+                            <strong className="text-emerald-400 font-mono">💰 {formatMoney(item.currentBid, country)}</strong>
+                          </div>
+                          <div>
+                            <small>الوقت المتبقي</small>
+                            <strong className="auction-time-text">⏰ {timeLabel}</strong>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          className="auction-enter-btn cursor-pointer"
+                          onClick={() => setSelectedAuctionId(item.id)}
+                        >
+                          ادخل المزاد 🔨
+                        </button>
+                      </div>
+                    </div>
+                  </article>
+                );
+              })}
+
+              {/* 2. Catalog Listings */}
+              {filteredCatalog.map((listing) => {
+                const material = MATERIAL_CATALOG.find((item) => item.id === listing.materialId);
+                const closeAt = getAuctionCloseAt(profile, listing);
+                const lotSummary = listing.lotType === 'land'
+                  ? `${formatNumber(listing.areaSquareMeters)} م² · أرض ${landTypeNames[listing.landType]}`
+                  : listing.lotType === 'factory'
+                    ? `توسعة طاقة مصنع بمقدار ${formatNumber(listing.energyCapacityBonus ?? 0)} وحدة`
+                    : `شحنة ${formatNumber(listing.quantity ?? 0)} ${material?.unit ?? 'وحدة'} من ${material?.name ?? 'مواد خام'}`;
+
+                return (
+                  <article className="auction-item-card" key={listing.id}>
+                    <div className={`auction-card-thumb auction-thumb--${listing.lotType}`}>
+                      <span className={`auction-tag-badge auction-tag--${listing.lotType}`}>
+                        {listing.lotType === 'land' ? 'أراضي' : listing.lotType === 'factory' ? 'مصانع' : 'مواد خام'}
+                      </span>
+                    </div>
+                    <div className="auction-card-body">
+                      <div className="auction-card-top">
+                        <div>
+                          <span className="inline-block text-[10px] font-bold text-amber-400 bg-amber-500/15 px-2 py-0.5 rounded-full border border-amber-500/30 mb-1">
+                            جهة الطرح: تصفية قضائية معلنة
+                          </span>
+                          <h3>{listing.label}</h3>
+                        </div>
+                        <span className="auction-location">📍 {listing.lotType === 'land' ? 'منطقة توسعة' : 'مركز لوجستي'}</span>
+                      </div>
+                      <p className="auction-desc">{lotSummary}</p>
+                      <div className="auction-card-footer">
+                        <div className="auction-meta-info">
+                          <div>
+                            <small>أقل مزايدة</small>
+                            <strong>💰 {formatMoney(listing.minimumBid, country)}</strong>
+                          </div>
+                          <div>
+                            <small>الوقت المتبقي</small>
+                            <strong className="auction-time-text">⏰ {formatAuctionCountdown(closeAt)}</strong>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          className="auction-enter-btn cursor-pointer"
+                          onClick={() => setSelectedAuctionId(listing.id)}
+                        >
+                          ادخل المزاد 🔨
+                        </button>
+                      </div>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          </>
+        )}
+
+        {/* VIEW 2: MY LISTED AUCTIONS (ACTIVE) */}
+        {auctionViewMode === 'my_listings' && (
+          <div className="space-y-4">
+            <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <span className="text-xl">🏛️</span>
+                <span>
+                  أصولك المعروضة في المزاد العلني تظل نشطة ومستقلة حتى تتم ترسيتها أو إلغاؤها، ويُصرف ثمن البيع مرة واحدة فقط عند اكتمال البيع.
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsListAssetModalOpen(true)}
+                className="py-1.5 px-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs shrink-0 cursor-pointer"
+              >
+                + طرح أصل جديد
+              </button>
+            </div>
+
+            {myActiveAuctions.length === 0 ? (
+              <div className="text-center py-12 px-4 rounded-3xl bg-slate-900/60 border border-slate-800 space-y-3">
+                <span className="text-4xl block">🔨</span>
+                <h3 className="text-base font-bold text-white">لا توجد أصول معروضة في المزاد حالياً</h3>
+                <p className="text-xs text-slate-400 max-w-md mx-auto">
+                  يمكنك طرح أراضيك أو مصانعك في قاعة المزاد ليتنافس عليها المستثمرون والصناديق وتحقيق أعلى قيمة نقدية كاش.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setIsListAssetModalOpen(true)}
+                  className="mt-2 py-2.5 px-6 rounded-2xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs cursor-pointer shadow-lg"
+                >
+                  طرح أصل في المزاد الآن 🏛️
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {myActiveAuctions.map((item) => (
+                  <article key={item.id} className="p-4 sm:p-5 rounded-3xl bg-slate-900 border border-amber-500/40 shadow-xl space-y-4 relative">
+                    <div className="flex items-start justify-between gap-2 border-b border-slate-800 pb-3">
+                      <div>
+                        <span className="inline-block text-[10px] font-bold text-amber-400 bg-amber-500/15 px-2 py-0.5 rounded-full border border-amber-500/30 mb-1">
+                          مزاد جاري · {item.assetType === 'land' ? 'أرض استثمارية' : 'منشأة صناعية'}
+                        </span>
+                        <h3 className="text-base font-bold text-white">{item.assetName}</h3>
+                        <p className="text-xs text-slate-400 mt-0.5">{item.assetSpecs}</p>
+                      </div>
+                      <span className="text-[11px] font-mono text-emerald-400 bg-emerald-950/60 border border-emerald-800/40 px-2.5 py-1 rounded-xl font-bold shrink-0">
+                        متاح للمزايدة
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div className="p-2.5 rounded-xl bg-slate-950/80 border border-slate-800">
+                        <span className="text-slate-400 block text-[10px]">القيمة التقديرية</span>
+                        <strong className="text-slate-200">{formatMoney(item.originalValue, country)}</strong>
+                      </div>
+                      <div className="p-2.5 rounded-xl bg-slate-950/80 border border-slate-800">
+                        <span className="text-slate-400 block text-[10px]">سعر البداية</span>
+                        <strong className="text-slate-200">{formatMoney(item.startingBid, country)}</strong>
+                      </div>
+                    </div>
+
+                    <div className="p-3 rounded-2xl bg-gradient-to-r from-slate-950 via-amber-950/20 to-slate-950 border border-amber-500/30 flex items-center justify-between">
+                      <div>
+                        <span className="text-[10px] text-slate-400 block">أعلى عرض مسجل حالياً</span>
+                        <strong className="text-base text-emerald-400 font-mono font-black">
+                          {formatMoney(item.currentBid, country)}
+                        </strong>
+                      </div>
+                      <div className="text-left">
+                        <span className="text-[10px] text-slate-400 block">المستثمر المتصدر</span>
+                        <strong className="text-xs text-amber-300 font-bold">{item.leadingBidderName}</strong>
+                        <small className="block text-[10px] text-slate-500">({item.leadingBidderType})</small>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const res = settlePlayerAssetAuction(profile, item.id);
+                          if (res.ok) {
+                            if (onProfileUpdate) onProfileUpdate(res.profile);
+                            onAction(res);
+                            playSound('cash');
+                          }
+                        }}
+                        className="flex-1 py-2.5 px-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 text-slate-950 font-black text-xs shadow-md transition transform active:scale-95 cursor-pointer text-center"
+                      >
+                        اعتماد البيع واستلام {formatMoney(item.currentBid, country)} 💰
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const res = cancelPlayerAssetAuction(profile, item.id);
+                          if (res.ok) {
+                            if (onProfileUpdate) onProfileUpdate(res.profile);
+                            onAction(res);
+                            playSound('click');
+                          }
+                        }}
+                        className="py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-rose-300 font-bold text-xs transition border border-rose-900/40 cursor-pointer"
+                        title="إلغاء المزاد واستعادة الأصل لمحفظتك"
+                      >
+                        إلغاء ↩️
+                      </button>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            )}
           </div>
-          <div className="fair-banner-gavel">🔨</div>
-        </div>
+        )}
 
-        {/* Auction Items Cards List */}
-        <div className="auctions-items-list">
-          {/* 1. Dynamic Live Distressed Auctions with Authorities & Rival Bidders */}
-          {filteredLive.map((item) => {
-            const remainingMins = Math.max(1, Math.round((item.closesAtMs - Date.now()) / 60000));
-            const hours = Math.floor(remainingMins / 60);
-            const mins = remainingMins % 60;
-            const timeLabel = hours > 0 ? `${hours}س ${mins}د` : `${mins}د`;
+        {/* VIEW 3: SALES & AUCTION HISTORY */}
+        {auctionViewMode === 'history' && (
+          <div className="space-y-4">
+            <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 text-slate-300 text-xs flex items-center justify-between">
+              <div>
+                <strong className="text-white block text-sm">سجل العمليات والمبيعات المغلقة</strong>
+                <p className="text-slate-400 text-[11px] mt-0.5">
+                  جميع الصفقات المباعة أو المشتراة بالمزاد موثقة نهائياً ولا يمكن إعادة صرف أرباحها.
+                </p>
+              </div>
+              <div className="text-left font-mono">
+                <span className="text-[10px] text-slate-400 block">إجمالي المبيعات المكتملة</span>
+                <strong className="text-emerald-400 text-sm">{mySoldAuctions.length} صفقات</strong>
+              </div>
+            </div>
 
-            return (
-              <article className="auction-item-card" key={item.id}>
-                {item.lotType === 'land' ? (
-                  <ItemImage type="land" landType={item.landType || 'industrial'} name={item.title} size="md" className="auction-card-thumb-wrap" />
-                ) : item.lotType === 'factory' ? (
-                  <ItemImage type="industry" id="electricity" name={item.title} size="md" className="auction-card-thumb-wrap" />
-                ) : (
-                  <ItemImage type="material" id={item.materialId || 'steel'} name={item.title} size="md" className="auction-card-thumb-wrap" />
-                )}
-
-                <div className="auction-card-body">
-                  <div className="auction-card-top">
+            {mySoldAuctions.length === 0 && catalogWins.length === 0 ? (
+              <div className="text-center py-12 px-4 rounded-3xl bg-slate-900/60 border border-slate-800 text-slate-400 text-xs">
+                لا توجد مبيعات أو صفقات سابقة مسجلة في السجل بعد.
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {mySoldAuctions.map((item) => (
+                  <article key={item.id} className="p-4 rounded-2xl bg-slate-900/90 border border-emerald-500/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
                     <div>
-                      <span className="inline-block text-[10px] font-bold text-amber-400 bg-amber-500/15 px-2 py-0.5 rounded-full border border-amber-500/30 mb-1">
-                        جهة الطرح: {item.authority}
-                      </span>
-                      <h3>{item.title}</h3>
-                    </div>
-                    <span className="auction-location">📍 {item.location}</span>
-                  </div>
-
-                  <p className="auction-desc">{item.description}</p>
-
-                  <div className="bg-slate-950/70 p-2 rounded-xl border border-slate-800 text-[11px] flex items-center justify-between mb-2">
-                    <span className="text-slate-400">العرض المتصدر حالياً:</span>
-                    <span className="font-bold text-slate-200">
-                      {item.leadingInvestor.name} <span className="text-[10px] text-amber-400">({item.leadingInvestor.type})</span>
-                    </span>
-                  </div>
-
-                  <div className="auction-card-footer">
-                    <div className="auction-meta-info">
-                      <div>
-                        <small>العرض الحالي</small>
-                        <strong className="text-emerald-400 font-mono">💰 {formatMoney(item.currentBid, country)}</strong>
+                      <div className="flex items-center gap-2">
+                        <span className="text-emerald-400 font-bold text-sm">✓</span>
+                        <strong className="text-white text-sm">{item.assetName}</strong>
+                        <span className="text-[10px] text-emerald-400 bg-emerald-950/60 border border-emerald-800/40 px-2 py-0.5 rounded-full font-mono">
+                          تم البيع واستلام المبلغ
+                        </span>
                       </div>
-                      <div>
-                        <small>الوقت المتبقي</small>
-                        <strong className="auction-time-text">⏰ {timeLabel}</strong>
-                      </div>
+                      <p className="text-[11px] text-slate-400 mt-1">
+                        المشتري: <span className="text-amber-300 font-bold">{item.winningBidderName || item.leadingBidderName}</span> · التاريخ: {item.soldAt ? new Date(item.soldAt).toLocaleDateString('ar-EG') : 'اليوم'}
+                      </p>
+                      <small className="text-[10px] text-slate-500 block mt-0.5">
+                        معاملة مغلقة نهائياً برقم ID: {item.id}
+                      </small>
                     </div>
-                    <button
-                      type="button"
-                      className="auction-enter-btn"
-                      onClick={() => setSelectedAuctionId(item.id)}
-                    >
-                      ادخل المزاد 🔨
-                    </button>
-                  </div>
-                </div>
-              </article>
-            );
-          })}
 
-          {/* 2. Catalog Listings */}
-          {filteredCatalog.map((listing) => {
-            const material = MATERIAL_CATALOG.find((item) => item.id === listing.materialId);
-            const closeAt = getAuctionCloseAt(profile, listing);
-            const lotSummary = listing.lotType === 'land'
-              ? `${formatNumber(listing.areaSquareMeters)} م² · أرض ${landTypeNames[listing.landType]}`
-              : listing.lotType === 'factory'
-                ? `توسعة طاقة مصنع بمقدار ${formatNumber(listing.energyCapacityBonus ?? 0)} وحدة`
-                : `شحنة ${formatNumber(listing.quantity ?? 0)} ${material?.unit ?? 'وحدة'} من ${material?.name ?? 'مواد خام'}`;
+                    <div className="text-left sm:text-right shrink-0">
+                      <span className="text-[10px] text-slate-400 block">قيمة البيع المحصّلة</span>
+                      <strong className="text-base text-emerald-400 font-mono font-black">
+                        +{formatMoney(item.finalSalePrice || item.currentBid, country)}
+                      </strong>
+                      {(item.profitDifference ?? 0) > 0 && (
+                        <span className="block text-[10px] text-emerald-300 font-bold">
+                          فارق ربح +{formatMoney(item.profitDifference ?? 0, country)} (+{item.profitPercent ?? 0}%)
+                        </span>
+                      )}
+                    </div>
+                  </article>
+                ))}
 
-            return (
-              <article className="auction-item-card" key={listing.id}>
-                <div className={`auction-card-thumb auction-thumb--${listing.lotType}`}>
-                  <span className={`auction-tag-badge auction-tag--${listing.lotType}`}>
-                    {listing.lotType === 'land' ? 'أراضي' : listing.lotType === 'factory' ? 'مصانع' : 'مواد خام'}
-                  </span>
-                </div>
-                <div className="auction-card-body">
-                  <div className="auction-card-top">
+                {catalogWins.map((win) => (
+                  <article key={win.id} className="p-3.5 rounded-2xl bg-slate-900/70 border border-slate-800 flex items-center justify-between gap-3 text-xs">
                     <div>
-                      <span className="inline-block text-[10px] font-bold text-amber-400 bg-amber-500/15 px-2 py-0.5 rounded-full border border-amber-500/30 mb-1">
-                        جهة الطرح: تصفية قضائية معلنة
-                      </span>
-                      <h3>{listing.label}</h3>
+                      <strong className="text-slate-200">صفقة شراء بالمزاد (ترسية)</strong>
+                      <p className="text-[11px] text-slate-400 mt-0.5">معرّف المزاد: {win.listingId}</p>
                     </div>
-                    <span className="auction-location">📍 {listing.lotType === 'land' ? 'منطقة توسعة' : 'مركز لوجستي'}</span>
-                  </div>
-                  <p className="auction-desc">{lotSummary}</p>
-                  <div className="auction-card-footer">
-                    <div className="auction-meta-info">
-                      <div>
-                        <small>أقل مزايدة</small>
-                        <strong>💰 {formatMoney(listing.minimumBid, country)}</strong>
-                      </div>
-                      <div>
-                        <small>الوقت المتبقي</small>
-                        <strong className="auction-time-text">⏰ {formatAuctionCountdown(closeAt)}</strong>
-                      </div>
+                    <div className="text-left font-mono">
+                      <span className="text-[10px] text-slate-400 block">المبلغ المدفوع</span>
+                      <strong className="text-slate-300">-{formatMoney(win.amount, country)}</strong>
                     </div>
-                    <button
-                      type="button"
-                      className="auction-enter-btn"
-                      onClick={() => setSelectedAuctionId(listing.id)}
-                    >
-                      ادخل المزاد 🔨
-                    </button>
-                  </div>
-                </div>
-              </article>
-            );
-          })}
-        </div>
+                  </article>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Live Bidding Modal Room */}
         {selectedAuction && (
@@ -686,7 +971,7 @@ export function SectionPage({ section, profile, country, focus, notificationThem
   if (section.id === 'lands') {
     const usedLandIds = new Set(profile.companies.map((company) => company.landId).filter(Boolean));
     const totalLandValue = profile.lands.reduce((sum, land) => sum + land.purchasePrice, 0);
-    const starterOfferVisible = profile.lands.length === 0 && profile.day <= 3;
+    const starterOfferVisible = !profile.lands.some((land) => land.id === 'starter-village-land') && profile.lands.length <= 1;
     const directLandOffers = getDirectLandsForCountry(country.id).filter((listing) => !profile.lands.some((land) => land.id === listing.id));
     const starterListing = getDirectLandsForCountry(country.id).find((listing) => listing.id === 'starter-village-land') || getDirectLandsForCountry(country.id)[0];
     const matchesLandType = (landType?: 'industrial' | 'agricultural' | 'commercial') => landTypeFilter === 'all' || landType === landTypeFilter;
@@ -696,17 +981,17 @@ export function SectionPage({ section, profile, country, focus, notificationThem
     return <div className="section-page">{heading}{pageShell(
       <>
         <div className="economy-grid economy-grid--three-mobile"><EconomyStat label="قطع الأراضي" value={formatNumber(profile.lands.length)} /><EconomyStat label="أراضٍ مرتبطة بشركات" value={formatNumber(usedLandIds.size)} /><EconomyStat label="القيمة الدفترية" value={formatMoney(totalLandValue, country)} /></div>
-        <div className="land-view-tabs" role="tablist" aria-label="أقسام الأراضي"><button className={landView === 'owned' ? 'is-active' : ''} type="button" role="tab" aria-selected={landView === 'owned'} onClick={() => setLandView('owned')}><Icon name="land" size={16} /> أراضي الإمبراطورية</button><button className={landView === 'offers' ? 'is-active' : ''} type="button" role="tab" aria-selected={landView === 'offers'} onClick={() => setLandView('offers')}><Icon name="store" size={16} /> العروض المباشرة</button></div>
+        <div className="land-view-tabs" role="tablist" aria-label="أقسام الأراضي"><button className={landView === 'owned' ? 'is-active' : ''} type="button" role="tab" aria-selected={landView === 'owned'} onClick={() => setLandView('owned')}><Icon name="land" size={16} /> أراضي الإمبراطورية</button><button className={landView === 'offers' ? 'is-active' : ''} type="button" role="tab" data-guide-tab="lands-offers-tab" aria-selected={landView === 'offers'} onClick={() => setLandView('offers')}><Icon name="store" size={16} /> العروض المباشرة</button></div>
         {landView === 'offers' ? <>
           {starterOfferVisible && starterListing && (
-            <SectionPanel title={`عرض البداية · ${starterListing.label}`} description={`عرض مضمون للتأسيس المباشر ومناسب لرأس مالك الأولي في ${country.name}.`}><article className="economy-card starter-land-offer"><div className="economy-card-head"><div className="economy-card-title"><span className="economy-card-icon"><Icon name="land" size={21} /></span><span><strong>{starterListing.label}</strong><small>{formatNumber(starterListing.areaSquareMeters)} م² · عرض التأسيس في {country.name}</small></span></div><span className="economy-price">{formatMoney(starterListing.price, country)}</span></div><div className="economy-card-body"><p className="economy-card-description">«أرض استثمارية مؤهلة وجاهزة لإطلاق أول خط إنتاج لإمبراطوريتك.»</p><div className="economy-meta"><span className="economy-pill economy-pill--gold">لا مزاد</span><span className="economy-pill economy-pill--green">عرض مضمون</span><span>سعر التأسيس</span></div><PurchaseOptions country={country} cashPrice={starterListing.price} bankBalance={profile.bankBalance} diamondsBalance={profile.diamonds} cashLabel="شراء الأرض نقدًا" guideTarget="buy-land-btn" onPurchase={(paymentMethod) => runCommand({ name: 'buy_direct_land', args: { listingId: starterListing.id, paymentMethod } }, (current) => buyDirectLand(current, starterListing.id, paymentMethod))} /></div></article></SectionPanel>
+            <SectionPanel id="lands-starter-offer" title={`عرض البداية · ${starterListing.label}`} description={`عرض مضمون للتأسيس المباشر ومناسب لرأس مالك الأولي في ${country.name}.`}><article className="economy-card starter-land-offer"><div className="economy-card-head"><div className="economy-card-title"><span className="economy-card-icon"><Icon name="land" size={21} /></span><span><strong>{starterListing.label}</strong><small>{formatNumber(starterListing.areaSquareMeters)} م² · عرض التأسيس في {country.name}</small></span></div><span className="economy-price">{formatMoney(starterListing.price, country)}</span></div><div className="economy-card-body"><p className="economy-card-description">«أرض استثمارية مؤهلة وجاهزة لإطلاق توسعات إمبراطوريتك.»</p><div className="economy-meta"><span className="economy-pill economy-pill--gold">لا مزاد</span><span className="economy-pill economy-pill--green">عرض مضمون</span><span>سعر التأسيس</span></div><PurchaseOptions country={country} cashPrice={starterListing.price} bankBalance={profile.bankBalance} diamondsBalance={profile.diamonds} cashLabel="شراء الأرض نقدًا" guideTarget="buy-land-btn" onPurchase={(paymentMethod) => runCommand({ name: 'buy_direct_land', args: { listingId: starterListing.id, paymentMethod } }, (current) => buyDirectLand(current, starterListing.id, paymentMethod))} /></div></article></SectionPanel>
           )}
-          <SectionPanel title={`أراضٍ معروضة مباشرة في ${country.name}`} description="اشترِ أرضًا فورًا في مواقع حقيقية دون انتظار مزاد، ثم اترك يومًا داخل اللعبة حتى تكتمل إجراءات نقل الملكية."><div className="land-filter-bar" role="group" aria-label="فلترة وترتيب الأراضي"><label>النوع<select value={landTypeFilter} onChange={(event) => setLandTypeFilter(event.target.value as typeof landTypeFilter)}><option value="all">كل الأنواع</option><option value="industrial">صناعية</option><option value="agricultural">زراعية</option><option value="commercial">تجارية</option></select></label><label>الترتيب<select value={landSort} onChange={(event) => setLandSort(event.target.value as typeof landSort)}><option value="price">السعر: الأعلى أولًا</option><option value="area">المساحة: الأكبر أولًا</option><option value="type">النوع أبجديًا</option></select></label></div><div className="economy-list">{visibleDirectLandOffers.filter((listing) => listing.id !== 'starter-village-land').map((listing) => (
-            <article className="economy-card economy-card--soft" key={listing.id}><div className="economy-card-head"><div className="economy-card-title"><span className="economy-card-icon"><Icon name="land" size={18} /></span><span><strong>{listing.label}</strong><small>{formatNumber(listing.areaSquareMeters)} م² · أرض {landTypeNames[listing.landType]}</small></span></div><span className="economy-price">{formatMoney(listing.price, country)}</span></div><PurchaseOptions country={country} cashPrice={listing.price} bankBalance={profile.bankBalance} diamondsBalance={profile.diamonds} onPurchase={(paymentMethod) => runCommand({ name: 'buy_direct_land', args: { listingId: listing.id, paymentMethod } }, (current) => buyDirectLand(current, listing.id, paymentMethod))} /></article>
+          <SectionPanel id="lands-direct-offers" title={`أراضٍ معروضة مباشرة في ${country.name}`} description="اشترِ أرضًا فورًا في مواقع حقيقية دون انتظار مزاد، ثم اترك يومًا داخل اللعبة حتى تكتمل إجراءات نقل الملكية."><div className="land-filter-bar" role="group" aria-label="فلترة وترتيب الأراضي"><label>النوع<select value={landTypeFilter} onChange={(event) => setLandTypeFilter(event.target.value as typeof landTypeFilter)}><option value="all">كل الأنواع</option><option value="industrial">صناعية</option><option value="agricultural">زراعية</option><option value="commercial">تجارية</option></select></label><label>الترتيب<select value={landSort} onChange={(event) => setLandSort(event.target.value as typeof landSort)}><option value="price">السعر: الأعلى أولًا</option><option value="area">المساحة: الأكبر أولًا</option><option value="type">النوع أبجديًا</option></select></label></div><div className="economy-list">{visibleDirectLandOffers.filter((listing) => listing.id !== 'starter-village-land').map((listing, offerIdx) => (
+            <article className="economy-card economy-card--soft" key={listing.id}><div className="economy-card-head"><div className="economy-card-title"><span className="economy-card-icon"><Icon name="land" size={18} /></span><span><strong>{listing.label}</strong><small>{formatNumber(listing.areaSquareMeters)} م² · أرض {landTypeNames[listing.landType]}</small></span></div><span className="economy-price">{formatMoney(listing.price, country)}</span></div><PurchaseOptions country={country} cashPrice={listing.price} bankBalance={profile.bankBalance} diamondsBalance={profile.diamonds} guideTarget={!starterOfferVisible && offerIdx === 0 ? 'buy-land-btn' : undefined} onPurchase={(paymentMethod) => runCommand({ name: 'buy_direct_land', args: { listingId: listing.id, paymentMethod } }, (current) => buyDirectLand(current, listing.id, paymentMethod))} /></article>
           ))}{visibleDirectLandOffers.filter((listing) => listing.id !== 'starter-village-land').length === 0 && <EconomyEmpty title="لا توجد عروض إضافية" message="استكشف صفحة المزادات لمواقع جديدة أو عد بعد تقدمك في القصة." />}</div><button className="button button-secondary" type="button" onClick={() => onNavigate('auctions')}><Icon name="gavel" size={16} /> استكشاف المزادات والمزيد من الفرص</button></SectionPanel>
         </> : <>
-          {starterOfferVisible && starterListing && <SectionPanel title="خطوة البداية" description={`ابدأ بالعرض المضمون في ${starterListing.label}؛ لن تحتاج إلى دخول المزاد في أول مهمة.`}><div className="economy-notice economy-notice--success"><Icon name="target" size={16} />افتح تبويب «العروض المباشرة» لقبول عرض الأرض والبدء.</div><button className="button button-primary" type="button" data-guide-target="buy-land-btn" onClick={() => setLandView('offers')}>فتح عرض البداية</button></SectionPanel>}
-          <SectionPanel title="أراضي الإمبراطورية" description="اضغط على أي أرض لرؤية حالتها، الشركة المرتبطة بها، وخيار تطويرها.">{profile.lands.length === 0 ? <EconomyEmpty title="لا توجد أراضٍ مملوكة بعد" message="افتح عرض البداية من تبويب العروض المباشرة، أو استكشف المزادات بعد فتحها." /> : <div className="economy-list">{visibleOwnedLands.map((land) => { const owner = profile.companies.find((company) => company.landId === land.id); const isExpanded = expandedLandId === land.id; const available = (land.availableForCompanyOnDay ?? land.acquiredOnDay ?? 1) <= profile.day; return <article className={`economy-card asset-detail-card${isExpanded ? ' asset-detail-card--expanded' : ''}`} key={land.id}><button className="asset-detail-trigger" type="button" aria-expanded={isExpanded} onClick={() => setExpandedLandId(isExpanded ? null : land.id)}><span className="economy-card-title"><span className="economy-card-icon"><Icon name={owner ? 'factory' : 'land'} size={19} /></span><span><strong>{land.label}</strong><small>{formatNumber(land.areaSquareMeters)} م² · {land.landType ? landTypeNames[land.landType] : 'نوع عام'} · مستوى {formatNumber(land.upgradeLevel ?? 1)}</small></span></span><span className={`economy-pill ${owner ? 'economy-pill--green' : 'economy-pill--gold'}`}>{owner ? `تشغلها ${owner.name}` : landTransferStatus(land, profile.day)}</span></button>{isExpanded && <div className="asset-detail-body"><div className="economy-meta"><span>سعر الشراء {formatMoney(land.purchasePrice, country)}</span><span>تاريخ التسجيل {new Date(land.acquiredAt).toLocaleDateString('ar-EG')}</span><span>الحالة {owner ? 'مرتبطة بشركة' : landTransferStatus(land, profile.day)}</span></div>{owner ? <div className="asset-detail-summary"><Icon name="factory" size={17} /><span>تدعم هذه الأرض شركة <strong>{owner.name}</strong> في قطاع {INDUSTRY_CATALOG.find((item) => item.id === owner.industryId)?.name ?? owner.industryId}.</span></div> : <><p className="economy-card-description">هذه الأرض {available ? 'جاهزة الآن لتأسيس شركة من القطاع المناسب.' : 'ما زالت قيد نقل الملكية، وستصبح متاحة بعد اكتمال الإجراءات.'}</p>{available && <button className="button button-primary" type="button" onClick={() => onNavigate('companies')}>تأسيس شركة على هذه الأرض</button>}</>}{(land.upgradeLevel ?? 1) >= 5 ? <p className="economy-meta">الأرض في أعلى مستوى تطوير.</p> : <PurchaseOptions country={country} cashPrice={Math.round(2_500 * Math.pow(1.5, (land.upgradeLevel ?? 1) - 1))} bankBalance={profile.bankBalance} diamondsBalance={profile.diamonds} cashLabel="تطوير الأرض · نقدًا" onPurchase={(paymentMethod) => runCommand({ name: 'upgrade_land', args: { landId: land.id, paymentMethod } }, (current) => upgradeLand(current, land.id, paymentMethod))} />}</div>}</article>; })}</div>}</SectionPanel>
+          {starterOfferVisible && starterListing && <SectionPanel id="lands-starter-step" title="خطوة البداية" description={`ابدأ بالعرض المضمون في ${starterListing.label}؛ لن تحتاج إلى دخول المزاد في هذه المرحلة.`}><div className="economy-notice economy-notice--success"><Icon name="target" size={16} />افتح تبويب «العروض المباشرة» لقبول عرض الأرض والبدء.</div><button className="button button-primary" type="button" data-guide-target="open-starter-land-btn" onClick={() => setLandView('offers')}>فتح عرض البداية</button></SectionPanel>}
+          <SectionPanel id="lands-owned" title="أراضي الإمبراطورية" description="اضغط على أي أرض لرؤية حالتها، الشركة المرتبطة بها، وخيار تطويرها.">{profile.lands.length === 0 ? <EconomyEmpty title="لا توجد أراضٍ مملوكة بعد" message="افتح عرض البداية من تبويب العروض المباشرة، أو استكشف المزادات بعد فتحها." /> : <div className="economy-list">{visibleOwnedLands.map((land) => { const owner = profile.companies.find((company) => company.landId === land.id); const isExpanded = expandedLandId === land.id; const available = (land.availableForCompanyOnDay ?? land.acquiredOnDay ?? 1) <= profile.day; return <article className={`economy-card asset-detail-card${isExpanded ? ' asset-detail-card--expanded' : ''}`} key={land.id}><button className="asset-detail-trigger" type="button" aria-expanded={isExpanded} onClick={() => setExpandedLandId(isExpanded ? null : land.id)}><span className="economy-card-title"><span className="economy-card-icon"><Icon name={owner ? 'factory' : 'land'} size={19} /></span><span><strong>{land.label}</strong><small>{formatNumber(land.areaSquareMeters)} م² · {land.landType ? landTypeNames[land.landType] : 'نوع عام'} · مستوى {formatNumber(land.upgradeLevel ?? 1)}</small></span></span><span className={`economy-pill ${owner ? 'economy-pill--green' : 'economy-pill--gold'}`}>{owner ? `تشغلها ${owner.name}` : landTransferStatus(land, profile.day)}</span></button>{isExpanded && <div className="asset-detail-body"><div className="economy-meta"><span>سعر الشراء {formatMoney(land.purchasePrice, country)}</span><span>تاريخ التسجيل {new Date(land.acquiredAt).toLocaleDateString('ar-EG')}</span><span>الحالة {owner ? 'مرتبطة بشركة' : landTransferStatus(land, profile.day)}</span></div>{owner ? <div className="asset-detail-summary"><Icon name="factory" size={17} /><span>تدعم هذه الأرض شركة <strong>{owner.name}</strong> في قطاع {INDUSTRY_CATALOG.find((item) => item.id === owner.industryId)?.name ?? owner.industryId}.</span></div> : <><p className="economy-card-description">هذه الأرض {available ? 'جاهزة الآن لتأسيس شركة من القطاع المناسب.' : 'ما زالت قيد نقل الملكية، وستصبح متاحة بعد اكتمال الإجراءات.'}</p>{available && <button className="button button-primary" type="button" onClick={() => onNavigate('companies')}>تأسيس شركة على هذه الأرض</button>}</>}{(land.upgradeLevel ?? 1) >= 5 ? <p className="economy-meta">الأرض في أعلى مستوى تطوير.</p> : <PurchaseOptions country={country} cashPrice={Math.round(2_500 * Math.pow(1.5, (land.upgradeLevel ?? 1) - 1))} bankBalance={profile.bankBalance} diamondsBalance={profile.diamonds} cashLabel="تطوير الأرض · نقدًا" onPurchase={(paymentMethod) => runCommand({ name: 'upgrade_land', args: { landId: land.id, paymentMethod } }, (current) => upgradeLand(current, land.id, paymentMethod))} />}</div>}</article>; })}</div>}</SectionPanel>
         </>}
       </>,
     )}</div>;
@@ -724,7 +1009,7 @@ export function SectionPage({ section, profile, country, focus, notificationThem
       <>
         <div className="economy-grid economy-grid--three-mobile"><EconomyStat label="الشركات" value={formatNumber(profile.companies.length)} /><EconomyStat label="تكلفة تأسيس القطاع" value={formatMoney(setupFee + licenseFee, country)} /><EconomyStat label="الأرض المتاحة" value={formatNumber(eligibleLands.length)} /></div>
         <div className="economy-layout">
-          <SectionPanel title="تأسيس شركة" description="اختر قطاعًا، واسمًا، وأرضًا مناسبة. تُخصم رسوم التأسيس والترخيص عند نجاح العملية.">
+          <SectionPanel id="companies-found" title="تأسيس شركة" description="اختر قطاعًا، واسمًا، وأرضًا مناسبة. تُخصم رسوم التأسيس والترخيص عند نجاح العملية.">
             {profile.lands.length === 0 ? <div className="economy-list"><EconomyEmpty title="تحتاج إلى أرض أولًا" message="اشترِ أرضًا من المزادات؛ بعدها يمكنك تأسيس شركة وتشغيل مصنعها." /><button className="button button-primary" type="button" onClick={onHome}>عرض ملخص الإمبراطورية</button></div> : <div className="economy-form">
               <div className="economy-field">
                 <label htmlFor="industry-select">القطاع الاقتصادي (اختر النشاط المناسب لرأس مالك)</label>
@@ -753,7 +1038,7 @@ export function SectionPage({ section, profile, country, focus, notificationThem
                   {industry.id === 'food' || industry.id === 'detergents' 
                     ? 'قطاع ممتاز كبداية! تكاليف ترخيصه منخفضة وتدوير خاماته سريع، مما يتيح لك تحقيق أرباح سريعة وآمنة لحماية رأس مالك.'
                     : industry.id === 'petroleum' || industry.id === 'electricity' || industry.id === 'gas'
-                    ? 'تحذير: هذا قطاع عملاق يستهلك مئات الآلاف في التراخيص والتشغيل اليومي. يُنصح بتأسيسه بعد جمع ثروة لا تقل عن 5 ملايين جنيه.'
+                    ? 'تحذير: هذا قطاع عملاق يستهلك مبالغ كبيرة في التراخيص والتشغيل اليومي. يُنصح بتأسيسه بعد جمع ثروة لا تقل عن 250,000 $.'
                     : 'قطاع صناعي واستثماري متوازن يتطلب متابعة دورية لسوق الخامات ومخزون المستودع.'}
                 </p>
               </div>
@@ -765,7 +1050,7 @@ export function SectionPage({ section, profile, country, focus, notificationThem
               <PurchaseOptions country={country} cashPrice={setupFee + licenseFee} bankBalance={profile.bankBalance} diamondsBalance={profile.diamonds} disabled={!selectedLandId || companyName.trim().length < 1} cashLabel="تأسيس الشركة نقدًا" onPurchase={(paymentMethod) => runCommand({ name: 'found_company', args: { industryId: industry.id, landId: selectedLandId, name: companyName, paymentMethod } }, (current) => foundCompany(current, industry.id, selectedLandId, companyName, paymentMethod))} />
             </div>}
           </SectionPanel>
-          <SectionPanel title="شركاتك القائمة" description="الطاقة والمصروفات تتحدث مع تقدم الأيام.">
+          <SectionPanel id="companies-existing" title="شركاتك القائمة" description="الطاقة والمصروفات تتحدث مع تقدم الأيام.">
             {profile.companies.length === 0 ? <EconomyEmpty title="لم تؤسس شركة بعد" message="ابدأ بشراء أرض مناسبة ثم أكمل نموذج التأسيس." /> : <div className="economy-list">{profile.companies.map((company) => {
               const definition = INDUSTRY_CATALOG.find((item) => item.id === company.industryId);
               const land = profile.lands.find((item) => item.id === company.landId);
@@ -841,6 +1126,7 @@ export function SectionPage({ section, profile, country, focus, notificationThem
       <>
         <div className="economy-grid economy-grid--four-mobile production-overview"><EconomyStat label="المصانع" value={formatNumber(profile.companies.length)} /><EconomyStat label="أوامر نشطة" value={formatNumber(activeProductionCount)} /><EconomyStat label="أوامر مكتملة" value={formatNumber(completedProductionCount)} /><EconomyStat label="الطاقة المتاحة" value={`${formatNumber(totalEnergy)} / ${formatNumber(totalEnergyCapacity)}`} /></div>
         <SectionPanel
+          id="production-lines"
           title="خطوط الإنتاج"
           icon="factory"
           badge={<span className="economy-pill economy-pill--green">🟢 {formatNumber(profile.companies.length)} مصنع نشط</span>}
@@ -887,6 +1173,7 @@ export function SectionPage({ section, profile, country, focus, notificationThem
                     </div>
                     <button
                       type="button"
+                      data-guide-target="auto-supply-produce-btn"
                       className="w-full sm:w-auto px-4 py-2 bg-gradient-to-r from-amber-500 to-emerald-600 hover:from-amber-400 hover:to-emerald-500 text-white text-xs font-bold rounded-lg shadow-md transition flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
                       disabled={!canAffordAutoSupply || companyTransferPending || !recipe || !selectedCompany}
                       onClick={() => {
@@ -923,6 +1210,7 @@ export function SectionPage({ section, profile, country, focus, notificationThem
           {visibleProductionOrders.length === 0 ? <EconomyEmpty title={hiddenProductionHistoryCount > 0 ? 'لا توجد أوامر مطابقة' : 'لا توجد أوامر إنتاج'} message={hiddenProductionHistoryCount > 0 ? 'غيّر الفلتر أو اعرض سجل الإنتاج السابق.' : 'ابدأ أول أمر من لوحة خطوط الإنتاج لتظهر هنا مواعيد التسليم.'} /> : <div className="economy-list">{visibleProductionOrders.map((order) => { const forecastPrice = getMarketQuote(profile, order.productId, order.completesOnDay)?.currentPrice ?? 0; const qualityMultiplier = 0.85 + order.qualityScore / 100 * 0.15; const expectedMargin = Math.round(order.outputQuantity * forecastPrice * qualityMultiplier - order.materialCost - order.energyCost - order.maintenanceCost); return <article className="economy-card economy-card--soft" key={order.id}><div className="economy-card-head"><div className="economy-card-title"><span><strong>{order.productName}</strong><small>{formatNumber(order.outputQuantity)} {order.outputUnit} · بدأ في اليوم {formatNumber(order.startedOnDay)}</small></span></div><span className={`economy-pill ${order.status === 'active' ? 'economy-pill--gold' : order.status === 'completed' ? 'economy-pill--green' : 'economy-pill--red'}`}>{order.status === 'active' ? `يكتمل يوم ${formatNumber(order.completesOnDay)}` : order.status === 'completed' ? 'اكتمل' : 'ملغى'}</span></div><div className="economy-meta"><span>تكلفة الوحدة {formatMoney(order.expectedUnitCost, country)}</span><span>طلب متوقع {formatNumber(order.demandForecast)} {order.outputUnit}</span><span>جودة {formatNumber(order.qualityScore)}%</span><span className={expectedMargin >= 0 ? 'economy-pill economy-pill--green' : 'economy-pill economy-pill--red'}>هامش متوقع {formatMoney(expectedMargin, country)}</span></div>{order.status === 'active' && <div className="economy-actions"><button className="button button-secondary" type="button" onClick={() => runCommand({ name: 'cancel_production', args: { orderId: order.id } }, (current) => cancelProductionOrder(current, order.id))}>إلغاء الأمر واسترداد جزئي</button>{(['production-25', 'production-50', 'production-instant'] as const).map((kind) => { const available = profile.speedCards.find((card) => card.kind === kind)?.quantity ?? 0; return available > 0 && <button className="button button-secondary" type="button" key={kind} onClick={() => runCommand({ name: 'use_speed_card', args: { orderId: order.id, kind } }, (current) => useProductionSpeedCard(current, order.id, kind))}>{kind === 'production-25' ? 'بطاقة 25%' : kind === 'production-50' ? 'بطاقة 50%' : 'إكمال فوري'} ({available})</button>; })}</div>}</article>; })}</div>}{hiddenProductionHistoryCount > 0 && <button className="button button-secondary production-history-toggle" type="button" onClick={() => setShowProductionHistory((value) => !value)}>{showProductionHistory ? 'إخفاء سجل الإنتاج' : `عرض سجل الإنتاج السابق (${formatNumber(hiddenProductionHistoryCount)})`}</button>}
         </SectionPanel>
         <SectionPanel
+          id="production-energy"
           title="الطاقة المتاحة"
           icon="lightning"
           badge={<span className="economy-pill economy-pill--yellow">⚡ {formatNumber(totalEnergy)} / {formatNumber(totalEnergyCapacity)} وحدة</span>}
@@ -937,50 +1225,305 @@ export function SectionPage({ section, profile, country, focus, notificationThem
   if (section.id === 'inventory') {
     const inventorySummary = selectInventorySummary(profile);
     const productRows = inventorySummary.rows.filter((row) => row.kind === 'product');
-    const materialStock = new Map(inventorySummary.rows.filter((row) => row.kind === 'material').map((row) => [row.itemId, row]));
+    const materialRows = inventorySummary.rows.filter((row) => row.kind === 'material');
+    const materialStock = new Map(materialRows.map((row) => [row.itemId, row]));
     const warehouseLevel = normalizeWarehouseLevel(profile.warehouseLevel);
     const warehouseCapacity = getWarehouseCapacity(warehouseLevel);
     const warehouseUsage = getWarehouseUsage(profile.inventory, profile.productionOrders);
     const upgradeRequirement = WAREHOUSE_UPGRADE_REQUIREMENTS[warehouseLevel + 1];
-    const missingUpgradeMaterials = upgradeRequirement ? Object.entries(upgradeRequirement.materials).filter(([materialId, required]) => (materialStock.get(materialId)?.quantity ?? 0) < required) : [];
+    const missingUpgradeMaterials = upgradeRequirement
+      ? Object.entries(upgradeRequirement.materials).filter(([materialId, required]) => (materialStock.get(materialId)?.quantity ?? 0) < required)
+      : [];
     const canUpgradeWarehouse = Boolean(upgradeRequirement && missingUpgradeMaterials.length === 0);
-    return <div className="section-page">{heading}{pageShell(
-      <>
-        <div className="economy-grid economy-grid--three-mobile"><EconomyStat label="أنواع المخزون" value={formatNumber(inventorySummary.rows.length)} /><EconomyStat label="مواد خام" value={formatNumber(inventorySummary.rows.filter((row) => row.kind === 'material').length)} /><EconomyStat label="قيمة المخزون" value={formatMoney(inventorySummary.totalValue, country)} /></div>
-        <SectionPanel id="warehouse-overview" title={`المخزن · المستوى ${formatNumber(warehouseLevel)}`} description="السعة مشتركة بين أنواع المواد الخام وبين المنتجات. تطوير المستوى يوسّع الفئتين ويرفع حد كل صنف، مقابل نقد ومواد محددة.">
-          <div className="warehouse-capacity-grid">
-            <article><span>المواد الخام</span><strong>{formatNumber(warehouseUsage.materials)} / {formatNumber(warehouseCapacity.materials)}</strong><div className="economy-progress"><span style={{ width: `${Math.min(100, warehouseUsage.materials / warehouseCapacity.materials * 100)}%` }} /></div></article>
-            <article><span>المنتجات مع الإنتاج المحجوز</span><strong>{formatNumber(warehouseUsage.products)} / {formatNumber(warehouseCapacity.products)}</strong><div className="economy-progress"><span style={{ width: `${Math.min(100, warehouseUsage.products / warehouseCapacity.products * 100)}%` }} /></div></article>
-          </div>
-          {upgradeRequirement ? <div className="warehouse-upgrade-card"><div><strong>تطوير إلى المستوى {formatNumber(warehouseLevel + 1)}</strong><small>التكلفة {formatMoney(upgradeRequirement.cash, country)} · المتطلبات:</small></div><div className="economy-meta">{Object.entries(upgradeRequirement.materials).map(([materialId, required]) => { const material = MATERIAL_CATALOG.find((item) => item.id === materialId); const owned = materialStock.get(materialId)?.quantity ?? 0; return <span className={owned >= required ? 'economy-pill economy-pill--green' : 'economy-pill economy-pill--gold'} key={materialId}>{material?.name ?? materialId} {formatNumber(owned)} / {formatNumber(required)}</span>; })}</div><PurchaseOptions country={country} cashPrice={upgradeRequirement.cash} bankBalance={profile.bankBalance} diamondsBalance={profile.diamonds} disabled={!canUpgradeWarehouse} cashLabel="تطوير المخزن نقدًا" onPurchase={(paymentMethod) => runCommand({ name: 'upgrade_warehouse', args: { paymentMethod } }, (current) => upgradeWarehouse(current, paymentMethod))} /></div> : <p className="economy-card-description">وصل المخزن إلى أعلى مستوى تطوير.</p>}
-        </SectionPanel>
-        <SectionPanel title="مخزون المواد الخام" description="تظهر هنا المواد الموجودة في مخزونك. تُتاح مشتريات المواد عبر عروض السوق والمزادات فقط.">
-          <div className="economy-list">{MATERIAL_CATALOG.map((material) => {
-            const stock = materialStock.get(material.id);
-            if (!stock) return null;
-            return <article className="economy-card economy-card--soft" key={material.id}><div className="economy-card-head"><div className="economy-card-title"><span className="economy-card-icon"><Icon name="warehouse" size={18} /></span><span><strong>{material.name}</strong><small>قيمة المخزون {formatMoney(stock.totalValue, country)}</small></span></div><span className="economy-pill">{formatNumber(stock.quantity)} {material.unit}</span></div></article>;
-          })}</div>
-        </SectionPanel>
-        <SectionPanel title="السوق العالمي · عروض التجار" description="يعرض السوق عروضًا متجددة للمواد الخام. بعض العروض تقبل التفاوض وبعضها بسعر ثابت.">
-          <div className="economy-list">{getGlobalMarketOffers(profile).map((offer) => { const material = MATERIAL_CATALOG.find((item) => item.id === offer.materialId); const quantity = materialQuantities[`global-${offer.id}`] ?? '10'; const agreedPrice = negotiatedMarketPrices[offer.id] ?? offer.unitPrice; const negotiated = negotiatedMarketPrices[offer.id] !== undefined; const currentQuantity = materialStock.get(offer.materialId)?.quantity ?? 0; const maxQuantity = Math.max(0, Math.min((getWarehouseItemCapacity(offer.materialId, warehouseLevel) ?? 0) - currentQuantity, warehouseCapacity.materials - warehouseUsage.materials)); const totalCost = Math.max(1, Number(quantity) || 0) * agreedPrice; const canPurchaseQuantity = Number.isInteger(Number(quantity)) && Number(quantity) >= 1 && Number(quantity) <= maxQuantity; return <article className="economy-card economy-card--soft" key={offer.id}><div className="economy-card-head"><div className="economy-card-title"><span className="economy-card-icon"><Icon name="briefcase" size={18} /></span><span><strong>{material?.name ?? offer.materialId}</strong><small>{offer.sellerName} · {material?.unit ?? 'وحدة'} · جودة العرض {offer.confidence === 'high' ? 'موثوق' : offer.confidence === 'medium' ? 'متوازن' : 'انتهازي'}</small></span></div><span className={`economy-pill ${offer.negotiable ? 'economy-pill--green' : 'economy-pill--gold'}`}>{offer.negotiable ? 'يقبل التفاوض' : 'سعر ثابت'}</span></div><div className="economy-card-body"><div className="economy-meta"><span>السعر {formatMoney(agreedPrice, country)} / {material?.unit ?? 'وحدة'}</span><span>السعر الأصلي {formatMoney(offer.unitPrice, country)}</span><span>المخزون الحالي {formatNumber(materialStock.get(offer.materialId)?.quantity ?? 0)}</span></div><div className="economy-form-row"><div className="economy-field"><label htmlFor={`global-qty-${offer.id}`}>الكمية (المتاح {formatNumber(maxQuantity)} {material?.unit ?? 'وحدة'})</label><input id={`global-qty-${offer.id}`} type="number" min="1" max={maxQuantity} step="1" value={quantity} onChange={(event) => setMaterialQuantities((previous) => ({ ...previous, [`global-${offer.id}`]: event.target.value }))} /></div><div className="economy-field"><label>إجمالي الصفقة</label><input value={formatMoney(Math.max(0, Number(quantity) || 0) * agreedPrice, country)} readOnly /></div></div><div className="economy-actions"><button className="button button-secondary" type="button" disabled={!offer.negotiable} onClick={() => { const result = negotiateGlobalMarketOffer(profile, offer.id); if (result.unitPrice !== undefined && result.accepted) setNegotiatedMarketPrices((previous) => ({ ...previous, [offer.id]: result.unitPrice! })); onAction(result.accepted ? { ok: true, profile, message: result.message, data: undefined } : { ok: false, profile, message: result.message, reason: 'condition-not-met' }); }}>{negotiated ? 'تم التفاوض' : offer.negotiable ? 'التفاوض مع التاجر' : 'غير قابل للتفاوض'}</button><PurchaseOptions country={country} cashPrice={totalCost} bankBalance={profile.bankBalance} diamondsBalance={profile.diamonds} disabled={!canPurchaseQuantity} cashLabel="قبول العرض نقدًا" onPurchase={(paymentMethod) => runCommand({ name: 'buy_global_material', args: { offerId: offer.id, quantity: Number(quantity), negotiatedUnitPrice: negotiated ? agreedPrice : undefined, paymentMethod } }, (current) => buyGlobalMaterial(current, offer.id, Number(quantity), negotiated ? agreedPrice : undefined, paymentMethod))} /></div></div></article>; })}</div>
-        </SectionPanel>
-        <SectionPanel title="المنتجات الجاهزة للبيع" description="الطلب والسعر يتغيران يوميًا داخل محاكاة اللعبة؛ تُخصم الضريبة من حصيلة البيع.">
-          {productRows.length === 0 ? <EconomyEmpty title="لا توجد منتجات جاهزة" message="أنشئ شركة، اشترِ مدخلاتها، ثم شغّل خط الإنتاج." /> : <div className="economy-list">{productRows.map((row) => {
-            const product = PRODUCT_CATALOG.find((item) => item.id === row.itemId);
-            const quantity = productQuantities[row.itemId] ?? '1';
-            const marketQuote = getMarketQuote(profile, row.itemId);
-            const maxSellable = Math.min(row.quantity, marketQuote?.demandUnits ?? row.quantity);
-            return <article className="economy-card" key={row.id}><div className="economy-card-head"><div className="economy-card-title"><span className="economy-card-icon"><Icon name="briefcase" size={18} /></span><span><strong>{row.name}</strong><small>المخزون {formatNumber(row.quantity)} {row.unit} · سعر السوق {formatMoney(marketQuote?.currentPrice ?? product?.baseSellPrice ?? 0, country)}</small></span></div><span className={`economy-pill economy-pill--${marketQuote?.trend === 'up' ? 'green' : marketQuote?.trend === 'down' ? 'red' : 'gold'}`}>{marketQuote?.trendLabel ?? 'السوق'}</span></div><div className="economy-card-body"><div className="economy-meta"><span>الطلب المتاح اليوم {formatNumber(marketQuote?.demandUnits ?? 0)} {row.unit}</span><span>القيمة الدفترية {formatMoney(row.totalValue, country)}</span></div><form className="economy-form" onSubmit={(event: FormEvent<HTMLFormElement>) => { event.preventDefault(); runCommand({ name: 'sell_product', args: { productId: row.itemId, quantity: Number(quantity) } }, (current) => sellProduct(current, row.itemId, Number(quantity))); }}><div className="economy-field"><label htmlFor={`sell-${row.itemId}`}>كمية البيع ({row.unit})</label><input id={`sell-${row.itemId}`} type="number" min="1" max={maxSellable} step="1" value={quantity} onChange={(event) => setProductQuantities((previous) => ({ ...previous, [row.itemId]: event.target.value }))} /></div><button className="button button-primary" type="submit" disabled={!quantity || Number(quantity) < 1 || Number(quantity) > maxSellable}><Icon name="investment" size={15} /> بيع بسعر السوق</button></form></div></article>;
-          })}</div>}
-        </SectionPanel>
-      </>,
-    )}</div>;
+
+    return (
+      <div className="section-page">
+        {heading}
+        {pageShell(
+          <>
+            {/* بطاقة واجهة السوق التجاري المستقل */}
+            <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-slate-900 via-slate-900/90 to-emerald-950/30 border border-emerald-500/30 shadow-xl mb-4">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-xl bg-gradient-to-tr from-emerald-500 to-teal-400 text-slate-950 flex items-center justify-center font-bold shadow-lg shadow-emerald-500/20 shrink-0">
+                    <Store className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h3 className="text-base sm:text-lg font-black text-white flex items-center gap-2">
+                      <span>السوق التجاري والبورصة</span>
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-mono font-bold">
+                        مباشر
+                      </span>
+                    </h3>
+                    <p className="text-xs text-slate-300 mt-0.5">
+                      بيع المنتجات المصنعة بالأسعار اليومية، وشراء وتوريد المواد الخام من البورصة العالمية.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <span className="text-xs px-3 py-1.5 rounded-xl bg-slate-950/80 border border-slate-700/80 text-emerald-300 font-bold flex items-center gap-1.5">
+                    <ShoppingBag className="w-4 h-4 text-emerald-400" />
+                    {productRows.length} منتجات جاهزة للبيع
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* إحصائيات السوق المباشرة */}
+            <div className="economy-grid economy-grid--three-mobile">
+              <EconomyStat
+                label="قيمة البضائع بالسوق"
+                value={formatMoney(inventorySummary.totalValue, country)}
+                note={`إجمالي البضائع والخامات (${formatNumber(inventorySummary.rows.length)} صنف)`}
+              />
+              <EconomyStat
+                label="المنتجات التامة للبيع"
+                value={`${formatNumber(productRows.length)} صنف`}
+                note={`${formatNumber(warehouseUsage.products)} وحدة جاهزة للتسويق`}
+              />
+              <EconomyStat
+                label="المواد الخام المتوفرة"
+                value={`${formatNumber(materialRows.length)} صنف`}
+                note={`${formatNumber(warehouseUsage.materials)} وحدة لتغذية المصانع`}
+              />
+            </div>
+
+            {/* 1. قسم بيع المنتجات الجاهزة بالسوق */}
+            <SectionPanel
+              id="inventory-sales"
+              data-guide-panel="inventory-sales"
+              title="بيع المنتجات الجاهزة بالسوق"
+              description="اختر كمية المنتجات التي ترغب في بيعها وفق حجم الطلب الفوري والأسعار الحالية للسوق."
+            >
+              {productRows.length === 0 ? (
+                <div className="p-6 text-center rounded-xl bg-slate-950/60 border border-slate-800 text-slate-400 text-xs">
+                  <ShoppingBag className="w-8 h-8 text-slate-600 mx-auto mb-2" />
+                  <p className="font-bold text-slate-300 mb-1">لا توجد منتجات جاهزة للبيع حالياً</p>
+                  <p>قم بتشغيل خطوط الإنتاج بالمصانع لتحويل المواد الخام إلى منتجات وطرحها في السوق.</p>
+                </div>
+              ) : (
+                <div className="economy-list">
+                  {productRows.map((row) => {
+                    const product = PRODUCT_CATALOG.find((item) => item.id === row.itemId);
+                    const quantity = productQuantities[row.itemId] ?? '1';
+                    const marketQuote = getMarketQuote(profile, row.itemId);
+                    const maxSellable = Math.min(row.quantity, marketQuote?.demandUnits ?? row.quantity);
+                    return (
+                      <article className="economy-card" key={row.id}>
+                        <div className="economy-card-head">
+                          <div className="economy-card-title">
+                            <span className="economy-card-icon">
+                              <Icon name="briefcase" size={18} />
+                            </span>
+                            <span>
+                              <strong>{row.name}</strong>
+                              <small>
+                                المتوفر {formatNumber(row.quantity)} {row.unit} · سعر السوق{' '}
+                                {formatMoney(marketQuote?.currentPrice ?? product?.baseSellPrice ?? 0, country)}
+                              </small>
+                            </span>
+                          </div>
+                          <span
+                            className={`economy-pill economy-pill--${
+                              marketQuote?.trend === 'up'
+                                ? 'green'
+                                : marketQuote?.trend === 'down'
+                                ? 'red'
+                                : 'gold'
+                            }`}
+                          >
+                            {marketQuote?.trendLabel ?? 'السوق'}
+                          </span>
+                        </div>
+                        <div className="economy-card-body">
+                          <div className="economy-meta">
+                            <span>
+                              الطلب المتاح اليوم {formatNumber(marketQuote?.demandUnits ?? 0)} {row.unit}
+                            </span>
+                            <span>القيمة الدفترية {formatMoney(row.totalValue, country)}</span>
+                          </div>
+                          <form
+                            className="economy-form"
+                            onSubmit={(event: FormEvent<HTMLFormElement>) => {
+                              event.preventDefault();
+                              runCommand(
+                                { name: 'sell_product', args: { productId: row.itemId, quantity: Number(quantity) } },
+                                (current) => sellProduct(current, row.itemId, Number(quantity)),
+                              );
+                            }}
+                          >
+                            <div className="economy-field">
+                              <label htmlFor={`sell-${row.itemId}`}>كمية البيع ({row.unit})</label>
+                              <input
+                                id={`sell-${row.itemId}`}
+                                type="number"
+                                min="1"
+                                max={maxSellable}
+                                step="1"
+                                value={quantity}
+                                onChange={(event) =>
+                                  setProductQuantities((previous) => ({ ...previous, [row.itemId]: event.target.value }))
+                                }
+                              />
+                            </div>
+                            <button
+                              className="button button-primary"
+                              type="submit"
+                              data-guide-target="sell-product-btn"
+                              disabled={!quantity || Number(quantity) < 1 || Number(quantity) > maxSellable}
+                            >
+                              <Icon name="investment" size={15} /> بيع بسعر السوق
+                            </button>
+                          </form>
+                        </div>
+                      </article>
+                    );
+                  })}
+                </div>
+              )}
+            </SectionPanel>
+
+            {/* 2. قسم بورصة السوق العالمي واستيراد السلع */}
+            <SectionPanel
+              id="inventory-global-market"
+              data-guide-panel="inventory-global-market"
+              title="بورصة السوق العالمي وتوريد السلع"
+              description="شراء المواد الخام، إبرام عقود الشحن الدولي، والتفاوض مع الموردين بالأسعار الفورية."
+            >
+              <GlobalMarketTerminal profile={profile} country={country} onCommand={runCommand} onAction={onAction} />
+            </SectionPanel>
+
+            {/* سعة التخزين وتطوير المخزن ومخزون المواد (مدمج كأداة سعة مساعدة) */}
+            <details id="warehouse-overview" className="group rounded-2xl border border-slate-800/80 bg-slate-900/40 p-4 transition-all">
+              <summary className="cursor-pointer list-none flex items-center justify-between text-xs font-bold text-slate-300 hover:text-white select-none">
+                <span className="flex items-center gap-2">
+                  <Warehouse className="w-4 h-4 text-amber-400" />
+                  <span>بيانات سعة التخزين ومستودع الخامات · المستوى {formatNumber(warehouseLevel)}</span>
+                </span>
+                <span className="text-[11px] px-2.5 py-1 rounded-lg bg-slate-800 text-slate-300 border border-slate-700">
+                  عرض السعة والمخزون ▾
+                </span>
+              </summary>
+
+              <div className="mt-4 space-y-4 pt-3 border-t border-slate-800">
+                <div className="warehouse-capacity-grid">
+                  <article>
+                    <span>سعة المواد الخام</span>
+                    <strong>
+                      {formatNumber(warehouseUsage.materials)} / {formatNumber(warehouseCapacity.materials)}
+                    </strong>
+                    <div className="economy-progress">
+                      <span
+                        style={{
+                          width: `${Math.min(100, (warehouseUsage.materials / warehouseCapacity.materials) * 100)}%`,
+                        }}
+                      />
+                    </div>
+                  </article>
+                  <article>
+                    <span>سعة المنتجات والإنتاج</span>
+                    <strong>
+                      {formatNumber(warehouseUsage.products)} / {formatNumber(warehouseCapacity.products)}
+                    </strong>
+                    <div className="economy-progress">
+                      <span
+                        style={{
+                          width: `${Math.min(100, (warehouseUsage.products / warehouseCapacity.products) * 100)}%`,
+                        }}
+                      />
+                    </div>
+                  </article>
+                </div>
+
+                {upgradeRequirement ? (
+                  <div className="warehouse-upgrade-card">
+                    <div>
+                      <strong>تطوير المخزن إلى المستوى {formatNumber(warehouseLevel + 1)}</strong>
+                      <small>التكلفة {formatMoney(upgradeRequirement.cash, country)} · المتطلبات:</small>
+                    </div>
+                    <div className="economy-meta">
+                      {Object.entries(upgradeRequirement.materials).map(([materialId, required]) => {
+                        const material = MATERIAL_CATALOG.find((item) => item.id === materialId);
+                        const owned = materialStock.get(materialId)?.quantity ?? 0;
+                        return (
+                          <span
+                            className={owned >= required ? 'economy-pill economy-pill--green' : 'economy-pill economy-pill--gold'}
+                            key={materialId}
+                          >
+                            {material?.name ?? materialId} {formatNumber(owned)} / {formatNumber(required)}
+                          </span>
+                        );
+                      })}
+                    </div>
+                    <PurchaseOptions
+                      country={country}
+                      cashPrice={upgradeRequirement.cash}
+                      bankBalance={profile.bankBalance}
+                      diamondsBalance={profile.diamonds}
+                      disabled={!canUpgradeWarehouse}
+                      cashLabel="تطوير المخزن نقدًا"
+                      onPurchase={(paymentMethod) =>
+                        runCommand(
+                          { name: 'upgrade_warehouse', args: { paymentMethod } },
+                          (current) => upgradeWarehouse(current, paymentMethod),
+                        )
+                      }
+                    />
+                  </div>
+                ) : null}
+
+                <div id="inventory-materials" className="pt-2">
+                  <div className="flex items-center justify-between pb-2 border-b border-slate-800 mb-3">
+                    <h4 className="text-xs font-bold text-slate-300 flex items-center gap-2">
+                      <Boxes className="w-4 h-4 text-blue-400" />
+                      <span>المواد الخام المخزنة في المستودع</span>
+                    </h4>
+                    <span className="text-xs text-slate-400 font-mono">
+                      {materialRows.length} صنف متوفر
+                    </span>
+                  </div>
+                  {materialRows.length === 0 ? (
+                    <p className="text-xs text-slate-400 py-1">لا توجد مواد خام حالياً في المستودع.</p>
+                  ) : (
+                    <div className="economy-list">
+                      {MATERIAL_CATALOG.map((material) => {
+                        const stock = materialStock.get(material.id);
+                        if (!stock) return null;
+                        return (
+                          <article className="economy-card economy-card--soft" key={material.id}>
+                            <div className="economy-card-head">
+                              <div className="economy-card-title">
+                                <span className="economy-card-icon">
+                                  <Icon name="warehouse" size={18} />
+                                </span>
+                                <span>
+                                  <strong>{material.name}</strong>
+                                  <small>قيمة المخزون {formatMoney(stock.totalValue, country)}</small>
+                                </span>
+                              </div>
+                              <span className="economy-pill">
+                                {formatNumber(stock.quantity)} {material.unit}
+                              </span>
+                            </div>
+                          </article>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </details>
+          </>,
+        )}
+      </div>
+    );
   }
 
   if (section.id === 'investments') {
     return (
       <div className="section-page w-full min-w-0">
-        <HubSubNav currentSection={section.id} onNavigate={onNavigate} />
+        {heading}
         <StockExchangeTerminal
           profile={profile}
           country={country}
@@ -1027,11 +1570,11 @@ export function SectionPage({ section, profile, country, focus, notificationThem
     return <div className="section-page">{heading}{pageShell(
       <>
         <div className="economy-grid economy-grid--three-mobile"><EconomyStat label="السمعة التجارية" value={`${formatNumber(profile.reputation ?? 50)} / 100`} /><EconomyStat label="عقود نشطة" value={`${formatNumber(activeContracts.length)} / 3`} /><EconomyStat label="عقود مكتملة" value={formatNumber(completedContracts.length)} /></div>
-        <SectionPanel title="مركز العملاء والعقود" description="كل عقد يربط الإنتاج والمخزون والسعر والسمعة. اختر ما تستطيع تنفيذه قبل الموعد بدل قبول كل الطلبات.">
-          <div className="economy-list">{offers.map((offer) => { const existingContract = (profile.contracts ?? []).find((contract) => contract.id === offer.id); const accepted = existingContract?.status === 'active'; const consumed = existingContract?.status === 'completed' || existingContract?.status === 'failed'; const expectedRevenue = offer.quantity * offer.unitPrice + offer.reward; const estimatedCost = (profile.inventory.find((item) => item.materialOrProductId === offer.productId)?.unitCost ?? 0) * offer.quantity; return <article className="economy-card" key={offer.id}><div className="economy-card-head"><div className="economy-card-title"><span className="economy-card-icon"><Icon name="briefcase" size={18} /></span><span><strong>{offer.clientName}</strong><small>{getCustomerSegmentLabel(offer.clientType)} · {offer.description}</small></span></div><span className="economy-price">{formatMoney(expectedRevenue, country)}</span></div><div className="economy-card-body"><div className="economy-meta"><span>المنتج: {offer.productName}</span><span>الكمية: {formatNumber(offer.quantity)}</span><span>التسليم قبل اليوم {formatNumber(offer.deadlineDay)}</span><span>{offer.minimumQuality ? `الجودة المطلوبة: ${formatNumber(offer.minimumQuality)}%` : 'الجودة: قياسية'}</span><span>سمعة +{formatNumber(offer.reputationReward)}</span><span className="economy-pill economy-pill--green">المعاينة: إيراد {formatMoney(expectedRevenue, country)} · تكلفة مخزون تقديرية {formatMoney(estimatedCost, country)}</span></div><button className="button button-primary" type="button" disabled={accepted || consumed || activeContracts.length >= 3} onClick={() => runCommand({ name: 'accept_contract', args: { offerId: offer.id } }, (current) => acceptContract(current, offer.id))}>{accepted ? 'العقد مقبول' : consumed ? existingContract?.status === 'completed' ? 'تم تنفيذ العرض' : 'انتهى العرض' : activeContracts.length >= 3 ? 'أكمل عقدًا أولًا' : 'قبول العقد'}</button></div></article>; })}</div>
+        <SectionPanel id="contracts-offers" title="مركز العملاء والعقود" description="كل عقد يربط الإنتاج والمخزون والسعر والسمعة. اختر ما تستطيع تنفيذه قبل الموعد بدل قبول كل الطلبات.">
+          <div className="economy-list">{offers.map((offer) => { const existingContract = (profile.contracts ?? []).find((contract) => contract.id === offer.id); const accepted = existingContract?.status === 'active'; const consumed = existingContract?.status === 'completed' || existingContract?.status === 'failed'; const expectedRevenue = offer.quantity * offer.unitPrice + offer.reward; const estimatedCost = (profile.inventory.find((item) => item.materialOrProductId === offer.productId)?.unitCost ?? 0) * offer.quantity; return <article className="economy-card" key={offer.id}><div className="economy-card-head"><div className="economy-card-title"><span className="economy-card-icon"><Icon name="briefcase" size={18} /></span><span><strong>{offer.clientName}</strong><small>{getCustomerSegmentLabel(offer.clientType)} · {offer.description}</small></span></div><span className="economy-price">{formatMoney(expectedRevenue, country)}</span></div><div className="economy-card-body"><div className="economy-meta"><span>المنتج: {offer.productName}</span><span>الكمية: {formatNumber(offer.quantity)}</span><span>التسليم قبل اليوم {formatNumber(offer.deadlineDay)}</span><span>{offer.minimumQuality ? `الجودة المطلوبة: ${formatNumber(offer.minimumQuality)}%` : 'الجودة: قياسية'}</span><span>سمعة +{formatNumber(offer.reputationReward)}</span><span className="economy-pill economy-pill--green">المعاينة: إيراد {formatMoney(expectedRevenue, country)} · تكلفة مخزون تقديرية {formatMoney(estimatedCost, country)}</span></div><button className="button button-primary" type="button" data-guide-target={!accepted && !consumed && activeContracts.length < 3 ? 'accept-contract-btn' : undefined} disabled={accepted || consumed || activeContracts.length >= 3} onClick={() => runCommand({ name: 'accept_contract', args: { offerId: offer.id } }, (current) => acceptContract(current, offer.id))}>{accepted ? 'العقد مقبول' : consumed ? existingContract?.status === 'completed' ? 'تم تنفيذ العرض' : 'انتهى العرض' : activeContracts.length >= 3 ? 'أكمل عقدًا أولًا' : 'قبول العقد'}</button></div></article>; })}</div>
         </SectionPanel>
         <SectionPanel id="contracts-active" title="العقود المقبولة" description="التسليم يدوي من المنتجات الموجودة في المخزن. لا يُحتسب العقد مكتملًا بمجرد الإنتاج.">
-          {activeContracts.length === 0 ? <EconomyEmpty title="لا توجد عقود نشطة" message="اقبل عرضًا من لوحة العملاء عندما تتأكد من قدرتك على الإنتاج والتسليم." /> : <div className="economy-list">{activeContracts.map((contract) => <article className="economy-card economy-card--soft" key={contract.id}><div className="economy-card-head"><div className="economy-card-title"><span><strong>{contract.clientName}</strong><small>{contract.productName} · {formatNumber(contract.quantity)} وحدة · المتبقي {formatNumber(Math.max(0, contract.deadlineDay - profile.day))} يوم</small></span></div><span className="economy-pill economy-pill--gold">{formatMoney(contract.quantity * contract.unitPrice + contract.reward, country)}</span></div><div className="economy-meta"><span>السيولة بعد التسليم تقريبًا {formatMoney(profile.bankBalance + contract.quantity * contract.unitPrice + contract.reward, country)}</span><span>{contract.negotiated ? contract.negotiationNote : 'يمكنك اختيار مقايضة واحدة قبل التسليم.'}</span></div><div className="economy-button-row"><button className="button button-secondary" type="button" onClick={() => runCommand({ name: 'deliver_contract', args: { contractId: contract.id } }, (current) => deliverContract(current, contract.id))}>تسليم العقد الآن</button>{!contract.negotiated && <><button className="button button-secondary" type="button" onClick={() => runCommand({ name: 'negotiate_contract', args: { contractId: contract.id, mode: 'price' } }, (current) => negotiateContract(current, contract.id, 'price'))}>تفاوض على السعر +8%</button><button className="button button-secondary" type="button" onClick={() => runCommand({ name: 'negotiate_contract', args: { contractId: contract.id, mode: 'deadline' } }, (current) => negotiateContract(current, contract.id, 'deadline'))}>تمديد يوم −5%</button></>}</div></article>)}</div>}
+          {activeContracts.length === 0 ? <EconomyEmpty title="لا توجد عقود نشطة" message="اقبل عرضًا من لوحة العملاء عندما تتأكد من قدرتك على الإنتاج والتسليم." /> : <div className="economy-list">{activeContracts.map((contract) => <article className="economy-card economy-card--soft" key={contract.id}><div className="economy-card-head"><div className="economy-card-title"><span><strong>{contract.clientName}</strong><small>{contract.productName} · {formatNumber(contract.quantity)} وحدة · المتبقي {formatNumber(Math.max(0, contract.deadlineDay - profile.day))} يوم</small></span></div><span className="economy-pill economy-pill--gold">{formatMoney(contract.quantity * contract.unitPrice + contract.reward, country)}</span></div><div className="economy-meta"><span>السيولة بعد التسليم تقريبًا {formatMoney(profile.bankBalance + contract.quantity * contract.unitPrice + contract.reward, country)}</span><span>{contract.negotiated ? contract.negotiationNote : 'يمكنك اختيار مقايضة واحدة قبل التسليم.'}</span></div><div className="economy-button-row"><button className="button button-secondary" type="button" data-guide-target="deliver-contract-btn" onClick={() => runCommand({ name: 'deliver_contract', args: { contractId: contract.id } }, (current) => deliverContract(current, contract.id))}>تسليم العقد الآن</button>{!contract.negotiated && <><button className="button button-secondary" type="button" onClick={() => runCommand({ name: 'negotiate_contract', args: { contractId: contract.id, mode: 'price' } }, (current) => negotiateContract(current, contract.id, 'price'))}>تفاوض على السعر +8%</button><button className="button button-secondary" type="button" onClick={() => runCommand({ name: 'negotiate_contract', args: { contractId: contract.id, mode: 'deadline' } }, (current) => negotiateContract(current, contract.id, 'deadline'))}>تمديد يوم −5%</button></>}</div></article>)}</div>}
         </SectionPanel>
         <SectionPanel title="سجل السمعة والإنجازات" description="الالتزام بالعقود يفتح ثقة العملاء ويمنح مكافآت إضافية. التأخر يخفض السمعة ويضيف غرامة."><div className="economy-meta"><span className="economy-pill economy-pill--green">سمعة {formatNumber(profile.reputation ?? 50)}%</span><span>مكتملة {formatNumber(completedContracts.length)}</span><span className="economy-pill economy-pill--red">فاشلة {formatNumber(failedContracts.length)}</span></div>{(profile.achievements ?? []).length > 0 && <div className="economy-list">{profile.achievements.map((achievement) => <article className="economy-task" key={achievement.id}><span className="economy-task-icon"><Icon name="shield" size={18} /></span><span className="economy-task-copy"><strong>{achievement.title}</strong><small>تم فتحها في اليوم {formatNumber(achievement.earnedAtDay)}</small></span><span className="economy-pill economy-pill--green">مكتملة</span></article>)}</div>}</SectionPanel>
       </>,
@@ -1061,8 +1604,8 @@ export function SectionPage({ section, profile, country, focus, notificationThem
         <SectionPanel title={`حدث اليوم · ${seasonEvent.event.title}`} description={seasonEvent.claimed ? 'تم تنفيذ قرار اليوم. سيظهر حدث جديد عند انتقال اليوم.' : seasonEvent.event.description}>
           {seasonEvent.claimed ? <div className="economy-notice economy-notice--success">تم اتخاذ القرار اليومي. استمر في إدارة إمبراطوريتك حتى يبدأ الحدث التالي.</div> : <div className="season-event-choices">{seasonEvent.event.choices.map((choice) => <button className="button button-secondary" type="button" key={choice.id} onClick={() => onCommand({ name: 'choose_season_event', args: { choiceId: choice.id } }, (current) => chooseSeasonEvent(current, choice.id))}><strong>{choice.label}</strong><span>{choice.description}</span></button>)}</div>}
         </SectionPanel>
-        <SectionPanel title="المهام والإنجازات" description="تحقق من شروط المهام ثم استلم كل مكافأة مرة واحدة.">
-          <div className="economy-list">{tasks.map((task) => <article className="economy-task" key={task.id}><span className="economy-task-icon"><Icon name={task.claimed ? 'shield' : 'tasks'} size={18} /></span><span className="economy-task-copy"><strong>{task.title}</strong><small>{task.description} المكافأة {formatMoney(task.reward, country)}</small></span>{task.claimed ? <span className="economy-pill economy-pill--green">مكتملة</span> : <button className="button button-primary" type="button" data-guide-target="claim-task-btn" disabled={!task.available} onClick={() => runCommand({ name: 'claim_task', args: { taskId: task.id } }, (current) => claimTask(current, task.id))}>{task.available ? 'استلام المكافأة' : 'لم تكتمل'}</button>}</article>)}</div>
+        <SectionPanel id="tasks-achievements" title="المهام والإنجازات" description="تحقق من شروط المهام ثم استلم كل مكافأة مرة واحدة.">
+          <div className="economy-list">{tasks.map((task) => <article className="economy-task" key={task.id}><span className="economy-task-icon"><Icon name={task.claimed ? 'shield' : 'tasks'} size={18} /></span><span className="economy-task-copy"><strong>{task.title}</strong><small>{task.description} المكافأة {formatMoney(task.reward, country)}</small></span>{task.claimed ? <span className="economy-pill economy-pill--green">مكتملة</span> : <button className="button button-primary" type="button" data-guide-target={task.available && !task.claimed ? 'claim-task-btn' : undefined} disabled={!task.available} onClick={() => runCommand({ name: 'claim_task', args: { taskId: task.id } }, (current) => claimTask(current, task.id))}>{task.available ? 'استلام المكافأة' : 'لم تكتمل'}</button>}</article>)}</div>
         </SectionPanel>
       </>,
     )}</div>;

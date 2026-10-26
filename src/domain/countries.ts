@@ -1,7 +1,6 @@
 export type CurrencyCode = string;
 export type CountryId =
   | 'egypt'
-  | 'jordan'
   | 'saudi'
   | 'uae'
   | 'usa'
@@ -90,32 +89,7 @@ export const COUNTRIES: readonly CountryDefinition[] = [
     },
   },
 
-  // 2. Jordan
-  {
-    id: 'jordan',
-    name: 'المملكة الأردنية الهاشمية',
-    flag: '🇯🇴',
-    storyTitle: 'بوابة التجارة الإقليمية وعمان وسحاب والعقبة',
-    storySummary: 'استلمت مشروعاً صناعياً متعثراً في سحاب يعاني من تراكم الديون وتحديات التوريد. سلّمتك أمك 25,000$ لتبدأ مسار الإنقاذ وتقتحم موانئ العقبة وتكشف صلات مجموعة الأفق.',
-    storyFull: [
-      'يا بني… لقد تخلى عنك الجميع بعد تعثر مصنع سحاب الصناعي وحاصرك الدائنون بالمطالبات المالية وتحديات سلاسل الإمداد.',
-      'لكن ثقتي بك لم تهتز! سلّمتك سراً 25,000 دولار كاش لتنطلق في إصلاح الماكينات وتأمين أول مورد موثوق والمنافسة على عقود التوريد الوطنية.',
-      'انطلق من عمان وسحاب نحو منطقة العقبة الاقتصادية وأسواق الإقليم، واكشف أسرار الماضي حتى تبني إمبراطورية تجارية تهز المنطقة بأسرها!',
-    ],
-    currency: { code: 'USD', symbol: '$', name: 'الدولار الأمريكي' },
-    startingBalance: 25_000,
-    startingBalanceEgpEquivalent: 25_000,
-    economy: {
-      exchangeRateToEgp: 1.0,
-      companySetupFee: 2_000,
-      licenseFeesByIndustry: buildIndustryFees(),
-      taxRate: 0.14,
-      customsRate: 0.02,
-      operatingCostMultiplier: 1.0,
-    },
-  },
-
-  // 3. Saudi Arabia
+  // 2. Saudi Arabia
   {
     id: 'saudi',
     name: 'المملكة العربية السعودية',
