@@ -5,7 +5,7 @@ import type { SectionId } from '../domain/navigation';
 import { formatMoney } from '../domain/formatters';
 import { PRODUCT_CATALOG } from '../game/catalog';
 import { getMarketQuote } from '../game/market';
-import { getStarterMissions, isSectionUnlocked } from '../game/onboarding';
+import { getStarterMissions, claimStarterMission, isSectionUnlocked } from '../game/onboarding';
 import { Icon } from './Icon';
 import { playSound } from '../game/soundEffects';
 import { getLuckySpinState } from '../game/luckyWheelService';
@@ -19,6 +19,7 @@ interface RightActionHubProps {
   onSellProduct: (productId: string, quantity: number) => void;
   onAdvanceDay: () => void;
   onOpenLuckyWheel?: () => void;
+  onProfileUpdate?: (profile: PlayerProfile) => void;
 }
 
 export function RightActionHub({
@@ -29,6 +30,7 @@ export function RightActionHub({
   onSellProduct,
   onAdvanceDay,
   onOpenLuckyWheel,
+  onProfileUpdate,
 }: RightActionHubProps) {
   const [open, setOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'all' | 'earnings' | 'market'>('all');
@@ -382,7 +384,7 @@ export function RightActionHub({
                   <div className="right-hub-section-header">
                     <div className="right-hub-section-title">
                       <Icon name="tasks" size={16} />
-                      <strong>المهام الأولية المتبقية ({remainingCount})</strong>
+                      <strong>{missions[0]?.stageName || 'المهام الأولية'} ({remainingCount})</strong>
                     </div>
                   </div>
 
@@ -398,8 +400,30 @@ export function RightActionHub({
                           }}
                         >
                           <div className="right-hub-mission-info">
-                            <strong>{mission.title}</strong>
+                            <div className="flex items-center justify-between gap-1">
+                              <strong>{mission.title}</strong>
+                              <span className="text-[10px] text-amber-400 font-mono font-bold shrink-0">
+                                +{mission.cashReward.toLocaleString()} $
+                              </span>
+                            </div>
                             <small>{mission.description}</small>
+                            {mission.completed && (
+                              <button
+                                type="button"
+                                className="mt-1.5 py-1 px-2.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-[11px] transition shadow cursor-pointer"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  const res = claimStarterMission(profile, mission.id);
+                                  if (res.ok) {
+                                    playSound('cash');
+                                    playSound('levelUp');
+                                    if (onProfileUpdate) onProfileUpdate(res.profile);
+                                  }
+                                }}
+                              >
+                                استلام المكافأة 🎉
+                              </button>
+                            )}
                           </div>
                           <span className="right-hub-mission-check">
                             {mission.completed ? '✓' : <Icon name={unlocked ? 'arrow' : 'lock'} size={14} />}

@@ -30,6 +30,9 @@ const OPTIONAL_PROFILE_KEYS = new Set([
   'globalShipments',
   'forwardContracts',
   'supplierTrust',
+  'playerAuctions',
+  'soldAssetIds',
+  'processedAuctionSaleIds',
 ]);
 
 const PROFILE_KEYS = new Set([
@@ -40,6 +43,7 @@ const PROFILE_KEYS = new Set([
   'season', 'reputation', 'contracts', 'achievements', 'onboarding', 'readNotificationIds', 'dismissedNotificationIds', 'unreadProductionOrderIds',
   'lastSpinTimestamp', 'lastSpinDay', 'avatarId', 'unlockedAvatarIds', 'bio', 'renameCountThisWeek', 'lastRenameWeekTimestamp', 'lastOfflineClaimAt',
   'globalShipments', 'forwardContracts', 'supplierTrust',
+  'playerAuctions', 'soldAssetIds', 'processedAuctionSaleIds',
 ]);
 
 const REQUIRED_PROFILE_KEYS = [...PROFILE_KEYS].filter((key) => !OPTIONAL_PROFILE_KEYS.has(key));
@@ -494,6 +498,9 @@ export function validatePlayerProfile(profile: unknown, previousProfile?: unknow
       'claimedStoryQuestIds',
       'claimedCampaignChapters',
       'campaignChapterId',
+      'starterMissionStage',
+      'claimedStarterMissionIds',
+      'completedStarterMissionIds',
     ],
     'profile.onboarding',
     errors,
@@ -512,6 +519,9 @@ export function validatePlayerProfile(profile: unknown, previousProfile?: unknow
     const claimedCh = requireArray(onboarding.claimedCampaignChapters, 'profile.onboarding.claimedCampaignChapters', errors);
     claimedCh.forEach((ch, idx) => requireNumber(ch, `profile.onboarding.claimedCampaignChapters[${idx}]`, errors, { min: 1, max: 20, integer: true }));
   }
+  if (onboarding.starterMissionStage !== undefined) requireNumber(onboarding.starterMissionStage, 'profile.onboarding.starterMissionStage', errors, { min: 1, max: 10, integer: true });
+  if (onboarding.claimedStarterMissionIds !== undefined) uniqueStrings(requireArray(onboarding.claimedStarterMissionIds, 'profile.onboarding.claimedStarterMissionIds', errors), 'profile.onboarding.claimedStarterMissionIds', errors);
+  if (onboarding.completedStarterMissionIds !== undefined) uniqueStrings(requireArray(onboarding.completedStarterMissionIds, 'profile.onboarding.completedStarterMissionIds', errors), 'profile.onboarding.completedStarterMissionIds', errors);
 
   if (profile.season !== undefined) {
     const season = requireRecord(profile.season, 'profile.season', errors);

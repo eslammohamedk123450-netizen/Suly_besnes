@@ -1312,6 +1312,10 @@ export default function App() {
           );
         }}
         onAdvanceDay={() => void handleDaysElapsed(1)}
+        onProfileUpdate={(updated) => {
+          setProfile(updated);
+          saveGame(updated, account?.id);
+        }}
       />
 
       <FlyingToast

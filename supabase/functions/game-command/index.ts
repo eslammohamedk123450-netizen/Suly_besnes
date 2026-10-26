@@ -9,6 +9,7 @@ const corsHeaders = {
 };
 const allowedCommands = new Set([
   'place_bid', 'buy_direct_land', 'buy_direct_company', 'sell_land', 'upgrade_land', 'sell_company', 'sell_asset',
+  'list_player_asset', 'settle_player_auction', 'cancel_player_auction', 'claim_starter_mission',
   'buy_global_material', 'export_global_product', 'sign_forward_contract', 'draw_forward_contract',
   'found_company', 'upgrade_company', 'run_production', 'auto_supply_and_produce', 'service_company',
   'cancel_production', 'use_speed_card', 'use_day_speed_card', 'buy_speed_card', 'upgrade_warehouse', 'sell_product', 'buy_gold', 'buy_gold_with_diamonds', 'sell_gold', 'hire_staff',

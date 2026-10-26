@@ -1,5 +1,6 @@
 import type { PlayerProfile, PlayerLand, PlayerCompany } from '../domain/player';
-import type { FinanceLedgerEntry } from '../domain/futureSystems';
+import type { FinanceLedgerEntry, PlayerAuctionListing, PlayerAuctionBid } from '../domain/futureSystems';
+import type { GameResult } from './engine';
 
 export interface RivalInvestor {
   id: string;
@@ -181,8 +182,8 @@ export function generateLiveAuctions(profile: PlayerProfile): LiveAuctionItem[] 
  * Calculates fair starting value for a player asset to put in auction
  */
 export function calculatePlayerAssetValuation(
-  assetType: 'land' | 'company',
-  item: PlayerLand | PlayerCompany,
+  assetType: 'land' | 'company' | 'asset',
+  item: PlayerLand | PlayerCompany | PlayerAsset,
 ): { fairValue: number; recommendedStartingBid: number; name: string; specs: string } {
   if (assetType === 'land') {
     const land = item as PlayerLand;
@@ -196,7 +197,7 @@ export function calculatePlayerAssetValuation(
       name: land.label,
       specs: `${(land.areaSquareMeters || 1000).toLocaleString()} م² · ${land.landType === 'industrial' ? 'صناعية' : land.landType === 'agricultural' ? 'زراعية' : 'تجارية'}`,
     };
-  } else {
+  } else if (assetType === 'company') {
     const company = item as PlayerCompany;
     const baseValue = (company.operatingCostPerDay ?? 1000) * 120 + (company.energyCapacity ?? 100) * 500;
     const condition = (company.maintenanceCondition ?? 100) / 100;
@@ -207,6 +208,16 @@ export function calculatePlayerAssetValuation(
       recommendedStartingBid,
       name: company.name,
       specs: `كفاءة ${company.maintenanceCondition ?? 100}% · طاقة ${company.energyCapacity ?? 100} وحدة`,
+    };
+  } else {
+    const asset = item as PlayerAsset;
+    const fairValue = asset.value || 10_000;
+    const recommendedStartingBid = Math.round(fairValue * 0.95);
+    return {
+      fairValue,
+      recommendedStartingBid,
+      name: asset.label,
+      specs: `أصل تجاري مسجل بقيمة ${fairValue.toLocaleString()} $`,
     };
   }
 }
@@ -296,51 +307,361 @@ export function simulatePlayerAssetAuction(fairValue: number, startingBid: numbe
 }
 
 /**
- * Executes the sale of a player asset in the auction and updates profile
+ * Creates an independent player auction listing for an owned asset
+ */
+export function listPlayerAssetForAuction(
+  profile: PlayerProfile,
+  assetType: 'land' | 'company' | 'asset',
+  assetId: string,
+  startingBid: number,
+): GameResult<PlayerAuctionListing> {
+  const isLand = assetType === 'land';
+  const isCompany = assetType === 'company';
+  const item = isLand
+    ? profile.lands.find((l) => l.id === assetId)
+    : isCompany
+    ? profile.companies.find((c) => c.id === assetId)
+    : profile.assets.find((a) => a.id === assetId);
+
+  if (!item) {
+    return {
+      ok: false,
+      profile,
+      reason: 'not-found',
+      message: 'الأصل المطلوب غير موجود في محفظتك الاستثمارية.',
+    };
+  }
+
+  if (profile.soldAssetIds?.includes(assetId)) {
+    return {
+      ok: false,
+      profile,
+      reason: 'already-owned',
+      message: 'هذا الأصل تم بيعه مسبقاً ولا يمكن طرحه مرة أخرى.',
+    };
+  }
+
+  // Check if land is tied to an active company
+  if (isLand && profile.companies.some((c) => c.landId === assetId)) {
+    return {
+      ok: false,
+      profile,
+      reason: 'condition-not-met',
+      message: 'لا يمكن طرح أرض مرتبطة بشركة قائمة في المزاد. انقل الشركة أو تصرّف بها أولاً.',
+    };
+  }
+
+  // Check if company has active production orders
+  if (!isLand && profile.productionOrders.some((o) => o.companyId === assetId && o.status === 'active')) {
+    return {
+      ok: false,
+      profile,
+      reason: 'condition-not-met',
+      message: 'يرجى إكمال أوامر الإنتاج الجارية قبل طرح الشركة في المزاد.',
+    };
+  }
+
+  // Check if asset is already in an active auction
+  const existingActiveAuction = (profile.playerAuctions ?? []).find(
+    (a) => a.assetId === assetId && a.status === 'active',
+  );
+  if (existingActiveAuction) {
+    return {
+      ok: false,
+      profile,
+      reason: 'already-owned',
+      message: 'هذا الأصل معروض بالفعل في جلسة مزاد نشطة حالياً.',
+    };
+  }
+
+  const valuation = calculatePlayerAssetValuation(assetType, item);
+  const effectiveStartingBid = Math.max(1_000, startingBid > 0 ? startingBid : valuation.recommendedStartingBid);
+  const sim = simulatePlayerAssetAuction(valuation.fairValue, effectiveStartingBid);
+
+  const uniqueListingId = `pauc-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const nowIso = new Date().toISOString();
+
+  const bidsHistory: PlayerAuctionBid[] = sim.bidsList.map((bid) => ({
+    investorId: bid.investor.id,
+    investorName: bid.investor.name,
+    investorType: bid.investor.type,
+    avatarColor: bid.investor.avatarColor,
+    amount: bid.amount,
+    timestamp: bid.timestamp,
+    note: bid.note,
+  }));
+
+  const newListing: PlayerAuctionListing = {
+    id: uniqueListingId,
+    assetType,
+    assetId,
+    assetName: valuation.name,
+    assetSpecs: valuation.specs,
+    originalValue: valuation.fairValue,
+    startingBid: effectiveStartingBid,
+    currentBid: sim.finalPrice,
+    status: 'active',
+    leadingBidderName: sim.winningInvestor.name,
+    leadingBidderType: sim.winningInvestor.type,
+    totalBidsCount: sim.bidsList.length,
+    closesAtMs: Date.now() + 300_000, // 5 minutes
+    listedAt: nowIso,
+    listedOnDay: profile.day,
+    bidsHistory,
+  };
+
+  const nextProfile: PlayerProfile = {
+    ...profile,
+    playerAuctions: [newListing, ...(profile.playerAuctions ?? [])],
+  };
+
+  return {
+    ok: true,
+    profile: nextProfile,
+    message: `تم طرح [${valuation.name}] بنجاح في سوق المزادات العلنية بسعر افتتاحي ${effectiveStartingBid.toLocaleString()} $.`,
+    data: newListing,
+  };
+}
+
+/**
+ * Settles a player auction, executing the sale and crediting funds EXACTLY ONCE.
+ */
+export function settlePlayerAssetAuction(
+  profile: PlayerProfile,
+  listingId: string,
+  customWinningAmount?: number,
+  customBuyerName?: string,
+): GameResult<{ listing: PlayerAuctionListing; payout: number }> {
+  const listing = (profile.playerAuctions ?? []).find((l) => l.id === listingId);
+
+  if (!listing) {
+    return {
+      ok: false,
+      profile,
+      reason: 'not-found',
+      message: 'عرض المزاد غير موجود أو تم إلغاؤه.',
+    };
+  }
+
+  // Guard against re-settling already sold listings
+  if (listing.status === 'sold') {
+    return {
+      ok: false,
+      profile,
+      reason: 'condition-not-met',
+      message: 'تم إتمام بيع هذا الأصل وتحصيل قيمته مسبقاً ولا يمكن تكرار البيع.',
+    };
+  }
+
+  if (listing.status !== 'active') {
+    return {
+      ok: false,
+      profile,
+      reason: 'condition-not-met',
+      message: 'جلسة المزاد غير نشطة أو تم إلغاؤها.',
+    };
+  }
+
+  // Transaction deduplication check
+  if ((profile.processedAuctionSaleIds ?? []).includes(listingId)) {
+    return {
+      ok: false,
+      profile,
+      reason: 'already-owned',
+      message: 'تم تسجيل تحصيل أرباح هذا المزاد مسبقاً.',
+    };
+  }
+
+  // Asset deduplication check
+  if ((profile.soldAssetIds ?? []).includes(listing.assetId)) {
+    return {
+      ok: false,
+      profile,
+      reason: 'already-owned',
+      message: 'هذا الأصل مباع بالفعل ولا يمكن تحصيل ثمنه مرة أخرى.',
+    };
+  }
+
+  // Verify asset ownership in lands, companies, or assets
+  const isLand = listing.assetType === 'land';
+  const isCompany = listing.assetType === 'company';
+  const ownedItem = isLand
+    ? profile.lands.find((l) => l.id === listing.assetId)
+    : isCompany
+    ? profile.companies.find((c) => c.id === listing.assetId)
+    : profile.assets.find((a) => a.id === listing.assetId);
+
+  if (!ownedItem) {
+    return {
+      ok: false,
+      profile,
+      reason: 'not-found',
+      message: 'الأصل غير موجود في ملكيتك الحالية.',
+    };
+  }
+
+  const payout = customWinningAmount && customWinningAmount > 0 ? customWinningAmount : listing.currentBid;
+  const buyerName = customBuyerName || listing.leadingBidderName || 'المستثمر الفائز';
+  const nowIso = new Date().toISOString();
+
+  const updatedLands = isLand ? profile.lands.filter((l) => l.id !== listing.assetId) : profile.lands;
+  const updatedCompanies = isCompany ? profile.companies.filter((c) => c.id !== listing.assetId) : profile.companies;
+  const updatedAssets = (!isLand && !isCompany) ? profile.assets.filter((a) => a.id !== listing.assetId) : profile.assets;
+
+  const ledgerEntry: FinanceLedgerEntry = {
+    id: `auction-sale-${listing.id}`,
+    category: 'revenue',
+    amount: payout,
+    countryId: profile.countryId,
+    occurredAt: nowIso,
+    note: `بيع [${listing.assetName}] بالمزاد العلني إلى [${buyerName}] بسعر ${payout.toLocaleString()} $`,
+  };
+
+  const updatedListing: PlayerAuctionListing = {
+    ...listing,
+    status: 'sold',
+    soldAt: nowIso,
+    soldOnDay: profile.day,
+    winningBidderName: buyerName,
+    finalSalePrice: payout,
+    profitDifference: payout - listing.originalValue,
+    profitPercent: listing.originalValue > 0 ? Math.round(((payout - listing.originalValue) / listing.originalValue) * 100) : 0,
+  };
+
+  const updatedPlayerAuctions = (profile.playerAuctions ?? []).map((l) =>
+    l.id === listingId ? updatedListing : l,
+  );
+
+  const updatedSoldAssetIds = Array.from(new Set([...(profile.soldAssetIds ?? []), listing.assetId]));
+  const updatedProcessedSaleIds = Array.from(new Set([...(profile.processedAuctionSaleIds ?? []), listing.id]));
+
+  const nextProfile: PlayerProfile = {
+    ...profile,
+    bankBalance: profile.bankBalance + payout,
+    assets: updatedAssets,
+    lands: updatedLands,
+    companies: updatedCompanies,
+    playerAuctions: updatedPlayerAuctions,
+    soldAssetIds: updatedSoldAssetIds,
+    processedAuctionSaleIds: updatedProcessedSaleIds,
+    finances: {
+      ...profile.finances,
+      totalRevenue: (profile.finances?.totalRevenue ?? 0) + payout,
+      netProfit: (profile.finances?.netProfit ?? 0) + payout,
+    },
+    ledger: [ledgerEntry, ...(profile.ledger || [])],
+  };
+
+  return {
+    ok: true,
+    profile: nextProfile,
+    message: `تهانينا! تم بيع [${listing.assetName}] إلى [${buyerName}] بسعر ${payout.toLocaleString()} $ واستلام المبلغ مرة واحدة فقط.`,
+    data: { listing: updatedListing, payout },
+  };
+}
+
+/**
+ * Cancels an active player auction listing and restores asset
+ */
+export function cancelPlayerAssetAuction(
+  profile: PlayerProfile,
+  listingId: string,
+): GameResult<{ listingId: string }> {
+  const listing = (profile.playerAuctions ?? []).find((l) => l.id === listingId);
+
+  if (!listing) {
+    return {
+      ok: false,
+      profile,
+      reason: 'not-found',
+      message: 'عرض المزاد غير موجود.',
+    };
+  }
+
+  if (listing.status !== 'active') {
+    return {
+      ok: false,
+      profile,
+      reason: 'condition-not-met',
+      message: 'لا يمكن إلغاء مزاد منتهٍ أو ملغى مسبقاً.',
+    };
+  }
+
+  const updatedPlayerAuctions = (profile.playerAuctions ?? []).map((l) =>
+    l.id === listingId ? { ...l, status: 'cancelled' as const } : l,
+  );
+
+  return {
+    ok: true,
+    profile: {
+      ...profile,
+      playerAuctions: updatedPlayerAuctions,
+    },
+    message: `تم إلغاء عرض المزاد لـ [${listing.assetName}] واستعادة الأصل لمحفظتك.`,
+    data: { listingId },
+  };
+}
+
+/**
+ * Backward compatibility helper that securely delegates to list & settle logic
  */
 export function executeSellPlayerAsset(
   profile: PlayerProfile,
-  assetType: 'land' | 'company',
+  assetType: 'land' | 'company' | 'asset',
   assetId: string,
   salePrice: number,
   buyerName: string,
-): { updatedProfile: PlayerProfile; ledgerEntry: FinanceLedgerEntry } {
-  let assetName = 'أصل استثماري';
-  let updatedLands = profile.lands;
-  let updatedCompanies = profile.companies;
+): { ok: boolean; updatedProfile: PlayerProfile; ledgerEntry: FinanceLedgerEntry } {
+  // Check if an active listing already exists for this asset
+  let existingListing = (profile.playerAuctions ?? []).find(
+    (l) => l.assetId === assetId && l.status === 'active',
+  );
 
-  if (assetType === 'land') {
-    const target = profile.lands.find((l) => l.id === assetId);
-    assetName = target?.label || 'أرض استثمارية';
-    updatedLands = profile.lands.filter((l) => l.id !== assetId);
-  } else {
-    const target = profile.companies.find((c) => c.id === assetId);
-    assetName = target?.name || 'منشأة صناعية';
-    updatedCompanies = profile.companies.filter((c) => c.id !== assetId);
+  let workingProfile = profile;
+  if (!existingListing) {
+    const listRes = listPlayerAssetForAuction(profile, assetType, assetId, Math.round(salePrice * 0.9));
+    if (!listRes.ok) {
+      return {
+        ok: false,
+        updatedProfile: profile,
+        ledgerEntry: {
+          id: `auction-noop-${Date.now()}`,
+          category: 'revenue',
+          amount: 0,
+          countryId: profile.countryId,
+          occurredAt: new Date().toISOString(),
+          note: listRes.message,
+        },
+      };
+    }
+    workingProfile = listRes.profile;
+    existingListing = listRes.data;
   }
 
-  const nowIso = new Date().toISOString();
-  const entry: FinanceLedgerEntry = {
-    id: `auction-sale-${Date.now()}`,
-    category: 'revenue',
+  const settleRes = settlePlayerAssetAuction(workingProfile, existingListing.id, salePrice, buyerName);
+  if (!settleRes.ok) {
+    return {
+      ok: false,
+      updatedProfile: profile,
+      ledgerEntry: {
+        id: `auction-noop-${Date.now()}`,
+        category: 'revenue',
+        amount: 0,
+        countryId: profile.countryId,
+        occurredAt: new Date().toISOString(),
+        note: settleRes.message,
+      },
+    };
+  }
+
+  const entry = settleRes.profile.ledger[0] || {
+    id: `auction-sale-${existingListing.id}`,
+    category: 'revenue' as const,
     amount: salePrice,
     countryId: profile.countryId,
-    occurredAt: nowIso,
-    note: `بيع [${assetName}] بالمزاد العلني إلى [${buyerName}] بسعر ${salePrice.toLocaleString()} $`,
+    occurredAt: new Date().toISOString(),
+    note: `بيع [${existingListing.assetName}] بالمزاد العلني`,
   };
 
-  const updatedProfile: PlayerProfile = {
-    ...profile,
-    bankBalance: profile.bankBalance + salePrice,
-    lands: updatedLands,
-    companies: updatedCompanies,
-    finances: {
-      ...profile.finances,
-      totalRevenue: (profile.finances?.totalRevenue ?? 0) + salePrice,
-      netProfit: (profile.finances?.netProfit ?? 0) + salePrice,
-    },
-    ledger: [entry, ...(profile.ledger || [])],
-  };
-
-  return { updatedProfile, ledgerEntry: entry };
+  return { ok: true, updatedProfile: settleRes.profile, ledgerEntry: entry };
 }

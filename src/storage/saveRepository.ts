@@ -1,6 +1,6 @@
 import { findCountry, type CountryId, type IndustryId } from '../domain/countries';
 import type { PlayerAsset, PlayerCompany, PlayerLand, PlayerProfile } from '../domain/player';
-import type { AchievementRecord, AuctionBidRecord, BusinessContract, DepositRecord, FinanceLedgerEntry, ForwardSupplyContract, GlobalShipmentRecord, InventoryLot, InvestmentRecord, LicenseRecord, LoanRecord, OnboardingProgress, ProductSale, ProductionOrder, StaffContract, TaskProgress } from '../domain/futureSystems';
+import type { AchievementRecord, AuctionBidRecord, BusinessContract, DepositRecord, FinanceLedgerEntry, ForwardSupplyContract, GlobalShipmentRecord, InventoryLot, InvestmentRecord, LicenseRecord, LoanRecord, OnboardingProgress, PlayerAuctionListing, ProductSale, ProductionOrder, StaffContract, TaskProgress } from '../domain/futureSystems';
 import { findIndustry, GOLD_PRICE_PER_GRAM } from '../game/catalog';
 import { normalizeAccountFeatures } from '../domain/accountFeatures';
 
@@ -225,7 +225,22 @@ function normalizeOnboarding(value: unknown): OnboardingProgress {
     ...(claimedStoryQuestIds.length > 0 || Array.isArray(value.claimedStoryQuestIds) ? { claimedStoryQuestIds } : {}),
     ...(claimedCampaignChapters.length > 0 || Array.isArray(value.claimedCampaignChapters) ? { claimedCampaignChapters } : {}),
     ...(typeof value.campaignChapterId === 'number' && Number.isInteger(value.campaignChapterId) && value.campaignChapterId >= 1 ? { campaignChapterId: value.campaignChapterId } : {}),
+    ...(typeof value.starterMissionStage === 'number' && Number.isInteger(value.starterMissionStage) && value.starterMissionStage >= 1 ? { starterMissionStage: value.starterMissionStage } : {}),
+    ...(Array.isArray(value.claimedStarterMissionIds) ? { claimedStarterMissionIds: Array.from(new Set(value.claimedStarterMissionIds.filter(isNonEmptyString))) } : {}),
+    ...(Array.isArray(value.completedStarterMissionIds) ? { completedStarterMissionIds: Array.from(new Set(value.completedStarterMissionIds.filter(isNonEmptyString))) } : {}),
   };
+}
+
+function isPlayerAuctionListing(value: unknown): value is PlayerAuctionListing {
+  return isRecord(value)
+    && isNonEmptyString(value.id)
+    && (value.assetType === 'land' || value.assetType === 'company' || value.assetType === 'asset')
+    && isNonEmptyString(value.assetId)
+    && isNonEmptyString(value.assetName)
+    && isFiniteNonNegative(value.startingBid)
+    && isFiniteNonNegative(value.currentBid)
+    && (value.status === 'active' || value.status === 'sold' || value.status === 'cancelled')
+    && isDateString(value.listedAt);
 }
 
 function isGlobalShipment(value: unknown): value is GlobalShipmentRecord {
@@ -438,6 +453,9 @@ function migrateProfile(value: unknown): PlayerProfile | null {
     bio: typeof value.bio === 'string' && value.bio.trim().length > 0 ? value.bio : 'ابنِ إمبراطوريتك الاستثمارية بعزيمة لا تلين ورؤية لا تعرف المستحيل.',
     renameCountThisWeek: typeof value.renameCountThisWeek === 'number' && Number.isInteger(value.renameCountThisWeek) ? value.renameCountThisWeek : 0,
     lastRenameWeekTimestamp: typeof value.lastRenameWeekTimestamp === 'number' ? value.lastRenameWeekTimestamp : Date.now(),
+    ...(Array.isArray(value.playerAuctions) && value.playerAuctions.every(isPlayerAuctionListing) ? { playerAuctions: value.playerAuctions } : {}),
+    ...(Array.isArray(value.soldAssetIds) ? { soldAssetIds: Array.from(new Set(value.soldAssetIds.filter(isNonEmptyString))) } : {}),
+    ...(Array.isArray(value.processedAuctionSaleIds) ? { processedAuctionSaleIds: Array.from(new Set(value.processedAuctionSaleIds.filter(isNonEmptyString))) } : {}),
   }, typeof value.accountCode === 'string' ? value.accountCode : value.id as string);
 }
 

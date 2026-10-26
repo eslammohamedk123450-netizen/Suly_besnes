@@ -43,7 +43,7 @@ import { BankTerminal } from './BankTerminal';
 import { getPlayerProgress, getSectionRequiredLevel, getSectionUnlockHint, isSectionUnlocked } from '../game/onboarding';
 import { getCountryScenario } from '../game/countryScenarios';
 import { ListAssetAuctionModal } from './DynamicAuctionModal';
-import { generateLiveAuctions, RIVAL_INVESTORS } from '../game/dynamicAuctions';
+import { generateLiveAuctions, RIVAL_INVESTORS, settlePlayerAssetAuction, cancelPlayerAssetAuction } from '../game/dynamicAuctions';
 import { GlobalMarketTerminal } from './GlobalMarketTerminal';
 
 interface SectionPageProps {
@@ -174,6 +174,7 @@ export function SectionPage({ section, profile, country, focus, notificationThem
   const [landTypeFilter, setLandTypeFilter] = useState<'all' | 'industrial' | 'agricultural' | 'commercial'>('all');
   const [landSort, setLandSort] = useState<'price' | 'area' | 'type'>('price');
   const [auctionCategoryTab, setAuctionCategoryTab] = useState<'all' | 'land' | 'factory' | 'material'>('all');
+  const [auctionViewMode, setAuctionViewMode] = useState<'market' | 'my_listings' | 'history'>('market');
   const [isListAssetModalOpen, setIsListAssetModalOpen] = useState(false);
   const [activePanelId, setActivePanelId] = useState<string | null>(null);
   const [expansionState, setExpansionState] = useState(() => loadExpansionState(profile));
@@ -471,6 +472,10 @@ export function SectionPage({ section, profile, country, focus, notificationThem
       return true;
     });
 
+    const myActiveAuctions = (profile.playerAuctions ?? []).filter((a) => a.status === 'active');
+    const mySoldAuctions = (profile.playerAuctions ?? []).filter((a) => a.status === 'sold');
+    const catalogWins = profile.auctionHistory.filter((b) => b.bidder === 'player');
+
     return (
       <div className="section-page auctions-view-page" dir="rtl">
         {heading}
@@ -481,7 +486,7 @@ export function SectionPage({ section, profile, country, focus, notificationThem
               <div className="auctions-hero-gavel">🔨</div>
               <div>
                 <h1>سوق المزادات الحية الذكية</h1>
-                <p>تنافس مع كبرى الصناديق والمستثمرين على الأصول النادرة · أراضٍ متعثرة وتوسعات مصانع</p>
+                <p>تنافس مع كبرى الصناديق والمستثمرين على الأصول النادرة · اطرح أصولك أو نافس على الفرص</p>
               </div>
             </div>
             <button
@@ -495,163 +500,400 @@ export function SectionPage({ section, profile, country, focus, notificationThem
           </div>
         </div>
 
-        {/* Category Segment Tabs */}
-        <div className="auctions-category-tabs" role="tablist">
+        {/* Main Auction Navigation Tabs */}
+        <div className="flex gap-2 p-1.5 bg-slate-950/90 rounded-2xl mb-4 border border-slate-800 text-xs sm:text-sm">
           <button
             type="button"
-            className={`auction-tab-btn ${auctionCategoryTab === 'all' ? 'is-active' : ''}`}
-            onClick={() => setAuctionCategoryTab('all')}
+            onClick={() => setAuctionViewMode('market')}
+            className={`flex-1 py-2.5 px-3 rounded-xl font-bold transition flex items-center justify-center gap-2 cursor-pointer ${
+              auctionViewMode === 'market'
+                ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 shadow-lg font-black'
+                : 'text-slate-400 hover:text-white'
+            }`}
           >
-            الكل
+            <span>🏛️ مزادات السوق الحية</span>
           </button>
           <button
             type="button"
-            className={`auction-tab-btn ${auctionCategoryTab === 'land' ? 'is-active' : ''}`}
-            onClick={() => setAuctionCategoryTab('land')}
+            onClick={() => setAuctionViewMode('my_listings')}
+            className={`flex-1 py-2.5 px-3 rounded-xl font-bold transition flex items-center justify-center gap-2 cursor-pointer ${
+              auctionViewMode === 'my_listings'
+                ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 shadow-lg font-black'
+                : 'text-slate-400 hover:text-white'
+            }`}
           >
-            <Icon name="land" size={18} /> أراضي
+            <span>🔨 مزاداتي المعروضة</span>
+            {myActiveAuctions.length > 0 && (
+              <span className="bg-slate-950 text-amber-400 px-2 py-0.5 rounded-full text-[11px] font-mono font-black">
+                {myActiveAuctions.length}
+              </span>
+            )}
           </button>
           <button
             type="button"
-            className={`auction-tab-btn ${auctionCategoryTab === 'factory' ? 'is-active' : ''}`}
-            onClick={() => setAuctionCategoryTab('factory')}
+            onClick={() => setAuctionViewMode('history')}
+            className={`flex-1 py-2.5 px-3 rounded-xl font-bold transition flex items-center justify-center gap-2 cursor-pointer ${
+              auctionViewMode === 'history'
+                ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 shadow-lg font-black'
+                : 'text-slate-400 hover:text-white'
+            }`}
           >
-            <Icon name="factory" size={18} /> مصانع
-          </button>
-          <button
-            type="button"
-            className={`auction-tab-btn ${auctionCategoryTab === 'material' ? 'is-active' : ''}`}
-            onClick={() => setAuctionCategoryTab('material')}
-          >
-            <Icon name="warehouse" size={18} /> مواد خام
+            <span>📜 سجل المبيعات والمزادات</span>
+            {mySoldAuctions.length > 0 && (
+              <span className="bg-slate-950 text-emerald-400 px-2 py-0.5 rounded-full text-[11px] font-mono font-black">
+                {mySoldAuctions.length}
+              </span>
+            )}
           </button>
         </div>
 
-        {/* Fair Bidding Guarantee Banner */}
-        <div className="auctions-fair-banner">
-          <div className="fair-banner-icon">⚖️</div>
-          <div className="fair-banner-text">
-            <h3>مزايدة عادلة وشفافة بمشاركة 30 صندوق ومستثمر إقليمي</h3>
-            <p>جميع الصفقات معتمدة قضائياً وبضمان تحصيل وتسجيل رسمي فوري للأصول.</p>
+        {/* VIEW 1: MARKET AUCTIONS */}
+        {auctionViewMode === 'market' && (
+          <>
+            {/* Category Segment Tabs */}
+            <div className="auctions-category-tabs" role="tablist">
+              <button
+                type="button"
+                className={`auction-tab-btn ${auctionCategoryTab === 'all' ? 'is-active' : ''}`}
+                onClick={() => setAuctionCategoryTab('all')}
+              >
+                الكل
+              </button>
+              <button
+                type="button"
+                className={`auction-tab-btn ${auctionCategoryTab === 'land' ? 'is-active' : ''}`}
+                onClick={() => setAuctionCategoryTab('land')}
+              >
+                <Icon name="land" size={18} /> أراضي
+              </button>
+              <button
+                type="button"
+                className={`auction-tab-btn ${auctionCategoryTab === 'factory' ? 'is-active' : ''}`}
+                onClick={() => setAuctionCategoryTab('factory')}
+              >
+                <Icon name="factory" size={18} /> مصانع
+              </button>
+              <button
+                type="button"
+                className={`auction-tab-btn ${auctionCategoryTab === 'material' ? 'is-active' : ''}`}
+                onClick={() => setAuctionCategoryTab('material')}
+              >
+                <Icon name="warehouse" size={18} /> مواد خام
+              </button>
+            </div>
+
+            {/* Fair Bidding Guarantee Banner */}
+            <div className="auctions-fair-banner">
+              <div className="fair-banner-icon">⚖️</div>
+              <div className="fair-banner-text">
+                <h3>مزايدة عادلة وشفافة بمشاركة 30 صندوق ومستثمر إقليمي</h3>
+                <p>جميع الصفقات معتمدة قضائياً وبضمان تحصيل وتسجيل رسمي فوري للأصول.</p>
+              </div>
+              <div className="fair-banner-gavel">🔨</div>
+            </div>
+
+            {/* Auction Items Cards List */}
+            <div className="auctions-items-list">
+              {/* 1. Dynamic Live Distressed Auctions */}
+              {filteredLive.map((item) => {
+                const remainingMins = Math.max(1, Math.round((item.closesAtMs - Date.now()) / 60000));
+                const hours = Math.floor(remainingMins / 60);
+                const mins = remainingMins % 60;
+                const timeLabel = hours > 0 ? `${hours}س ${mins}د` : `${mins}د`;
+
+                return (
+                  <article className="auction-item-card" key={item.id}>
+                    {item.lotType === 'land' ? (
+                      <ItemImage type="land" landType={item.landType || 'industrial'} name={item.title} size="md" className="auction-card-thumb-wrap" />
+                    ) : item.lotType === 'factory' ? (
+                      <ItemImage type="industry" id="electricity" name={item.title} size="md" className="auction-card-thumb-wrap" />
+                    ) : (
+                      <ItemImage type="material" id={item.materialId || 'steel'} name={item.title} size="md" className="auction-card-thumb-wrap" />
+                    )}
+
+                    <div className="auction-card-body">
+                      <div className="auction-card-top">
+                        <div>
+                          <span className="inline-block text-[10px] font-bold text-amber-400 bg-amber-500/15 px-2 py-0.5 rounded-full border border-amber-500/30 mb-1">
+                            جهة الطرح: {item.authority}
+                          </span>
+                          <h3>{item.title}</h3>
+                        </div>
+                        <span className="auction-location">📍 {item.location}</span>
+                      </div>
+
+                      <p className="auction-desc">{item.description}</p>
+
+                      <div className="bg-slate-950/70 p-2 rounded-xl border border-slate-800 text-[11px] flex items-center justify-between mb-2">
+                        <span className="text-slate-400">العرض المتصدر حالياً:</span>
+                        <span className="font-bold text-slate-200">
+                          {item.leadingInvestor.name} <span className="text-[10px] text-amber-400">({item.leadingInvestor.type})</span>
+                        </span>
+                      </div>
+
+                      <div className="auction-card-footer">
+                        <div className="auction-meta-info">
+                          <div>
+                            <small>العرض الحالي</small>
+                            <strong className="text-emerald-400 font-mono">💰 {formatMoney(item.currentBid, country)}</strong>
+                          </div>
+                          <div>
+                            <small>الوقت المتبقي</small>
+                            <strong className="auction-time-text">⏰ {timeLabel}</strong>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          className="auction-enter-btn cursor-pointer"
+                          onClick={() => setSelectedAuctionId(item.id)}
+                        >
+                          ادخل المزاد 🔨
+                        </button>
+                      </div>
+                    </div>
+                  </article>
+                );
+              })}
+
+              {/* 2. Catalog Listings */}
+              {filteredCatalog.map((listing) => {
+                const material = MATERIAL_CATALOG.find((item) => item.id === listing.materialId);
+                const closeAt = getAuctionCloseAt(profile, listing);
+                const lotSummary = listing.lotType === 'land'
+                  ? `${formatNumber(listing.areaSquareMeters)} م² · أرض ${landTypeNames[listing.landType]}`
+                  : listing.lotType === 'factory'
+                    ? `توسعة طاقة مصنع بمقدار ${formatNumber(listing.energyCapacityBonus ?? 0)} وحدة`
+                    : `شحنة ${formatNumber(listing.quantity ?? 0)} ${material?.unit ?? 'وحدة'} من ${material?.name ?? 'مواد خام'}`;
+
+                return (
+                  <article className="auction-item-card" key={listing.id}>
+                    <div className={`auction-card-thumb auction-thumb--${listing.lotType}`}>
+                      <span className={`auction-tag-badge auction-tag--${listing.lotType}`}>
+                        {listing.lotType === 'land' ? 'أراضي' : listing.lotType === 'factory' ? 'مصانع' : 'مواد خام'}
+                      </span>
+                    </div>
+                    <div className="auction-card-body">
+                      <div className="auction-card-top">
+                        <div>
+                          <span className="inline-block text-[10px] font-bold text-amber-400 bg-amber-500/15 px-2 py-0.5 rounded-full border border-amber-500/30 mb-1">
+                            جهة الطرح: تصفية قضائية معلنة
+                          </span>
+                          <h3>{listing.label}</h3>
+                        </div>
+                        <span className="auction-location">📍 {listing.lotType === 'land' ? 'منطقة توسعة' : 'مركز لوجستي'}</span>
+                      </div>
+                      <p className="auction-desc">{lotSummary}</p>
+                      <div className="auction-card-footer">
+                        <div className="auction-meta-info">
+                          <div>
+                            <small>أقل مزايدة</small>
+                            <strong>💰 {formatMoney(listing.minimumBid, country)}</strong>
+                          </div>
+                          <div>
+                            <small>الوقت المتبقي</small>
+                            <strong className="auction-time-text">⏰ {formatAuctionCountdown(closeAt)}</strong>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          className="auction-enter-btn cursor-pointer"
+                          onClick={() => setSelectedAuctionId(listing.id)}
+                        >
+                          ادخل المزاد 🔨
+                        </button>
+                      </div>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          </>
+        )}
+
+        {/* VIEW 2: MY LISTED AUCTIONS (ACTIVE) */}
+        {auctionViewMode === 'my_listings' && (
+          <div className="space-y-4">
+            <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <span className="text-xl">🏛️</span>
+                <span>
+                  أصولك المعروضة في المزاد العلني تظل نشطة ومستقلة حتى تتم ترسيتها أو إلغاؤها، ويُصرف ثمن البيع مرة واحدة فقط عند اكتمال البيع.
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsListAssetModalOpen(true)}
+                className="py-1.5 px-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs shrink-0 cursor-pointer"
+              >
+                + طرح أصل جديد
+              </button>
+            </div>
+
+            {myActiveAuctions.length === 0 ? (
+              <div className="text-center py-12 px-4 rounded-3xl bg-slate-900/60 border border-slate-800 space-y-3">
+                <span className="text-4xl block">🔨</span>
+                <h3 className="text-base font-bold text-white">لا توجد أصول معروضة في المزاد حالياً</h3>
+                <p className="text-xs text-slate-400 max-w-md mx-auto">
+                  يمكنك طرح أراضيك أو مصانعك في قاعة المزاد ليتنافس عليها المستثمرون والصناديق وتحقيق أعلى قيمة نقدية كاش.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setIsListAssetModalOpen(true)}
+                  className="mt-2 py-2.5 px-6 rounded-2xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs cursor-pointer shadow-lg"
+                >
+                  طرح أصل في المزاد الآن 🏛️
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {myActiveAuctions.map((item) => (
+                  <article key={item.id} className="p-4 sm:p-5 rounded-3xl bg-slate-900 border border-amber-500/40 shadow-xl space-y-4 relative">
+                    <div className="flex items-start justify-between gap-2 border-b border-slate-800 pb-3">
+                      <div>
+                        <span className="inline-block text-[10px] font-bold text-amber-400 bg-amber-500/15 px-2 py-0.5 rounded-full border border-amber-500/30 mb-1">
+                          مزاد جاري · {item.assetType === 'land' ? 'أرض استثمارية' : 'منشأة صناعية'}
+                        </span>
+                        <h3 className="text-base font-bold text-white">{item.assetName}</h3>
+                        <p className="text-xs text-slate-400 mt-0.5">{item.assetSpecs}</p>
+                      </div>
+                      <span className="text-[11px] font-mono text-emerald-400 bg-emerald-950/60 border border-emerald-800/40 px-2.5 py-1 rounded-xl font-bold shrink-0">
+                        متاح للمزايدة
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div className="p-2.5 rounded-xl bg-slate-950/80 border border-slate-800">
+                        <span className="text-slate-400 block text-[10px]">القيمة التقديرية</span>
+                        <strong className="text-slate-200">{formatMoney(item.originalValue, country)}</strong>
+                      </div>
+                      <div className="p-2.5 rounded-xl bg-slate-950/80 border border-slate-800">
+                        <span className="text-slate-400 block text-[10px]">سعر البداية</span>
+                        <strong className="text-slate-200">{formatMoney(item.startingBid, country)}</strong>
+                      </div>
+                    </div>
+
+                    <div className="p-3 rounded-2xl bg-gradient-to-r from-slate-950 via-amber-950/20 to-slate-950 border border-amber-500/30 flex items-center justify-between">
+                      <div>
+                        <span className="text-[10px] text-slate-400 block">أعلى عرض مسجل حالياً</span>
+                        <strong className="text-base text-emerald-400 font-mono font-black">
+                          {formatMoney(item.currentBid, country)}
+                        </strong>
+                      </div>
+                      <div className="text-left">
+                        <span className="text-[10px] text-slate-400 block">المستثمر المتصدر</span>
+                        <strong className="text-xs text-amber-300 font-bold">{item.leadingBidderName}</strong>
+                        <small className="block text-[10px] text-slate-500">({item.leadingBidderType})</small>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const res = settlePlayerAssetAuction(profile, item.id);
+                          if (res.ok) {
+                            if (onProfileUpdate) onProfileUpdate(res.profile);
+                            onAction(res);
+                            playSound('cash');
+                          }
+                        }}
+                        className="flex-1 py-2.5 px-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 text-slate-950 font-black text-xs shadow-md transition transform active:scale-95 cursor-pointer text-center"
+                      >
+                        اعتماد البيع واستلام {formatMoney(item.currentBid, country)} 💰
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const res = cancelPlayerAssetAuction(profile, item.id);
+                          if (res.ok) {
+                            if (onProfileUpdate) onProfileUpdate(res.profile);
+                            onAction(res);
+                            playSound('click');
+                          }
+                        }}
+                        className="py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-rose-300 font-bold text-xs transition border border-rose-900/40 cursor-pointer"
+                        title="إلغاء المزاد واستعادة الأصل لمحفظتك"
+                      >
+                        إلغاء ↩️
+                      </button>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            )}
           </div>
-          <div className="fair-banner-gavel">🔨</div>
-        </div>
+        )}
 
-        {/* Auction Items Cards List */}
-        <div className="auctions-items-list">
-          {/* 1. Dynamic Live Distressed Auctions with Authorities & Rival Bidders */}
-          {filteredLive.map((item) => {
-            const remainingMins = Math.max(1, Math.round((item.closesAtMs - Date.now()) / 60000));
-            const hours = Math.floor(remainingMins / 60);
-            const mins = remainingMins % 60;
-            const timeLabel = hours > 0 ? `${hours}س ${mins}د` : `${mins}د`;
+        {/* VIEW 3: SALES & AUCTION HISTORY */}
+        {auctionViewMode === 'history' && (
+          <div className="space-y-4">
+            <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 text-slate-300 text-xs flex items-center justify-between">
+              <div>
+                <strong className="text-white block text-sm">سجل العمليات والمبيعات المغلقة</strong>
+                <p className="text-slate-400 text-[11px] mt-0.5">
+                  جميع الصفقات المباعة أو المشتراة بالمزاد موثقة نهائياً ولا يمكن إعادة صرف أرباحها.
+                </p>
+              </div>
+              <div className="text-left font-mono">
+                <span className="text-[10px] text-slate-400 block">إجمالي المبيعات المكتملة</span>
+                <strong className="text-emerald-400 text-sm">{mySoldAuctions.length} صفقات</strong>
+              </div>
+            </div>
 
-            return (
-              <article className="auction-item-card" key={item.id}>
-                {item.lotType === 'land' ? (
-                  <ItemImage type="land" landType={item.landType || 'industrial'} name={item.title} size="md" className="auction-card-thumb-wrap" />
-                ) : item.lotType === 'factory' ? (
-                  <ItemImage type="industry" id="electricity" name={item.title} size="md" className="auction-card-thumb-wrap" />
-                ) : (
-                  <ItemImage type="material" id={item.materialId || 'steel'} name={item.title} size="md" className="auction-card-thumb-wrap" />
-                )}
-
-                <div className="auction-card-body">
-                  <div className="auction-card-top">
+            {mySoldAuctions.length === 0 && catalogWins.length === 0 ? (
+              <div className="text-center py-12 px-4 rounded-3xl bg-slate-900/60 border border-slate-800 text-slate-400 text-xs">
+                لا توجد مبيعات أو صفقات سابقة مسجلة في السجل بعد.
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {mySoldAuctions.map((item) => (
+                  <article key={item.id} className="p-4 rounded-2xl bg-slate-900/90 border border-emerald-500/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
                     <div>
-                      <span className="inline-block text-[10px] font-bold text-amber-400 bg-amber-500/15 px-2 py-0.5 rounded-full border border-amber-500/30 mb-1">
-                        جهة الطرح: {item.authority}
-                      </span>
-                      <h3>{item.title}</h3>
-                    </div>
-                    <span className="auction-location">📍 {item.location}</span>
-                  </div>
-
-                  <p className="auction-desc">{item.description}</p>
-
-                  <div className="bg-slate-950/70 p-2 rounded-xl border border-slate-800 text-[11px] flex items-center justify-between mb-2">
-                    <span className="text-slate-400">العرض المتصدر حالياً:</span>
-                    <span className="font-bold text-slate-200">
-                      {item.leadingInvestor.name} <span className="text-[10px] text-amber-400">({item.leadingInvestor.type})</span>
-                    </span>
-                  </div>
-
-                  <div className="auction-card-footer">
-                    <div className="auction-meta-info">
-                      <div>
-                        <small>العرض الحالي</small>
-                        <strong className="text-emerald-400 font-mono">💰 {formatMoney(item.currentBid, country)}</strong>
+                      <div className="flex items-center gap-2">
+                        <span className="text-emerald-400 font-bold text-sm">✓</span>
+                        <strong className="text-white text-sm">{item.assetName}</strong>
+                        <span className="text-[10px] text-emerald-400 bg-emerald-950/60 border border-emerald-800/40 px-2 py-0.5 rounded-full font-mono">
+                          تم البيع واستلام المبلغ
+                        </span>
                       </div>
-                      <div>
-                        <small>الوقت المتبقي</small>
-                        <strong className="auction-time-text">⏰ {timeLabel}</strong>
-                      </div>
+                      <p className="text-[11px] text-slate-400 mt-1">
+                        المشتري: <span className="text-amber-300 font-bold">{item.winningBidderName || item.leadingBidderName}</span> · التاريخ: {item.soldAt ? new Date(item.soldAt).toLocaleDateString('ar-EG') : 'اليوم'}
+                      </p>
+                      <small className="text-[10px] text-slate-500 block mt-0.5">
+                        معاملة مغلقة نهائياً برقم ID: {item.id}
+                      </small>
                     </div>
-                    <button
-                      type="button"
-                      className="auction-enter-btn"
-                      onClick={() => setSelectedAuctionId(item.id)}
-                    >
-                      ادخل المزاد 🔨
-                    </button>
-                  </div>
-                </div>
-              </article>
-            );
-          })}
 
-          {/* 2. Catalog Listings */}
-          {filteredCatalog.map((listing) => {
-            const material = MATERIAL_CATALOG.find((item) => item.id === listing.materialId);
-            const closeAt = getAuctionCloseAt(profile, listing);
-            const lotSummary = listing.lotType === 'land'
-              ? `${formatNumber(listing.areaSquareMeters)} م² · أرض ${landTypeNames[listing.landType]}`
-              : listing.lotType === 'factory'
-                ? `توسعة طاقة مصنع بمقدار ${formatNumber(listing.energyCapacityBonus ?? 0)} وحدة`
-                : `شحنة ${formatNumber(listing.quantity ?? 0)} ${material?.unit ?? 'وحدة'} من ${material?.name ?? 'مواد خام'}`;
+                    <div className="text-left sm:text-right shrink-0">
+                      <span className="text-[10px] text-slate-400 block">قيمة البيع المحصّلة</span>
+                      <strong className="text-base text-emerald-400 font-mono font-black">
+                        +{formatMoney(item.finalSalePrice || item.currentBid, country)}
+                      </strong>
+                      {(item.profitDifference ?? 0) > 0 && (
+                        <span className="block text-[10px] text-emerald-300 font-bold">
+                          فارق ربح +{formatMoney(item.profitDifference ?? 0, country)} (+{item.profitPercent ?? 0}%)
+                        </span>
+                      )}
+                    </div>
+                  </article>
+                ))}
 
-            return (
-              <article className="auction-item-card" key={listing.id}>
-                <div className={`auction-card-thumb auction-thumb--${listing.lotType}`}>
-                  <span className={`auction-tag-badge auction-tag--${listing.lotType}`}>
-                    {listing.lotType === 'land' ? 'أراضي' : listing.lotType === 'factory' ? 'مصانع' : 'مواد خام'}
-                  </span>
-                </div>
-                <div className="auction-card-body">
-                  <div className="auction-card-top">
+                {catalogWins.map((win) => (
+                  <article key={win.id} className="p-3.5 rounded-2xl bg-slate-900/70 border border-slate-800 flex items-center justify-between gap-3 text-xs">
                     <div>
-                      <span className="inline-block text-[10px] font-bold text-amber-400 bg-amber-500/15 px-2 py-0.5 rounded-full border border-amber-500/30 mb-1">
-                        جهة الطرح: تصفية قضائية معلنة
-                      </span>
-                      <h3>{listing.label}</h3>
+                      <strong className="text-slate-200">صفقة شراء بالمزاد (ترسية)</strong>
+                      <p className="text-[11px] text-slate-400 mt-0.5">معرّف المزاد: {win.listingId}</p>
                     </div>
-                    <span className="auction-location">📍 {listing.lotType === 'land' ? 'منطقة توسعة' : 'مركز لوجستي'}</span>
-                  </div>
-                  <p className="auction-desc">{lotSummary}</p>
-                  <div className="auction-card-footer">
-                    <div className="auction-meta-info">
-                      <div>
-                        <small>أقل مزايدة</small>
-                        <strong>💰 {formatMoney(listing.minimumBid, country)}</strong>
-                      </div>
-                      <div>
-                        <small>الوقت المتبقي</small>
-                        <strong className="auction-time-text">⏰ {formatAuctionCountdown(closeAt)}</strong>
-                      </div>
+                    <div className="text-left font-mono">
+                      <span className="text-[10px] text-slate-400 block">المبلغ المدفوع</span>
+                      <strong className="text-slate-300">-{formatMoney(win.amount, country)}</strong>
                     </div>
-                    <button
-                      type="button"
-                      className="auction-enter-btn"
-                      onClick={() => setSelectedAuctionId(listing.id)}
-                    >
-                      ادخل المزاد 🔨
-                    </button>
-                  </div>
-                </div>
-              </article>
-            );
-          })}
-        </div>
+                  </article>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Live Bidding Modal Room */}
         {selectedAuction && (

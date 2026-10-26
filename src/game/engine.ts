@@ -1971,7 +1971,11 @@ export type GameCommand =
   | { name: 'claim_season_challenge'; args: { challengeId: string } }
   | { name: 'claim_login_reward'; args: { rewardId: (typeof LOGIN_REWARDS)[number]['id'] } }
   | { name: 'choose_season_event'; args: { choiceId: string } }
-  | { name: 'update_notification_state'; args: { action: 'read' | 'dismiss'; notificationIds: string[] } };
+  | { name: 'update_notification_state'; args: { action: 'read' | 'dismiss'; notificationIds: string[] } }
+  | { name: 'list_player_asset'; args: { assetType: 'land' | 'company'; assetId: string; startingBid: number } }
+  | { name: 'settle_player_auction'; args: { listingId: string; customWinningAmount?: number; customBuyerName?: string } }
+  | { name: 'cancel_player_auction'; args: { listingId: string } }
+  | { name: 'claim_starter_mission'; args: { missionId: string } };
 
 export type GameCommandHandler = (command: GameCommand, fallback: (profile: PlayerProfile) => GameResult<unknown>) => void | Promise<void>;
 
@@ -2023,5 +2027,24 @@ export function executeGameCommand(profile: PlayerProfile, command: GameCommand)
     case 'claim_login_reward': return claimLoginReward(profile, command.args.rewardId);
     case 'choose_season_event': return chooseSeasonEvent(profile, command.args.choiceId);
     case 'update_notification_state': return updateNotificationState(profile, command.args.action, command.args.notificationIds);
+    case 'list_player_asset': return listPlayerAssetForAuction(profile, command.args.assetType, command.args.assetId, command.args.startingBid);
+    case 'settle_player_auction': return settlePlayerAssetAuction(profile, command.args.listingId, command.args.customWinningAmount, command.args.customBuyerName);
+    case 'cancel_player_auction': return cancelPlayerAssetAuction(profile, command.args.listingId);
+    case 'claim_starter_mission': return claimStarterMission(profile, command.args.missionId);
   }
 }
+
+export {
+  listPlayerAssetForAuction,
+  settlePlayerAssetAuction,
+  cancelPlayerAssetAuction,
+  executeSellPlayerAsset,
+} from './dynamicAuctions';
+
+export {
+  claimStarterMission,
+  getStarterMissions,
+  getCompletedStarterMissions,
+  getCurrentStarterMissionStage,
+  STARTER_MISSION_SPECS,
+} from './onboarding';

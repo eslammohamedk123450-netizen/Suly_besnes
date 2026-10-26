@@ -34,6 +34,40 @@ export interface BotBid {
   placedAt: string;
 }
 
+export interface PlayerAuctionBid {
+  investorId: string;
+  investorName: string;
+  investorType: string;
+  avatarColor: string;
+  amount: number;
+  timestamp: number;
+  note?: string;
+}
+
+export interface PlayerAuctionListing {
+  id: string;
+  assetType: 'land' | 'company';
+  assetId: string;
+  assetName: string;
+  assetSpecs: string;
+  originalValue: number;
+  startingBid: number;
+  currentBid: number;
+  status: 'active' | 'sold' | 'cancelled';
+  leadingBidderName: string;
+  leadingBidderType: string;
+  totalBidsCount: number;
+  closesAtMs: number;
+  listedAt: string;
+  listedOnDay: number;
+  soldAt?: string;
+  soldOnDay?: number;
+  finalSalePrice?: number;
+  profitDifference?: number;
+  profitPercent?: number;
+  bidsHistory: PlayerAuctionBid[];
+}
+
 export interface CompanyRecord {
   id: string;
   name: string;
@@ -258,6 +292,9 @@ export interface OnboardingProgress {
   claimedStoryQuestIds?: string[];
   claimedCampaignChapters?: number[];
   campaignChapterId?: number;
+  starterMissionStage?: number;
+  claimedStarterMissionIds?: string[];
+  completedStarterMissionIds?: string[];
 }
 
 export type CommodityGrade = 'A+' | 'B' | 'C';

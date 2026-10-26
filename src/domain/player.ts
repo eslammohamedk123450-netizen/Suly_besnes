@@ -18,6 +18,7 @@ import type {
   OnboardingProgress,
   GlobalShipmentRecord,
   ForwardSupplyContract,
+  PlayerAuctionListing,
 } from './futureSystems';
 import type { SpeedCardStack } from './accountFeatures';
 import { FREE_AVATAR_IDS, DEFAULT_AVATAR_ID } from './avatars';
@@ -123,6 +124,9 @@ export interface PlayerProfile {
   globalShipments?: GlobalShipmentRecord[];
   forwardContracts?: ForwardSupplyContract[];
   supplierTrust?: Record<string, number>;
+  playerAuctions?: PlayerAuctionListing[];
+  soldAssetIds?: string[];
+  processedAuctionSaleIds?: string[];
 }
 
 function createId(): string {

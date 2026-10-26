@@ -6,12 +6,21 @@ import {
   SECTION_DEPENDENCY_MAP,
 } from './progressionEngine';
 
+import type { FinanceLedgerEntry } from '../domain/futureSystems';
+import type { GameResult } from './engine';
+
 export interface StarterMission {
   id: string;
+  stage: number;
+  stageName: string;
   title: string;
   description: string;
   section: SectionId;
+  cashReward: number;
+  diamondReward: number;
   completed: boolean;
+  claimed: boolean;
+  claimedAt?: string;
 }
 
 export interface SystemGuide {
@@ -92,37 +101,318 @@ export function getSectionUnlockHint(profile: PlayerProfile, section: SectionId)
   return `يفتح في مستوى ${spec.requiredLevel} · ${spec.storyHint}`;
 }
 
+export interface StarterMissionSpec {
+  id: string;
+  stage: number;
+  stageName: string;
+  title: string;
+  description: string;
+  section: SectionId;
+  cashReward: number;
+  diamondReward: number;
+  checkCompleted: (profile: PlayerProfile) => boolean;
+}
+
+export const STARTER_MISSION_SPECS: readonly StarterMissionSpec[] = [
+  // المرحلة 1: التأسيس والإنقاذ
+  {
+    id: 'starter-m1-repair',
+    stage: 1,
+    stageName: 'المرحلة 1: التأسيس والإنقاذ',
+    title: 'صيانة وتأهيل المصنع',
+    description: 'ارفع كفاءة المصنع الموروث إلى 90% على الأقل لتأمين خطوط الإنتاج وجودة المنتجات.',
+    section: 'companies',
+    cashReward: 5_000,
+    diamondReward: 10,
+    checkCompleted: (p) => p.companies.some((c) => (c.maintenanceCondition ?? 100) >= 90),
+  },
+  {
+    id: 'starter-m1-production',
+    stage: 1,
+    stageName: 'المرحلة 1: التأسيس والإنقاذ',
+    title: 'تشغيل خط الإنتاج الأول',
+    description: 'أكمل أول دفعة تصنيع منتجات غذائية أو صناعية لتوفير مخزون تجاري جاهز للبيع.',
+    section: 'production',
+    cashReward: 6_000,
+    diamondReward: 10,
+    checkCompleted: (p) => p.productionOrders.some((order) => order.status === 'completed'),
+  },
+  {
+    id: 'starter-m1-contract',
+    stage: 1,
+    stageName: 'المرحلة 1: التأسيس والإنقاذ',
+    title: 'استعادة ثقة السوق',
+    description: 'سلّم أول عقد تجاري في موعده لرفع التجميد واستعادة ثقة العملاء بالسوق.',
+    section: 'contracts',
+    cashReward: 8_000,
+    diamondReward: 15,
+    checkCompleted: (p) => p.contracts.some((contract) => contract.status === 'completed'),
+  },
+
+  // المرحلة 2: التوسع والاستثمار
+  {
+    id: 'starter-m2-land',
+    stage: 2,
+    stageName: 'المرحلة 2: التوسع والاستثمار',
+    title: 'التوسع العقاري والاستثماري',
+    description: 'امتلك قطعتي أرض استثمارية على الأقل لتجهيز مواقع المصانع والمجمعات التوسعية.',
+    section: 'lands',
+    cashReward: 12_000,
+    diamondReward: 20,
+    checkCompleted: (p) => p.lands.length >= 2,
+  },
+  {
+    id: 'starter-m2-company',
+    stage: 2,
+    stageName: 'المرحلة 2: التوسع والاستثمار',
+    title: 'تطوير المصنع أو تأسيس شركة ثانية',
+    description: 'طوّر المصنع لمستوى أعلى أو أسس شركة ثانية لتنويع مصادر التدفقات المالية.',
+    section: 'companies',
+    cashReward: 15_000,
+    diamondReward: 20,
+    checkCompleted: (p) => p.companies.length >= 2 || p.companies.some((c) => (c.upgradeLevel ?? 1) >= 2 || (c.energyCapacity ?? 100) > 100),
+  },
+  {
+    id: 'starter-m2-market',
+    stage: 2,
+    stageName: 'المرحلة 2: التوسع والاستثمار',
+    title: 'دخول سوق المزادات أو البيع المباشر',
+    description: 'قم ببيع أول شحنة منتجات في السوق أو شارك في جلسات المزاد العلني.',
+    section: 'auctions',
+    cashReward: 18_000,
+    diamondReward: 25,
+    checkCompleted: (p) => p.sales.length > 0 || (p.playerAuctions ?? []).length > 0 || p.auctionHistory.length > 0,
+  },
+
+  // المرحلة 3: بناء الإمبراطورية
+  {
+    id: 'starter-m3-staff',
+    stage: 3,
+    stageName: 'المرحلة 3: بناء الإمبراطورية',
+    title: 'بناء الفريق الإداري',
+    description: 'عيّن مديرًا تنفيذيًا أو محاسبًا في قسم الإدارة والرواتب لقيادة النمو.',
+    section: 'staff',
+    cashReward: 25_000,
+    diamondReward: 30,
+    checkCompleted: (p) => p.staff.some((m) => m.status === 'active'),
+  },
+  {
+    id: 'starter-m3-wealth',
+    stage: 3,
+    stageName: 'المرحلة 3: بناء الإمبراطورية',
+    title: 'الاستقرار المالي والسيولة',
+    description: 'حقق رصيدًا بنكيًا نقدياً لا يقل عن 50,000 $ لضمان تمويل الاستحواذات الكبرى.',
+    section: 'bank',
+    cashReward: 30_000,
+    diamondReward: 40,
+    checkCompleted: (p) => p.bankBalance >= 50_000,
+  },
+  {
+    id: 'starter-m3-contracts',
+    stage: 3,
+    stageName: 'المرحلة 3: بناء الإمبراطورية',
+    title: 'شراكات التوريد الكبرى',
+    description: 'سلّم 3 عقود تجارية بنجاح لبناء سمعة اقتصادية راسخة تفتح أبواب الصفقات السيادية.',
+    section: 'contracts',
+    cashReward: 40_000,
+    diamondReward: 50,
+    checkCompleted: (p) => p.contracts.filter((c) => c.status === 'completed').length >= 3,
+  },
+];
+
+/**
+ * Determines current active stage based on claimed missions
+ */
+export function getCurrentStarterMissionStage(profile: PlayerProfile): number {
+  const claimedSet = new Set([
+    ...(profile.onboarding?.claimedStarterMissionIds ?? []),
+    ...(profile.completedTaskIds ?? []),
+  ]);
+
+  const stage1Specs = STARTER_MISSION_SPECS.filter((s) => s.stage === 1);
+  const stage1Finished = stage1Specs.every((s) => claimedSet.has(s.id));
+  if (!stage1Finished) return 1;
+
+  const stage2Specs = STARTER_MISSION_SPECS.filter((s) => s.stage === 2);
+  const stage2Finished = stage2Specs.every((s) => claimedSet.has(s.id));
+  if (!stage2Finished) return 2;
+
+  const stage3Specs = STARTER_MISSION_SPECS.filter((s) => s.stage === 3);
+  const stage3Finished = stage3Specs.every((s) => claimedSet.has(s.id));
+  if (!stage3Finished) return 3;
+
+  return 4; // All stages completed!
+}
+
+/**
+ * Returns active missions for current stage. Completed & claimed missions disappear.
+ */
 export function getStarterMissions(profile: PlayerProfile): StarterMission[] {
-  return [
-    {
-      id: 'intro-repair',
-      title: 'صيانة المصنع الموروث',
-      description: 'ارفع كفاءة المعدات إلى 100% لضمان جودة الإنتاج وعدم تعطل الخطوط.',
-      section: 'companies',
-      completed: profile.companies.some((c) => (c.maintenanceCondition ?? 100) >= 90),
+  const currentStage = getCurrentStarterMissionStage(profile);
+  const claimedSet = new Set([
+    ...(profile.onboarding?.claimedStarterMissionIds ?? []),
+    ...(profile.completedTaskIds ?? []),
+  ]);
+
+  if (currentStage > 3) return [];
+
+  // Filter to current stage missions that are NOT claimed yet
+  return STARTER_MISSION_SPECS
+    .filter((spec) => spec.stage === currentStage && !claimedSet.has(spec.id))
+    .map((spec) => ({
+      id: spec.id,
+      stage: spec.stage,
+      stageName: spec.stageName,
+      title: spec.title,
+      description: spec.description,
+      section: spec.section,
+      cashReward: spec.cashReward,
+      diamondReward: spec.diamondReward,
+      completed: spec.checkCompleted(profile),
+      claimed: false,
+    }));
+}
+
+/**
+ * Returns archive of all completed and claimed starter missions across stages
+ */
+export function getCompletedStarterMissions(profile: PlayerProfile): StarterMission[] {
+  const claimedSet = new Set([
+    ...(profile.onboarding?.claimedStarterMissionIds ?? []),
+    ...(profile.completedTaskIds ?? []),
+  ]);
+
+  return STARTER_MISSION_SPECS
+    .filter((spec) => claimedSet.has(spec.id))
+    .map((spec) => ({
+      id: spec.id,
+      stage: spec.stage,
+      stageName: spec.stageName,
+      title: spec.title,
+      description: spec.description,
+      section: spec.section,
+      cashReward: spec.cashReward,
+      diamondReward: spec.diamondReward,
+      completed: true,
+      claimed: true,
+    }));
+}
+
+/**
+ * Claims a starter mission reward, records it permanently, prevents duplicate payouts,
+ * and automatically unlocks the next stage.
+ */
+export function claimStarterMission(
+  profile: PlayerProfile,
+  missionId: string,
+): GameResult<{ missionId: string; cashReward: number; diamondReward: number }> {
+  // Support legacy mission ID mapping
+  const normalizedId =
+    missionId === 'intro-repair' ? 'starter-m1-repair'
+    : missionId === 'intro-production' ? 'starter-m1-production'
+    : missionId === 'intro-contract' ? 'starter-m1-contract'
+    : missionId === 'intro-land' ? 'starter-m2-land'
+    : missionId;
+
+  const spec = STARTER_MISSION_SPECS.find((s) => s.id === normalizedId);
+  if (!spec) {
+    return {
+      ok: false,
+      profile,
+      reason: 'not-found',
+      message: 'المهمة الأولية غير موجودة.',
+    };
+  }
+
+  const claimedSet = new Set([
+    ...(profile.onboarding?.claimedStarterMissionIds ?? []),
+    ...(profile.completedTaskIds ?? []),
+  ]);
+
+  if (claimedSet.has(spec.id)) {
+    return {
+      ok: false,
+      profile,
+      reason: 'already-claimed',
+      message: 'تم تحصيل مكافأة هذه المهمة مسبقاً ولا يمكن صرفها مرة أخرى.',
+    };
+  }
+
+  if (!spec.checkCompleted(profile)) {
+    return {
+      ok: false,
+      profile,
+      reason: 'condition-not-met',
+      message: 'لم يتم استيفاء شروط إنجاز هذه المهمة بعد.',
+    };
+  }
+
+  const nowIso = new Date().toISOString();
+  const entry: FinanceLedgerEntry = {
+    id: `starter-mission-${spec.id}-${Date.now()}`,
+    category: 'revenue',
+    amount: spec.cashReward,
+    countryId: profile.countryId,
+    occurredAt: nowIso,
+    note: `مكافأة المهمة الأولية: [${spec.title}]`,
+  };
+
+  const updatedClaimedStarterIds = Array.from(new Set([
+    ...(profile.onboarding?.claimedStarterMissionIds ?? []),
+    spec.id,
+    missionId, // record both in case legacy
+  ]));
+
+  const updatedCompletedStarterIds = Array.from(new Set([
+    ...(profile.onboarding?.completedStarterMissionIds ?? []),
+    spec.id,
+    missionId,
+  ]));
+
+  const updatedCompletedTaskIds = Array.from(new Set([
+    ...(profile.completedTaskIds ?? []),
+    spec.id,
+    missionId,
+  ]));
+
+  const tempProfile: PlayerProfile = {
+    ...profile,
+    bankBalance: profile.bankBalance + spec.cashReward,
+    diamonds: profile.diamonds + spec.diamondReward,
+    finances: {
+      ...profile.finances,
+      totalRevenue: (profile.finances?.totalRevenue ?? 0) + spec.cashReward,
+      netProfit: (profile.finances?.netProfit ?? 0) + spec.cashReward,
     },
-    {
-      id: 'intro-land',
-      title: 'توسيع الأصول العقارية',
-      description: 'اشترِ قطعة أرض إضافية لتوسيع إمبراطوريتك الصناعية والزراعية.',
-      section: 'lands',
-      completed: profile.lands.length >= 2,
+    ledger: [entry, ...(profile.ledger || [])],
+    completedTaskIds: updatedCompletedTaskIds,
+    onboarding: {
+      ...profile.onboarding,
+      claimedStarterMissionIds: updatedClaimedStarterIds,
+      completedStarterMissionIds: updatedCompletedStarterIds,
     },
-    {
-      id: 'intro-production',
-      title: 'تشغيل أول خط إنتاج',
-      description: 'اشترِ المواد الخام وأكمل دفعة إنتاج قابلة للبيع.',
-      section: 'production',
-      completed: profile.productionOrders.some((order) => order.status === 'completed'),
+  };
+
+  // Recalculate next stage
+  const nextStage = getCurrentStarterMissionStage(tempProfile);
+  const nextProfile: PlayerProfile = {
+    ...tempProfile,
+    onboarding: {
+      ...tempProfile.onboarding,
+      starterMissionStage: nextStage,
     },
-    {
-      id: 'intro-contract',
-      title: 'استعادة ثقة السوق',
-      description: 'سلّم أول عقد تجاري في موعده لرفع التجميد البنكي.',
-      section: 'contracts',
-      completed: profile.contracts.some((contract) => contract.status === 'completed'),
+  };
+
+  return {
+    ok: true,
+    profile: nextProfile,
+    message: `تهانينا! تم استلام مكافأة مهمة «${spec.title}»: +${spec.cashReward.toLocaleString()} $ و +${spec.diamondReward} ماسة، ونقلت إلى سجل المهام المكتملة.`,
+    data: {
+      missionId: spec.id,
+      cashReward: spec.cashReward,
+      diamondReward: spec.diamondReward,
     },
-  ];
+  };
 }
 
 const SYSTEM_GUIDES: Record<SectionId, SystemGuide> = {
