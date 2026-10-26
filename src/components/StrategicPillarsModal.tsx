@@ -266,7 +266,7 @@ export function StrategicPillarsModal({
             <span className="text-[11px] text-slate-400">تحكم فوري بكافة أذرع الإدارة</span>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-2.5">
             {/* Pillar 1: Smart Offline Idle Report */}
             <button
               type="button"
@@ -275,7 +275,7 @@ export function StrategicPillarsModal({
                 onClose();
                 onOpenMorningReport?.();
               }}
-              className="p-3.5 rounded-2xl bg-slate-900/90 border border-amber-500/40 hover:border-amber-400 hover:bg-slate-900 transition text-right flex flex-col justify-between group active:scale-95 cursor-pointer shadow-lg"
+              className="p-2.5 sm:p-3 rounded-2xl bg-slate-900/90 border border-amber-500/40 hover:border-amber-400 hover:bg-slate-900 transition text-right flex flex-col justify-between group active:scale-95 cursor-pointer shadow-lg min-h-[152px] sm:min-h-[166px]"
             >
               <div>
                 <div className="flex items-center justify-between mb-1.5">
@@ -309,7 +309,7 @@ export function StrategicPillarsModal({
                   onNavigate('bank');
                 }
               }}
-              className="p-3.5 rounded-2xl bg-slate-900/90 border border-emerald-500/40 hover:border-emerald-400 hover:bg-slate-900 transition text-right flex flex-col justify-between group active:scale-95 cursor-pointer shadow-lg"
+              className="p-2.5 sm:p-3 rounded-2xl bg-slate-900/90 border border-emerald-500/40 hover:border-emerald-400 hover:bg-slate-900 transition text-right flex flex-col justify-between group active:scale-95 cursor-pointer shadow-lg min-h-[152px] sm:min-h-[166px]"
             >
               <div>
                 <div className="flex items-center justify-between mb-1.5">
@@ -339,7 +339,7 @@ export function StrategicPillarsModal({
                 onClose();
                 onNavigate('territory');
               }}
-              className="p-3.5 rounded-2xl bg-slate-900/90 border border-indigo-500/40 hover:border-indigo-400 hover:bg-slate-900 transition text-right flex flex-col justify-between group active:scale-95 cursor-pointer shadow-lg"
+              className="p-2.5 sm:p-3 rounded-2xl bg-slate-900/90 border border-indigo-500/40 hover:border-indigo-400 hover:bg-slate-900 transition text-right flex flex-col justify-between group active:scale-95 cursor-pointer shadow-lg min-h-[152px] sm:min-h-[166px]"
             >
               <div>
                 <div className="flex items-center justify-between mb-1.5">
@@ -373,7 +373,7 @@ export function StrategicPillarsModal({
                   onNavigate('luxury');
                 }
               }}
-              className="p-3.5 rounded-2xl bg-slate-900/90 border border-purple-500/40 hover:border-purple-400 hover:bg-slate-900 transition text-right flex flex-col justify-between group active:scale-95 cursor-pointer shadow-lg"
+              className="p-2.5 sm:p-3 rounded-2xl bg-slate-900/90 border border-purple-500/40 hover:border-purple-400 hover:bg-slate-900 transition text-right flex flex-col justify-between group active:scale-95 cursor-pointer shadow-lg min-h-[152px] sm:min-h-[166px]"
             >
               <div>
                 <div className="flex items-center justify-between mb-1.5">
