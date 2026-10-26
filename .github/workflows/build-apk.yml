@@ -12,8 +12,8 @@ jobs:
         with:
           distribution: temurin
           java-version: 17
-      - run: npm install
-      - run: npm install @capacitor/core @capacitor/cli @capacitor/android
+      - run: npm install --legacy-peer-deps
+      - run: npm install @capacitor/core @capacitor/cli @capacitor/android --legacy-peer-deps
       - run: npm run build
       - run: npx cap init "Suly Besnes" com.sulybesnes.game --web-dir=dist --npm-client npm || true
       - run: npx cap add android || true
