@@ -62,6 +62,8 @@ import { calculateOfflineIdleProgress, applyOfflineReportToProfile, recordOfflin
 import { MorningAbsenceReportModal } from './components/MorningAbsenceReportModal';
 import { CentralBankModal } from './components/CentralBankModal';
 import { PrestigeExpansionModal } from './components/PrestigeExpansionModal';
+import { StrategicPillarsModal } from './components/StrategicPillarsModal';
+import { acceptBotMarketOffer } from './game/economyBots';
 import { triggerHaptic } from './services/nativeMobileService';
 
 function getPendingSyncCount(accountId: string): number {
@@ -113,6 +115,7 @@ export default function App() {
   const [offlineReport, setOfflineReport] = useState<OfflineIdleReport | null>(null);
   const [isCentralBankModalOpen, setIsCentralBankModalOpen] = useState(false);
   const [isPrestigeModalOpen, setIsPrestigeModalOpen] = useState(false);
+  const [isStrategicPillarsOpen, setIsStrategicPillarsOpen] = useState(false);
   const syncLock = useRef(false);
   const remoteCommandAttempts = useRef(new Map<string, Promise<RemoteGameCommandAttempt>>());
 
@@ -1141,6 +1144,10 @@ export default function App() {
                 triggerHaptic('light');
                 setIsPrestigeModalOpen(true);
               }}
+              onOpenStrategicPillars={() => {
+                triggerHaptic('light');
+                setIsStrategicPillarsOpen(true);
+              }}
               onUpdateProfile={(updater) => {
                 setProfile((prev) => {
                   if (!prev) return prev;
@@ -1312,6 +1319,20 @@ export default function App() {
           );
         }}
         onAdvanceDay={() => void handleDaysElapsed(1)}
+        onOpenStoryCampaign={() => {
+          triggerHaptic('light');
+          setIsCampaignHubOpen(true);
+        }}
+        onOpenStrategicPillars={() => {
+          triggerHaptic('light');
+          setIsStrategicPillarsOpen(true);
+        }}
+        onAcceptBotOffer={(offerId) => {
+          void handleGameCommand(
+            { name: 'accept_bot_offer', args: { offerId } },
+            (curr) => acceptBotMarketOffer(curr, offerId),
+          );
+        }}
         onProfileUpdate={(updated) => {
           setProfile(updated);
           saveGame(updated, account?.id);
@@ -1626,6 +1647,23 @@ export default function App() {
               subtitle: 'انطلقت إمبراطوريتك نحو العواصم العالمية مع الاحتفاظ بكافة امتيازات وأوسمة الهيبة الدائمة.',
               rewardText: 'توسّع دولي مع نقاط هيبة ورصيد انطلاق جديد',
             });
+          }}
+        />
+      )}
+
+      {/* 4. Strategic Operations & Empire Pillars Modal */}
+      {isStrategicPillarsOpen && (
+        <StrategicPillarsModal
+          isOpen={isStrategicPillarsOpen}
+          onClose={() => setIsStrategicPillarsOpen(false)}
+          profile={profile}
+          country={country}
+          onNavigate={(sec) => navigate(sec)}
+          onAcceptBotOffer={(offerId) => {
+            void handleGameCommand(
+              { name: 'accept_bot_offer', args: { offerId } },
+              (curr) => acceptBotMarketOffer(curr, offerId),
+            );
           }}
         />
       )}

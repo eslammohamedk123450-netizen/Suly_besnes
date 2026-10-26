@@ -33,6 +33,7 @@ const OPTIONAL_PROFILE_KEYS = new Set([
   'playerAuctions',
   'soldAssetIds',
   'processedAuctionSaleIds',
+  'processedBotOfferIds',
   'automationDirectives',
 ]);
 
@@ -44,7 +45,7 @@ const PROFILE_KEYS = new Set([
   'season', 'reputation', 'contracts', 'achievements', 'onboarding', 'readNotificationIds', 'dismissedNotificationIds', 'unreadProductionOrderIds',
   'lastSpinTimestamp', 'lastSpinDay', 'avatarId', 'unlockedAvatarIds', 'bio', 'renameCountThisWeek', 'lastRenameWeekTimestamp', 'lastOfflineClaimAt',
   'globalShipments', 'forwardContracts', 'supplierTrust',
-  'playerAuctions', 'soldAssetIds', 'processedAuctionSaleIds',
+  'playerAuctions', 'soldAssetIds', 'processedAuctionSaleIds', 'processedBotOfferIds',
   'automationDirectives',
 ]);
 
@@ -105,7 +106,7 @@ function scanJson(value: unknown, path: string, depth: number, state: { nodes: n
     if (!Number.isFinite(value)) addError(errors, `${path}:non_finite_number`);
     return;
   }
-  if (value === null || typeof value === 'boolean') return;
+  if (value === null || value === undefined || typeof value === 'boolean') return;
   if (Array.isArray(value)) {
     if (value.length > MAX_ARRAY_ITEMS) addError(errors, `${path}:too_many_items`);
     for (let index = 0; index < Math.min(value.length, MAX_ARRAY_ITEMS); index += 1) {

@@ -45,7 +45,10 @@ import {
   Lock,
   BookOpen,
   Store,
+  Target,
 } from 'lucide-react';
+import { StrategicPillarsModal } from './StrategicPillarsModal';
+import { acceptBotMarketOffer } from '../game/economyBots';
 
 interface DashboardProps {
   profile: PlayerProfile;
@@ -60,6 +63,7 @@ interface DashboardProps {
   onOpenMorningReport?: () => void;
   onOpenCentralBank?: () => void;
   onOpenPrestige?: () => void;
+  onOpenStrategicPillars?: () => void;
   onMarkBriefingSeen?: (questId: string) => void;
   onStartGuidedWalkthrough?: (quest: CountryStoryQuest) => void;
 }
@@ -80,6 +84,7 @@ export function Dashboard({
   profile,
   country,
   onNavigate,
+  onCommand,
   onClaimReward,
   onOpenLuckyWheel,
   onOpenTutorial,
@@ -87,11 +92,13 @@ export function Dashboard({
   onOpenMorningReport,
   onOpenCentralBank,
   onOpenPrestige,
+  onOpenStrategicPillars,
   onMarkBriefingSeen,
   onStartGuidedWalkthrough,
 }: DashboardProps) {
   const [isLeaderboardOpen, setIsLeaderboardOpen] = useState(false);
   const [isFinanceModalOpen, setIsFinanceModalOpen] = useState(false);
+  const [isStrategicPillarsOpen, setIsStrategicPillarsOpen] = useState(false);
   const [spinState, setSpinState] = useState(() => getLuckySpinState(profile.lastSpinTimestamp));
   const [opsFilter, setOpsFilter] = useState<'all' | 'available' | 'core' | 'expansion'>('all');
   const [lockedGateModal, setLockedGateModal] = useState<{
@@ -174,6 +181,26 @@ export function Dashboard({
       requiredLevel: 1,
       isUnlocked: true,
       hint: 'فرصة دوران مجانية كل 50 دقيقة لدعم السيولة والذهب.',
+    },
+    {
+      id: 'story_campaign',
+      title: 'خريطة القصة',
+      category: 'special',
+      icon: <BookOpen className="w-5 h-5 sm:w-6 sm:h-6 text-slate-950" />,
+      gradient: 'bg-gradient-to-tr from-amber-500 to-yellow-300',
+      requiredLevel: 1,
+      isUnlocked: true,
+      hint: 'استعراض فصول القصة الوطنية وتحديات بناء الإمبراطورية.',
+    },
+    {
+      id: 'strategic_pillars',
+      title: 'المحاور الاستراتيجية',
+      category: 'special',
+      icon: <Target className="w-5 h-5 sm:w-6 sm:h-6 text-slate-950" />,
+      gradient: 'bg-gradient-to-tr from-blue-500 to-cyan-400',
+      requiredLevel: 1,
+      isUnlocked: true,
+      hint: 'لوحة التحكم الاستراتيجية، تتبع السيولة والمنافسة وتوجيهات الإمبراطورية.',
     },
     {
       id: 'companies',
@@ -522,7 +549,7 @@ export function Dashboard({
 
       {/* 2.2. Strategic Systems Hub (Gated by Progression Rules) */}
       <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-4 sm:p-5 shadow-2xl backdrop-blur-md space-y-3">
-        <div className="flex items-center justify-between pb-2.5 border-b border-slate-800/80">
+        <div className="flex flex-wrap items-center justify-between gap-2 pb-2.5 border-b border-slate-800/80">
           <div className="flex items-center gap-2">
             <h3 className="font-extrabold text-sm sm:text-base text-white">
               المحاور الاستراتيجية لإدارة الإمبراطورية
@@ -531,6 +558,21 @@ export function Dashboard({
               · أرباح الغياب · السياسة النقدية · التنافس الإقليمي · الصندوق السيادي
             </span>
           </div>
+          <button
+            type="button"
+            onClick={() => {
+              playSound('click');
+              if (onOpenStrategicPillars) {
+                onOpenStrategicPillars();
+              } else {
+                setIsStrategicPillarsOpen(true);
+              }
+            }}
+            className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-500 hover:to-cyan-400 text-white font-black text-xs flex items-center gap-1.5 shadow-md shadow-blue-900/30 active:scale-95 transition cursor-pointer"
+          >
+            <Target className="w-3.5 h-3.5" />
+            <span>لوحة المحاور والمنافسين 🎯</span>
+          </button>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
@@ -746,6 +788,16 @@ export function Dashboard({
                   } else if (item.id === 'lucky_wheel') {
                     playSound('click');
                     onOpenLuckyWheel?.();
+                  } else if (item.id === 'story_campaign') {
+                    playSound('click');
+                    onOpenCampaignHub?.();
+                  } else if (item.id === 'strategic_pillars') {
+                    playSound('click');
+                    if (onOpenStrategicPillars) {
+                      onOpenStrategicPillars();
+                    } else {
+                      setIsStrategicPillarsOpen(true);
+                    }
                   } else if (item.sectionId) {
                     handleNav(item.sectionId);
                   }
@@ -1029,6 +1081,22 @@ export function Dashboard({
           profile={profile}
           country={country}
           onNavigate={handleNav}
+        />
+      )}
+
+      {isStrategicPillarsOpen && (
+        <StrategicPillarsModal
+          isOpen={isStrategicPillarsOpen}
+          onClose={() => setIsStrategicPillarsOpen(false)}
+          profile={profile}
+          country={country}
+          onNavigate={handleNav}
+          onAcceptBotOffer={(offerId) => {
+            onCommand?.(
+              { name: 'accept_bot_offer', args: { offerId } },
+              (curr) => acceptBotMarketOffer(curr, offerId),
+            );
+          }}
         />
       )}
 

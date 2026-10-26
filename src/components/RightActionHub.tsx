@@ -6,6 +6,7 @@ import { formatMoney } from '../domain/formatters';
 import { PRODUCT_CATALOG } from '../game/catalog';
 import { getMarketQuote } from '../game/market';
 import { getStarterMissions, claimStarterMission, isSectionUnlocked } from '../game/onboarding';
+import { generateBotMarketOffers, acceptBotMarketOffer, type BotMarketOffer } from '../game/economyBots';
 import { Icon } from './Icon';
 import { playSound } from '../game/soundEffects';
 import { getLuckySpinState } from '../game/luckyWheelService';
@@ -19,6 +20,8 @@ interface RightActionHubProps {
   onSellProduct: (productId: string, quantity: number) => void;
   onAdvanceDay: () => void;
   onOpenLuckyWheel?: () => void;
+  onOpenStoryCampaign?: () => void;
+  onOpenStrategicPillars?: () => void;
   onProfileUpdate?: (profile: PlayerProfile) => void;
 }
 
@@ -30,11 +33,14 @@ export function RightActionHub({
   onSellProduct,
   onAdvanceDay,
   onOpenLuckyWheel,
+  onOpenStoryCampaign,
+  onOpenStrategicPillars,
   onProfileUpdate,
 }: RightActionHubProps) {
   const [open, setOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<'all' | 'earnings' | 'market'>('all');
+  const [activeTab, setActiveTab] = useState<'all' | 'earnings' | 'market' | 'bots'>('all');
   const [justCollected, setJustCollected] = useState(false);
+  const [tradeMessage, setTradeMessage] = useState<string | null>(null);
   const [spinState, setSpinState] = useState(() => getLuckySpinState(profile.lastSpinTimestamp));
 
   useEffect(() => {
@@ -95,6 +101,22 @@ export function RightActionHub({
     return finishedProductsInStock.reduce((sum, item) => sum + item.estimatedGross, 0);
   }, [finishedProductsInStock]);
 
+  const botOffers = useMemo(() => generateBotMarketOffers(profile), [profile.day, profile.inventory, profile.processedBotOfferIds]);
+
+  const handleAcceptBotDeal = (offerId: string) => {
+    const result = acceptBotMarketOffer(profile, offerId);
+    if (result.ok) {
+      playSound('cash');
+      setTradeMessage(result.message);
+      if (onProfileUpdate) onProfileUpdate(result.profile);
+      setTimeout(() => setTradeMessage(null), 4000);
+    } else {
+      playSound('error');
+      setTradeMessage(result.message);
+      setTimeout(() => setTradeMessage(null), 4000);
+    }
+  };
+
   const handleCollectActual = () => {
     if (alreadyCollectedToday) return;
     playSound('cash');
@@ -128,7 +150,7 @@ export function RightActionHub({
 
   return (
     <>
-      {/* 1. Resting Handle Dock (Lucky Wheel + Imperial Hub side-by-side) */}
+      {/* 1. Resting Handle Dock (Lucky Wheel + Story Campaign + Imperial Hub) */}
       {!open && (
         <div className="right-floating-dock-group">
           {onOpenLuckyWheel && (
@@ -155,20 +177,36 @@ export function RightActionHub({
             </button>
           )}
 
+          {onOpenStoryCampaign && (
+            <button
+              type="button"
+              className="right-story-handle"
+              onClick={() => {
+                playSound('click');
+                onOpenStoryCampaign();
+              }}
+              aria-label="مسار القصة والسيناريو الإمبراطوري"
+              title="مسار القصة والسيناريو الإمبراطوري - فصول القصة والأهداف والمكافآت"
+            >
+              <span className="right-story-handle-icon">📜</span>
+              <span className="right-story-badge">القصة</span>
+            </button>
+          )}
+
           <button
             type="button"
             className="right-hub-handle"
             onClick={() => setOpen(true)}
             aria-label="المركز الإمبراطوري السريع"
-            title="المركز الإمبراطوري السريع - الجمع الفعلي وطرح المنتجات"
+            title="المركز الإمبراطوري السريع - الجمع الفعلي وطرح المنتجات وصفقات المنافسين"
           >
             <span className="right-hub-handle-icon">⚡</span>
-            {(remainingCount > 0 || (!alreadyCollectedToday && actualDailyProfit > 0) || finishedProductsInStock.length > 0) && (
+            {(remainingCount > 0 || (!alreadyCollectedToday && actualDailyProfit > 0) || finishedProductsInStock.length > 0 || botOffers.length > 0) && (
               <span
                 className="right-hub-badge"
-                title={`${remainingCount} مهام - ${finishedProductsInStock.length} منتجات جاهزة للطرح`}
+                title={`${remainingCount} مهام - ${finishedProductsInStock.length} منتجات - ${botOffers.length} صفقات`}
               >
-                {finishedProductsInStock.length > 0 ? '🏪' : remainingCount || '✓'}
+                {botOffers.length > 0 ? '🤝' : finishedProductsInStock.length > 0 ? '🏪' : remainingCount || '✓'}
               </span>
             )}
             <div className="right-hub-label-dots">
@@ -225,6 +263,13 @@ export function RightActionHub({
                 onClick={() => setActiveTab('market')}
               >
                 طرح بالسوق ({finishedProductsInStock.length})
+              </button>
+              <button
+                type="button"
+                className={`right-hub-tab ${activeTab === 'bots' ? 'is-active' : ''}`}
+                onClick={() => setActiveTab('bots')}
+              >
+                صفقات المنافسين 🤝 ({botOffers.length})
               </button>
             </div>
 
@@ -378,6 +423,70 @@ export function RightActionHub({
                 </div>
               )}
 
+              {/* SECTION 2.5: صفقات وعروض المنافسين المباشرة (Smart Economic Bot Deals) */}
+              {(activeTab === 'all' || activeTab === 'bots') && (
+                <div className="right-hub-section">
+                  <div className="right-hub-section-header">
+                    <div className="right-hub-section-title">
+                      <span className="right-hub-icon-emoji">🤝</span>
+                      <strong>صفقات وعروض المنافسين المباشرة ({botOffers.length})</strong>
+                    </div>
+                  </div>
+
+                  {tradeMessage && (
+                    <div className="p-2.5 rounded-xl bg-emerald-950/80 border border-emerald-500/50 text-emerald-200 text-xs mb-3">
+                      {tradeMessage}
+                    </div>
+                  )}
+
+                  {botOffers.length > 0 ? (
+                    <div className="space-y-2.5">
+                      {botOffers.map((offer) => (
+                        <div key={offer.id} className="p-3 rounded-2xl bg-slate-950/80 border border-amber-500/30 flex flex-col gap-2">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xl">{offer.botAvatar}</span>
+                              <div>
+                                <strong className="text-xs text-white block">{offer.botName}</strong>
+                                <small className="text-[10px] text-amber-400 font-bold">{offer.botTitle}</small>
+                              </div>
+                            </div>
+                            <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold text-[10px]">
+                              {offer.type === 'buy_player_product' ? `علاوة +${offer.marketPriceComparison}%` : `خصم ${Math.abs(offer.marketPriceComparison)}%`}
+                            </span>
+                          </div>
+
+                          <p className="text-[11px] text-slate-300 leading-relaxed bg-slate-900/60 p-2 rounded-xl">
+                            «{offer.dialogueNote}»
+                          </p>
+
+                          <div className="flex items-center justify-between pt-1 text-xs">
+                            <div>
+                              <span className="text-slate-400 text-[10px] block">إجمالي الصفقة:</span>
+                              <strong className="text-emerald-400 font-bold font-mono">
+                                {offer.type === 'buy_player_product' ? '+' : '-'} {formatMoney(offer.totalAmount, country)}
+                              </strong>
+                            </div>
+
+                            <button
+                              type="button"
+                              className="py-1.5 px-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs transition cursor-pointer"
+                              onClick={() => handleAcceptBotDeal(offer.id)}
+                            >
+                              {offer.type === 'buy_player_product' ? 'قبول البيع واستلام الكاش 💵' : 'قبول الشراء بالخصم 📦'}
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800 text-center text-xs text-slate-400">
+                      لا توجد عروض منافسين معلقة حالياً؛ تتجدد العروض اليومية أو عند توفير بضائع جاهزة بالمخزن.
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* SECTION 3: المهام الأولية المتبقية (Remaining Starter Missions) */}
               {(activeTab === 'all') && missions.length > 0 && (
                 <div className="right-hub-section">
@@ -445,6 +554,34 @@ export function RightActionHub({
                 </div>
 
                 <div className="right-hub-shortcuts-grid">
+                  {onOpenStoryCampaign && (
+                    <div
+                      className="right-hub-shortcut-card"
+                      onClick={() => {
+                        setOpen(false);
+                        playSound('click');
+                        onOpenStoryCampaign();
+                      }}
+                    >
+                      <span className="right-hub-shortcut-icon">📜</span>
+                      <span>مسار القصة</span>
+                    </div>
+                  )}
+
+                  {onOpenStrategicPillars && (
+                    <div
+                      className="right-hub-shortcut-card"
+                      onClick={() => {
+                        setOpen(false);
+                        playSound('click');
+                        onOpenStrategicPillars();
+                      }}
+                    >
+                      <span className="right-hub-shortcut-icon">🏛️</span>
+                      <span>المحاور الاستراتيجية</span>
+                    </div>
+                  )}
+
                   <div
                     className="right-hub-shortcut-card"
                     onClick={() => handleNavigate('auctions')}
