@@ -38,6 +38,8 @@ const OPTIONAL_PROFILE_KEYS = new Set([
   'claimedRewardIds',
   'dismissedStoryEventIds',
   'automationDirectives',
+  'luckyWheelLevel',
+  'fastStarterProductionUsed',
 ]);
 
 const PROFILE_KEYS = new Set([
@@ -50,7 +52,7 @@ const PROFILE_KEYS = new Set([
   'globalShipments', 'forwardContracts', 'supplierTrust',
   'playerAuctions', 'soldAssetIds', 'processedAuctionSaleIds', 'processedBotOfferIds',
   'completedMissionIds', 'claimedRewardIds', 'dismissedStoryEventIds',
-  'automationDirectives',
+  'automationDirectives', 'luckyWheelLevel', 'fastStarterProductionUsed',
 ]);
 
 const REQUIRED_PROFILE_KEYS = [...PROFILE_KEYS].filter((key) => !OPTIONAL_PROFILE_KEYS.has(key));

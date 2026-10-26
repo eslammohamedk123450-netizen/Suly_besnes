@@ -51,9 +51,12 @@ export interface PlayerAuctionListing {
   assetName: string;
   assetSpecs: string;
   originalValue: number;
+  fairMarketValue?: number;
+  instantSellPrice?: number;
+  maxAllowedBid?: number;
   startingBid: number;
   currentBid: number;
-  status: 'active' | 'sold' | 'cancelled';
+  status: 'active' | 'sold' | 'cancelled' | 'unsold';
   leadingBidderName: string;
   leadingBidderType: string;
   winningBidderName?: string;
@@ -66,6 +69,8 @@ export interface PlayerAuctionListing {
   finalSalePrice?: number;
   profitDifference?: number;
   profitPercent?: number;
+  outcomeType?: 'no_bids' | 'single_bidder' | 'moderate' | 'competitive' | 'rare_surge';
+  outcomeReason?: string;
   bidsHistory: PlayerAuctionBid[];
 }
 

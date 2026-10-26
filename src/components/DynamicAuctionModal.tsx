@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from 'react';
-import type { PlayerProfile, PlayerLand, PlayerCompany } from '../domain/player';
+import { useState, useEffect } from 'react';
+import type { PlayerProfile } from '../domain/player';
 import type { CountryDefinition } from '../domain/countries';
 import { formatMoney } from '../domain/formatters';
 import { playSound } from '../game/soundEffects';
@@ -8,13 +8,11 @@ import {
   simulatePlayerAssetAuction,
   listPlayerAssetForAuction,
   settlePlayerAssetAuction,
-  RIVAL_INVESTORS,
+  cancelPlayerAssetAuction,
+  instantSellPlayerAsset,
   type RivalInvestor,
-  type LiveAuctionItem,
-  getRandomInvestor,
 } from '../game/dynamicAuctions';
-import { Icon } from './Icon';
-import { Gavel, Clock, ShieldCheck, Flame, TrendingUp, Sparkles, X, CheckCircle, AlertCircle, Building, MapPin } from 'lucide-react';
+import { Gavel, Clock, Flame, X, CheckCircle, AlertCircle, Building, MapPin, Zap, Shield, ArrowDownUp } from 'lucide-react';
 
 interface ListAssetAuctionModalProps {
   profile: PlayerProfile;
@@ -127,6 +125,11 @@ export function ListAssetAuctionModal({
     if (!isLiveBiddingActive || biddingStage !== 'live' || !simulationData) return;
 
     const bids = simulationData.bidsList;
+    if (bids.length === 0) {
+      // Unsold auction outcome
+      return;
+    }
+
     const intervals: NodeJS.Timeout[] = [];
 
     bids.forEach((bid, index) => {
@@ -169,27 +172,64 @@ export function ListAssetAuctionModal({
     setCreatedListingId(created.id);
     setLiveProfile(listRes.profile);
 
-    // Prepare simulation
+    // Prepare simulation with varied outcomes
     const sim = simulatePlayerAssetAuction(valuation.fairValue, startingBid);
     setSimulationData(sim);
-    setCurrentBid(startingBid);
-    setLeadingBidder(getRandomInvestor());
+
+    if (sim.outcome === 'no_bids' || sim.bidsList.length === 0) {
+      setCurrentBid(0);
+      setLeadingBidder(null);
+      setRemainingSeconds(6);
+    } else {
+      setCurrentBid(sim.bidsList[0].amount);
+      setLeadingBidder(sim.bidsList[0].investor);
+      setRemainingSeconds(12);
+    }
+
     setBidHistory([]);
-    setRemainingSeconds(12);
     setBiddingStage('live');
     setIsLiveBiddingActive(true);
+  };
+
+  const handleInstantSell = () => {
+    if (!selectedItem || !valuation) return;
+    setErrorMessage('');
+    const res = instantSellPlayerAsset(profile, assetType, selectedItem.id);
+    if (!res.ok) {
+      setErrorMessage(res.message);
+      playSound('error');
+      return;
+    }
+    playSound('cash');
+    const message = `تم التسييل الفوري لـ [${valuation.name}] بنجاح واستلام ${formatMoney(res.data.payout, country)} نقدًا في خزينة البنك. ⚡`;
+    onAssetSold(res.profile, message);
+    onClose();
   };
 
   const handleFinishAuction = () => {
     setIsLiveBiddingActive(false);
     setBiddingStage('finished');
-    playSound('success');
+    if (simulationData?.outcome === 'no_bids' || !leadingBidder) {
+      playSound('error');
+    } else {
+      playSound('success');
+    }
   };
 
   const handleConfirmSale = () => {
-    if (!selectedItem || !leadingBidder || !createdListingId) return;
+    if (!selectedItem || !createdListingId) return;
 
     const currentProfileToSettle = liveProfile || profile;
+
+    // Handle unsold auction
+    if (!leadingBidder || currentBid <= 0 || simulationData?.outcome === 'no_bids') {
+      const cancelRes = cancelPlayerAssetAuction(currentProfileToSettle, createdListingId);
+      const restoredProfile = cancelRes.ok ? cancelRes.profile : currentProfileToSettle;
+      onAssetSold(restoredProfile, `لم يرسُ المزاد على أي مشترٍ وتم إرجاع [${valuation?.name}] لمحفظتك سالماً.`);
+      onClose();
+      return;
+    }
+
     const finalAmount = currentBid;
 
     // Execute safe, deduplicated settlement
@@ -208,9 +248,9 @@ export function ListAssetAuctionModal({
 
     const profitDifference = finalAmount - (valuation?.fairValue || finalAmount);
     const profitPercent = valuation?.fairValue ? Math.round((profitDifference / valuation.fairValue) * 100) : 0;
-    const message = `تهانينا! تم بيع [${valuation?.name}] إلى [${leadingBidder.name}] بسعر ${formatMoney(finalAmount, country)} (فارق ربح ${profitPercent > 0 ? `+${profitPercent}%` : '0%'})! 🏛️`;
+    const message = `تهانينا! تم بيع [${valuation?.name}] إلى [${leadingBidder.name}] بسعر ${formatMoney(finalAmount, country)} (فارق ربح ${profitPercent > 0 ? `+${profitPercent}%` : `${profitPercent}%`})! 🏛️`;
 
-    // Notify parent with the authoritative updated profile
+    // Notify parent with authoritative profile
     onAssetSold(settleRes.profile, message);
 
     // Completely reset all modal states before closing
@@ -219,6 +259,16 @@ export function ListAssetAuctionModal({
     setSimulationData(null);
     setIsLiveBiddingActive(false);
     setLiveProfile(null);
+    onClose();
+  };
+
+  const handleCancelUnsold = () => {
+    const currentProfileToSettle = liveProfile || profile;
+    if (createdListingId) {
+      const cancelRes = cancelPlayerAssetAuction(currentProfileToSettle, createdListingId);
+      const restored = cancelRes.ok ? cancelRes.profile : currentProfileToSettle;
+      onAssetSold(restored, `تم إلغاء المزاد واستعادة الأصل إلى محفظتك.`);
+    }
     onClose();
   };
 
@@ -235,10 +285,10 @@ export function ListAssetAuctionModal({
             </div>
             <div>
               <h3 className="text-base sm:text-lg font-black text-amber-300">
-                طرح أصل في المزاد العلني
+                منظومة تقييم ومزاد الأصول العقارية والصناعية
               </h3>
               <p className="text-xs text-slate-400">
-                اعرض أراضيك أو مصانعك في قاعة المزاد وتنافس عليها كبار المستثمرين والصناديق
+                تقييم اقتصادي دقيق، تسييل فوري، أو منافسة مزايدة حية مع كبار الصناديق
               </p>
             </div>
           </div>
@@ -258,6 +308,7 @@ export function ListAssetAuctionModal({
               <span>{errorMessage}</span>
             </div>
           )}
+
           {biddingStage === 'selection' && (
             <>
               {/* Type Switcher */}
@@ -289,7 +340,7 @@ export function ListAssetAuctionModal({
                 {assetType === 'land' ? (
                   availableLands.length === 0 ? (
                     <div className="text-center py-6 text-xs text-slate-400 bg-slate-950/60 rounded-2xl border border-slate-800">
-                      لا تمتلك أي أراضٍ حالياً لطرحها في المزاد.
+                      لا تمتلك أي أراضٍ غير مرتبطة حالياً لطرحها في المزاد.
                     </div>
                   ) : (
                     availableLands.map((land) => (
@@ -349,25 +400,53 @@ export function ListAssetAuctionModal({
                 )}
               </div>
 
-              {/* Valuation & Starting Bid Setting */}
+              {/* Economic Valuation Matrix */}
               {valuation && selectedItem && (
-                <div className="bg-slate-950 border border-slate-800 rounded-2xl p-4 space-y-3">
-                  <div className="flex items-center justify-between text-xs pb-2 border-b border-slate-800">
-                    <span className="text-slate-400">التقييم السوقي العادل للأصل:</span>
-                    <strong className="text-emerald-400 font-mono text-sm">
-                      {formatMoney(valuation.fairValue, country)}
-                    </strong>
+                <div className="bg-slate-950 border border-slate-800 rounded-2xl p-4 space-y-4">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
+                    <div className="p-2.5 rounded-xl bg-slate-900 border border-slate-800">
+                      <span className="text-[10px] text-slate-400 block">تكلفة الشراء الأصلية</span>
+                      <strong className="text-xs sm:text-sm text-slate-200 font-mono">
+                        {formatMoney(valuation.purchaseCost, country)}
+                      </strong>
+                    </div>
+                    <div className="p-2.5 rounded-xl bg-slate-900 border border-emerald-500/30">
+                      <span className="text-[10px] text-emerald-400 block font-bold">القيمة السوقية المرجعية</span>
+                      <strong className="text-xs sm:text-sm text-emerald-300 font-mono">
+                        {formatMoney(valuation.fairValue, country)}
+                      </strong>
+                    </div>
+                    <div className="p-2.5 rounded-xl bg-slate-900 border border-cyan-500/30">
+                      <span className="text-[10px] text-cyan-400 block font-bold">سعر التسييل الفوري (88%)</span>
+                      <strong className="text-xs sm:text-sm text-cyan-300 font-mono">
+                        {formatMoney(valuation.instantSellPrice, country)}
+                      </strong>
+                    </div>
+                    <div className="p-2.5 rounded-xl bg-slate-900 border border-amber-500/30">
+                      <span className="text-[10px] text-amber-400 block font-bold">السقف الاقتصادي الأعلى</span>
+                      <strong className="text-xs sm:text-sm text-amber-300 font-mono">
+                        {formatMoney(valuation.maxAllowedBid, country)}
+                      </strong>
+                    </div>
                   </div>
 
-                  <div className="space-y-1.5">
-                    <label className="text-xs text-slate-300 font-semibold block">
-                      سعر افتتاح المزاد المقترح ({country.currency.code}):
-                    </label>
+                  {/* Starting Bid Controller */}
+                  <div className="space-y-1.5 pt-2 border-t border-slate-800">
+                    <div className="flex items-center justify-between text-xs">
+                      <label className="text-slate-300 font-semibold flex items-center gap-1.5">
+                        <ArrowDownUp className="w-3.5 h-3.5 text-amber-400" />
+                        سعر بدء المزاد ({country.currency.code}):
+                      </label>
+                      <span className="text-[11px] text-slate-400">
+                        النطاق المسموح: {formatMoney(valuation.minStartingBid, country)} إلى {formatMoney(valuation.maxStartingBid, country)}
+                      </span>
+                    </div>
+
                     <div className="flex items-center gap-2">
                       <input
                         type="number"
-                        min={Math.round(valuation.fairValue * 0.5)}
-                        max={Math.round(valuation.fairValue * 1.5)}
+                        min={valuation.minStartingBid}
+                        max={valuation.maxStartingBid}
                         step={1000}
                         value={startingBid}
                         onChange={(e) => setStartingBid(Number(e.target.value))}
@@ -383,16 +462,17 @@ export function ListAssetAuctionModal({
                     </div>
                   </div>
 
-                  {/* Guaranteed Profit Distribution Notice */}
+                  {/* Realistic Outcome Distribution */}
                   <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-3 text-[11px] text-amber-300 space-y-1">
                     <div className="font-bold flex items-center gap-1.5 text-amber-400">
                       <Flame className="w-3.5 h-3.5" />
-                      خوارزمية تنافس المستثمرين وضمان الربح:
+                      تنوع نتائج المزاد وسلوك المستثمرين (غير مضمونة):
                     </div>
                     <ul className="list-disc list-inside text-slate-300 space-y-0.5 pr-1">
-                      <li><strong>65% من الحالات</strong>: ربح طبيعي إضافي (+5% إلى +15% عن التقييم).</li>
-                      <li><strong>25% من الحالات</strong>: تنافس محموم بين مجموعتين (+18% إلى +35%).</li>
-                      <li><strong>10% من الحالات</strong>: طفرة مزاد نادرة بدخول ملياردير كبرى (+50% إلى +85%)!</li>
+                      <li><strong>عدم اكتمال النصاب (Unsold)</strong>: في حال رفع السعر الافتتاحي أو فتور السوق.</li>
+                      <li><strong>مزايد وحيد (Single Bidder)</strong>: رسو المزاد عند السعر الافتتاحي أو دونه.</li>
+                      <li><strong>تنافس متوازن (Moderate/Competitive)</strong>: ربح بين 102% و 135% من القيمة.</li>
+                      <li><strong>طفرة نادرة (Surge)</strong>: دخول ملياردير بميزانية استثنائية ضمن السقف القانوني.</li>
                     </ul>
                   </div>
                 </div>
@@ -420,15 +500,19 @@ export function ListAssetAuctionModal({
                 <div className="space-y-1">
                   <span className="text-[11px] text-slate-400 block">أعلى عرض مسجل حالياً</span>
                   <strong className="text-3xl sm:text-4xl font-black text-amber-400 font-mono tracking-tight block">
-                    {formatMoney(currentBid, country)}
+                    {currentBid > 0 ? formatMoney(currentBid, country) : 'لا توجد عروض بعد'}
                   </strong>
                 </div>
 
-                {leadingBidder && (
+                {leadingBidder ? (
                   <div className="inline-flex items-center gap-2 bg-slate-900/90 border border-slate-800 px-3 py-1.5 rounded-xl text-xs">
                     <span className="w-3 h-3 rounded-full" style={{ backgroundColor: leadingBidder.avatarColor }} />
                     <span className="text-slate-200">المتصدر: <strong>{leadingBidder.name}</strong></span>
                     <span className="text-[10px] text-amber-400 font-bold">({leadingBidder.type})</span>
+                  </div>
+                ) : (
+                  <div className="text-xs text-slate-400 italic">
+                    في انتظار استجابة المستثمرين والصناديق...
                   </div>
                 )}
               </div>
@@ -441,23 +525,29 @@ export function ListAssetAuctionModal({
                 </div>
 
                 <div className="space-y-1.5 max-h-40 overflow-y-auto">
-                  {bidHistory.map((item, index) => (
-                    <div
-                      key={index}
-                      className={`p-2 rounded-xl flex items-center justify-between text-xs animate-fade-in ${
-                        index === 0 ? 'bg-amber-500/15 border border-amber-500/40 font-bold' : 'bg-slate-900/60 text-slate-300'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2">
-                        <span className="w-2 h-2 rounded-full" style={{ backgroundColor: item.investor.avatarColor }} />
-                        <span>{item.investor.name}</span>
-                        {item.note && <span className="text-[10px] text-amber-400">({item.note})</span>}
-                      </div>
-                      <div className="text-left font-mono font-bold text-emerald-400">
-                        {formatMoney(item.amount, country)}
-                      </div>
+                  {bidHistory.length === 0 ? (
+                    <div className="text-center py-4 text-xs text-slate-500">
+                      لم يتم تسجيل أي مزايدة بعد...
                     </div>
-                  ))}
+                  ) : (
+                    bidHistory.map((item, index) => (
+                      <div
+                        key={index}
+                        className={`p-2 rounded-xl flex items-center justify-between text-xs animate-fade-in ${
+                          index === 0 ? 'bg-amber-500/15 border border-amber-500/40 font-bold' : 'bg-slate-900/60 text-slate-300'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full" style={{ backgroundColor: item.investor.avatarColor }} />
+                          <span>{item.investor.name}</span>
+                          {item.note && <span className="text-[10px] text-amber-400">({item.note})</span>}
+                        </div>
+                        <div className="text-left font-mono font-bold text-emerald-400">
+                          {formatMoney(item.amount, country)}
+                        </div>
+                      </div>
+                    ))
+                  )}
                 </div>
               </div>
             </div>
@@ -465,38 +555,69 @@ export function ListAssetAuctionModal({
 
           {biddingStage === 'finished' && (
             <div className="text-center space-y-4 py-4">
-              <div className="w-16 h-16 rounded-3xl bg-emerald-500/20 text-emerald-400 mx-auto flex items-center justify-center font-bold">
-                <CheckCircle className="w-8 h-8 text-emerald-400" />
-              </div>
-
-              <div>
-                <h4 className="text-lg sm:text-xl font-black text-emerald-400">
-                  انتهت الجلسة ورسى المزاد بنجاح!
-                </h4>
-                <p className="text-xs text-slate-300 mt-1">
-                  فاز بعقد الشراء النهائي المستثمر: <strong className="text-amber-300">{leadingBidder?.name}</strong>
-                </p>
-              </div>
-
-              <div className="bg-slate-950 border border-emerald-500/40 rounded-2xl p-4 inline-block min-w-[260px]">
-                <span className="text-xs text-slate-400 block mb-1">صافي ثمن البيع المحصل</span>
-                <strong className="text-2xl sm:text-3xl font-black text-amber-400 font-mono">
-                  {formatMoney(currentBid, country)}
-                </strong>
-                {valuation && (
-                  <div className="text-xs text-emerald-400 font-bold mt-1">
-                    فارق ربح: +{Math.round(((currentBid - valuation.fairValue) / valuation.fairValue) * 100)}% فوق التقييم
+              {leadingBidder && currentBid > 0 ? (
+                <>
+                  <div className="w-16 h-16 rounded-3xl bg-emerald-500/20 text-emerald-400 mx-auto flex items-center justify-center font-bold">
+                    <CheckCircle className="w-8 h-8 text-emerald-400" />
                   </div>
-                )}
-              </div>
+
+                  <div>
+                    <h4 className="text-lg sm:text-xl font-black text-emerald-400">
+                      انتهت الجلسة ورسى المزاد بنجاح!
+                    </h4>
+                    <p className="text-xs text-slate-300 mt-1">
+                      فاز بعقد الشراء النهائي المستثمر: <strong className="text-amber-300">{leadingBidder.name}</strong>
+                    </p>
+                  </div>
+
+                  <div className="bg-slate-950 border border-emerald-500/40 rounded-2xl p-4 inline-block min-w-[260px]">
+                    <span className="text-xs text-slate-400 block mb-1">صافي ثمن البيع المحصل</span>
+                    <strong className="text-2xl sm:text-3xl font-black text-amber-400 font-mono">
+                      {formatMoney(currentBid, country)}
+                    </strong>
+                    {valuation && (
+                      <div className="text-xs text-emerald-400 font-bold mt-1">
+                        فارق القيمة المرجعية: {Math.round(((currentBid - valuation.fairValue) / valuation.fairValue) * 100)}%
+                      </div>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="w-16 h-16 rounded-3xl bg-amber-500/20 text-amber-400 mx-auto flex items-center justify-center font-bold">
+                    <Shield className="w-8 h-8 text-amber-400" />
+                  </div>
+
+                  <div>
+                    <h4 className="text-lg sm:text-xl font-black text-amber-300">
+                      لم يرسُ المزاد على أي مشترٍ (لم تكتمل المزايدة)
+                    </h4>
+                    <p className="text-xs text-slate-300 mt-1">
+                      لم يتقدم أي مستثمر لشراء الأصل بهذا السعر الافتتاحي. تم الاحتفاظ بالأصل سالماً في محفظتك.
+                    </p>
+                  </div>
+                </>
+              )}
             </div>
           )}
         </div>
 
         {/* Footer Actions */}
-        <div className="p-4 sm:p-6 border-t border-slate-800 bg-slate-950/60 flex items-center justify-end gap-3">
+        <div className="p-4 sm:p-6 border-t border-slate-800 bg-slate-950/60 flex flex-wrap items-center justify-end gap-3">
           {biddingStage === 'selection' && (
             <>
+              {valuation && selectedItem && (
+                <button
+                  type="button"
+                  onClick={handleInstantSell}
+                  className="px-4 py-2.5 rounded-xl bg-cyan-700 hover:bg-cyan-600 text-white text-xs sm:text-sm font-bold flex items-center gap-1.5 transition cursor-pointer"
+                  title="بيع وتسييل فوري كاش مباشر بنسبة 88% من القيمة العادلة"
+                >
+                  <Zap className="w-4 h-4 text-cyan-300" />
+                  تسييل فوري كاش ({formatMoney(valuation.instantSellPrice, country)})
+                </button>
+              )}
+
               <button
                 type="button"
                 onClick={onClose}
@@ -504,13 +625,14 @@ export function ListAssetAuctionModal({
               >
                 إلغاء
               </button>
+
               <button
                 type="button"
                 onClick={handleStartAuction}
-                disabled={!selectedItem || startingBid <= 0}
-                className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 text-xs sm:text-sm font-black shadow-lg shadow-amber-500/20 transition disabled:opacity-50"
+                disabled={!selectedItem || startingBid <= 0 || (valuation && (startingBid < valuation.minStartingBid || startingBid > valuation.maxStartingBid))}
+                className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 text-xs sm:text-sm font-black shadow-lg shadow-amber-500/20 transition disabled:opacity-50 cursor-pointer"
               >
-                بدء جلسة المزاد العلني 🔨
+                طرح في المزاد العلني 🔨
               </button>
             </>
           )}
@@ -519,20 +641,30 @@ export function ListAssetAuctionModal({
             <button
               type="button"
               onClick={handleFinishAuction}
-              className="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs sm:text-sm font-black shadow-lg transition"
+              className="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs sm:text-sm font-black shadow-lg transition cursor-pointer"
             >
-              قبول العرض الحالي وإنهاء المزاد فوراً ({formatMoney(currentBid, country)}) 🤝
+              {currentBid > 0 ? `قبول العرض الحالي وإنهاء المزاد (${formatMoney(currentBid, country)}) 🤝` : 'إنهاء الجلسة'}
             </button>
           )}
 
           {biddingStage === 'finished' && (
-            <button
-              type="button"
-              onClick={handleConfirmSale}
-              className="w-full py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 text-slate-950 text-xs sm:text-sm font-black shadow-lg transition"
-            >
-              استلام السيولة وإتمام نقل الملكية 💰
-            </button>
+            leadingBidder && currentBid > 0 ? (
+              <button
+                type="button"
+                onClick={handleConfirmSale}
+                className="w-full py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 text-slate-950 text-xs sm:text-sm font-black shadow-lg transition cursor-pointer"
+              >
+                استلام السيولة وإتمام نقل الملكية 💰
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handleCancelUnsold}
+                className="w-full py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs sm:text-sm font-bold shadow-lg transition cursor-pointer"
+              >
+                استعادة الأصل إلى المحفظة 🔄
+              </button>
+            )
           )}
         </div>
       </div>

@@ -178,44 +178,95 @@ export function generateLiveAuctions(profile: PlayerProfile): LiveAuctionItem[] 
   return baseItems;
 }
 
+export interface AssetValuationResult {
+  purchaseCost: number;
+  fairValue: number;
+  instantSellPrice: number;
+  recommendedStartingBid: number;
+  minStartingBid: number;
+  maxStartingBid: number;
+  maxAllowedBid: number;
+  name: string;
+  specs: string;
+}
+
 /**
- * Calculates fair starting value for a player asset to put in auction
+ * Calculates authoritative economic valuation for an asset based on actual property attributes,
+ * condition, upgrades, and market baseline.
  */
 export function calculatePlayerAssetValuation(
   assetType: 'land' | 'company' | 'asset',
   item: PlayerLand | PlayerCompany | PlayerAsset,
-): { fairValue: number; recommendedStartingBid: number; name: string; specs: string } {
+): AssetValuationResult {
   if (assetType === 'land') {
     const land = item as PlayerLand;
-    const baseValue = land.purchasePrice || 50_000;
-    const upgradeBonus = (land.upgradeLevel ?? 1) * 0.15;
-    const fairValue = Math.round(baseValue * (1 + upgradeBonus));
-    const recommendedStartingBid = Math.round(fairValue * 0.95);
+    const purchaseCost = Math.max(10_000, land.purchasePrice || 50_000);
+    const area = land.areaSquareMeters || 1000;
+    const perSqm = land.landType === 'commercial' ? 50 : land.landType === 'industrial' ? 30 : 15;
+    const areaMarketBase = area * perSqm;
+    const levelMultiplier = 1 + ((land.upgradeLevel ?? 1) - 1) * 0.15;
+    const baseline = Math.max(purchaseCost, areaMarketBase);
+    const fairValue = Math.round(baseline * levelMultiplier);
+    const instantSellPrice = Math.round(fairValue * 0.88);
+    const recommendedStartingBid = Math.round(fairValue * 0.90);
+    const minStartingBid = Math.round(fairValue * 0.60);
+    const maxStartingBid = Math.round(fairValue * 1.20);
+    const maxAllowedBid = Math.round(fairValue * 1.65);
+
     return {
+      purchaseCost,
       fairValue,
+      instantSellPrice,
       recommendedStartingBid,
+      minStartingBid,
+      maxStartingBid,
+      maxAllowedBid,
       name: land.label,
-      specs: `${(land.areaSquareMeters || 1000).toLocaleString()} م² · ${land.landType === 'industrial' ? 'صناعية' : land.landType === 'agricultural' ? 'زراعية' : 'تجارية'}`,
+      specs: `${area.toLocaleString()} م² · ${land.landType === 'industrial' ? 'صناعية' : land.landType === 'agricultural' ? 'زراعية' : 'تجارية'}`,
     };
   } else if (assetType === 'company') {
     const company = item as PlayerCompany;
-    const baseValue = (company.operatingCostPerDay ?? 1000) * 120 + (company.energyCapacity ?? 100) * 500;
-    const condition = (company.maintenanceCondition ?? 100) / 100;
-    const fairValue = Math.max(30_000, Math.round(baseValue * condition));
-    const recommendedStartingBid = Math.round(fairValue * 0.95);
+    const baseEquipValue = (company.energyCapacity ?? 100) * 500 + (company.operatingCostPerDay ?? 1000) * 100;
+    const upgradeLevel = company.upgradeLevel ?? 1;
+    const upgradeBonus = 1 + (upgradeLevel - 1) * 0.25;
+    const purchaseCost = Math.round(baseEquipValue * upgradeBonus);
+    const condition = Math.max(0.2, (company.maintenanceCondition ?? 100) / 100);
+    const fairValue = Math.max(30_000, Math.round(purchaseCost * (0.5 + 0.5 * condition)));
+    const instantSellPrice = Math.round(fairValue * 0.88);
+    const recommendedStartingBid = Math.round(fairValue * 0.90);
+    const minStartingBid = Math.round(fairValue * 0.60);
+    const maxStartingBid = Math.round(fairValue * 1.20);
+    const maxAllowedBid = Math.round(fairValue * 1.65);
+
     return {
+      purchaseCost,
       fairValue,
+      instantSellPrice,
       recommendedStartingBid,
+      minStartingBid,
+      maxStartingBid,
+      maxAllowedBid,
       name: company.name,
       specs: `كفاءة ${company.maintenanceCondition ?? 100}% · طاقة ${company.energyCapacity ?? 100} وحدة`,
     };
   } else {
     const asset = item as PlayerAsset;
-    const fairValue = asset.value || 10_000;
-    const recommendedStartingBid = Math.round(fairValue * 0.95);
+    const purchaseCost = Math.max(5_000, asset.value || 10_000);
+    const fairValue = purchaseCost;
+    const instantSellPrice = Math.round(fairValue * 0.88);
+    const recommendedStartingBid = Math.round(fairValue * 0.90);
+    const minStartingBid = Math.round(fairValue * 0.60);
+    const maxStartingBid = Math.round(fairValue * 1.20);
+    const maxAllowedBid = Math.round(fairValue * 1.65);
+
     return {
+      purchaseCost,
       fairValue,
+      instantSellPrice,
       recommendedStartingBid,
+      minStartingBid,
+      maxStartingBid,
+      maxAllowedBid,
       name: asset.label,
       specs: `أصل تجاري مسجل بقيمة ${fairValue.toLocaleString()} $`,
     };
@@ -223,11 +274,14 @@ export function calculatePlayerAssetValuation(
 }
 
 export interface PlayerAuctionSimulation {
-  outcomeType: 'normal' | 'medium' | 'surge';
+  outcomeType: 'no_bids' | 'single_bidder' | 'moderate' | 'competitive' | 'rare_surge';
+  outcome?: 'no_bids' | 'single_bidder' | 'moderate' | 'competitive' | 'rare_surge';
   outcomeLabel: string;
   surgeMultiplier: number;
   finalPrice: number;
-  winningInvestor: RivalInvestor;
+  finalBid: number;
+  winningInvestor?: RivalInvestor;
+  isSold: boolean;
   bidsList: {
     investor: RivalInvestor;
     amount: number;
@@ -237,77 +291,158 @@ export interface PlayerAuctionSimulation {
 }
 
 /**
- * Pre-computes realistic auction competition according to the confirmed distribution:
- * - 65% Normal (+5% to +15%)
- * - 25% Medium (+18% to +35%)
- * - 10% Rare Surge (+50% to +85%)
+ * Simulates realistic market competition with diverse, non-guaranteed outcomes:
+ * 1. No bids (10% - or 35% if overpriced) -> Unsold, returns to player
+ * 2. Single bidder (20%) -> Closes at starting bid (can be below fair value if seller started low)
+ * 3. Moderate competition (40%) -> Modest rise (+4% to +10%)
+ * 4. Competitive round (20%) -> Good competition (+10% to +25%)
+ * 5. Rare surge (10%) -> Sovereign / whale interest (+30% to +55%), strictly clamped to economic ceiling.
  */
-export function simulatePlayerAssetAuction(fairValue: number, startingBid: number): PlayerAuctionSimulation {
+export function simulatePlayerAssetAuction(
+  valuationInput: AssetValuationResult | number,
+  startingBid: number,
+): PlayerAuctionSimulation {
+  const valuation: AssetValuationResult = typeof valuationInput === 'number'
+    ? {
+        purchaseCost: valuationInput,
+        fairValue: valuationInput,
+        instantSellPrice: Math.round(valuationInput * 0.88),
+        recommendedStartingBid: Math.round(valuationInput * 0.9),
+        minStartingBid: Math.round(valuationInput * 0.6),
+        maxStartingBid: Math.round(valuationInput * 1.2),
+        maxAllowedBid: Math.round(valuationInput * 1.65),
+        name: 'أصل تجاري',
+        specs: '',
+      }
+    : valuationInput;
+
+  const isOverpriced = startingBid > valuation.fairValue * 1.12;
   const roll = Math.random() * 100;
-  let outcomeType: 'normal' | 'medium' | 'surge' = 'normal';
+
+  let outcomeType: PlayerAuctionSimulation['outcomeType'] = 'moderate';
+  let outcomeLabel = '✅ مزاد اعتيادي ومزايدات متزنة';
   let profitPercent = 0.08;
-  let outcomeLabel = 'ربح مزايدة طبيعي (+10%)';
+  let isSold = true;
 
-  if (roll < 10) {
-    outcomeType = 'surge';
-    profitPercent = 0.50 + Math.random() * 0.35; // 50% to 85%
-    outcomeLabel = '🔥 طفرة مزاد استثنائية! تنافس مليارديرات وتدافع استثماري';
-  } else if (roll < 35) {
-    outcomeType = 'medium';
-    profitPercent = 0.18 + Math.random() * 0.17; // 18% to 35%
-    outcomeLabel = '⚡ مزاد تنافسي قوي بين مجموعتين استثماريتين';
+  if (isOverpriced) {
+    if (roll < 40) {
+      outcomeType = 'no_bids';
+      outcomeLabel = '❌ انتهت الجلسة دون أي عروض؛ اعتبر المشترون سعر البداية مبالغاً فيه.';
+      isSold = false;
+    } else if (roll < 75) {
+      outcomeType = 'single_bidder';
+      outcomeLabel = '👤 تقدم مزايد وحيد بسعر البداية دون وجود منافسة.';
+      profitPercent = 0;
+    } else {
+      outcomeType = 'moderate';
+      outcomeLabel = '⚖️ منافسة محدودة بسعر قريب من الافتتاح.';
+      profitPercent = 0.03;
+    }
   } else {
-    outcomeType = 'normal';
-    profitPercent = 0.05 + Math.random() * 0.10; // 5% to 15%
-    outcomeLabel = '✅ مزاد اعتيادي ومزايدات متزنة';
-  }
-
-  const finalPrice = Math.round(Math.max(startingBid * 1.05, fairValue * (1 + profitPercent)));
-  const winningInvestor = outcomeType === 'surge'
-    ? (RIVAL_INVESTORS.find((i) => i.biddingStyle === 'whale') || RIVAL_INVESTORS[5])
-    : getRandomInvestor();
-
-  // Generate 4-7 progressive bids leading to the final price
-  const bidsCount = outcomeType === 'surge' ? 7 : outcomeType === 'medium' ? 5 : 4;
-  const bidsList: PlayerAuctionSimulation['bidsList'] = [];
-  let currentAmount = startingBid;
-  const priceStep = Math.max(1000, Math.round((finalPrice - startingBid) / bidsCount));
-
-  const competingInvestors: RivalInvestor[] = [];
-  while (competingInvestors.length < Math.min(3, bidsCount)) {
-    const inv = getRandomInvestor();
-    if (!competingInvestors.some((x) => x.id === inv.id)) {
-      competingInvestors.push(inv);
+    if (roll < 30) {
+      outcomeType = 'single_bidder';
+      outcomeLabel = '👤 مزايد وحيد قَبِل سعر البداية دون منافسين.';
+      profitPercent = 0;
+    } else if (roll < 70) {
+      outcomeType = 'moderate';
+      outcomeLabel = '✅ منافسة متزنة بين مجموعتين استثماريتين (+5% إلى +12%).';
+      profitPercent = 0.05 + Math.random() * 0.07;
+    } else if (roll < 90) {
+      outcomeType = 'competitive';
+      outcomeLabel = '⚡ مزاد تنافسي قوي بين كبار المستثمرين (+15% إلى +25%).';
+      profitPercent = 0.15 + Math.random() * 0.10;
+    } else {
+      outcomeType = 'rare_surge';
+      outcomeLabel = '🔥 طفرة مزاد نادرة وتنافس مستثمر سيادي (+30% إلى +55%).';
+      profitPercent = 0.30 + Math.random() * 0.25;
     }
   }
 
+  if (!isSold) {
+    return {
+      outcomeType: 'no_bids',
+      outcome: 'no_bids',
+      outcomeLabel,
+      surgeMultiplier: 0,
+      finalPrice: 0,
+      finalBid: 0,
+      winningInvestor: undefined,
+      isSold: false,
+      bidsList: [],
+    };
+  }
+
+  // Calculate raw final price based on outcome
+  let rawFinalPrice = startingBid;
+  if (outcomeType === 'single_bidder') {
+    rawFinalPrice = startingBid;
+  } else if (outcomeType === 'moderate') {
+    rawFinalPrice = Math.round(startingBid * (1 + profitPercent));
+  } else if (outcomeType === 'competitive') {
+    rawFinalPrice = Math.round(Math.max(startingBid * 1.05, valuation.fairValue * (1 + profitPercent)));
+  } else if (outcomeType === 'rare_surge') {
+    rawFinalPrice = Math.round(Math.max(startingBid * 1.10, valuation.fairValue * (1 + profitPercent)));
+  }
+
+  // STRICT ECONOMIC CEILING: Cannot exceed maxAllowedBid under ANY circumstances
+  const finalPrice = Math.max(startingBid, Math.min(valuation.maxAllowedBid, rawFinalPrice));
+
+  const winningInvestor = outcomeType === 'rare_surge'
+    ? (RIVAL_INVESTORS.find((i) => i.biddingStyle === 'whale') || RIVAL_INVESTORS[5])
+    : getRandomInvestor();
+
+  const bidsCount = outcomeType === 'single_bidder' ? 1
+    : outcomeType === 'moderate' ? 3
+    : outcomeType === 'competitive' ? 5
+    : 6;
+
+  const bidsList: PlayerAuctionSimulation['bidsList'] = [];
   const now = Date.now();
-  for (let i = 0; i < bidsCount; i++) {
-    const isFinal = i === bidsCount - 1;
-    const investor = isFinal ? winningInvestor : competingInvestors[i % competingInvestors.length];
-    currentAmount = isFinal ? finalPrice : Math.round(currentAmount + priceStep * (0.8 + Math.random() * 0.4));
+
+  if (bidsCount === 1) {
     bidsList.push({
-      investor,
-      amount: currentAmount,
-      timestamp: now + (i + 1) * 2000,
-      note: isFinal
-        ? (outcomeType === 'surge' ? 'عرض نهائي حاسم بسعر قياسي!' : 'أعلى عرض مسجل بالجلسة')
-        : 'رفع سعر المزايدة',
+      investor: winningInvestor,
+      amount: finalPrice,
+      timestamp: now + 2000,
+      note: 'عرض افتتاح وحيد قبل إغلاق الجلسة',
     });
+  } else {
+    let currentAmount = startingBid;
+    const priceStep = Math.max(500, Math.round((finalPrice - startingBid) / bidsCount));
+    const competitors = [winningInvestor, getRandomInvestor(winningInvestor.id)];
+
+    for (let i = 0; i < bidsCount; i++) {
+      const isFinal = i === bidsCount - 1;
+      const investor = isFinal ? winningInvestor : competitors[i % competitors.length];
+      currentAmount = isFinal ? finalPrice : Math.min(finalPrice - 500, currentAmount + priceStep);
+      // Ensure bid does not exceed investor budget ceiling
+      const investorBudgetCap = Math.round(investor.maxBudgetMultiplier * valuation.fairValue);
+      const safeAmount = Math.min(investorBudgetCap, Math.min(valuation.maxAllowedBid, currentAmount));
+
+      bidsList.push({
+        investor,
+        amount: safeAmount,
+        timestamp: now + (i + 1) * 1800,
+        note: isFinal ? (outcomeType === 'rare_surge' ? 'عرض حاسم قياسي عند سقف المزاد!' : 'أعلى عرض فائز بالجلسة') : 'رفع المزايدة',
+      });
+    }
   }
 
   return {
     outcomeType,
+    outcome: outcomeType,
     outcomeLabel,
     surgeMultiplier: profitPercent,
     finalPrice,
+    finalBid: finalPrice,
     winningInvestor,
+    isSold: true,
     bidsList,
   };
 }
 
 /**
- * Creates an independent player auction listing for an owned asset
+ * Creates an independent player auction listing for an owned asset with strict economic limits.
  */
 export function listPlayerAssetForAuction(
   profile: PlayerProfile,
@@ -341,7 +476,6 @@ export function listPlayerAssetForAuction(
     };
   }
 
-  // Check if land is tied to an active company
   if (isLand && profile.companies.some((c) => c.landId === assetId)) {
     return {
       ok: false,
@@ -351,7 +485,6 @@ export function listPlayerAssetForAuction(
     };
   }
 
-  // Check if company has active production orders
   if (!isLand && profile.productionOrders.some((o) => o.companyId === assetId && o.status === 'active')) {
     return {
       ok: false,
@@ -361,7 +494,6 @@ export function listPlayerAssetForAuction(
     };
   }
 
-  // Check if asset is already in an active auction
   const existingActiveAuction = (profile.playerAuctions ?? []).find(
     (a) => a.assetId === assetId && a.status === 'active',
   );
@@ -375,9 +507,19 @@ export function listPlayerAssetForAuction(
   }
 
   const valuation = calculatePlayerAssetValuation(assetType, item);
-  const effectiveStartingBid = Math.max(1_000, startingBid > 0 ? startingBid : valuation.recommendedStartingBid);
-  const sim = simulatePlayerAssetAuction(valuation.fairValue, effectiveStartingBid);
+  const effectiveStartingBid = startingBid > 0 ? startingBid : valuation.recommendedStartingBid;
 
+  // Strict check: Starting bid cannot be below 60% or above 120% of fair value
+  if (effectiveStartingBid < valuation.minStartingBid || effectiveStartingBid > valuation.maxStartingBid) {
+    return {
+      ok: false,
+      profile,
+      reason: 'invalid-input',
+      message: `سعر افتتاح المزاد (${effectiveStartingBid.toLocaleString()} $) غير مقبول؛ يجب أن يكون بين ${valuation.minStartingBid.toLocaleString()} $ و ${valuation.maxStartingBid.toLocaleString()} $ بناءً على التقييم المرجعي للأصل (${valuation.fairValue.toLocaleString()} $).`,
+    };
+  }
+
+  const sim = simulatePlayerAssetAuction(valuation, effectiveStartingBid);
   const uniqueListingId = `pauc-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const nowIso = new Date().toISOString();
 
@@ -397,14 +539,20 @@ export function listPlayerAssetForAuction(
     assetId,
     assetName: valuation.name,
     assetSpecs: valuation.specs,
-    originalValue: valuation.fairValue,
+    originalValue: valuation.purchaseCost,
+    fairMarketValue: valuation.fairValue,
+    instantSellPrice: valuation.instantSellPrice,
+    maxAllowedBid: valuation.maxAllowedBid,
     startingBid: effectiveStartingBid,
     currentBid: sim.finalPrice,
     status: 'active',
-    leadingBidderName: sim.winningInvestor.name,
-    leadingBidderType: sim.winningInvestor.type,
+    leadingBidderName: sim.winningInvestor?.name ?? (sim.isSold ? 'مستثمر مجهول' : 'لا يوجد مزايدين'),
+    leadingBidderType: sim.winningInvestor?.type ?? 'سوق المزايدات',
+    winningBidderName: sim.winningInvestor?.name,
     totalBidsCount: sim.bidsList.length,
-    closesAtMs: Date.now() + 300_000, // 5 minutes
+    outcomeType: sim.outcomeType,
+    outcomeReason: sim.outcomeLabel,
+    closesAtMs: Date.now() + 300_000,
     listedAt: nowIso,
     listedOnDay: profile.day,
     bidsHistory,
@@ -415,16 +563,21 @@ export function listPlayerAssetForAuction(
     playerAuctions: [newListing, ...(profile.playerAuctions ?? [])],
   };
 
+  const feedback = sim.isSold
+    ? `تم طرح [${valuation.name}] بنجاح في سوق المزادات العلنية بسعر افتتاحي ${effectiveStartingBid.toLocaleString()} $ (التقييم: ${valuation.fairValue.toLocaleString()} $).`
+    : `طُرح [${valuation.name}] في المزاد ولكن لم يتقدم أي مشترٍ في هذه الجولة. الأصل متاح في محفظتك.`;
+
   return {
     ok: true,
     profile: nextProfile,
-    message: `تم طرح [${valuation.name}] بنجاح في سوق المزادات العلنية بسعر افتتاحي ${effectiveStartingBid.toLocaleString()} $.`,
+    message: feedback,
     data: newListing,
   };
 }
 
 /**
- * Settles a player auction, executing the sale and crediting funds EXACTLY ONCE.
+ * Settles a player auction with server-grade economic ceiling verification,
+ * preventing arbitrary price inflation exploits and guaranteeing deduplication.
  */
 export function settlePlayerAssetAuction(
   profile: PlayerProfile,
@@ -443,13 +596,21 @@ export function settlePlayerAssetAuction(
     };
   }
 
-  // Guard against re-settling already sold listings
   if (listing.status === 'sold') {
     return {
       ok: false,
       profile,
       reason: 'condition-not-met',
       message: 'تم إتمام بيع هذا الأصل وتحصيل قيمته مسبقاً ولا يمكن تكرار البيع.',
+    };
+  }
+
+  if (listing.status === 'unsold') {
+    return {
+      ok: false,
+      profile,
+      reason: 'condition-not-met',
+      message: 'انتهت جلسة المزاد دون مشترين مؤهلين؛ لا يمكن تنفيذ البيع.',
     };
   }
 
@@ -500,7 +661,36 @@ export function settlePlayerAssetAuction(
     };
   }
 
-  const payout = customWinningAmount && customWinningAmount > 0 ? customWinningAmount : listing.currentBid;
+  // AUTHORITATIVE ECONOMIC VALIDATION: Compute valuation directly from player state
+  const valuation = calculatePlayerAssetValuation(listing.assetType, ownedItem);
+  const maxAllowedCeiling = valuation.maxAllowedBid;
+
+  const requestedAmount = customWinningAmount && customWinningAmount > 0
+    ? customWinningAmount
+    : listing.currentBid;
+
+  // HARD DEFENSE AGAINST PRICE INFLATION EXPLOIT:
+  // If requested amount exceeds economic ceiling (e.g. 100k land trying to settle for 95 million),
+  // STRICTLY REJECT the transaction and do not credit balance!
+  if (requestedAmount > maxAllowedCeiling) {
+    return {
+      ok: false,
+      profile,
+      reason: 'invalid-input',
+      message: `تم رفض الصفقة: السعر المطلوب (${requestedAmount.toLocaleString()} $) يتجاوز السقف الاقتصادي الأعلى المسموح به للأصل (${maxAllowedCeiling.toLocaleString()} $ بناءً على تقييم ${valuation.fairValue.toLocaleString()} $). تم منع تضخم الأسعار.`,
+    };
+  }
+
+  if (requestedAmount <= 0) {
+    return {
+      ok: false,
+      profile,
+      reason: 'invalid-input',
+      message: 'سعر بيع المزاد يجب أن يكون قيمة موجبة معتمدة.',
+    };
+  }
+
+  const payout = requestedAmount;
   const buyerName = customBuyerName || listing.leadingBidderName || 'المستثمر الفائز';
   const nowIso = new Date().toISOString();
 
@@ -514,7 +704,7 @@ export function settlePlayerAssetAuction(
     amount: payout,
     countryId: profile.countryId,
     occurredAt: nowIso,
-    note: `بيع [${listing.assetName}] بالمزاد العلني إلى [${buyerName}] بسعر ${payout.toLocaleString()} $`,
+    note: `بيع [${listing.assetName}] بالمزاد العلني إلى [${buyerName}] بسعر ${payout.toLocaleString()} $ (التقييم: ${valuation.fairValue.toLocaleString()} $)`,
   };
 
   const updatedListing: PlayerAuctionListing = {
@@ -524,8 +714,8 @@ export function settlePlayerAssetAuction(
     soldOnDay: profile.day,
     winningBidderName: buyerName,
     finalSalePrice: payout,
-    profitDifference: payout - listing.originalValue,
-    profitPercent: listing.originalValue > 0 ? Math.round(((payout - listing.originalValue) / listing.originalValue) * 100) : 0,
+    profitDifference: payout - valuation.purchaseCost,
+    profitPercent: valuation.purchaseCost > 0 ? Math.round(((payout - valuation.purchaseCost) / valuation.purchaseCost) * 100) : 0,
   };
 
   const updatedPlayerAuctions = (profile.playerAuctions ?? []).map((l) =>
@@ -561,6 +751,92 @@ export function settlePlayerAssetAuction(
 }
 
 /**
+ * Immediate direct sale of a player asset at instant sell price (~88% of fair value)
+ * for instant liquidity without waiting for auction.
+ */
+export function instantSellPlayerAsset(
+  profile: PlayerProfile,
+  assetType: 'land' | 'company' | 'asset',
+  assetId: string,
+): GameResult<{ payout: number; assetName: string }> {
+  const isLand = assetType === 'land';
+  const isCompany = assetType === 'company';
+  const item = isLand
+    ? profile.lands.find((l) => l.id === assetId)
+    : isCompany
+    ? profile.companies.find((c) => c.id === assetId)
+    : profile.assets.find((a) => a.id === assetId);
+
+  if (!item) {
+    return {
+      ok: false,
+      profile,
+      reason: 'not-found',
+      message: 'الأصل المطلوب غير موجود في محفظتك الاستثمارية.',
+    };
+  }
+
+  if (profile.soldAssetIds?.includes(assetId)) {
+    return {
+      ok: false,
+      profile,
+      reason: 'already-owned',
+      message: 'تم بيع هذا الأصل مسبقاً ولا يمكن بيعه مجدداً.',
+    };
+  }
+
+  if (isLand && profile.companies.some((c) => c.landId === assetId)) {
+    return {
+      ok: false,
+      profile,
+      reason: 'condition-not-met',
+      message: 'لا يمكن بيع أرض مرتبطة بشركة قائمة. انقل الشركة أو تصرّف بها أولاً.',
+    };
+  }
+
+  const valuation = calculatePlayerAssetValuation(assetType, item);
+  const payout = valuation.instantSellPrice;
+  const nowIso = new Date().toISOString();
+
+  const updatedLands = isLand ? profile.lands.filter((l) => l.id !== assetId) : profile.lands;
+  const updatedCompanies = isCompany ? profile.companies.filter((c) => c.id !== assetId) : profile.companies;
+  const updatedAssets = (!isLand && !isCompany) ? profile.assets.filter((a) => a.id !== assetId) : profile.assets;
+
+  const ledgerEntry: FinanceLedgerEntry = {
+    id: `instant-sale-${assetId}-${Date.now()}`,
+    category: 'revenue',
+    amount: payout,
+    countryId: profile.countryId,
+    occurredAt: nowIso,
+    note: `بيع فوري مباشر لـ [${valuation.name}] بسعر تسييل ${payout.toLocaleString()} $ (القيمة المرجعية: ${valuation.fairValue.toLocaleString()} $)`,
+  };
+
+  const updatedSoldAssetIds = Array.from(new Set([...(profile.soldAssetIds ?? []), assetId]));
+
+  const nextProfile: PlayerProfile = {
+    ...profile,
+    bankBalance: profile.bankBalance + payout,
+    assets: updatedAssets,
+    lands: updatedLands,
+    companies: updatedCompanies,
+    soldAssetIds: updatedSoldAssetIds,
+    finances: {
+      ...profile.finances,
+      totalRevenue: (profile.finances?.totalRevenue ?? 0) + payout,
+      netProfit: (profile.finances?.netProfit ?? 0) + payout,
+    },
+    ledger: [ledgerEntry, ...(profile.ledger || [])],
+  };
+
+  return {
+    ok: true,
+    profile: nextProfile,
+    message: `تم البيع الفوري لـ [${valuation.name}] بمبلغ ${payout.toLocaleString()} $ نقدًا.`,
+    data: { payout, assetName: valuation.name },
+  };
+}
+
+/**
  * Cancels an active player auction listing and restores asset
  */
 export function cancelPlayerAssetAuction(
@@ -578,7 +854,7 @@ export function cancelPlayerAssetAuction(
     };
   }
 
-  if (listing.status !== 'active') {
+  if (listing.status !== 'active' && listing.status !== 'unsold') {
     return {
       ok: false,
       profile,
@@ -609,37 +885,16 @@ export function executeSellPlayerAsset(
   profile: PlayerProfile,
   assetType: 'land' | 'company' | 'asset',
   assetId: string,
-  salePrice: number,
-  buyerName: string,
+  salePrice?: number,
+  buyerName?: string,
 ): { ok: boolean; updatedProfile: PlayerProfile; ledgerEntry: FinanceLedgerEntry } {
-  // Check if an active listing already exists for this asset
-  let existingListing = (profile.playerAuctions ?? []).find(
-    (l) => l.assetId === assetId && l.status === 'active',
-  );
+  const item = assetType === 'land'
+    ? profile.lands.find((l) => l.id === assetId)
+    : assetType === 'company'
+    ? profile.companies.find((c) => c.id === assetId)
+    : profile.assets.find((a) => a.id === assetId);
 
-  let workingProfile = profile;
-  if (!existingListing) {
-    const listRes = listPlayerAssetForAuction(profile, assetType, assetId, Math.round(salePrice * 0.9));
-    if (!listRes.ok) {
-      return {
-        ok: false,
-        updatedProfile: profile,
-        ledgerEntry: {
-          id: `auction-noop-${Date.now()}`,
-          category: 'revenue',
-          amount: 0,
-          countryId: profile.countryId,
-          occurredAt: new Date().toISOString(),
-          note: listRes.message,
-        },
-      };
-    }
-    workingProfile = listRes.profile;
-    existingListing = listRes.data;
-  }
-
-  const settleRes = settlePlayerAssetAuction(workingProfile, existingListing.id, salePrice, buyerName);
-  if (!settleRes.ok) {
+  if (!item) {
     return {
       ok: false,
       updatedProfile: profile,
@@ -649,19 +904,36 @@ export function executeSellPlayerAsset(
         amount: 0,
         countryId: profile.countryId,
         occurredAt: new Date().toISOString(),
-        note: settleRes.message,
+        note: 'الأصل غير موجود في المحفظة.',
       },
     };
   }
 
-  const entry = settleRes.profile.ledger[0] || {
-    id: `auction-sale-${existingListing.id}`,
+  // Use instantSell for direct execution without auction delay
+  const instantRes = instantSellPlayerAsset(profile, assetType, assetId);
+  if (!instantRes.ok) {
+    return {
+      ok: false,
+      updatedProfile: profile,
+      ledgerEntry: {
+        id: `auction-noop-${Date.now()}`,
+        category: 'revenue',
+        amount: 0,
+        countryId: profile.countryId,
+        occurredAt: new Date().toISOString(),
+        note: instantRes.message,
+      },
+    };
+  }
+
+  const entry = instantRes.profile.ledger[0] || {
+    id: `instant-sale-${assetId}`,
     category: 'revenue' as const,
-    amount: salePrice,
+    amount: instantRes.data?.payout ?? 0,
     countryId: profile.countryId,
     occurredAt: new Date().toISOString(),
-    note: `بيع [${existingListing.assetName}] بالمزاد العلني`,
+    note: `بيع [${instantRes.data?.assetName}]`,
   };
 
-  return { ok: true, updatedProfile: settleRes.profile, ledgerEntry: entry };
+  return { ok: true, updatedProfile: instantRes.profile, ledgerEntry: entry };
 }

@@ -262,13 +262,20 @@ export default function App() {
     saveGame(updated, account?.id);
   };
 
-  const handleLuckySpinReward = (reward: { type: 'cash' | 'gold' | 'diamonds' | 'speed_card'; amount: number; label: string; wasFree?: boolean }) => {
+  const handleLuckySpinReward = (reward: {
+    type: 'cash' | 'gold' | 'diamonds' | 'speed_card';
+    amount: number;
+    label: string;
+    wasFree?: boolean;
+    costDiamonds?: number;
+  }) => {
     if (!profile) return;
+    const spinCost = reward.wasFree ? 0 : (reward.costDiamonds ?? 2);
     const next: PlayerProfile = {
       ...profile,
       lastSpinDay: profile.day,
       lastSpinTimestamp: reward.wasFree ? Date.now() : profile.lastSpinTimestamp,
-      diamonds: reward.wasFree ? profile.diamonds : Math.max(0, (profile.diamonds ?? 0) - 2),
+      diamonds: Math.max(0, (profile.diamonds ?? 0) - spinCost),
       ledger: [...(profile.ledger ?? [])],
       finances: { ...profile.finances },
     };
@@ -291,13 +298,29 @@ export default function App() {
     } else if (reward.type === 'speed_card') {
       const existingCards = next.speedCards ? next.speedCards.map((c) => ({ ...c })) : [];
       const idx = existingCards.findIndex((c) => c.kind === 'production-instant');
-      if (idx >= 0) existingCards[idx].quantity += 1;
-      else existingCards.push({ kind: 'production-instant', quantity: 1 });
+      if (idx >= 0) existingCards[idx].quantity += reward.amount;
+      else existingCards.push({ kind: 'production-instant', quantity: reward.amount });
       next.speedCards = existingCards;
     }
     setProfile(next);
     saveGame(next, account?.id);
     showNotice(`🎉 مبروك! ربحت ${reward.label} من عجلة الحظ!`, 'success', 'مكافأة عجلة الحظ');
+  };
+
+  const handleUpgradeLuckyWheel = (newLevel: number, diamondCost: number) => {
+    if (!profile) return;
+    if ((profile.diamonds ?? 0) < diamondCost) {
+      showNotice('رصيد الماس غير كافٍ لترقية عجلة الحظ.', 'danger', 'عجلة الحظ');
+      return;
+    }
+    const next: PlayerProfile = {
+      ...profile,
+      luckyWheelLevel: newLevel,
+      diamonds: profile.diamonds - diamondCost,
+    };
+    setProfile(next);
+    saveGame(next, account?.id);
+    showNotice(`تمت ترقية عجلة الحظ بنجاح إلى المستوى ${newLevel}! 🎉`, 'success', 'ترقية عجلة الحظ');
   };
 
   async function claimDailyLogin(nextAccount: LocalAccount) {
@@ -1401,6 +1424,7 @@ export default function App() {
         onClose={() => setIsLuckyWheelOpen(false)}
         profile={profile}
         onRewardWon={handleLuckySpinReward}
+        onUpgradeWheel={handleUpgradeLuckyWheel}
       />
 
       <CelebrationModal
@@ -1412,7 +1436,7 @@ export default function App() {
         activeSection={activeSection}
         onNavigate={navigate}
         onOpenLuckyWheel={() => setIsLuckyWheelOpen(true)}
-        isFreeSpinAvailable={getLuckySpinState(profile.lastSpinTimestamp).isFree}
+        isFreeSpinAvailable={getLuckySpinState(profile.lastSpinTimestamp, profile.luckyWheelLevel ?? 1).isFree}
         profile={profile}
       />
 

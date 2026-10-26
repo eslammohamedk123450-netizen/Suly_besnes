@@ -1,6 +1,14 @@
 import { describe, expect, it, beforeEach, vi } from 'vitest';
 import { getAuctionListings, getAuctionCloseAt, isAuctionOpen } from './auctions';
-import { listPlayerAssetForAuction, settlePlayerAssetAuction, cancelPlayerAssetAuction, executeSellPlayerAsset } from './dynamicAuctions';
+import {
+  listPlayerAssetForAuction,
+  settlePlayerAssetAuction,
+  cancelPlayerAssetAuction,
+  executeSellPlayerAsset,
+  calculatePlayerAssetValuation,
+  simulatePlayerAssetAuction,
+  instantSellPlayerAsset,
+} from './dynamicAuctions';
 import { saveGame, loadSavedGame } from '../storage/saveRepository';
 import { createNewPlayer } from '../domain/player';
 import { findCountry } from '../domain/countries';
@@ -227,3 +235,143 @@ describe('player asset auction listing and anti-duplication system', () => {
     expect(profile.bankBalance).toBe(100_000);
   });
 });
+
+describe('economic valuation and anti-inflation auction tests (100k vs 95M exploit prevention)', () => {
+  it('1. GUARANTEES a 100,000 $ asset CANNOT sell for 95,000,000 $ and rejects exploit settlement', () => {
+    let profile = newTestProfile();
+    const testLand = {
+      id: 'land-100k-exploit',
+      label: 'أرض 100 ألف دولار',
+      areaSquareMeters: 1000,
+      purchasePrice: 100_000,
+      acquiredAt: new Date().toISOString(),
+      acquiredOnDay: 1,
+      landType: 'commercial' as const,
+    };
+    profile.lands.push(testLand);
+
+    const valuation = calculatePlayerAssetValuation('land', testLand);
+    expect(valuation.purchaseCost).toBe(100_000);
+    expect(valuation.fairValue).toBe(100_000);
+    // Max economic ceiling is capped at 165% of fair value (165,000), never 95,000,000!
+    expect(valuation.maxAllowedBid).toBeLessThan(200_000);
+    expect(valuation.maxAllowedBid).toBeGreaterThan(100_000);
+
+    // List the asset
+    const listRes = listPlayerAssetForAuction(profile, 'land', 'land-100k-exploit', valuation.recommendedStartingBid);
+    expect(listRes.ok).toBe(true);
+    if (!listRes.ok || !listRes.data) return;
+    profile = listRes.profile;
+
+    // Simulation check: Run 50 auction simulations, NONE must ever exceed maxAllowedBid
+    for (let i = 0; i < 50; i++) {
+      const sim = simulatePlayerAssetAuction(valuation.fairValue, valuation.recommendedStartingBid);
+      expect(sim.finalBid).toBeLessThanOrEqual(valuation.maxAllowedBid);
+      expect(sim.finalBid).not.toBe(95_000_000);
+      for (const bid of sim.bidsList) {
+        expect(bid.amount).toBeLessThanOrEqual(valuation.maxAllowedBid);
+      }
+    }
+
+    // Exploit attempt: A modified client tries to settle with customWinningAmount = 95,000,000
+    const exploitSettle = settlePlayerAssetAuction(
+      profile,
+      listRes.data.id,
+      95_000_000,
+      'هاكر غير مصرح',
+    );
+    // MUST BE REJECTED!
+    expect(exploitSettle.ok).toBe(false);
+    if (!exploitSettle.ok) {
+      expect(exploitSettle.reason).toBe('invalid-input');
+      expect(exploitSettle.message).toContain('يتجاوز السقف الاقتصادي');
+    }
+    // Profile balance must NOT be inflated
+    expect(profile.bankBalance).not.toBeGreaterThanOrEqual(95_000_000);
+  });
+
+  it('2. Unsold scenario: correctly handles zero bids without fake sales', () => {
+    let profile = newTestProfile();
+    const testLand = {
+      id: 'land-unsold-test',
+      label: 'أرض معروضة بسعر مبالغ فيه',
+      areaSquareMeters: 1000,
+      purchasePrice: 50_000,
+      acquiredAt: new Date().toISOString(),
+      acquiredOnDay: 1,
+      landType: 'industrial' as const,
+    };
+    profile.lands.push(testLand);
+
+    const valuation = calculatePlayerAssetValuation('land', testLand);
+    const listRes = listPlayerAssetForAuction(profile, 'land', 'land-unsold-test', valuation.maxStartingBid);
+    expect(listRes.ok).toBe(true);
+    if (!listRes.ok || !listRes.data) return;
+    profile = listRes.profile;
+
+    // Cancelling an unsold listing safely restores the asset
+    const cancelRes = cancelPlayerAssetAuction(profile, listRes.data.id);
+    expect(cancelRes.ok).toBe(true);
+    if (!cancelRes.ok) return;
+    profile = cancelRes.profile;
+
+    expect(profile.lands.some((l) => l.id === 'land-unsold-test')).toBe(true);
+    expect(profile.soldAssetIds ?? []).not.toContain('land-unsold-test');
+  });
+
+  it('3. Single bidder & varied simulation scenarios behave within economic boundaries', () => {
+    const fairValue = 200_000;
+    const startingBid = 190_000;
+
+    let sawNoBids = false;
+    let sawBids = false;
+
+    for (let i = 0; i < 60; i++) {
+      const sim = simulatePlayerAssetAuction(fairValue, startingBid);
+      if (sim.outcome === 'no_bids') {
+        sawNoBids = true;
+        expect(sim.bidsList.length).toBe(0);
+        expect(sim.finalBid).toBe(0);
+      } else {
+        sawBids = true;
+        expect(sim.bidsList.length).toBeGreaterThanOrEqual(1);
+        expect(sim.finalBid).toBeGreaterThanOrEqual(startingBid);
+        expect(sim.finalBid).toBeLessThanOrEqual(Math.round(fairValue * 1.65));
+      }
+    }
+    expect(sawBids).toBe(true);
+  });
+
+  it('4. Instant sell direct liquidation executes at 88% fair value', () => {
+    let profile = newTestProfile();
+    profile.bankBalance = 10_000;
+
+    const testLand = {
+      id: 'land-instant-sell',
+      label: 'أرض للتسييل الفوري',
+      areaSquareMeters: 2000,
+      purchasePrice: 100_000,
+      acquiredAt: new Date().toISOString(),
+      acquiredOnDay: 1,
+      landType: 'commercial' as const,
+    };
+    profile.lands.push(testLand);
+
+    const valuation = calculatePlayerAssetValuation('land', testLand);
+    expect(valuation.instantSellPrice).toBe(Math.round(valuation.fairValue * 0.88));
+
+    const instantRes = instantSellPlayerAsset(profile, 'land', 'land-instant-sell');
+    expect(instantRes.ok).toBe(true);
+    if (!instantRes.ok) return;
+
+    profile = instantRes.profile;
+    expect(profile.lands.some((l) => l.id === 'land-instant-sell')).toBe(false);
+    expect(profile.soldAssetIds).toContain('land-instant-sell');
+    expect(profile.bankBalance).toBe(10_000 + valuation.instantSellPrice);
+
+    // Cannot instant sell twice
+    const dupRes = instantSellPlayerAsset(profile, 'land', 'land-instant-sell');
+    expect(dupRes.ok).toBe(false);
+  });
+});
+

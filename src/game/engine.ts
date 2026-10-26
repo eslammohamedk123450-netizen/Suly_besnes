@@ -36,6 +36,7 @@ import {
   listPlayerAssetForAuction,
   settlePlayerAssetAuction,
   cancelPlayerAssetAuction,
+  instantSellPlayerAsset,
 } from './dynamicAuctions';
 import { claimStarterMission } from './onboarding';
 import { acceptBotMarketOffer } from './economyBots';
@@ -1170,11 +1171,39 @@ export function runProduction(profile: PlayerProfile, companyId: string, batches
   const effectiveMaterialCost = Math.round(materialCost * (1 - materialWasteDiscount));
   const expectedUnitCost = (effectiveMaterialCost + energyCost + maintenanceCost) / outputQuantity;
   const nextMaintenanceCondition = Math.max(0, maintenanceCondition - Math.max(8, Math.ceil(batches / 2)));
-  const order: ProductionOrder = { id: nextId(profile, 'production', profile.productionOrders.length), companyId, productId: recipe.productId, productName: recipe.productName, batches, outputQuantity, outputUnit: recipe.outputUnit, materialCost: effectiveMaterialCost, energyCost, expectedUnitCost, demandForecast: marketForecast?.demandUnits ?? 0, qualityScore, maintenanceCost, startedOnDay: profile.day, completesOnDay: profile.day + durationDays, status: 'active' };
+  const completesOnDay = profile.day + durationDays;
+
+  const order: ProductionOrder = {
+    id: nextId(profile, 'production', profile.productionOrders.length),
+    companyId,
+    productId: recipe.productId,
+    productName: recipe.productName,
+    batches,
+    outputQuantity,
+    outputUnit: recipe.outputUnit,
+    materialCost: effectiveMaterialCost,
+    energyCost,
+    expectedUnitCost,
+    demandForecast: marketForecast?.demandUnits ?? 0,
+    qualityScore,
+    maintenanceCost,
+    startedOnDay: profile.day,
+    completesOnDay,
+    status: 'active',
+  };
   const companiesWithMaintenance = companies.map((item) => item.id === companyId ? { ...item, maintenanceCondition: nextMaintenanceCondition } : item);
   const nextProfile = addLedger(
-    { ...profile, inventory, companies: companiesWithMaintenance, productionOrders: [...profile.productionOrders, order] },
-    [ledgerEntry(profile, 'expense', energyCost, `حجز طاقة لأمر إنتاج ${recipe.productName}`, 0), ledgerEntry(profile, 'expense', maintenanceCost, `صيانة وقائية لأمر إنتاج ${recipe.productName}`, 1), ledgerEntry(profile, 'asset', effectiveMaterialCost, `حجز مواد لأمر إنتاج ${recipe.productName}${foreman ? ' (مع وفورات رئيس العمال)' : ''}`, 2)],
+    {
+      ...profile,
+      inventory,
+      companies: companiesWithMaintenance,
+      productionOrders: [...profile.productionOrders, order],
+    },
+    [
+      ledgerEntry(profile, 'expense', energyCost, `حجز طاقة لأمر إنتاج ${recipe.productName}`, 0),
+      ledgerEntry(profile, 'expense', maintenanceCost, `صيانة وقائية لأمر إنتاج ${recipe.productName}`, 1),
+      ledgerEntry(profile, 'asset', effectiveMaterialCost, `حجز مواد لأمر إنتاج ${recipe.productName}${foreman ? ' (مع وفورات رئيس العمال)' : ''}`, 2),
+    ],
     profile.bankBalance - energyCost - maintenanceCost,
   );
   return success(syncTasks(nextProfile), `بدأ أمر إنتاج ${recipe.productName} ويكتمل في اليوم ${order.completesOnDay}.`, { orderId: order.id, companyId, productId: recipe.productId, batches, outputQuantity, completesOnDay: order.completesOnDay });
@@ -2638,6 +2667,7 @@ export type GameCommand =
   | { name: 'list_player_asset'; args: { assetType: 'land' | 'company'; assetId: string; startingBid: number } }
   | { name: 'settle_player_auction'; args: { listingId: string; customWinningAmount?: number; customBuyerName?: string } }
   | { name: 'cancel_player_auction'; args: { listingId: string } }
+  | { name: 'instant_sell_player_asset'; args: { assetType: 'land' | 'company' | 'asset'; assetId: string } }
   | { name: 'claim_starter_mission'; args: { missionId: string } }
   | { name: 'claim_mission_reward'; args: { missionId: string } }
   | { name: 'accept_bot_offer'; args: { offerId: string } };
@@ -2696,6 +2726,7 @@ export function executeGameCommand(profile: PlayerProfile, command: GameCommand)
     case 'list_player_asset': return listPlayerAssetForAuction(profile, command.args.assetType, command.args.assetId, command.args.startingBid);
     case 'settle_player_auction': return settlePlayerAssetAuction(profile, command.args.listingId, command.args.customWinningAmount, command.args.customBuyerName);
     case 'cancel_player_auction': return cancelPlayerAssetAuction(profile, command.args.listingId);
+    case 'instant_sell_player_asset': return instantSellPlayerAsset(profile, command.args.assetType, command.args.assetId);
     case 'claim_starter_mission': return claimStarterMission(profile, command.args.missionId);
     case 'claim_mission_reward': return claimMissionReward(profile, command.args.missionId);
     case 'accept_bot_offer': return acceptBotMarketOffer(profile, command.args.offerId);
@@ -2713,6 +2744,7 @@ export {
   listPlayerAssetForAuction,
   settlePlayerAssetAuction,
   cancelPlayerAssetAuction,
+  instantSellPlayerAsset,
   executeSellPlayerAsset,
 } from './dynamicAuctions';
 

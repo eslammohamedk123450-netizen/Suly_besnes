@@ -133,6 +133,8 @@ export interface PlayerProfile {
   claimedRewardIds?: string[];
   dismissedStoryEventIds?: string[];
   automationDirectives?: AutomationDirectives;
+  luckyWheelLevel?: number;
+  fastStarterProductionUsed?: boolean;
 }
 
 export function getDefaultAutomationDirectives(): AutomationDirectives {
