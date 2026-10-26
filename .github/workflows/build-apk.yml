@@ -15,9 +15,11 @@ jobs:
       - run: npm install --legacy-peer-deps
       - run: npm install @capacitor/core @capacitor/cli @capacitor/android --legacy-peer-deps
       - run: npm run build
-      - run: npx cap init "Suly Besnes" com.sulybesnes.game --web-dir=dist --npm-client npm || true
-      - run: npx cap add android || true
+      - run: rm -rf android
+      - run: npx cap add android
       - run: npx cap copy android
+      - run: mkdir -p android/capacitor-cordova-android-plugins
+      - run: echo "" > android/capacitor-cordova-android-plugins/cordova.variables.gradle
       - run: cd android && chmod +x gradlew && ./gradlew assembleDebug
       - uses: actions/upload-artifact@v4
         with:
