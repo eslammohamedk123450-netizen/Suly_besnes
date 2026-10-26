@@ -15,13 +15,14 @@ import './RightActionHub.css';
 interface RightActionHubProps {
   profile: PlayerProfile;
   country: CountryDefinition;
-  onNavigate: (section: SectionId) => void;
+  onNavigate: (section: SectionId, focus?: string) => void;
   onCollectActualProfit: (amount: number) => void;
   onSellProduct: (productId: string, quantity: number) => void;
   onAdvanceDay: () => void;
   onOpenLuckyWheel?: () => void;
   onOpenStoryCampaign?: () => void;
   onOpenStrategicPillars?: () => void;
+  onAcceptBotOffer?: (offerId: string) => void;
   onProfileUpdate?: (profile: PlayerProfile) => void;
 }
 
@@ -35,6 +36,7 @@ export function RightActionHub({
   onOpenLuckyWheel,
   onOpenStoryCampaign,
   onOpenStrategicPillars,
+  onAcceptBotOffer,
   onProfileUpdate,
 }: RightActionHubProps) {
   const [open, setOpen] = useState(false);

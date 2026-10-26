@@ -12,7 +12,7 @@ export function canAccessSystem(
   arg1: PlayerProfile | SectionId,
   arg2: SectionId | PlayerProfile,
 ): boolean {
-  const profile = (typeof arg1 === 'object' && arg1 !== null && 'level' in arg1 ? arg1 : arg2) as PlayerProfile;
+  const profile = (typeof arg1 === 'object' && arg1 !== null && 'bankBalance' in arg1 ? arg1 : arg2) as PlayerProfile;
   const section = (typeof arg1 === 'string' ? arg1 : arg2) as SectionId;
   return isSectionUnlocked(profile, section);
 }
@@ -24,9 +24,9 @@ export function isNotificationAllowed(
   arg1: GameNotification | PlayerProfile,
   arg2: PlayerProfile | GameNotification,
 ): boolean {
-  const profile = (typeof arg1 === 'object' && arg1 !== null && 'level' in arg1 ? arg1 : arg2) as PlayerProfile;
-  const notif = (typeof arg1 === 'object' && arg1 !== null && 'id' in arg1 && 'title' in arg1 ? arg1 : arg2) as GameNotification;
-  const targetSection = (notif.targetSection || notif.section) as SectionId | undefined;
+  const profile = (typeof arg1 === 'object' && arg1 !== null && 'bankBalance' in arg1 ? arg1 : arg2) as PlayerProfile;
+  const notif = (typeof arg1 === 'object' && arg1 !== null && ('title' in arg1 || 'section' in arg1 || 'tone' in arg1) ? arg1 : arg2) as GameNotification;
+  const targetSection = ((notif as unknown as { targetSection?: SectionId })?.targetSection || notif?.section) as SectionId | undefined;
   if (targetSection && !isSectionUnlocked(profile, targetSection)) {
     return false;
   }
@@ -42,7 +42,7 @@ export function filterSynchronizedNotifications(
   arg1: PlayerProfile | GameNotification[],
   arg2: GameNotification[] | PlayerProfile,
 ): GameNotification[] {
-  const profile = (typeof arg1 === 'object' && arg1 !== null && 'level' in arg1 ? arg1 : arg2) as PlayerProfile;
+  const profile = (typeof arg1 === 'object' && arg1 !== null && 'bankBalance' in arg1 ? arg1 : arg2) as PlayerProfile;
   const notifications = (Array.isArray(arg1) ? arg1 : arg2) as GameNotification[];
   return notifications.filter((notification) => {
     return isNotificationAllowed(notification, profile);
@@ -57,8 +57,10 @@ export function isStoryEventAllowed(
   arg1: PlayerProfile | StoryEventAlert,
   arg2: StoryEventAlert | PlayerProfile,
 ): boolean {
-  const profile = (typeof arg1 === 'object' && arg1 !== null && 'level' in arg1 ? arg1 : arg2) as PlayerProfile;
-  const event = (typeof arg1 === 'object' && arg1 !== null && 'targetSection' in arg1 ? arg1 : arg2) as StoryEventAlert;
+  const profile = (typeof arg1 === 'object' && arg1 !== null && 'bankBalance' in arg1 ? arg1 : arg2) as PlayerProfile;
+  const event = (typeof arg1 === 'object' && arg1 !== null && ('storyStage' in arg1 || 'targetSection' in arg1 || 'dialogue' in arg1 || 'choices' in arg1) ? arg1 : arg2) as StoryEventAlert;
+
+  if (!event || !profile) return true;
 
   // 1. Check if already dismissed
   const dismissedIds = new Set(profile.dismissedStoryEventIds ?? []);

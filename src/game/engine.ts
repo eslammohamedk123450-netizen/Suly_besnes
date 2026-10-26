@@ -39,6 +39,7 @@ import {
 } from './dynamicAuctions';
 import { claimStarterMission } from './onboarding';
 import { acceptBotMarketOffer } from './economyBots';
+import { claimMissionReward } from './missionsEngine';
 
 export type GameErrorCode =
   | 'invalid-input'
@@ -1789,6 +1790,7 @@ export function calculateCompanyValuation(company: PlayerCompany, profile: Playe
 
 export interface EmpireValuation {
   totalEmpireValuation: number;
+  grossAssets: number;
   liquidCash: number;
   goldValue: number;
   landsTotalValue: number;
@@ -1823,13 +1825,15 @@ export function calculateEmpireValuation(profile: PlayerProfile): EmpireValuatio
     .filter((d) => d.status === 'active')
     .reduce((sum, d) => sum + d.principal, 0);
 
+  const movableAssetsValue = (profile.assets || []).reduce((sum, a) => sum + (a.value || 0), 0);
+
   const outstandingSalary = unpaidSalaryTotal(profile);
   const activeLoansBalance = (profile.banking?.loans || [])
     .filter((l) => l.status === 'active')
     .reduce((sum, l) => sum + l.remainingBalance, 0);
   const totalLiabilities = (profile.payables || 0) + outstandingSalary + activeLoansBalance;
 
-  const grossAssets = liquidCash + goldValue + landsTotalValue + companiesTotalValue + inventoryMarketValue + activeInvestmentsValue + bankDepositsValue;
+  const grossAssets = liquidCash + goldValue + landsTotalValue + companiesTotalValue + inventoryMarketValue + activeInvestmentsValue + bankDepositsValue + movableAssetsValue;
   const netWorth = grossAssets - totalLiabilities;
   const totalEmpireValuation = Math.max(0, netWorth);
 
@@ -1845,6 +1849,7 @@ export function calculateEmpireValuation(profile: PlayerProfile): EmpireValuatio
 
   return {
     totalEmpireValuation,
+    grossAssets,
     liquidCash,
     goldValue,
     landsTotalValue,
@@ -2074,7 +2079,6 @@ export function advanceDay(profile: PlayerProfile): GameResult<DayOutcome> {
   }, 0);
   if (salaryAccrued > 0) {
     entries.push(ledgerEntry(profile, 'expense', salaryAccrued, 'رواتب مستحقة عن اليوم', entries.length));
-    entries.push(ledgerEntry(profile, 'liability', salaryAccrued, 'التزام رواتب غير مسدد', entries.length));
   }
 
   // Directive 1: Executive Director auto-pays salaries if authorized
@@ -2342,6 +2346,10 @@ export function advanceDay(profile: PlayerProfile): GameResult<DayOutcome> {
             };
 
             const outputQuantity = Math.max(recipe.outputQuantity, Math.round(batches * recipe.outputQuantity * getSynergyProductionMultiplier(profile)));
+            const materialCost = recipe.inputs.reduce((sum, input) => {
+              const lot = inventory.find((item) => item.materialOrProductId === input.materialId);
+              return sum + input.quantity * batches * (lot?.unitCost ?? 0);
+            }, 0);
             const autoOrder: ProductionOrder = {
               id: nextId(profile, 'production', productionOrders.length),
               companyId: company.id,
@@ -2350,9 +2358,9 @@ export function advanceDay(profile: PlayerProfile): GameResult<DayOutcome> {
               batches,
               outputQuantity,
               outputUnit: recipe.outputUnit,
-              materialCost: 0,
+              materialCost,
               energyCost,
-              expectedUnitCost: (energyCost + maintenanceCost) / outputQuantity,
+              expectedUnitCost: (materialCost + energyCost + maintenanceCost) / outputQuantity,
               demandForecast: 25,
               qualityScore: 92,
               maintenanceCost,
@@ -2631,6 +2639,7 @@ export type GameCommand =
   | { name: 'settle_player_auction'; args: { listingId: string; customWinningAmount?: number; customBuyerName?: string } }
   | { name: 'cancel_player_auction'; args: { listingId: string } }
   | { name: 'claim_starter_mission'; args: { missionId: string } }
+  | { name: 'claim_mission_reward'; args: { missionId: string } }
   | { name: 'accept_bot_offer'; args: { offerId: string } };
 
 export type GameCommandHandler = (command: GameCommand, fallback: (profile: PlayerProfile) => GameResult<unknown>) => void | Promise<void>;
@@ -2688,9 +2697,17 @@ export function executeGameCommand(profile: PlayerProfile, command: GameCommand)
     case 'settle_player_auction': return settlePlayerAssetAuction(profile, command.args.listingId, command.args.customWinningAmount, command.args.customBuyerName);
     case 'cancel_player_auction': return cancelPlayerAssetAuction(profile, command.args.listingId);
     case 'claim_starter_mission': return claimStarterMission(profile, command.args.missionId);
+    case 'claim_mission_reward': return claimMissionReward(profile, command.args.missionId);
     case 'accept_bot_offer': return acceptBotMarketOffer(profile, command.args.offerId);
   }
 }
+
+export {
+  claimMissionReward,
+  getAvailableMissions,
+  getMissionStatus,
+  CENTRAL_MISSIONS_CATALOG,
+} from './missionsEngine';
 
 export {
   listPlayerAssetForAuction,

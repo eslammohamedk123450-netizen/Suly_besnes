@@ -376,7 +376,33 @@ export function applyOfflineReportToProfile(
 
   const updatedInventory: InventoryLot[] = [...(profile.inventory || [])];
 
-  // Deduct consumed raw materials from player inventory
+  // 1. Credit auto-purchased raw materials first so inventory balances with cash paid
+  if (report.materialsAutoPurchased && report.materialsAutoPurchased.length > 0) {
+    report.materialsAutoPurchased.forEach((purchased) => {
+      const existingIndex = updatedInventory.findIndex((i) => i.materialOrProductId === purchased.materialId);
+      const unitCost = Math.round(purchased.cost / Math.max(1, purchased.quantity));
+      if (existingIndex >= 0) {
+        const prev = updatedInventory[existingIndex];
+        const nextQty = prev.quantity + purchased.quantity;
+        updatedInventory[existingIndex] = {
+          ...prev,
+          quantity: nextQty,
+          unitCost: Math.round((prev.quantity * prev.unitCost + purchased.cost) / nextQty),
+        };
+      } else {
+        updatedInventory.push({
+          id: `idle_mat_${claimTimestamp}_${purchased.materialId}`,
+          materialOrProductId: purchased.materialId,
+          quantity: purchased.quantity,
+          unit: purchased.unit,
+          unitCost,
+          qualityScore: 90,
+        });
+      }
+    });
+  }
+
+  // 2. Deduct consumed raw materials from player inventory
   if (report.materialsConsumed && report.materialsConsumed.length > 0) {
     report.materialsConsumed.forEach((consumed) => {
       let remainingToDeduct = consumed.quantity;

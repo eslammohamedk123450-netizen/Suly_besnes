@@ -61,3 +61,22 @@ export function isChapterCompleted(profile: PlayerProfile, chapter: CampaignChap
   const netProfit = profile.finances.netProfit;
   return level >= chapter.requiredLevel && companies >= chapter.requiredCompanies && netProfit >= chapter.requiredProfit;
 }
+
+export function getLeadAdvisor(countryId?: CountryId) {
+  const scenario = getCountryScenario(countryId);
+  return scenario.advisors.elder;
+}
+
+export function getFinanceAdvisor(countryId?: CountryId) {
+  const scenario = getCountryScenario(countryId);
+  return scenario.advisors.finance;
+}
+
+export function getRivalCharacter(countryId?: CountryId) {
+  const scenario = getCountryScenario(countryId);
+  return {
+    name: 'المنافس الإقليمي',
+    title: `رائد تكتل أعمال في ${scenario.economicProfile.headline}`,
+    avatar: '🎩',
+  };
+}
