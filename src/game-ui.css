@@ -495,20 +495,53 @@
 .economy-page--compact .economy-layout > :not(.economy-panel--compact) { grid-column: 1 / -1; }
 .economy-page--compact .economy-layout > .economy-panel--compact { grid-column: span 1; }
 .economy-panel--compact:not(.is-expanded) { min-width: 0; min-height: 0; padding: 0; overflow: visible; border: 0; background: transparent; box-shadow: none; }
-.economy-panel-tile { display: grid; grid-template-columns: 1fr auto; grid-template-rows: auto 1fr auto; align-items: start; gap: 10px; width: 100%; min-height: 176px; aspect-ratio: 1.08; padding: 15px; color: #eaf0f3; text-align: right; background: linear-gradient(145deg, #102a40 0%, #0a1c2b 62%, #142c3d 100%); border: 1px solid rgba(214, 185, 103, .28); border-radius: 18px; box-shadow: 0 12px 26px rgba(8, 25, 40, .13), inset 0 1px 0 rgba(255, 255, 255, .06); cursor: pointer; transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease, background .18s ease; }
-.economy-panel-tile:hover { transform: translateY(-3px); border-color: rgba(232, 203, 126, .72); box-shadow: 0 16px 30px rgba(8, 25, 40, .2), 0 0 0 1px rgba(232, 203, 126, .12); }
+.economy-panel-tile { display: grid; grid-template-columns: 1fr; grid-template-rows: auto 1fr auto; align-items: start; gap: 11px; width: 100%; min-height: 180px; aspect-ratio: 1.05; padding: 16px; color: #eaf0f3; text-align: right; background: linear-gradient(145deg, #0e2438 0%, #081724 62%, #11293c 100%); border: 1px solid rgba(214, 185, 103, .28); border-radius: 18px; box-shadow: 0 12px 28px rgba(5, 18, 30, .2), inset 0 1px 0 rgba(255, 255, 255, .07); cursor: pointer; transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease, background .18s ease; position: relative; overflow: hidden; }
+.economy-panel-tile::before { content: ''; position: absolute; top: 0; right: 0; left: 0; height: 3px; background: linear-gradient(90deg, transparent, rgba(232, 203, 126, .5), transparent); opacity: 0; transition: opacity .2s; }
+.economy-panel-tile:hover { transform: translateY(-3px); border-color: rgba(232, 203, 126, .72); box-shadow: 0 16px 32px rgba(5, 18, 30, .3), 0 0 0 1px rgba(232, 203, 126, .18); }
+.economy-panel-tile:hover::before { opacity: 1; }
 .economy-panel-tile:focus-visible { outline: 3px solid #d8bd72; outline-offset: 3px; }
-.economy-panel-tile-icon { grid-row: 1; grid-column: 1; display: grid; place-items: center; width: 46px; height: 46px; color: #efd58f; background: linear-gradient(145deg, rgba(238, 211, 139, .17), rgba(255, 255, 255, .035)); border: 1px solid rgba(231, 202, 126, .42); border-radius: 14px; box-shadow: inset 0 1px 0 rgba(255,255,255,.12), 0 7px 16px rgba(0,0,0,.12); }
-.economy-panel-tile-copy { grid-row: 2; grid-column: 1 / -1; display: grid; align-content: start; gap: 6px; min-width: 0; }
-.economy-panel-tile-copy strong { color: #f3dfaa; font-size: 13px; font-weight: 900; line-height: 1.55; }
-.economy-panel-tile-copy small { display: -webkit-box; overflow: hidden; color: rgba(226, 235, 240, .7); font-size: 10px; line-height: 1.7; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
-.economy-panel-tile-arrow { grid-row: 3; grid-column: 1; display: grid; place-items: center; width: 27px; height: 27px; color: #dec575; background: rgba(255,255,255,.055); border: 1px solid rgba(255,255,255,.09); border-radius: 50%; }
+
+.economy-panel-tile-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; }
+.economy-panel-tile-badge { display: flex; align-items: center; }
+
+.economy-panel-tile-icon { display: grid; place-items: center; width: 48px; height: 48px; color: #efd58f; background: linear-gradient(145deg, rgba(238, 211, 139, .17), rgba(255, 255, 255, .035)); border: 1px solid rgba(231, 202, 126, .42); border-radius: 14px; box-shadow: inset 0 1px 0 rgba(255,255,255,.14), 0 6px 16px rgba(0,0,0,.18); transition: transform .18s, box-shadow .18s; }
+.economy-panel-tile:hover .economy-panel-tile-icon { transform: scale(1.05); }
+
+/* Themed Glows & Accents for Tiles */
+.icon-glow--factory { color: #f6c453; background: linear-gradient(145deg, rgba(246, 196, 83, .22), rgba(246, 196, 83, .04)); border-color: rgba(246, 196, 83, .45); box-shadow: 0 0 16px rgba(246, 196, 83, .2); }
+.icon-glow--conveyor { color: #38bdf8; background: linear-gradient(145deg, rgba(56, 189, 248, .22), rgba(56, 189, 248, .04)); border-color: rgba(56, 189, 248, .45); box-shadow: 0 0 16px rgba(56, 189, 248, .2); }
+.icon-glow--lightning { color: #facc15; background: linear-gradient(145deg, rgba(250, 204, 21, .25), rgba(250, 204, 21, .05)); border-color: rgba(250, 204, 21, .55); box-shadow: 0 0 18px rgba(250, 204, 21, .28); }
+.icon-glow--users { color: #2dd4bf; background: linear-gradient(145deg, rgba(45, 212, 191, .22), rgba(45, 212, 191, .04)); border-color: rgba(45, 212, 191, .45); box-shadow: 0 0 16px rgba(45, 212, 191, .2); }
+.icon-glow--warehouse { color: #fb923c; background: linear-gradient(145deg, rgba(251, 146, 60, .22), rgba(251, 146, 60, .04)); border-color: rgba(251, 146, 60, .45); box-shadow: 0 0 16px rgba(251, 146, 60, .2); }
+.icon-glow--bank { color: #eab308; background: linear-gradient(145deg, rgba(234, 179, 8, .22), rgba(234, 179, 8, .04)); border-color: rgba(234, 179, 8, .45); box-shadow: 0 0 16px rgba(234, 179, 8, .2); }
+.icon-glow--land { color: #4ade80; background: linear-gradient(145deg, rgba(74, 222, 128, .22), rgba(74, 222, 128, .04)); border-color: rgba(74, 222, 128, .45); box-shadow: 0 0 16px rgba(74, 222, 128, .2); }
+
+.economy-panel-tile--cyan .economy-panel-tile { border-color: rgba(56, 189, 248, .3); }
+.economy-panel-tile--cyan .economy-panel-tile:hover { border-color: rgba(56, 189, 248, .75); box-shadow: 0 16px 32px rgba(5, 18, 30, .3), 0 0 0 1px rgba(56, 189, 248, .2); }
+.economy-panel-tile--cyan .economy-panel-tile::before { background: linear-gradient(90deg, transparent, rgba(56, 189, 248, .6), transparent); }
+
+.economy-panel-tile--yellow .economy-panel-tile { border-color: rgba(250, 204, 21, .32); }
+.economy-panel-tile--yellow .economy-panel-tile:hover { border-color: rgba(250, 204, 21, .8); box-shadow: 0 16px 32px rgba(5, 18, 30, .3), 0 0 0 1px rgba(250, 204, 21, .25); }
+.economy-panel-tile--yellow .economy-panel-tile::before { background: linear-gradient(90deg, transparent, rgba(250, 204, 21, .7), transparent); }
+
+.economy-panel-tile-copy { display: grid; align-content: start; gap: 5px; min-width: 0; }
+.economy-panel-tile-copy strong { color: #f5f8fb; font-size: 14px; font-weight: 900; line-height: 1.45; }
+.economy-panel-tile-copy small { display: -webkit-box; overflow: hidden; color: rgba(210, 224, 235, .75); font-size: 10px; line-height: 1.6; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.economy-panel-tile-arrow { display: grid; place-items: center; width: 28px; height: 28px; color: #dec575; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.1); border-radius: 50%; }
+
+.economy-pill--cyan { color: #7dd3fc; background: rgba(56, 189, 248, .12); border: 1px solid rgba(56, 189, 248, .28); }
+.economy-pill--yellow { color: #fde047; background: rgba(250, 204, 21, .14); border: 1px solid rgba(250, 204, 21, .3); }
+.icon-production-amber { color: #f6c453 !important; }
+.icon-queue-cyan { color: #38bdf8 !important; }
+.icon-energy-yellow { color: #facc15 !important; }
+
 .economy-panel--compact.is-expanded { grid-column: 1 / -1; min-width: 0; padding: 0; overflow: hidden; border-color: rgba(205, 174, 92, .44); background: #fff; box-shadow: 0 15px 34px rgba(9, 27, 45, .09); }
 .economy-panel--compact.is-expanded > .economy-panel-tile { min-height: 74px; aspect-ratio: auto; grid-template-columns: auto minmax(0,1fr) auto; grid-template-rows: auto; align-items: center; padding: 12px 15px; border: 0; border-radius: 17px 17px 0 0; background: linear-gradient(110deg, #0a1c2b, #15354b); box-shadow: none; }
-.economy-panel--compact.is-expanded .economy-panel-tile-icon { grid-row: 1; grid-column: 1; width: 42px; height: 42px; }
-.economy-panel--compact.is-expanded .economy-panel-tile-copy { grid-row: 1; grid-column: 2; }
+.economy-panel--compact.is-expanded .economy-panel-tile-top { width: auto; }
+.economy-panel--compact.is-expanded .economy-panel-tile-icon { width: 42px; height: 42px; }
+.economy-panel--compact.is-expanded .economy-panel-tile-badge { display: none; }
+.economy-panel--compact.is-expanded .economy-panel-tile-copy { display: grid; }
 .economy-panel--compact.is-expanded .economy-panel-tile-copy small { display: none; }
-.economy-panel--compact.is-expanded .economy-panel-tile-arrow { grid-row: 1; grid-column: 3; }
 .economy-panel-content { padding: 16px; }
 .economy-panel-heading--compact { margin-bottom: 13px; }
 .economy-panel-heading--compact h2 { color: #18334a; }

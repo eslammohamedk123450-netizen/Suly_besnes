@@ -62,7 +62,7 @@ function isCompany(value: unknown): value is PlayerCompany {
     && typeof value.industryId === 'string'
     && INDUSTRY_IDS.has(value.industryId)
     && typeof value.countryId === 'string'
-    && findCountry(value.countryId) !== undefined
+    && findCountry(value.countryId as CountryId) !== undefined
     && isDateString(value.foundedAt)
     && (value.foundedOnDay === undefined || (Number.isInteger(value.foundedOnDay) && (value.foundedOnDay as number) >= 1))
     && (value.operationalFromDay === undefined || (Number.isInteger(value.operationalFromDay) && (value.operationalFromDay as number) >= 1))
@@ -82,7 +82,7 @@ function isInventoryLot(value: unknown): value is InventoryLot {
 
 function isLicense(value: unknown): value is LicenseRecord {
   return isRecord(value) && isNonEmptyString(value.id) && typeof value.countryId === 'string'
-    && findCountry(value.countryId) !== undefined && typeof value.industryId === 'string'
+    && findCountry(value.countryId as CountryId) !== undefined && typeof value.industryId === 'string'
     && INDUSTRY_IDS.has(value.industryId) && isFiniteNonNegative(value.feePaid) && isDateString(value.issuedAt);
 }
 
@@ -124,7 +124,7 @@ function isLoan(value: unknown): value is LoanRecord {
 
 function isStaffContract(value: unknown): value is StaffContract {
   return isRecord(value) && isNonEmptyString(value.id) && isNonEmptyString(value.name)
-    && (value.role === 'manager' || value.role === 'accountant' || value.role === 'lawyer' || value.role === 'hr')
+    && (value.role === 'manager' || value.role === 'accountant' || value.role === 'lawyer' || value.role === 'hr' || value.role === 'worker' || value.role === 'cfo_payroll' || value.role === 'production_supervisor')
     && (value.companyId === undefined || isNonEmptyString(value.companyId)) && isFiniteNonNegative(value.dailySalary)
     && (value.level === undefined || (Number.isInteger(value.level) && (value.level as number) >= 1 && (value.level as number) <= 5))
     && (value.experience === undefined || (isFiniteNonNegative(value.experience) && value.experience <= 100))
@@ -169,7 +169,7 @@ function isLedgerEntry(value: unknown): value is FinanceLedgerEntry {
   return isRecord(value) && isNonEmptyString(value.id)
     && (value.category === 'revenue' || value.category === 'expense' || value.category === 'asset' || value.category === 'liability' || value.category === 'settlement')
     && isFiniteNonNegative(value.amount) && typeof value.countryId === 'string'
-    && findCountry(value.countryId) !== undefined && isDateString(value.occurredAt) && isNonEmptyString(value.note);
+    && findCountry(value.countryId as CountryId) !== undefined && isDateString(value.occurredAt) && isNonEmptyString(value.note);
 }
 
 function isTaskProgress(value: unknown): value is TaskProgress {
@@ -212,7 +212,7 @@ function isLegacyProfile(value: unknown): value is Record<string, unknown> {
   return isNonEmptyString(value.id)
     && isNonEmptyString(value.name)
     && typeof value.level === 'number' && Number.isInteger(value.level) && value.level >= 1
-    && typeof value.countryId === 'string' && findCountry(value.countryId) !== undefined
+    && typeof value.countryId === 'string' && findCountry(value.countryId as CountryId) !== undefined
     && isDateString(value.createdAt)
     && isFiniteNonNegative(value.bankBalance)
     && isFiniteNonNegative(value.goldGrams)

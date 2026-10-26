@@ -1,0 +1,85 @@
+.tech-tree-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  padding: 1rem;
+  color: #f8fafc;
+  direction: rtl;
+}
+
+.tech-header-card {
+  background: linear-gradient(135deg, #0b132b 0%, #1c2541 50%, #3a506b 100%);
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  border-radius: 1rem;
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+}
+
+.category-tab {
+  padding: 0.65rem 1.25rem;
+  border-radius: 0.75rem;
+  font-size: 0.875rem;
+  font-weight: 700;
+  transition: all 0.2s ease;
+  border: 1px solid transparent;
+  cursor: pointer;
+}
+
+.category-tab.active {
+  background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
+  color: #ffffff;
+  border-color: #38bdf8;
+  box-shadow: 0 4px 12px rgba(2, 132, 199, 0.4);
+}
+
+.category-tab:not(.active) {
+  background: rgba(15, 23, 42, 0.8);
+  color: #94a3b8;
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.tech-node-card {
+  background: #0f172a;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 1rem;
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  position: relative;
+  transition: all 0.25s ease;
+}
+
+.tech-node-card.unlocked {
+  border-color: rgba(16, 185, 129, 0.5);
+  background: linear-gradient(180deg, #0f172a 0%, #064e3b 100%);
+}
+
+.tech-node-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.3);
+}
+
+.unlock-tech-btn {
+  background: linear-gradient(135deg, #059669 0%, #047857 100%);
+  color: #ffffff;
+  font-weight: 700;
+  padding: 0.65rem 1.25rem;
+  border-radius: 0.75rem;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  width: 100%;
+}
+
+.unlock-tech-btn:hover {
+  background: linear-gradient(135deg, #047857 0%, #065f46 100%);
+}
+
+.unlock-tech-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

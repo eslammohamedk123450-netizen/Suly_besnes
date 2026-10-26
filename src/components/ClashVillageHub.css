@@ -1,0 +1,562 @@
+/* Clash of Clans Village Hub Styles */
+
+.clash-village-viewport {
+  position: relative;
+  min-height: calc(100vh - 120px);
+  background: radial-gradient(circle at 50% 30%, #1e3a1e 0%, #0d2010 60%, #051007 100%);
+  overflow: hidden;
+  padding: 16px 12px 100px 12px;
+  user-select: none;
+}
+
+/* Subtle grass texture & grid pattern */
+.clash-village-grid-bg {
+  position: absolute;
+  inset: 0;
+  background-image: 
+    linear-gradient(rgba(34, 197, 94, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(34, 197, 94, 0.04) 1px, transparent 1px);
+  background-size: 40px 40px;
+  pointer-events: none;
+}
+
+/* Village Container */
+.clash-village-canvas {
+  position: relative;
+  max-width: 1200px;
+  margin: 0 auto;
+  z-index: 10;
+}
+
+/* Banner / Story Kicker at Top of Village */
+.clash-village-top-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: linear-gradient(145deg, rgba(15, 23, 42, 0.9), rgba(30, 41, 59, 0.9));
+  border: 1.5px solid rgba(246, 196, 83, 0.3);
+  border-radius: 16px;
+  padding: 10px 16px;
+  margin-bottom: 20px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+}
+
+.clash-village-banner-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.clash-village-flag {
+  font-size: 26px;
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.4));
+}
+
+.clash-village-title {
+  font-size: 14px;
+  font-weight: 900;
+  color: #ffffff;
+}
+
+.clash-village-subtitle {
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+/* Quick Village Stats Bar */
+.clash-village-stats {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.clash-stat-chip {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 4px 10px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 800;
+  color: #f8fafc;
+}
+
+/* The Village Layout (Isometric Grid Representation) */
+.clash-buildings-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 18px;
+  margin-top: 10px;
+}
+
+@media (min-width: 1024px) {
+  .clash-buildings-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+/* Individual Building Card (Supercell Style Tile) */
+.clash-building-tile {
+  position: relative;
+  background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
+  border: 2px solid #334155;
+  border-radius: 20px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 190px;
+  cursor: pointer;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s, box-shadow 0.2s;
+}
+
+.clash-building-tile:hover {
+  transform: translateY(-4px) scale(1.02);
+  border-color: #f59e0b;
+  box-shadow: 0 16px 30px -5px rgba(245, 158, 11, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+.clash-building-tile.is-selected {
+  border-color: #10b981;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.35), 0 16px 30px rgba(0, 0, 0, 0.6);
+}
+
+/* Building Level Tag */
+.clash-building-level {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  background: linear-gradient(145deg, #d97706, #b45309);
+  border: 1px solid #fef08a;
+  border-radius: 8px;
+  padding: 2px 7px;
+  font-size: 10px;
+  font-weight: 900;
+  color: #ffffff;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+}
+
+/* Special HQ Card Highlight */
+.clash-building-tile.is-hq {
+  grid-column: span 1;
+  background: linear-gradient(180deg, #1e3a5f 0%, #0c1c30 100%);
+  border-color: #3b82f6;
+}
+
+@media (min-width: 768px) {
+  .clash-building-tile.is-hq {
+    grid-column: span 2;
+  }
+}
+
+.clash-building-tile.is-hq:hover {
+  border-color: #60a5fa;
+  box-shadow: 0 16px 35px -5px rgba(59, 130, 246, 0.35);
+}
+
+/* Building Visual Presentation */
+.clash-building-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  margin: 10px 0;
+  text-align: center;
+}
+
+.clash-building-avatar {
+  font-size: 48px;
+  filter: drop-shadow(0 8px 12px rgba(0, 0, 0, 0.5));
+  transition: transform 0.2s;
+}
+
+.clash-building-tile:hover .clash-building-avatar {
+  transform: scale(1.12);
+}
+
+.clash-building-name {
+  font-size: 13px;
+  font-weight: 900;
+  color: #f8fafc;
+  margin-top: 6px;
+}
+
+.clash-building-role {
+  font-size: 10px;
+  color: #94a3b8;
+  font-weight: 600;
+}
+
+/* Building Progress Bar (During production or upgrade) */
+.clash-building-progress-wrap {
+  width: 100%;
+  margin-top: 6px;
+}
+
+.clash-building-progress-bar {
+  height: 6px;
+  background: #091322;
+  border-radius: 9999px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.clash-building-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #10b981, #34d399);
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.8);
+  border-radius: inherit;
+  transition: width 0.3s;
+}
+
+.clash-building-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 11px;
+}
+
+.clash-building-stat-value {
+  font-weight: 900;
+  color: #34d399;
+  font-variant-numeric: tabular-nums;
+}
+
+.clash-building-action-hint {
+  font-size: 10px;
+  color: #f59e0b;
+  font-weight: 800;
+}
+
+/* Empty Land Expansion Tile */
+.clash-building-tile.is-expansion {
+  background: rgba(15, 23, 42, 0.5);
+  border: 2px dashed rgba(246, 196, 83, 0.35);
+}
+
+.clash-building-tile.is-expansion:hover {
+  border-color: #f6c453;
+  background: rgba(246, 196, 83, 0.08);
+}
+
+/* In-flow Village Actions Bar */
+.clash-village-actions-bar {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+  margin-top: 24px;
+  margin-bottom: 24px;
+  z-index: 15;
+}
+
+.clash-action-pill-btn {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 18px;
+  border-radius: 18px;
+  cursor: pointer;
+  transition: transform 0.15s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.15s;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  text-align: right;
+  border: none;
+}
+
+.clash-action-pill-btn:hover {
+  transform: translateY(-2px) scale(1.02);
+}
+
+.clash-action-pill-btn:active {
+  transform: translateY(1px);
+}
+
+.clash-action-pill-btn.is-attack {
+  background: linear-gradient(135deg, #b91c1c 0%, #7f1d1d 100%);
+  border: 2px solid #f87171;
+  box-shadow: 0 8px 24px rgba(185, 28, 28, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+
+.clash-action-pill-btn.is-shop {
+  background: linear-gradient(135deg, #d97706 0%, #92400e 100%);
+  border: 2px solid #fbbf24;
+  box-shadow: 0 8px 24px rgba(217, 119, 6, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+
+.clash-action-pill-btn.is-cartel {
+  background: linear-gradient(135deg, #0369a1 0%, #075985 100%);
+  border: 2px solid #38bdf8;
+}
+
+/* ===================================================
+   Clash Building Inspector Modal / Card
+   =================================================== */
+.clash-inspector-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 60;
+  padding: 16px;
+}
+
+.clash-inspector-modal {
+  width: 100%;
+  max-width: 520px;
+  background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
+  border: 2px solid #f59e0b;
+  border-radius: 24px;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.8), 0 0 30px rgba(245, 158, 11, 0.25);
+  overflow: hidden;
+  animation: clashPopIn 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes clashPopIn {
+  from {
+    opacity: 0;
+    transform: scale(0.92) translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.clash-inspector-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  background: #091322;
+  border-bottom: 2px solid rgba(255, 255, 255, 0.08);
+}
+
+.clash-inspector-title-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.clash-inspector-avatar {
+  font-size: 36px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 14px;
+  width: 50px;
+  height: 50px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.clash-inspector-name {
+  font-size: 16px;
+  font-weight: 900;
+  color: #ffffff;
+}
+
+.clash-inspector-tag {
+  font-size: 11px;
+  color: #38bdf8;
+  font-weight: 700;
+}
+
+.clash-inspector-body {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.clash-inspector-desc {
+  font-size: 12px;
+  color: #cbd5e1;
+  line-height: 1.6;
+}
+
+/* Inspector Stats Grid */
+.clash-inspector-stats {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+.clash-inspector-stat-box {
+  background: #091322;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 10px 12px;
+}
+
+.clash-inspector-stat-label {
+  font-size: 10px;
+  color: #94a3b8;
+  font-weight: 700;
+}
+
+.clash-inspector-stat-val {
+  font-size: 13px;
+  font-weight: 900;
+  color: #ffffff;
+  margin-top: 2px;
+}
+
+/* Inspector Action Buttons Footer */
+.clash-inspector-actions {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  padding: 14px 20px 20px 20px;
+  background: #091322;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.clash-action-card-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 10px 8px;
+  border-radius: 14px;
+  font-weight: 900;
+  cursor: pointer;
+  transition: transform 0.15s, filter 0.15s;
+  text-align: center;
+  border: none;
+}
+
+.clash-action-card-btn:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.1);
+}
+
+.clash-action-card-btn:active {
+  transform: translateY(1px);
+}
+
+.clash-action-card-btn.is-upgrade {
+  background: linear-gradient(180deg, #10b981 0%, #059669 100%);
+  color: #ffffff;
+  border: 2px solid #6ee7b7;
+}
+
+.clash-action-card-btn.is-boost {
+  background: linear-gradient(180deg, #0284c7 0%, #0369a1 100%);
+  color: #ffffff;
+  border: 2px solid #7dd3fc;
+}
+
+.clash-action-card-btn.is-collect {
+  background: linear-gradient(180deg, #f59e0b 0%, #d97706 100%);
+  color: #78350f;
+  border: 2px solid #fef08a;
+}
+
+.clash-action-card-btn.is-manage {
+  background: linear-gradient(180deg, #475569 0%, #334155 100%);
+  color: #ffffff;
+  border: 2px solid #94a3b8;
+}
+
+/* ===================================================
+   Clash Shop Modal
+   =================================================== */
+.clash-shop-tabs {
+  display: flex;
+  gap: 6px;
+  padding: 10px 20px 0 20px;
+  background: #091322;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  overflow-x: auto;
+}
+
+.clash-shop-tab-btn {
+  padding: 8px 14px;
+  border-radius: 12px 12px 0 0;
+  background: transparent;
+  border: none;
+  font-size: 12px;
+  font-weight: 800;
+  color: #94a3b8;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.clash-shop-tab-btn.is-active {
+  background: #1e293b;
+  color: #f59e0b;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom-color: #1e293b;
+}
+
+.clash-shop-items-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
+  padding: 16px 20px;
+  max-height: 420px;
+  overflow-y: auto;
+}
+
+.clash-shop-item-card {
+  background: #091322;
+  border: 1.5px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 8px;
+  transition: transform 0.15s, border-color 0.15s;
+}
+
+.clash-shop-item-card:hover {
+  transform: translateY(-2px);
+  border-color: #f59e0b;
+}
+
+.clash-shop-item-icon {
+  font-size: 32px;
+  text-align: center;
+}
+
+.clash-shop-item-title {
+  font-size: 12px;
+  font-weight: 900;
+  color: #ffffff;
+  text-align: center;
+}
+
+.clash-shop-item-price {
+  font-size: 11px;
+  font-weight: 900;
+  color: #34d399;
+  text-align: center;
+}
+
+.clash-shop-item-buy-btn {
+  background: linear-gradient(180deg, #10b981, #059669);
+  border: 1.5px solid #6ee7b7;
+  color: white;
+  border-radius: 10px;
+  padding: 6px;
+  font-size: 11px;
+  font-weight: 900;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.clash-shop-item-buy-btn:hover {
+  background: #059669;
+}

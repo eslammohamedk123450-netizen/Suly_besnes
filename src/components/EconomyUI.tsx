@@ -38,16 +38,40 @@ export interface EconomyPanelProps {
   icon?: IconName;
   expanded?: boolean;
   onToggle?: () => void;
+  badge?: ReactNode;
+  iconVariant?: 'gold' | 'cyan' | 'yellow' | 'green' | 'purple' | 'orange';
 }
 
-export function EconomyPanel({ id, title, description, aside, children, className = '', compact = false, icon = 'briefcase', expanded = false, onToggle }: EconomyPanelProps) {
+export function EconomyPanel({ id, title, description, aside, children, className = '', compact = false, icon = 'briefcase', expanded = false, onToggle, badge, iconVariant }: EconomyPanelProps) {
   const contentId = useId();
+  const autoVariant = iconVariant 
+    ? `economy-panel-tile--${iconVariant}`
+    : icon === 'lightning'
+    ? 'economy-panel-tile--yellow'
+    : icon === 'conveyor'
+    ? 'economy-panel-tile--cyan'
+    : icon === 'factory'
+    ? 'economy-panel-tile--gold'
+    : icon === 'users' || icon === 'user'
+    ? 'economy-panel-tile--green'
+    : icon === 'warehouse'
+    ? 'economy-panel-tile--orange'
+    : '';
+
   if (compact) {
     return (
-      <section id={id} className={`economy-panel economy-panel--compact${expanded ? ' is-expanded' : ''}${className ? ` ${className}` : ''}`}>
+      <section id={id} className={`economy-panel economy-panel--compact${expanded ? ' is-expanded' : ''}${className ? ` ${className}` : ''} ${autoVariant}`}>
         <button className="economy-panel-tile" type="button" aria-expanded={expanded} aria-controls={contentId} onClick={onToggle}>
-          <span className="economy-panel-tile-icon"><Icon name={icon} size={25} /></span>
-          <span className="economy-panel-tile-copy"><strong>{title}</strong>{description && <small>{description}</small>}</span>
+          <div className="economy-panel-tile-top">
+            <span className={`economy-panel-tile-icon icon-glow--${icon}`}>
+              <Icon name={icon} size={25} />
+            </span>
+            {badge && <div className="economy-panel-tile-badge">{badge}</div>}
+          </div>
+          <span className="economy-panel-tile-copy">
+            <strong>{title}</strong>
+            {description && <small>{description}</small>}
+          </span>
           <span className="economy-panel-tile-arrow"><Icon name={expanded ? 'close' : 'chevron'} size={16} /></span>
         </button>
         <div id={contentId} className="economy-panel-content" hidden={!expanded}>

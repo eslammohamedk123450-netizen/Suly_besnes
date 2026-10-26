@@ -1,0 +1,960 @@
+/* ====================================================================
+   CompaniesEmpireHub.css - Single Mega-Corporation & Empire Hub
+   Egyptian Business Tycoon - Clean CoC Aesthetics, Responsive & Polished
+   ==================================================================== */
+
+.companies-empire-hub {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 8px 12px 100px;
+  gap: 16px;
+  direction: rtl;
+  color: #f1f5f9;
+  font-family: inherit;
+  box-sizing: border-box;
+}
+
+/* 1. Cinematic Hero Banner */
+.empire-hero-banner {
+  position: relative;
+  width: 100%;
+  min-height: 240px;
+  border-radius: 20px;
+  background-size: cover;
+  background-position: center;
+  overflow: hidden;
+  box-shadow: 0 12px 32px -8px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(234, 179, 8, 0.25);
+  display: flex;
+  align-items: flex-end;
+}
+
+.empire-hero-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.25) 0%, rgba(15, 23, 42, 0.75) 50%, rgba(10, 15, 29, 0.96) 100%);
+  backdrop-filter: blur(2px);
+}
+
+.empire-hero-content {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  padding: 24px 20px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.empire-badge-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.empire-gold-tag {
+  background: rgba(234, 179, 8, 0.18);
+  border: 1px solid rgba(234, 179, 8, 0.4);
+  color: #fde047;
+  font-size: 11px;
+  font-weight: 800;
+  padding: 3px 10px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+}
+
+.empire-level-tag {
+  background: rgba(59, 130, 246, 0.2);
+  border: 1px solid rgba(59, 130, 246, 0.4);
+  color: #93c5fd;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 999px;
+}
+
+.empire-country-tag {
+  background: rgba(16, 185, 129, 0.18);
+  border: 1px solid rgba(16, 185, 129, 0.4);
+  color: #6ee7b7;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 999px;
+}
+
+.empire-hero-title {
+  margin: 0;
+  font-size: 26px;
+  font-weight: 900;
+  color: #ffffff;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.8);
+  letter-spacing: -0.3px;
+}
+
+.empire-hero-subtitle {
+  margin: 0;
+  font-size: 13px;
+  color: #cbd5e1;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.8);
+}
+
+.empire-hero-stats-bar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: rgba(15, 23, 42, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 14px;
+  padding: 8px 14px;
+  margin-top: 8px;
+  backdrop-filter: blur(12px);
+  flex-wrap: wrap;
+}
+
+.hero-stat-box {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.stat-label {
+  font-size: 10px;
+  color: #94a3b8;
+  font-weight: 600;
+}
+
+.stat-value {
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.hero-stat-sep {
+  width: 1px;
+  height: 24px;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+/* 2. Navigation Tabs */
+.empire-nav-tabs {
+  display: flex;
+  gap: 8px;
+  background: rgba(15, 23, 42, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 6px;
+  border-radius: 14px;
+  overflow-x: auto;
+}
+
+.empire-tab-btn {
+  flex: 1;
+  min-width: 140px;
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  padding: 10px 14px;
+  font-size: 13px;
+  font-weight: 700;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.empire-tab-btn:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.empire-tab-btn.is-active {
+  background: linear-gradient(135deg, rgba(234, 179, 8, 0.22), rgba(217, 119, 6, 0.28));
+  border: 1px solid rgba(234, 179, 8, 0.45);
+  color: #fde047;
+  box-shadow: 0 4px 12px -2px rgba(234, 179, 8, 0.25);
+}
+
+/* Single Corp Policy Banner */
+.single-corp-notice-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  background: linear-gradient(135deg, rgba(30, 41, 59, 0.7), rgba(15, 23, 42, 0.8));
+  border: 1px solid rgba(234, 179, 8, 0.25);
+  border-radius: 16px;
+  padding: 14px 16px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+}
+
+.notice-icon-circle {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: rgba(234, 179, 8, 0.15);
+  border: 1px solid rgba(234, 179, 8, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.notice-text h3 {
+  margin: 0 0 4px;
+  font-size: 14px;
+  font-weight: 800;
+  color: #fbbf24;
+}
+
+.notice-text p {
+  margin: 0;
+  font-size: 12px;
+  color: #cbd5e1;
+  line-height: 1.5;
+}
+
+/* 3. Mega-Corp Card */
+.mega-corp-card {
+  display: grid;
+  grid-template-columns: 340px 1fr;
+  gap: 20px;
+  background: linear-gradient(145deg, rgba(30, 41, 59, 0.85), rgba(15, 23, 42, 0.95));
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 20px;
+  padding: 18px;
+  box-shadow: 0 16px 36px -10px rgba(0, 0, 0, 0.6);
+}
+
+@media (max-width: 900px) {
+  .mega-corp-card {
+    grid-template-columns: 1fr;
+  }
+}
+
+.mega-corp-visual-col {
+  position: relative;
+  border-radius: 16px;
+  overflow: hidden;
+  min-height: 260px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.mega-corp-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.mega-corp-level-badge {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: rgba(15, 23, 42, 0.85);
+  border: 1px solid rgba(234, 179, 8, 0.4);
+  color: #fde047;
+  font-size: 12px;
+  font-weight: 800;
+  padding: 5px 12px;
+  border-radius: 999px;
+  backdrop-filter: blur(8px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+}
+
+.mega-corp-details-col {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.corp-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.corp-title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 800;
+  color: #ffffff;
+}
+
+.corp-subtitle {
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+.corp-service-btn {
+  background: rgba(234, 179, 8, 0.15);
+  border: 1px solid rgba(234, 179, 8, 0.35);
+  color: #fde047;
+  padding: 6px 12px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.corp-service-btn:hover {
+  background: rgba(234, 179, 8, 0.28);
+}
+
+/* Attached Land Strip */
+.corp-land-strip {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 10px 14px;
+  flex-wrap: wrap;
+}
+
+.land-mini-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+
+.land-label {
+  color: #94a3b8;
+}
+
+.land-val {
+  font-weight: 700;
+  color: #f8fafc;
+}
+
+/* Staffing Checklist for Next Expansion */
+.corp-staff-requirements-box {
+  background: rgba(15, 23, 42, 0.7);
+  border: 1px solid rgba(234, 179, 8, 0.2);
+  border-radius: 14px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.req-header h4 {
+  margin: 0 0 2px;
+  font-size: 13px;
+  font-weight: 800;
+  color: #ffffff;
+}
+
+.req-sub {
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+.req-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.req-card {
+  background: rgba(30, 41, 59, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  transition: all 0.15s ease;
+}
+
+.req-card.is-satisfied {
+  border-color: rgba(16, 185, 129, 0.35);
+  background: rgba(16, 185, 129, 0.06);
+}
+
+.req-card.is-missing {
+  border-color: rgba(234, 179, 8, 0.35);
+  background: rgba(234, 179, 8, 0.06);
+}
+
+.req-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.req-card-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: #e2e8f0;
+}
+
+.req-card-count {
+  font-size: 11px;
+  font-weight: 800;
+  color: #fbbf24;
+}
+
+.req-progress-bar {
+  width: 100%;
+  height: 5px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.req-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #10b981, #059669);
+  border-radius: 999px;
+}
+
+.req-card.is-missing .req-progress-fill {
+  background: linear-gradient(90deg, #f59e0b, #d97706);
+}
+
+.req-card-footer {
+  margin-top: 2px;
+}
+
+.req-hire-btn {
+  width: 100%;
+  background: rgba(234, 179, 8, 0.18);
+  border: 1px solid rgba(234, 179, 8, 0.35);
+  color: #fde047;
+  padding: 4px 8px;
+  border-radius: 8px;
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.req-hire-btn:hover {
+  background: rgba(234, 179, 8, 0.32);
+}
+
+/* Big Upgrade Action */
+.corp-actions-bar {
+  margin-top: auto;
+  padding-top: 8px;
+}
+
+.corp-upgrade-cta-btn {
+  width: 100%;
+  padding: 14px 20px;
+  border-radius: 14px;
+  font-size: 15px;
+  font-weight: 900;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  border: none;
+}
+
+.corp-upgrade-cta-btn.can-upgrade {
+  background: linear-gradient(135deg, #d97706, #f59e0b, #eab308);
+  color: #0f172a;
+  box-shadow: 0 6px 20px rgba(234, 179, 8, 0.4);
+}
+
+.corp-upgrade-cta-btn.can-upgrade:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(234, 179, 8, 0.55);
+}
+
+.corp-upgrade-cta-btn.is-locked {
+  background: linear-gradient(135deg, rgba(51, 65, 85, 0.8), rgba(30, 41, 59, 0.9));
+  color: #e2e8f0;
+  border: 1px solid rgba(234, 179, 8, 0.3);
+}
+
+/* 4. C-Suite Management & Monthly Payroll */
+.payroll-calendar-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  background: linear-gradient(135deg, rgba(30, 41, 59, 0.8), rgba(15, 23, 42, 0.9));
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  border-radius: 16px;
+  padding: 16px 20px;
+  flex-wrap: wrap;
+}
+
+.cal-title {
+  display: block;
+  font-size: 15px;
+  font-weight: 800;
+  color: #ffffff;
+}
+
+.cal-subtitle {
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+.calendar-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.cal-stat-pill {
+  background: rgba(15, 23, 42, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  padding: 6px 12px;
+  font-size: 12px;
+  color: #cbd5e1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.cal-stat-pill.is-highlight {
+  border-color: rgba(234, 179, 8, 0.4);
+  background: rgba(234, 179, 8, 0.1);
+}
+
+.csuite-section-title {
+  font-size: 15px;
+  font-weight: 800;
+  color: #ffffff;
+  margin-top: 8px;
+}
+
+.csuite-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 16px;
+}
+
+.csuite-card {
+  position: relative;
+  background: linear-gradient(145deg, rgba(30, 41, 59, 0.75), rgba(15, 23, 42, 0.85));
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 18px;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.csuite-card.is-appointed {
+  border-color: rgba(16, 185, 129, 0.35);
+  box-shadow: 0 8px 24px -6px rgba(16, 185, 129, 0.15);
+}
+
+.csuite-card.is-vacant {
+  border-color: rgba(234, 179, 8, 0.3);
+}
+
+.csuite-card-badge {
+  align-self: flex-start;
+  font-size: 10px;
+  font-weight: 800;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #94a3b8;
+}
+
+.csuite-card.is-appointed .csuite-card-badge {
+  background: rgba(16, 185, 129, 0.2);
+  color: #6ee7b7;
+  border: 1px solid rgba(16, 185, 129, 0.4);
+}
+
+.csuite-avatar {
+  font-size: 32px;
+  margin: 4px 0;
+}
+
+.csuite-name {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 800;
+  color: #ffffff;
+}
+
+.csuite-desc {
+  margin: 0;
+  font-size: 12px;
+  color: #94a3b8;
+  line-height: 1.5;
+}
+
+.csuite-salary-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: rgba(15, 23, 42, 0.6);
+  border-radius: 10px;
+  font-size: 12px;
+  color: #cbd5e1;
+  margin: 6px 0;
+}
+
+.csuite-appoint-btn {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  border: none;
+  color: #0f172a;
+  padding: 10px 14px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.csuite-appoint-btn:hover {
+  filter: brightness(1.1);
+}
+
+.auto-payroll-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+  color: #cbd5e1;
+}
+
+.toggle-switch-btn {
+  border: none;
+  padding: 5px 12px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.toggle-switch-btn.is-on {
+  background: #10b981;
+  color: #ffffff;
+}
+
+.toggle-switch-btn.is-off {
+  background: #475569;
+  color: #cbd5e1;
+}
+
+.csuite-status-note {
+  font-size: 11px;
+  font-weight: 600;
+}
+
+/* Monthly Payroll Ledger Card */
+.payroll-ledger-card {
+  background: linear-gradient(145deg, rgba(30, 41, 59, 0.8), rgba(15, 23, 42, 0.9));
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 18px;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.ledger-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.payroll-breakdown-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: rgba(15, 23, 42, 0.6);
+  border-radius: 12px;
+  padding: 12px;
+}
+
+.breakdown-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  color: #cbd5e1;
+  padding: 4px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.breakdown-row:last-child {
+  border-bottom: none;
+}
+
+.payroll-action-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.disburse-now-btn {
+  background: linear-gradient(135deg, #10b981, #059669);
+  border: none;
+  color: #ffffff;
+  padding: 10px 18px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.disburse-now-btn:hover {
+  filter: brightness(1.1);
+}
+
+/* 5. Emergency Bailout Lifeline */
+.bailout-hero-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  background: linear-gradient(135deg, rgba(234, 179, 8, 0.12), rgba(15, 23, 42, 0.85));
+  border: 1px solid rgba(234, 179, 8, 0.3);
+  border-radius: 18px;
+  padding: 18px;
+}
+
+.bailout-icon-box {
+  width: 50px;
+  height: 50px;
+  border-radius: 14px;
+  background: rgba(234, 179, 8, 0.2);
+  border: 1px solid rgba(234, 179, 8, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.bailout-options-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 16px;
+}
+
+.bailout-card {
+  background: linear-gradient(145deg, rgba(30, 41, 59, 0.8), rgba(15, 23, 42, 0.9));
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 18px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+}
+
+.bailout-card-badge {
+  align-self: flex-start;
+  font-size: 10px;
+  font-weight: 800;
+  padding: 3px 10px;
+  border-radius: 999px;
+  margin-bottom: 10px;
+}
+
+.bailout-action-btn {
+  margin-top: auto;
+  border: none;
+  color: #ffffff;
+  padding: 12px 18px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+/* 6. Modals */
+.empire-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.82);
+  backdrop-filter: blur(6px);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.empire-modal-content {
+  background: linear-gradient(145deg, #1e293b, #0f172a);
+  border: 1px solid rgba(234, 179, 8, 0.35);
+  border-radius: 20px;
+  width: 100%;
+  max-width: 580px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.8);
+  overflow: hidden;
+  animation: modalPop 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes modalPop {
+  0% { transform: scale(0.94); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.modal-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 800;
+  color: #ffffff;
+}
+
+.modal-close-btn {
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  font-size: 24px;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+}
+
+.modal-body {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.upgrade-summary-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: rgba(15, 23, 42, 0.65);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 12px 18px;
+}
+
+.summary-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 12px;
+  color: #cbd5e1;
+}
+
+.summary-arrow {
+  font-size: 18px;
+}
+
+.modal-checklist-card {
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.checklist-title {
+  margin: 0 0 4px;
+  font-size: 13px;
+  font-weight: 800;
+  color: #fbbf24;
+}
+
+.checklist-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  color: #e2e8f0;
+  padding: 6px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.checklist-item:last-child {
+  border-bottom: none;
+}
+
+.modal-quick-hire-btn {
+  background: rgba(234, 179, 8, 0.2);
+  border: 1px solid rgba(234, 179, 8, 0.4);
+  color: #fde047;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.modal-payment-options {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.modal-pay-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(234, 179, 8, 0.4);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.modal-pay-btn.can-pay {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: #0f172a;
+}
+
+.modal-pay-btn.is-diamonds.can-pay {
+  background: linear-gradient(135deg, #0284c7, #0369a1);
+  color: #ffffff;
+  border-color: rgba(56, 189, 248, 0.5);
+}
+
+.modal-pay-btn.cant-pay {
+  background: rgba(51, 65, 85, 0.4);
+  border-color: rgba(255, 255, 255, 0.1);
+  color: #64748b;
+  cursor: not-allowed;
+}
+
+.pay-btn-label {
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.pay-btn-amount {
+  font-size: 15px;
+  font-weight: 900;
+}

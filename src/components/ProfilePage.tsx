@@ -5,6 +5,8 @@ import { accountCodeFromSeed } from '../domain/accountFeatures';
 import { formatGold, formatMoney, formatNumber } from '../domain/formatters';
 import { getPlayerProgress } from '../game/onboarding';
 import { selectEmpirePulse } from '../game/selectors';
+import { Icon } from './Icon';
+import './ProfilePage.css';
 
 interface ProfilePageProps {
   profile: PlayerProfile;
@@ -13,6 +15,7 @@ interface ProfilePageProps {
   isGuest: boolean;
   isSynced: boolean;
   onLinkAccount: () => void;
+  onResetWorld?: () => void;
 }
 
 async function copyTextWithFallback(text: string): Promise<boolean> {
@@ -22,7 +25,7 @@ async function copyTextWithFallback(text: string): Promise<boolean> {
       return true;
     }
   } catch {
-    // Clipboard API may be unavailable or rejected in embedded Android WebViews.
+    // Clipboard API may be unavailable or rejected in embedded WebViews.
   }
 
   try {
@@ -46,7 +49,7 @@ async function copyTextWithFallback(text: string): Promise<boolean> {
   }
 }
 
-export function ProfilePage({ profile, country, accountId, isGuest, isSynced, onLinkAccount }: ProfilePageProps) {
+export function ProfilePage({ profile, country, accountId, isGuest, isSynced, onLinkAccount, onResetWorld }: ProfilePageProps) {
   const [copyMessage, setCopyMessage] = useState<{ text: string; success: boolean } | null>(null);
   const progress = getPlayerProgress(profile);
   const accountCode = accountCodeFromSeed(accountId);
@@ -60,137 +63,231 @@ export function ProfilePage({ profile, country, accountId, isGuest, isSynced, on
   async function copyAccountCode() {
     const copied = await copyTextWithFallback(accountCode);
     setCopyMessage({
-      text: copied ? 'تم نسخ معرف اللاعب بنجاح.' : 'تعذر نسخ المعرف. حدده وانسخه يدويًا.',
+      text: copied ? 'تم نسخ المعرف بنجاح!' : 'تعذر النسخ تلقائياً.',
       success: copied,
     });
+    setTimeout(() => setCopyMessage(null), 3000);
   }
 
-  return (
-    <main className="profile-page" dir="rtl" aria-labelledby="profile-page-title">
-      <header className="profile-page-header">
-        <span className="profile-page-kicker">ملف اللاعب</span>
-        <h1 id="profile-page-title">ملفي الشخصي</h1>
-        <p>ملخص هويتك وتقدمك وأصولك في عالم الأعمال.</p>
-      </header>
+  const initialLetter = profile.name.trim().charAt(0) || 'م';
 
-      <section className="profile-identity" aria-label="هوية اللاعب">
-        <div className="profile-identity-copy">
-          <span className="profile-eyebrow">المستثمر</span>
-          <h2>{profile.name}</h2>
-          <span className="profile-country">الدولة: {country.name}</span>
+  return (
+    <main className="lux-profile-container" dir="rtl">
+      {/* 1. VIP Executive Hero Card */}
+      <section className="lux-profile-hero" aria-label="هوية اللاعب المتميزة">
+        <div className="lux-profile-hero-top">
+          <div className="lux-profile-identity">
+            <div className="lux-profile-avatar-wrapper">
+              <div className="lux-profile-avatar-ring">
+                <div className="lux-profile-avatar-inner">{initialLetter}</div>
+              </div>
+              <span className="lux-profile-level-badge">Lvl {progress.level}</span>
+            </div>
+
+            <div className="lux-profile-meta">
+              <div className="lux-profile-title-row">
+                <h1>{profile.name}</h1>
+                <span className={`lux-profile-status-tag ${isGuest ? 'lux-profile-status-tag--guest' : 'lux-profile-status-tag--verified'}`}>
+                  {isGuest ? '⚡ حساب ضيف محلي' : '👑 مستثمر موثق'}
+                </span>
+              </div>
+              <div className="lux-profile-subtitle">
+                <span>{country.flag}</span>
+                <span>{country.name}</span>
+                <span>•</span>
+                <span>قائد إمبراطورية الأعمال</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Account Code Box */}
+          <div className="lux-profile-id-box" onClick={() => void copyAccountCode()} title="اضغط لنسخ معرف الحساب">
+            <div className="lux-profile-id-info">
+              <label>معرف اللاعب (ID)</label>
+              <code dir="ltr">{accountCode}</code>
+            </div>
+            <button type="button" className="lux-copy-icon-btn" aria-label="نسخ المعرف">
+              <Icon name="shield" size={16} />
+            </button>
+          </div>
         </div>
-        <button
-          className="profile-account-code"
-          type="button"
-          onClick={() => void copyAccountCode()}
-          aria-label={`نسخ معرف اللاعب ${accountCode}`}
-        >
-          <span>معرف اللاعب</span>
-          <strong dir="ltr">{accountCode}</strong>
-          <small>اضغط لنسخ المعرف</small>
-        </button>
+
         {copyMessage && (
-          <p className={`profile-copy-message${copyMessage.success ? '' : ' is-error'}`} role="status" aria-live="polite">
-            {copyMessage.text}
-          </p>
+          <div className={`lux-sync-banner ${copyMessage.success ? 'lux-sync-banner--ready' : 'lux-sync-banner--guest'}`} style={{ marginTop: 12 }}>
+            <span>{copyMessage.text}</span>
+          </div>
+        )}
+
+        {/* Sync Status Banner */}
+        {isGuest ? (
+          <div className="lux-sync-banner lux-sync-banner--guest">
+            <div>
+              <strong>جلسة ضيف محلي ({country.name})</strong>
+              <p style={{ margin: '2px 0 0', fontSize: '0.8rem', opacity: 0.9 }}>
+                تقدمك محفوظ محلياً. يمكنك اختيار دولة واسم جديدين أو ربط الحساب.
+              </p>
+            </div>
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              {onResetWorld && (
+                <button type="button" className="lux-btn-link-account" style={{ background: '#2563eb' }} onClick={onResetWorld}>
+                  تغيير الدولة والاسم 🌍
+                </button>
+              )}
+              <button type="button" className="lux-btn-link-account" onClick={onLinkAccount}>
+                ترقية لحساب متصل ⚡
+              </button>
+            </div>
+          </div>
+        ) : !isSynced ? (
+          <div className="lux-sync-banner lux-sync-banner--pending">
+            <span>جارٍ مزامنة بيانات العالم مع السحابة الإمبراطورية...</span>
+          </div>
+        ) : (
+          <div className="lux-sync-banner lux-sync-banner--ready">
+            <span>✓ الحساب متصل ومُزامن بالكامل مع السحابة الإمبراطورية</span>
+          </div>
         )}
       </section>
 
-      {isGuest ? (
-        <section className="profile-sync-notice profile-sync-notice--guest" role="status">
-          <div>
-            <strong>هذا معرف ضيف محلي — لا يظهر في لوحة الإدارة</strong>
-            <p>عالم الضيف محفوظ على هذا الجهاز. أنشئ حسابًا للحصول على معرف قابل للبحث؛ سيبدأ الحساب الجديد بعالم جديد وتبقى نسخة الضيف هنا.</p>
+      {/* 2. Level Progress Card */}
+      <section className="lux-card">
+        <div className="lux-progress-header">
+          <div className="lux-progress-title">
+            <Icon name="crown" size={20} />
+            <span>المستوى {formatNumber(progress.level)}</span>
           </div>
-          <button className="profile-sync-link" type="button" onClick={onLinkAccount}>إنشاء حساب</button>
-        </section>
-      ) : !isSynced ? (
-        <section className="profile-sync-notice profile-sync-notice--pending" role="status">
-          <strong>لم يكتمل حفظ العالم بعد</strong>
-          <p>سيصبح هذا المعرف قابلًا للبحث في لوحة الإدارة بعد اكتمال الحفظ. تحقق من الاتصال وحالة الحفظ أعلى الشاشة.</p>
-        </section>
-      ) : (
-        <section className="profile-sync-notice profile-sync-notice--ready" role="status">
-          <strong>الحساب متصل</strong>
-          <p>هذا هو معرف الحساب الحالي الذي تستخدمه لوحة الإدارة للبحث عن اللاعب.</p>
-        </section>
-      )}
+          <span className="lux-xp-count">
+            إجمالي الخبرة: <strong>{formatNumber(progress.totalExperience)} XP</strong>
+          </span>
+        </div>
 
-      <section className="profile-progress" aria-label="المستوى والخبرة">
-        <div className="profile-section-heading">
-          <div>
-            <span className="profile-eyebrow">التقدم</span>
-            <h2>المستوى {formatNumber(progress.level)}</h2>
-          </div>
-          <strong className="profile-experience-count">
-            {formatNumber(progress.totalExperience)} خبرة إجمالية
-          </strong>
+        <div className="lux-progress-track-wrapper">
+          <div className="lux-progress-bar-fill" style={{ width: `${progressPercent}%` }} />
         </div>
-        <div
-          className="profile-progress-track"
-          role="progressbar"
-          aria-label="الخبرة نحو المستوى التالي"
-          aria-valuemin={0}
-          aria-valuemax={progress.experienceForNextLevel}
-          aria-valuenow={progress.experienceInLevel}
-        >
-          <span style={{ width: `${progressPercent}%` }} />
-        </div>
-        <p className="profile-progress-caption">
-          {formatNumber(progress.experienceInLevel)} من {formatNumber(progress.experienceForNextLevel)} خبرة للمستوى التالي
+
+        <p className="lux-progress-caption">
+          {formatNumber(progress.experienceInLevel)} من {formatNumber(progress.experienceForNextLevel)} XP للوصول للمستوى القادم ({Math.round(progressPercent)}%)
         </p>
       </section>
 
-      <section className="profile-stat-grid" aria-label="موارد اللاعب">
-        <article className="profile-stat profile-stat--day">
-          <span>اليوم</span>
-          <strong>{formatNumber(profile.day)}</strong>
-        </article>
-        <article className="profile-stat profile-stat--money">
-          <span>المال</span>
-          <strong>{formatMoney(profile.bankBalance, country)}</strong>
-        </article>
-        <article className="profile-stat profile-stat--gold">
-          <span>الذهب</span>
-          <strong>{formatGold(profile.goldGrams)}</strong>
-        </article>
-        <article className="profile-stat profile-stat--diamonds">
-          <span>الماس</span>
-          <strong>{formatNumber(profile.diamonds)}</strong>
-        </article>
-      </section>
-
-      <section className="profile-stat-grid profile-stat-grid--ownership" aria-label="أصول اللاعب والشارات">
-        <article className="profile-stat profile-stat--companies">
-          <span>الشركات</span>
-          <strong>{formatNumber(profile.companies.length)}</strong>
-        </article>
-        <article className="profile-stat profile-stat--lands">
-          <span>الأراضي</span>
-          <strong>{formatNumber(profile.lands.length)}</strong>
-        </article>
-        <article className="profile-stat profile-stat--badges-count">
-          <span>الشارات</span>
-          <strong>{formatNumber(earnedBadges.length)}</strong>
-        </article>
-      </section>
-
-      <section className="profile-badges" aria-labelledby="profile-badges-title">
-        <div className="profile-section-heading">
-          <div>
-            <span className="profile-eyebrow">المكتسبات</span>
-            <h2 id="profile-badges-title">شاراتي</h2>
-          </div>
-          <span className="profile-badges-total">{formatNumber(earnedBadges.length)}</span>
+      {/* 3. Compact High-Density Stat Grid */}
+      <section>
+        <div className="lux-section-title">
+          <Icon name="bank" size={18} />
+          <span>الأصول والموارد الإمبراطورية</span>
         </div>
+
+        <div className="lux-stats-grid">
+          {/* Cash Balance */}
+          <div className="lux-stat-card">
+            <div className="lux-stat-icon-badge lux-stat-icon--green">
+              <Icon name="bank" size={18} />
+            </div>
+            <div className="lux-stat-content">
+              <span className="lux-stat-label">السيولة النقدية</span>
+              <strong className="lux-stat-value">{formatMoney(profile.bankBalance, country)}</strong>
+            </div>
+          </div>
+
+          {/* Gold Holdings */}
+          <div className="lux-stat-card">
+            <div className="lux-stat-icon-badge lux-stat-icon--gold">
+              <Icon name="gold" size={18} />
+            </div>
+            <div className="lux-stat-content">
+              <span className="lux-stat-label">الذهب الخالص</span>
+              <strong className="lux-stat-value">{formatGold(profile.goldGrams)}</strong>
+            </div>
+          </div>
+
+          {/* Diamonds */}
+          <div className="lux-stat-card">
+            <div className="lux-stat-icon-badge lux-stat-icon--cyan">
+              <Icon name="crown" size={18} />
+            </div>
+            <div className="lux-stat-content">
+              <span className="lux-stat-label">الماس الإمبراطوري</span>
+              <strong className="lux-stat-value">{formatNumber(profile.diamonds)} 💎</strong>
+            </div>
+          </div>
+
+          {/* Days Elapsed */}
+          <div className="lux-stat-card">
+            <div className="lux-stat-icon-badge lux-stat-icon--amber">
+              <Icon name="clock" size={18} />
+            </div>
+            <div className="lux-stat-content">
+              <span className="lux-stat-label">اليوم الإمبراطوري</span>
+              <strong className="lux-stat-value">اليوم {formatNumber(profile.day)}</strong>
+            </div>
+          </div>
+
+          {/* Companies Count */}
+          <div className="lux-stat-card">
+            <div className="lux-stat-icon-badge lux-stat-icon--gold">
+              <Icon name="company" size={18} />
+            </div>
+            <div className="lux-stat-content">
+              <span className="lux-stat-label">الشركات التابعة</span>
+              <strong className="lux-stat-value">{formatNumber(profile.companies.length)} شركات</strong>
+            </div>
+          </div>
+
+          {/* Land Holdings */}
+          <div className="lux-stat-card">
+            <div className="lux-stat-icon-badge lux-stat-icon--green">
+              <Icon name="land" size={18} />
+            </div>
+            <div className="lux-stat-content">
+              <span className="lux-stat-label">الأراضي والمساحات</span>
+              <strong className="lux-stat-value">{formatNumber(profile.lands.length)} عقار</strong>
+            </div>
+          </div>
+
+          {/* Reputation */}
+          <div className="lux-stat-card">
+            <div className="lux-stat-icon-badge lux-stat-icon--purple">
+              <Icon name="target" size={18} />
+            </div>
+            <div className="lux-stat-content">
+              <span className="lux-stat-label">السمعة التجارية</span>
+              <strong className="lux-stat-value">{formatNumber(profile.reputation ?? 50)}/100</strong>
+            </div>
+          </div>
+
+          {/* Badges Earned */}
+          <div className="lux-stat-card">
+            <div className="lux-stat-icon-badge lux-stat-icon--cyan">
+              <Icon name="shield" size={18} />
+            </div>
+            <div className="lux-stat-content">
+              <span className="lux-stat-label">الشارات والوسامات</span>
+              <strong className="lux-stat-value">{formatNumber(earnedBadges.length)} وسام</strong>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* 4. Badges Showcase Section */}
+      <section className="lux-card">
+        <div className="lux-section-title" style={{ marginBottom: 16 }}>
+          <Icon name="shield" size={18} />
+          <span>معرض الشارات والوسامات</span>
+        </div>
+
         {earnedBadges.length > 0 ? (
-          <ul className="profile-badge-list profile-badge-list--dashboard-style">
+          <div className="lux-badges-grid">
             {earnedBadges.map((badge) => (
-              <li className="empire-badge empire-badge--earned" key={badge.id}><span aria-hidden="true">◆</span> {badge.label}</li>
+              <div className="lux-badge-chip" key={badge.id}>
+                <span className="lux-badge-symbol">◆</span>
+                <span className="lux-badge-name">{badge.label}</span>
+              </div>
             ))}
-          </ul>
+          </div>
         ) : (
-          <p className="profile-badges-empty">لا توجد شارات مكتسبة بعد.</p>
+          <p className="lux-badges-empty">
+            لم تحصل على وسامات إمبراطورية بعد. واصل توسعة أعمالك لفتح الوسامات!
+          </p>
         )}
       </section>
     </main>

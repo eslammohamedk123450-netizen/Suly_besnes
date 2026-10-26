@@ -229,11 +229,12 @@ function conditionMet(profile: PlayerProfile, condition: (typeof TASK_CATALOG)[n
   }
 }
 
-function ensureEgypt(profile: PlayerProfile): GameResult<never> | null {
-  return profile.countryId === 'egypt' && findCountry(profile.countryId)
+function ensureValidCountry(profile: PlayerProfile): GameResult<never> | null {
+  return findCountry(profile.countryId)
     ? null
-    : failure(profile, 'wrong-country', 'هذه الجولة متاحة لمصر فقط.');
+    : failure(profile, 'wrong-country', 'الدولة المحددة غير صالحة.');
 }
+const ensureEgypt = ensureValidCountry;
 
 export function placeBid(profile: PlayerProfile, listingId: string, amount: number, targetCompanyId?: string): GameResult<AuctionOutcome> {
   const countryError = ensureEgypt(profile);
@@ -478,6 +479,9 @@ export function upgradeWarehouse(profile: PlayerProfile, paymentMethod: Purchase
 export function foundCompany(profile: PlayerProfile, industryId: IndustryId, landId: string, name: string, paymentMethod: PurchasePaymentMethod = 'cash'): GameResult<{ companyId: string; totalCost: number; diamondsSpent: number }> {
   const countryError = ensureEgypt(profile);
   if (countryError) return countryError;
+  if (profile.companies.length >= 1) {
+    return failure(profile, 'condition-not-met', 'نظام الإمبراطورية يركز على صرح الشركة الواحدة المركزية العملاقة (Mega-Corporation)؛ يمكنك توسيع أرضها وترقية مستوياتها وإدارتها بدلاً من تشتيت الموارد.');
+  }
   const industry = findIndustry(industryId);
   const country = findCountry(profile.countryId);
   if (!industry || !country) return failure(profile, 'not-found', 'القطاع أو الدولة غير موجود.');
@@ -526,21 +530,49 @@ export function upgradeCompany(profile: PlayerProfile, companyId: string, paymen
   const company = profile.companies.find((item) => item.id === companyId);
   if (!company) return failure(profile, 'not-found', 'الشركة غير موجودة.');
   const level = company.upgradeLevel ?? 1;
-  if (level >= 5) return failure(profile, 'condition-not-met', 'وصلت هذه الشركة إلى أعلى مستوى تطوير.');
+  if (level >= 10) return failure(profile, 'condition-not-met', 'وصلت هذه الشركة إلى أعلى مستوى تطوير وإمبراطورية صناعية.');
+
+  // Staffing checks required by user:
+  // 1. Scaled workers: (level * 10 workers required)
+  // 2. Exactly 2 accountants: (accountants >= 2)
+  // 3. 2 Lawyers: (lawyers >= 2)
+  const requiredWorkers = Math.max(10, level * 12);
+  const currentWorkers = (company.assignedWorkersCount ?? 0) + profile.staff.filter((m) => m.status === 'active' && m.role === 'worker').length;
+  const currentAccountants = (company.assignedAccountantsCount ?? 0) + profile.staff.filter((m) => m.status === 'active' && m.role === 'accountant').length;
+  const currentLawyers = (company.assignedLawyersCount ?? 0) + profile.staff.filter((m) => m.status === 'active' && m.role === 'lawyer').length;
+
+  if (currentWorkers < requiredWorkers) {
+    return failure(profile, 'condition-not-met', `تحتاج الشركة إلى زيادة العمال للترقية للمستوى ${level + 1}: المطلوب ${requiredWorkers} عاملاً، ولديك حالياً ${currentWorkers} فقط. عيّن طاقم عمال أولاً.`);
+  }
+  if (currentAccountants < 2) {
+    return failure(profile, 'condition-not-met', `تشترط لوائح توسعة الشركات تعيين عدد 2 محاسبين قانونيين معتمدين للميزانية والتدقيق. المتاح لديك: ${currentAccountants}.`);
+  }
+  if (currentLawyers < 2) {
+    return failure(profile, 'condition-not-met', `تشترط التوسعة تعيين عدد 2 محامين للشؤون القانونية والعقود والتراخيص. المتاح لديك: ${currentLawyers}.`);
+  }
+
   const completedBatches = profile.productionOrders
     .filter((order) => order.companyId === companyId && order.status === 'completed')
     .reduce((sum, order) => sum + order.batches, 0);
-  const requiredBatches = level * 2;
-  if (completedBatches < requiredBatches) return failure(profile, 'condition-not-met', `تحتاج إلى إكمال ${requiredBatches} دفعات إنتاج قبل الوصول إلى المستوى ${level + 1}. أكملت ${completedBatches}.`);
-  const cost = Math.round(120_000 * Math.pow(1.55, level - 1));
+  const requiredBatches = Math.max(1, (level - 1) * 2);
+  if (completedBatches < requiredBatches) return failure(profile, 'condition-not-met', `تحتاج إلى إكمال ${requiredBatches} دفعات إنتاج قبل الترقية للمستوى ${level + 1}. أكملت ${completedBatches}.`);
+
+  const cost = Math.round(120_000 * Math.pow(1.5, level - 1));
   const payment = resolvePurchaseDebit(profile, cost, paymentMethod);
-  if ('message' in payment) return failure(profile, 'insufficient-funds', `تحتاج إلى ${cost.toLocaleString('ar-EG')} ج.م أو ما يعادلها بالماس لتطوير الشركة. ${payment.message}`);
-  const capacityBonus = 20 * level;
+  if ('message' in payment) return failure(profile, 'insufficient-funds', `تحتاج إلى ${cost.toLocaleString('ar-EG')} ج.م أو ما يعادلها بالماس لتطوير وتوسيع الشركة. ${payment.message}`);
+  const capacityBonus = 30 * level;
   const companies = profile.companies.map((item) => item.id === companyId
-    ? { ...item, upgradeLevel: level + 1, energyCapacity: (item.energyCapacity ?? 0) + capacityBonus, energyUnits: (item.energyUnits ?? 0) + capacityBonus, maintenanceCondition: 100 }
+    ? {
+        ...item,
+        upgradeLevel: level + 1,
+        energyCapacity: (item.energyCapacity ?? 100) + capacityBonus,
+        energyUnits: (item.energyUnits ?? 100) + capacityBonus,
+        maintenanceCondition: 100,
+        assignedWorkersCount: Math.max(item.assignedWorkersCount ?? 0, requiredWorkers),
+      }
     : item);
-  const nextProfile = addLedger({ ...profile, companies }, [ledgerEntry(profile, 'expense', cost, `تطوير ${company.name} إلى المستوى ${level + 1}`, 0)], payment.bankBalance, { diamonds: payment.diamonds });
-  return success(nextProfile, `تم تطوير ${company.name} إلى المستوى ${level + 1} ${paymentMethod === 'diamonds' ? `مقابل ${payment.diamondsSpent} ماسة` : 'نقدًا'} وزادت طاقتها.`, { companyId, level: level + 1, cost, diamondsSpent: payment.diamondsSpent });
+  const nextProfile = addLedger({ ...profile, companies }, [ledgerEntry(profile, 'expense', cost, `تطوير وتوسيع ${company.name} إلى المستوى ${level + 1}`, 0)], payment.bankBalance, { diamonds: payment.diamonds });
+  return success(nextProfile, `تم تطوير وتوسيع صرح ${company.name} إلى المستوى ${level + 1} بنجاح بعد استيفاء شروط العمال والمحاسبين والمحامين!`, { companyId, level: level + 1, cost, diamondsSpent: payment.diamondsSpent });
 }
 
 export function runProduction(profile: PlayerProfile, companyId: string, batches: number): GameResult<ProductionOutcome> {
@@ -792,11 +824,14 @@ export function getDayBriefing(profile: PlayerProfile): DayBriefing {
   return { day, operatingCost, existingPayables: profile.payables + outstandingSalary, maturingInvestments, event, availableEnergy, energyPaused: profile.payables > 0 || outstandingSalary > 0 };
 }
 
-const STAFF_ROLE_OPTIONS: Record<StaffRole, { label: string; dailySalary: number; companyRequired: boolean }> = {
-  manager: { label: 'مدير شركة', dailySalary: 7_000, companyRequired: true },
-  accountant: { label: 'محاسب', dailySalary: 4_500, companyRequired: false },
-  lawyer: { label: 'محامٍ', dailySalary: 4_000, companyRequired: false },
-  hr: { label: 'مدير موارد بشرية', dailySalary: 3_500, companyRequired: false },
+export const STAFF_ROLE_OPTIONS: Record<StaffRole, { label: string; description: string; dailySalary: number; monthlySalary: number; companyRequired: boolean }> = {
+  manager: { label: 'مدير تنفيذي / تشغيلي (COO)', description: 'يرفع كفاءة خطوط الإنتاج وجودة المنتجات ويخفض تكلفة التشغيل.', dailySalary: 800, monthlySalary: 24_000, companyRequired: true },
+  cfo_payroll: { label: 'مدير مالي وشؤون رواتب (CFO)', description: 'يدير السيولة والرواتب نيابة عنك تلقائياً كل شهر لتجنب توقف التشغيل.', dailySalary: 600, monthlySalary: 18_000, companyRequired: true },
+  production_supervisor: { label: 'مدير رقابة إنتاج', description: 'قم بتعيين مدير الإنتاج للإنتاج المستمر', dailySalary: 500, monthlySalary: 15_000, companyRequired: true },
+  accountant: { label: 'محاسب قانوني معتمد', description: 'يقلل الضرائب ويشترط وجود 2 محاسبين لكل ترقية وتوسعة للشركة.', dailySalary: 450, monthlySalary: 13_500, companyRequired: false },
+  lawyer: { label: 'محامٍ ومستشار عقود وتراخيص', description: 'يحمي من الغرامات ويشترط وجود 2 محامين لكل ترقية وتوسعة للشركة.', dailySalary: 400, monthlySalary: 12_000, companyRequired: false },
+  hr: { label: 'مدير موارد بشرية وتوظيف', description: 'يخفض تكاليف التعاقدات الجديدة ويدرب الكوادر ويرفع خبرتهم.', dailySalary: 350, monthlySalary: 10_500, companyRequired: false },
+  worker: { label: 'عامل تشغيل وخط إنتاج', description: 'القوة التشغيلية للماكينات، يتطلب كل مستوى توسعة زيادة عدد العمال.', dailySalary: 150, monthlySalary: 4_500, companyRequired: true },
 };
 
 const MAX_STAFF_LEVEL = 5;
@@ -816,7 +851,7 @@ export function getStaffUpgradeCost(employee: StaffContract): number {
 
 function developStaff(employee: StaffContract): StaffContract {
   let level = staffLevel(employee);
-  let experience = staffExperience(employee) + (employee.role === 'manager' ? 12 : 10);
+  let experience = staffExperience(employee) + (employee.role === 'manager' || employee.role === 'cfo_payroll' ? 12 : 10);
   while (level < MAX_STAFF_LEVEL && experience >= STAFF_EXPERIENCE_PER_LEVEL) {
     experience -= STAFF_EXPERIENCE_PER_LEVEL;
     level += 1;
@@ -827,18 +862,55 @@ function developStaff(employee: StaffContract): StaffContract {
 export function hireStaff(profile: PlayerProfile, role: StaffRole, name: string, companyId?: string): GameResult<StaffContract> {
   const option = STAFF_ROLE_OPTIONS[role];
   if (!option || name.trim().length < 2) return failure(profile, 'invalid-input', 'أدخل اسمًا صحيحًا واختر دورًا معروفًا.');
-  if (option.companyRequired && !profile.companies.some((company) => company.id === companyId)) return failure(profile, 'not-found', 'المدير يجب أن يرتبط بشركة موجودة.');
-  if (role === 'manager' && profile.staff.some((member) => member.status === 'active' && member.role === 'manager' && member.companyId === companyId)) return failure(profile, 'invalid-input', 'هذه الشركة لديها مدير نشط بالفعل.');
+  if (option.companyRequired && !profile.companies.some((company) => company.id === companyId)) return failure(profile, 'not-found', 'هذا الدور يجب أن يرتبط بصرح الشركة الموجودة.');
+  if (role === 'manager' && profile.staff.some((member) => member.status === 'active' && member.role === 'manager' && member.companyId === companyId)) {
+    return failure(profile, 'invalid-input', 'هذه الشركة لديها مدير تشغيلي نشط بالفعل.');
+  }
+  if (role === 'cfo_payroll' && profile.staff.some((member) => member.status === 'active' && member.role === 'cfo_payroll' && member.companyId === companyId)) {
+    return failure(profile, 'invalid-input', 'هذه الشركة لديها مدير مالي وشؤون رواتب نشط بالفعل.');
+  }
+  if (role === 'production_supervisor' && profile.staff.some((member) => member.status === 'active' && member.role === 'production_supervisor' && member.companyId === companyId)) {
+    return failure(profile, 'invalid-input', 'هذه الشركة لديها مدير رقابة إنتاج نشط بالفعل.');
+  }
   const hr = profile.staff.find((member) => member.status === 'active' && member.role === 'hr');
-  const contractCost = Math.round(option.dailySalary * (hr ? Math.max(0.68, 0.8 - (staffLevel(hr) - 1) * 0.03) : 1));
-  if (profile.bankBalance < contractCost) return failure(profile, 'insufficient-funds', 'لا يكفي الرصيد لتوقيع عقد الموظف ودفع يوم التعاقد.');
-  const staff: StaffContract = { id: nextId(profile, 'staff', profile.staff.length), role, name: name.trim(), companyId, dailySalary: option.dailySalary, level: 1, experience: 0, hiredOnDay: profile.day, nextPayDay: profile.day + 1, status: 'active' };
+  const contractCost = Math.round(option.monthlySalary * 0.25 * (hr ? Math.max(0.68, 0.8 - (staffLevel(hr) - 1) * 0.03) : 1));
+  if (profile.bankBalance < contractCost) return failure(profile, 'insufficient-funds', `لا يكفي الرصيد لمقدم توقيع العقد (${contractCost.toLocaleString('ar-EG')} ج.م).`);
+
+  const nextPayMonth = Math.ceil(profile.day / 30) * 30 + (profile.day % 30 === 0 ? 30 : 0);
+  const staff: StaffContract = {
+    id: nextId(profile, 'staff', profile.staff.length),
+    role,
+    name: name.trim(),
+    companyId,
+    dailySalary: option.dailySalary,
+    monthlySalary: option.monthlySalary,
+    level: 1,
+    experience: 0,
+    hiredOnDay: profile.day,
+    nextPayDay: nextPayMonth,
+    status: 'active',
+  };
+
+  const updatedCompanies = profile.companies.map((c) => {
+    if (c.id === companyId) {
+      return {
+        ...c,
+        cfoPayrollAssigned: role === 'cfo_payroll' ? true : c.cfoPayrollAssigned,
+        autoPayrollEnabled: role === 'cfo_payroll' ? true : c.autoPayrollEnabled,
+        cooAssigned: role === 'manager' ? true : c.cooAssigned,
+        productionSupervisorAssigned: role === 'production_supervisor' ? true : c.productionSupervisorAssigned,
+        continuousProductionEnabled: role === 'production_supervisor' ? true : c.continuousProductionEnabled,
+      };
+    }
+    return c;
+  });
+
   const nextProfile = addLedger(
-    { ...profile, staff: [...profile.staff, staff] },
+    { ...profile, staff: [...profile.staff, staff], companies: updatedCompanies },
     [ledgerEntry(profile, 'expense', contractCost, `توقيع عقد ${option.label}: ${staff.name}`, 0)],
     profile.bankBalance - contractCost,
   );
-  return success(nextProfile, `تم تعيين ${staff.name} بوظيفة ${option.label}؛ أول راتب دوري في اليوم التالي.`, staff);
+  return success(nextProfile, `تم تعيين ${staff.name} بوظيفة ${option.label} براتب شهري ${option.monthlySalary.toLocaleString('ar-EG')} ج.م؛ أول استحقاق شهري في اليوم ${nextPayMonth}.`, staff);
 }
 
 export function upgradeStaff(profile: PlayerProfile, staffId: string): GameResult<StaffContract> {
@@ -869,6 +941,25 @@ export function payStaffSalary(profile: PlayerProfile, staffId: string): GameRes
     profile.bankBalance - amount,
   );
   return success(nextProfile, `تم دفع ${amount.toLocaleString('ar-EG')} ج.م للموظف ${employee.name}.`, { staffId, amount });
+}
+
+export function payAllMonthlySalaries(profile: PlayerProfile): GameResult<{ totalPaid: number; count: number }> {
+  const activeStaff = profile.staff.filter((m) => m.status === 'active' && (m.unpaidSalary ?? 0) > 0);
+  const totalUnpaid = activeStaff.reduce((sum, m) => sum + (m.unpaidSalary ?? 0), 0);
+  if (totalUnpaid <= 0) {
+    return failure(profile, 'condition-not-met', 'لا توجد رواتب شهرية مستحقة للصرف حالياً.');
+  }
+  if (profile.bankBalance < totalUnpaid) {
+    return failure(profile, 'insufficient-funds', `تحتاج إلى ${totalUnpaid.toLocaleString('ar-EG')} ج.م في رصيدك لصرف مسير الرواتب الشهري.`);
+  }
+  const nextPayMonth = profile.day + 30;
+  const staff = profile.staff.map((m) => m.status === 'active' ? { ...m, unpaidSalary: 0, nextPayDay: nextPayMonth } : m);
+  const nextProfile = addLedger(
+    { ...profile, staff },
+    [ledgerEntry(profile, 'settlement', totalUnpaid, `صرف مسير الرواتب الشهري لجميع الموظفين والعمال (${activeStaff.length} موظف)`, 0)],
+    profile.bankBalance - totalUnpaid,
+  );
+  return success(nextProfile, `تم صرف مسير الرواتب الشهري بنجاح بقيمة ${totalUnpaid.toLocaleString('ar-EG')} ج.م لـ ${activeStaff.length} كادر وظيفي.`, { totalPaid: totalUnpaid, count: activeStaff.length });
 }
 
 export function terminateStaff(profile: PlayerProfile, staffId: string): GameResult<StaffContract> {
@@ -1074,21 +1165,59 @@ export function advanceDay(profile: PlayerProfile): GameResult<DayOutcome> {
     const remainingBalance = Math.max(0, loan.remainingBalance - due);
     return { ...loan, remainingBalance, nextPaymentDay: nextDay + 1, status: remainingBalance === 0 ? 'paid' as const : 'active' as const };
   });
-  const staff = profile.staff.map((employee) => {
+  const isMonthEnd = nextDay % 30 === 0;
+  const hasCFO = profile.staff.some((m) => m.status === 'active' && m.role === 'cfo_payroll')
+    || profile.companies.some((c) => c.cfoPayrollAssigned);
+
+  let updatedStaff = profile.staff.map((employee) => {
     if (employee.status !== 'active') return employee;
     const developed = developStaff(employee);
-    if (employee.nextPayDay > nextDay) return developed;
-    const dueDays = Math.max(1, nextDay - employee.nextPayDay + 1);
-    return { ...developed, nextPayDay: nextDay + 1, unpaidSalary: (employee.unpaidSalary ?? 0) + employee.dailySalary * dueDays };
+    // If not month end and employee's scheduled payday is in the future, no monthly salary due yet
+    if (employee.nextPayDay > nextDay && !isMonthEnd) return developed;
+
+    // Monthly payroll triggered (every 30 days)!
+    const monthlyAmt = employee.monthlySalary ?? Math.round(employee.dailySalary * 30);
+    const nextPayMonth = nextDay + 30;
+    return {
+      ...developed,
+      nextPayDay: nextPayMonth,
+      unpaidSalary: (employee.unpaidSalary ?? 0) + monthlyAmt,
+    };
   });
-  const salaryAccrued = staff.reduce((sum, employee) => {
-    const previous = profile.staff.find((item) => item.id === employee.id);
-    return sum + Math.max(0, (employee.unpaidSalary ?? 0) - (previous?.unpaidSalary ?? 0));
-  }, 0);
-  if (salaryAccrued > 0) {
-    entries.push(ledgerEntry(profile, 'expense', salaryAccrued, 'رواتب مستحقة عن اليوم', entries.length));
-    entries.push(ledgerEntry(profile, 'liability', salaryAccrued, 'التزام رواتب غير مسدد', entries.length));
+
+  // If CFO / Payroll Director is active, CFO pays salaries on player's behalf automatically!
+  if (hasCFO) {
+    const totalDue = updatedStaff.reduce((sum, e) => sum + (e.unpaidSalary ?? 0), 0);
+    if (totalDue > 0) {
+      const autoPaid = Math.min(balance, totalDue);
+      balance -= autoPaid;
+      entries.push(ledgerEntry(profile, 'settlement', autoPaid, `مسير الرواتب الشهري (صرفه المدير المالي تلقائياً نيابة عنك)`, entries.length));
+      let remainingToDeduct = autoPaid;
+      updatedStaff = updatedStaff.map((e) => {
+        const unpaid = e.unpaidSalary ?? 0;
+        if (unpaid <= 0) return e;
+        const paidThis = Math.min(remainingToDeduct, unpaid);
+        remainingToDeduct -= paidThis;
+        return { ...e, unpaidSalary: unpaid - paidThis };
+      });
+      if (totalDue > autoPaid) {
+        const leftover = totalDue - autoPaid;
+        payables += leftover;
+        entries.push(ledgerEntry(profile, 'liability', leftover, 'التزام رواتب شهرية متبقٍ لعدم كفاية الرصيد', entries.length));
+      }
+    }
+  } else {
+    // No CFO: accrue expense once a month on month-end
+    const newlyAccrued = updatedStaff.reduce((sum, e) => {
+      const prev = profile.staff.find((item) => item.id === e.id);
+      return sum + Math.max(0, (e.unpaidSalary ?? 0) - (prev?.unpaidSalary ?? 0));
+    }, 0);
+    if (newlyAccrued > 0) {
+      entries.push(ledgerEntry(profile, 'expense', newlyAccrued, `رواتب شهرية مستحقة عن الشهر ${Math.ceil(nextDay / 30)}`, entries.length));
+      entries.push(ledgerEntry(profile, 'liability', newlyAccrued, 'التزام رواتب شهرية غير مسددة', entries.length));
+    }
   }
+  const staff = updatedStaff;
   let inventory = [...profile.inventory];
   const newlyCompletedProductionIds: string[] = [];
   const productionOrders = profile.productionOrders.map((order) => {
@@ -1161,6 +1290,70 @@ export function advanceDay(profile: PlayerProfile): GameResult<DayOutcome> {
     const supply = industry?.dailyEnergySupply ?? capacity;
     return { ...company, energyUnits: energyPaused ? 0 : Math.min(capacity, (company.energyUnits ?? 0) + supply) };
   });
+
+  // Automated Continuous Production handled by Production Supervision Manager
+  for (let i = 0; i < companies.length; i++) {
+    const comp = companies[i];
+    const hasSupervisor = comp.productionSupervisorAssigned
+      || (comp.continuousProductionEnabled ?? false)
+      || staff.some((s) => s.status === 'active' && s.role === 'production_supervisor' && s.companyId === comp.id);
+    if (!hasSupervisor) continue;
+
+    const hasActive = productionOrders.some((o) => o.companyId === comp.id && o.status === 'active');
+    if (hasActive) continue;
+
+    const recipe = findRecipeForIndustry(comp.industryId);
+    if (!recipe) continue;
+
+    if ((comp.energyUnits ?? 0) < recipe.energyUnits) continue;
+
+    const hasMaterials = recipe.inputs.every((input) => {
+      const lot = inventory.find((item) => item.materialOrProductId === input.materialId);
+      return lot && lot.quantity >= input.quantity;
+    });
+    if (!hasMaterials) continue;
+
+    const energyCost = recipe.energyCost;
+    if (balance < energyCost) continue;
+
+    balance -= energyCost;
+    const materialCost = recipe.inputs.reduce((sum, input) => {
+      const lot = inventory.find((item) => item.materialOrProductId === input.materialId);
+      return sum + input.quantity * (lot?.unitCost ?? 0);
+    }, 0);
+
+    inventory = inventory.map((lot) => {
+      const input = recipe.inputs.find((item) => item.materialId === lot.materialOrProductId);
+      return input ? { ...lot, quantity: lot.quantity - input.quantity } : lot;
+    }).filter((lot) => lot.quantity > 0);
+
+    companies[i] = { ...comp, energyUnits: (comp.energyUnits ?? recipe.energyUnits) - recipe.energyUnits };
+
+    const supervisor = staff.find((s) => s.status === 'active' && s.role === 'production_supervisor' && s.companyId === comp.id);
+    const superLevel = staffLevel(supervisor);
+    const outputQuantity = Math.max(recipe.outputQuantity, Math.round(recipe.outputQuantity * getSynergyProductionMultiplier(profile)));
+
+    const autoOrder: ProductionOrder = {
+      id: nextId(profile, 'production', productionOrders.length),
+      companyId: comp.id,
+      productId: recipe.productId,
+      productName: recipe.productName,
+      batches: 1,
+      outputQuantity,
+      outputUnit: recipe.outputUnit,
+      materialCost,
+      energyCost,
+      expectedUnitCost: (materialCost + energyCost) / outputQuantity,
+      demandForecast: 100,
+      qualityScore: Math.min(100, 88 + (superLevel - 1) * 3),
+      maintenanceCost: 0,
+      startedOnDay: nextDay,
+      completesOnDay: nextDay + 1,
+      status: 'active',
+    };
+    productionOrders.push(autoOrder);
+    entries.push(ledgerEntry(profile, 'expense', energyCost, `إنتاج مستمر تلقائي (مدير رقابة الإنتاج): ${recipe.productName}`, entries.length));
+  }
   const expiredContracts = (profile.contracts ?? []).filter((contract) => contract.status === 'active' && contract.deadlineDay < nextDay);
   const contracts = (profile.contracts ?? []).map((contract) => contract.status === 'active' && contract.deadlineDay < nextDay
     ? { ...contract, status: 'failed' as const, failedOnDay: nextDay }

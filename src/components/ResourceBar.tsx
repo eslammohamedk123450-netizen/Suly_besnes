@@ -2,8 +2,9 @@ import type { CountryDefinition } from '../domain/countries';
 import type { PlayerProfile } from '../domain/player';
 import type { SectionId } from '../domain/navigation';
 import { formatGold, formatMoney, formatNumber } from '../domain/formatters';
-import { getPlayerProgress, getStarterMissions } from '../game/onboarding';
-import { Icon } from './Icon';
+import { getPlayerProgress } from '../game/onboarding';
+import { playSound } from '../game/soundEffects';
+import './ClashHUD.css';
 
 export type ResourceSyncState = 'synced' | 'syncing' | 'offline' | 'blocked' | 'local';
 
@@ -15,41 +16,176 @@ interface ResourceBarProps {
   pendingCommandCount: number;
 }
 
-export function ResourceBar({ profile, country, onNavigate, syncState, pendingCommandCount }: ResourceBarProps) {
+export function ResourceBar({ profile, country, onNavigate }: ResourceBarProps) {
   const progress = getPlayerProgress(profile);
-  const missionsLeft = getStarterMissions(profile).filter((mission) => !mission.completed).length;
-  const progressPercent = Math.min(100, (progress.experienceInLevel / progress.experienceForNextLevel) * 100);
-  const syncCopy: Record<ResourceSyncState, { title: string; detail: string }> = {
-    local: { title: 'لعب محلي', detail: 'محفوظ على الجهاز' },
-    synced: { title: 'المزامنة جاهزة', detail: 'حفظ تلقائي مباشر' },
-    syncing: { title: 'جارٍ المزامنة', detail: pendingCommandCount ? `${formatNumber(pendingCommandCount)} أوامر` : 'تحديث العالم' },
-    offline: { title: 'تلعب دون اتصال', detail: pendingCommandCount ? `${formatNumber(pendingCommandCount)} تنتظر الشبكة` : 'الحفظ محلي' },
-    blocked: { title: 'المزامنة متوقفة', detail: `${formatNumber(pendingCommandCount)} تحتاج مراجعة` },
-  };
+  const progressPercent = Math.min(100, Math.round((progress.experienceInLevel / Math.max(1, progress.experienceForNextLevel)) * 100));
+
+  // Visual filling percentages for Clash-style resource gauges
+  const maxCashVault = Math.max(2000000, profile.bankBalance * 1.5);
+  const cashPercent = Math.min(100, Math.round((profile.bankBalance / maxCashVault) * 100));
+
+  const maxGoldVault = Math.max(100, profile.goldGrams * 2);
+  const goldPercent = Math.min(100, Math.round((profile.goldGrams / maxGoldVault) * 100));
+
+  const diamondPercent = Math.min(100, Math.round((profile.diamonds / 1000) * 100));
 
   return (
-    <section className="resource-bar" aria-label="موارد الإمبراطورية وتقدم اللاعب">
-      <div className="resource-bar-head">
-        <div className="resource-level" aria-label={`المستوى ${formatNumber(progress.level)}`}>
-          <span className="resource-level-emblem"><Icon name="crown" size={19} /></span>
-          <span className="resource-level-copy">
-            <span className="resource-level-line"><strong>المستوى {formatNumber(progress.level)}</strong><small>{formatNumber(progress.experienceInLevel)} / {formatNumber(progress.experienceForNextLevel)} خبرة</small></span>
-            <span className="resource-experience-track"><span style={{ width: `${progressPercent}%` }} /></span>
-          </span>
+    <header className="clash-hud-header" aria-label="رأس الإمبراطورية وموارد كلاش">
+      <div className="clash-hud-container">
+        {/* Left Side: Level Star Badge + Builders + Shield */}
+        <div className="clash-hud-left">
+          {/* Blue CoC Star XP Badge */}
+          <div
+            className="clash-xp-badge"
+            onClick={() => {
+              playSound('click');
+              onNavigate('profile');
+            }}
+            title="الملف الشخصي والمستوى"
+          >
+            <div className="clash-xp-star">
+              <span>{formatNumber(progress.level)}</span>
+            </div>
+            <div className="clash-xp-bar-wrap">
+              <div className="clash-xp-title">
+                <span>المستوى {formatNumber(progress.level)}</span>
+                <span>{progressPercent}%</span>
+              </div>
+              <div className="clash-xp-progress">
+                <div className="clash-xp-fill" style={{ width: `${progressPercent}%` }} />
+              </div>
+            </div>
+          </div>
+
+          {/* In-Game Monthly Cycle Pill */}
+          <div
+            className="clash-meter-pill is-active"
+            onClick={() => {
+              playSound('click');
+              onNavigate('companies');
+            }}
+            title="تقويم الشهر الافتراضي ومسير الرواتب"
+          >
+            <span className="clash-meter-icon">📅</span>
+            <span>شهر {Math.ceil(profile.day / 30)}: <strong className="text-amber-300">يوم {((profile.day - 1) % 30) + 1}/30</strong></span>
+          </div>
+
+          {/* Mega-Corp Power Pill */}
+          <div
+            className="clash-meter-pill"
+            onClick={() => {
+              playSound('click');
+              onNavigate('production');
+            }}
+            title="طاقة تشغيل مجمع الشركات"
+          >
+            <span className="clash-meter-icon">⚡</span>
+            <span>طاقة: <strong className="text-cyan-300">{profile.companies[0]?.energyUnits ?? 100} و</strong></span>
+          </div>
         </div>
-        <div className={`resource-sync resource-sync--${syncState}`} role="status" aria-live="polite">
-          <span className="resource-sync-dot" aria-hidden="true" />
-          <span><small>{syncCopy[syncState].title}</small><strong>{syncCopy[syncState].detail}</strong></span>
+
+        {/* Right Side: Clash Resource Containers */}
+        <div className="clash-hud-right">
+          {/* Cash Container */}
+          <div
+            className="clash-resource-capsule is-money"
+            onClick={() => {
+              playSound('cash');
+              onNavigate('bank');
+            }}
+            title="خزينة السيولة النقدية"
+          >
+            <div className="clash-resource-icon-badge">💵</div>
+            <div className="clash-resource-body">
+              <div className="clash-resource-top">
+                <span className="clash-resource-label">السيولة</span>
+                <span className="clash-resource-value">{formatMoney(profile.bankBalance, country)}</span>
+              </div>
+              <div className="clash-resource-bar">
+                <div className="clash-resource-fill" style={{ width: `${cashPercent}%` }} />
+              </div>
+            </div>
+            <button
+              className="clash-resource-add-btn"
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                playSound('click');
+                onNavigate('bank');
+              }}
+              title="إيداع أو اقتراض"
+            >
+              +
+            </button>
+          </div>
+
+          {/* Gold Vault Container */}
+          <div
+            className="clash-resource-capsule is-gold"
+            onClick={() => {
+              playSound('click');
+              onNavigate('auctions');
+            }}
+            title="خزينة سبائك الذهب"
+          >
+            <div className="clash-resource-icon-badge">🪙</div>
+            <div className="clash-resource-body">
+              <div className="clash-resource-top">
+                <span className="clash-resource-label">الذهب</span>
+                <span className="clash-resource-value">{formatGold(profile.goldGrams)}</span>
+              </div>
+              <div className="clash-resource-bar">
+                <div className="clash-resource-fill" style={{ width: `${goldPercent}%` }} />
+              </div>
+            </div>
+            <button
+              className="clash-resource-add-btn"
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                playSound('click');
+                onNavigate('auctions');
+              }}
+              title="تداول وشراء الذهب"
+            >
+              +
+            </button>
+          </div>
+
+          {/* Diamonds Depot Container */}
+          <div
+            className="clash-resource-capsule is-diamonds"
+            onClick={() => {
+              playSound('click');
+              onNavigate('store');
+            }}
+            title="رصيد الماس النادر"
+          >
+            <div className="clash-resource-icon-badge">💎</div>
+            <div className="clash-resource-body">
+              <div className="clash-resource-top">
+                <span className="clash-resource-label">الماس</span>
+                <span className="clash-resource-value">{formatNumber(profile.diamonds)}</span>
+              </div>
+              <div className="clash-resource-bar">
+                <div className="clash-resource-fill" style={{ width: `${diamondPercent}%` }} />
+              </div>
+            </div>
+            <button
+              className="clash-resource-add-btn"
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                playSound('click');
+                onNavigate('store');
+              }}
+              title="شراء الماس وحزم التسريع"
+            >
+              +
+            </button>
+          </div>
         </div>
       </div>
-      <div className="resource-pills">
-        <div className="resource-pill resource-pill--money"><span className="resource-pill-icon"><Icon name="bank" size={16} /></span><span><small>الرصيد</small><strong>{formatMoney(profile.bankBalance, country)}</strong></span></div>
-        <div className="resource-pill resource-pill--diamonds"><span className="resource-pill-icon">◆</span><span><small>الماس</small><strong>{formatNumber(profile.diamonds)}</strong></span></div>
-        <div className="resource-pill resource-pill--gold"><span className="resource-pill-icon"><Icon name="gold" size={16} /></span><span><small>الذهب</small><strong>{formatGold(profile.goldGrams)}</strong></span></div>
-        <button className="resource-pill resource-pill--missions" type="button" onClick={() => onNavigate('tasks')} aria-label={`المهام، المتبقي ${missionsLeft}`}>
-          <span className="resource-pill-icon"><Icon name="tasks" size={16} /></span><span><small>المهام</small><strong>{missionsLeft ? `${formatNumber(missionsLeft)} متبقية` : 'عرض الكل'}</strong></span><Icon className="resource-pill-chevron" name="chevron" size={13} />
-        </button>
-      </div>
-    </section>
+    </header>
   );
 }

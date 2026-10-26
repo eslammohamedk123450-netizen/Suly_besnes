@@ -1,0 +1,380 @@
+.maritime-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  padding: 1rem;
+}
+
+.maritime-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 50%, #1d4ed8 100%);
+  border-radius: 16px;
+  padding: 1.5rem;
+  color: white;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+}
+
+.maritime-header-copy h2 {
+  font-size: 1.5rem;
+  font-weight: 800;
+  margin: 0.25rem 0;
+}
+
+.maritime-kicker {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #93c5fd;
+}
+
+.maritime-header-badge {
+  font-size: 3rem;
+  background: rgba(255, 255, 255, 0.1);
+  width: 70px;
+  height: 70px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(4px);
+}
+
+.maritime-tabs {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.maritime-tab-btn {
+  padding: 0.75rem 1.25rem;
+  border-radius: 10px;
+  background: #1e293b;
+  color: #94a3b8;
+  border: 1px solid #334155;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.maritime-tab-btn.active {
+  background: #2563eb;
+  color: white;
+  border-color: #3b82f6;
+}
+
+.vessels-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 1.25rem;
+}
+
+.vessel-card {
+  background: #0f172a;
+  border: 1px solid #1e293b;
+  border-radius: 16px;
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.vessel-card-head {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.vessel-icon {
+  font-size: 2.25rem;
+  background: #1e293b;
+  padding: 0.5rem;
+  border-radius: 12px;
+}
+
+.vessel-card-head h3 {
+  margin: 0;
+  font-size: 1.1rem;
+  color: #f8fafc;
+}
+
+.vessel-type-pill {
+  font-size: 0.75rem;
+  background: #1e3a8a;
+  color: #93c5fd;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  display: inline-block;
+  margin-top: 0.2rem;
+}
+
+.vessel-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  background: #1e293b;
+  padding: 0.75rem;
+  border-radius: 10px;
+}
+
+.vstat {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.85rem;
+}
+
+.vstat span {
+  color: #94a3b8;
+}
+
+.vstat strong {
+  color: #f1f5f9;
+}
+
+.profit-text {
+  color: #10b981 !important;
+}
+
+.vessel-card-foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: auto;
+  padding-top: 0.75rem;
+  border-top: 1px solid #1e293b;
+}
+
+.vessel-owned-count span {
+  font-size: 0.75rem;
+  color: #94a3b8;
+  display: block;
+}
+
+.vessel-owned-count strong {
+  font-size: 0.95rem;
+  color: #38bdf8;
+}
+
+.buy-vessel-btn {
+  background: #2563eb;
+  color: white;
+  border: none;
+  padding: 0.6rem 1rem;
+  border-radius: 8px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.buy-vessel-btn:disabled {
+  background: #334155;
+  color: #64748b;
+  cursor: not-allowed;
+}
+
+.routes-launch-section {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.launch-box {
+  background: #1e293b;
+  border: 1px solid #3b82f6;
+  border-radius: 16px;
+  padding: 1.5rem;
+  color: white;
+}
+
+.launch-box h3 {
+  margin: 0 0 0.25rem 0;
+  font-size: 1.25rem;
+}
+
+.launch-box p {
+  color: #94a3b8;
+  font-size: 0.9rem;
+  margin-bottom: 1.25rem;
+}
+
+.launch-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.form-field label {
+  font-size: 0.85rem;
+  color: #cbd5e1;
+  font-weight: 600;
+}
+
+.form-field select {
+  padding: 0.75rem;
+  border-radius: 8px;
+  background: #0f172a;
+  color: white;
+  border: 1px solid #334155;
+  font-weight: bold;
+}
+
+.launch-btn {
+  background: #10b981;
+  color: white;
+  border: none;
+  padding: 0.85rem;
+  border-radius: 10px;
+  font-size: 1rem;
+  font-weight: 800;
+  cursor: pointer;
+  margin-top: 0.5rem;
+}
+
+.routes-list h4 {
+  color: #f8fafc;
+  margin-bottom: 1rem;
+}
+
+.routes-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 1rem;
+}
+
+.route-card {
+  background: #0f172a;
+  border: 1px solid #1e293b;
+  border-radius: 12px;
+  padding: 1rem;
+}
+
+.route-head {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.route-flag {
+  font-size: 2rem;
+}
+
+.route-head h5 {
+  margin: 0;
+  font-size: 0.95rem;
+  color: #f8fafc;
+}
+
+.route-dest {
+  font-size: 0.75rem;
+  color: #94a3b8;
+}
+
+.route-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.8rem;
+  color: #cbd5e1;
+}
+
+.risk-text {
+  color: #ef4444;
+}
+
+.mult-text {
+  color: #38bdf8;
+}
+
+.voyages-section {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.no-voyages {
+  text-align: center;
+  padding: 3rem;
+  background: #0f172a;
+  border-radius: 16px;
+  border: 1px dashed #334155;
+  color: #94a3b8;
+}
+
+.no-voyages span {
+  font-size: 4rem;
+  display: block;
+  margin-bottom: 1rem;
+}
+
+.voyages-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.voyage-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #0f172a;
+  border: 1px solid #1e293b;
+  padding: 1rem 1.25rem;
+  border-radius: 12px;
+}
+
+.voyage-info {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.voyage-ship-icon {
+  font-size: 2rem;
+  background: #1e293b;
+  padding: 0.4rem;
+  border-radius: 10px;
+}
+
+.voyage-info h4 {
+  margin: 0;
+  color: #f8fafc;
+  font-size: 1rem;
+}
+
+.voyage-route-name {
+  font-size: 0.8rem;
+  color: #94a3b8;
+}
+
+.voyage-profit span {
+  font-size: 0.75rem;
+  color: #94a3b8;
+  display: block;
+}
+
+.voyage-profit strong {
+  font-size: 1.1rem;
+  color: #10b981;
+}
+
+.claim-voyage-btn {
+  background: #10b981;
+  color: white;
+  border: none;
+  padding: 0.6rem 1.2rem;
+  border-radius: 8px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.claimed-badge {
+  color: #64748b;
+  font-weight: bold;
+  font-size: 0.85rem;
+}

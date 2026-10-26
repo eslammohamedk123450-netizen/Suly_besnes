@@ -126,18 +126,18 @@ describe('Business Empire economy invariants', () => {
   });
 
   it('buys speed cards with diamonds and rejects unaffordable quantities', () => {
-    const base = profile({ diamonds: 60 });
+    const base = profile({ diamonds: 5 });
     const bought = buySpeedCard(base, 'production-50', 2);
     expect(bought.ok).toBe(true);
     if (!bought.ok) return;
-    expect(bought.profile.diamonds).toBe(12);
+    expect(bought.profile.diamonds).toBe(1);
     expect(bought.profile.speedCards.find((card) => card.kind === 'production-50')?.quantity).toBe(2);
     expect(buySpeedCard(bought.profile, 'production-instant', 1).ok).toBe(false);
   });
 
   it('allows buying speed cards with cash at the matching 1%-discounted diamond rate', () => {
     const base = profile({ bankBalance: 1_000_000, diamonds: 0 });
-    const cashPrice = getCashPriceForDiamondPrice(24);
+    const cashPrice = getCashPriceForDiamondPrice(2);
     const bought = buySpeedCard(base, 'production-50', 1, 'cash');
     expect(bought.ok).toBe(true);
     if (!bought.ok) return;

@@ -25,7 +25,19 @@ import { getGlobalMarketOffers, negotiateGlobalMarketOffer } from '../game/globa
 import { getWarehouseCapacity, getWarehouseItemCapacity, getWarehouseUsage, normalizeWarehouseLevel, WAREHOUSE_UPGRADE_REQUIREMENTS } from '../game/warehouse';
 import { getGameDayDurationMinutes } from '../game/time';
 import { getDiscountedDiamondPrice, type PurchasePaymentMethod } from '../game/purchasePricing';
-import { CodeRedemption } from './CodeRedemption';
+import { StockExchangeTerminal } from './StockExchangeTerminal';
+import { TerritoryConquestMap } from './TerritoryConquestMap';
+import { TechTreeRND } from './TechTreeRND';
+import { CeoLuxurySuite } from './CeoLuxurySuite';
+import { CartelSyndicate } from './CartelSyndicate';
+import { MaritimeTradeRoutes } from './MaritimeTradeRoutes';
+import { GovernmentMegaprojects } from './GovernmentMegaprojects';
+import { StartupIncubatorVC } from './StartupIncubatorVC';
+import { loadExpansionState } from '../game/expansionEngine';
+import { loadMegaExpansionState } from '../game/expansionV2Engine';
+import { HubSubNav } from './HubSubNav';
+import { ItemImage } from './ItemImage';
+import { CompaniesEmpireHub } from './CompaniesEmpireHub';
 
 interface SectionPageProps {
   section: SectionItem;
@@ -44,6 +56,8 @@ interface SectionPageProps {
   onLinkAccount: () => void;
   onLogout: () => void;
   onShowGuide: () => void;
+  onUpdateProfile?: (updater: (prev: PlayerProfile) => PlayerProfile) => void;
+  onNotice?: (msg: string, tone?: 'success' | 'error') => void;
 }
 
 const landTypeNames = { industrial: 'صناعية', agricultural: 'زراعية', commercial: 'تجارية' } as const;
@@ -52,19 +66,21 @@ const compactSectionIds = new Set<SectionId>(['auctions', 'obligations', 'bank',
 
 function panelIconFor(sectionId: SectionId, title: string): IconName {
   const normalized = title.toLocaleLowerCase('ar');
+  if (normalized.includes('طاقة') || normalized.includes('كهرباء')) return 'lightning';
+  if (normalized.includes('طابور') || normalized.includes('جدولة')) return 'conveyor';
   if (normalized.includes('أرض') || normalized.includes('أصول')) return 'land';
-  if (normalized.includes('مصنع') || normalized.includes('إنتاج')) return 'factory';
+  if (normalized.includes('خطوط') || normalized.includes('مصنع') || normalized.includes('إنتاج')) return 'factory';
   if (normalized.includes('مخزن') || normalized.includes('مخزون')) return 'warehouse';
   if (normalized.includes('عقد') || normalized.includes('عملاء')) return 'briefcase';
   if (normalized.includes('مهمة') || normalized.includes('إنجاز') || normalized.includes('موسم')) return 'tasks';
   if (normalized.includes('تقرير') || normalized.includes('إحصاء') || normalized.includes('مبيعات')) return 'report';
   if (normalized.includes('استثمار')) return 'investment';
-  if (normalized.includes('موظف') || normalized.includes('رواتب')) return 'user';
+  if (normalized.includes('موظف') || normalized.includes('رواتب') || normalized.includes('إدارة')) return 'users';
   if (normalized.includes('بنك') || normalized.includes('وديعة') || normalized.includes('قرض')) return 'bank';
   if (normalized.includes('التزام') || normalized.includes('سداد')) return 'shield';
   if (normalized.includes('سوق') || normalized.includes('شراء') || normalized.includes('بيع')) return 'store';
   const fallback: Record<SectionId, IconName> = {
-    home: 'home', auctions: 'gavel', companies: 'company', investments: 'investment', lands: 'land', production: 'factory', inventory: 'warehouse', reports: 'report', tasks: 'tasks', settings: 'settings', profile: 'user', bank: 'bank', staff: 'user', obligations: 'shield', store: 'store', contracts: 'briefcase',
+    home: 'home', auctions: 'gavel', companies: 'company', investments: 'investment', lands: 'land', production: 'factory', inventory: 'warehouse', reports: 'report', tasks: 'tasks', settings: 'settings', profile: 'user', bank: 'bank', staff: 'users', obligations: 'shield', store: 'store', contracts: 'briefcase', territory: 'land', tech_tree: 'factory', luxury: 'crown', cartel: 'company', maritime: 'land', megaprojects: 'gavel', incubator: 'investment',
   };
   return fallback[sectionId];
 }
@@ -86,7 +102,26 @@ function economicEventDetails(event: PlayerProfile['events'][number], currentDay
   return details;
 }
 
-export function SectionPage({ section, profile, country, focus, notificationTheme, isGuest, onNotificationThemeChange, onHome, onNavigate, onAction, onCommand, onRedeemed, onRefreshProfile, onLinkAccount, onLogout, onShowGuide }: SectionPageProps) {
+export function SectionPage({
+  section,
+  profile,
+  country,
+  focus,
+  notificationTheme,
+  isGuest,
+  onNotificationThemeChange,
+  onHome,
+  onNavigate,
+  onAction,
+  onCommand,
+  onRedeemed,
+  onRefreshProfile,
+  onLinkAccount,
+  onLogout,
+  onShowGuide,
+  onUpdateProfile,
+  onNotice,
+}: SectionPageProps) {
   const playerProgress = getPlayerProgress(profile);
   const [bidAmounts, setBidAmounts] = useState<Record<string, string>>({});
   const [companyName, setCompanyName] = useState('شركة جديدة');
@@ -121,7 +156,10 @@ export function SectionPage({ section, profile, country, focus, notificationThem
   const [landView, setLandView] = useState<'owned' | 'offers'>('owned');
   const [landTypeFilter, setLandTypeFilter] = useState<'all' | 'industrial' | 'agricultural' | 'commercial'>('all');
   const [landSort, setLandSort] = useState<'price' | 'area' | 'type'>('price');
+  const [auctionCategoryTab, setAuctionCategoryTab] = useState<'all' | 'land' | 'factory' | 'material'>('land');
   const [activePanelId, setActivePanelId] = useState<string | null>(null);
+  const [expansionState, setExpansionState] = useState(() => loadExpansionState(profile));
+  const [megaExpState, setMegaExpState] = useState(() => loadMegaExpansionState(profile));
 
   useEffect(() => {
     if (compactSectionIds.has(section.id)) setActivePanelId(focus ? '__all__' : null);
@@ -152,14 +190,19 @@ export function SectionPage({ section, profile, country, focus, notificationThem
   const SectionPanel = (props: EconomyPanelProps) => {
     const panelKey = props.id ?? props.title;
     const expanded = compactPage && (activePanelId === '__all__' || activePanelId === panelKey);
-    return <BaseEconomyPanel {...props} compact={compactPage} icon={panelIconFor(section.id, props.title)} expanded={expanded} onToggle={() => setActivePanelId((current) => current === panelKey ? null : panelKey)} />;
+    const resolvedIcon = props.icon ?? panelIconFor(section.id, props.title);
+    return <BaseEconomyPanel {...props} compact={compactPage} icon={resolvedIcon} expanded={expanded} onToggle={() => setActivePanelId((current) => current === panelKey ? null : panelKey)} />;
   };
+
   const heading = (
-    <div className="page-heading">
-      <span className="heading-icon"><Icon name={section.icon} size={23} /></span>
-      <div className="page-heading-copy"><span className="section-kicker">إدارة الإمبراطورية</span><h1>{section.label}</h1><p className="page-subtitle">{section.subtitle}</p></div>
-      <button className="page-help-button" type="button" onClick={onShowGuide}><Icon name="target" size={15} /> شرح للمبتدئين</button>
-    </div>
+    <>
+      <HubSubNav currentSection={section.id} onNavigate={onNavigate} />
+      <div className="page-heading">
+        <span className="heading-icon"><Icon name={section.icon} size={23} /></span>
+        <div className="page-heading-copy"><span className="section-kicker">إدارة الإمبراطورية</span><h1>{section.label}</h1><p className="page-subtitle">{section.subtitle}</p></div>
+        <button className="page-help-button" type="button" onClick={onShowGuide}><Icon name="target" size={15} /> شرح للمبتدئين</button>
+      </div>
+    </>
   );
 
   if (section.id === 'obligations') {
@@ -178,9 +221,9 @@ export function SectionPage({ section, profile, country, focus, notificationThem
   if (section.id === 'store') {
     return <div className="section-page store-page">{heading}{pageShell(
       <>
-        <div className="store-hero"><div><span className="section-kicker">متجر المشتريات</span><h2>اشترِ الماس فقط</h2><p>اختر باقتك، راجع السعر، ثم أرسل طلب الشحن للمراجعة.</p></div><Icon name="store" size={38} /></div>
-        <SectionPanel title="باقات الماس" description="كل بطاقة تعرض عدد الماسات وسعرها بوضوح. الماس هو المنتج المدفوع الأساسي في اللعبة.">
-          <DiamondStore profile={profile} isGuest={isGuest} onLinkAccount={onLinkAccount} onRefreshProfile={onRefreshProfile} />
+        <div className="store-hero"><div><span className="section-kicker">المتجر الماسي</span><h2>اشترِ الماس والمكافآت</h2><p>اختر باقتك، راجع السعر والمكافآت، ثم أرسل طلب الشحن للمراجعة.</p></div><Icon name="store" size={38} /></div>
+        <SectionPanel title="باقات الماس" description="اختر الباقة المناسبة، راجع السعر والمكافآت، ثم أرسل طلب الشحن للمراجعة.">
+          <DiamondStore profile={profile} isGuest={isGuest} onLinkAccount={onLinkAccount} onRefreshProfile={onRefreshProfile} onBack={onHome} onPurchaseSpeedCard={(kind) => runCommand({ name: 'buy_speed_card', args: { kind, quantity: 1, paymentMethod: 'diamonds' } }, (current) => buySpeedCard(current, kind, 1, 'diamonds'))} />
         </SectionPanel>
       </>,
     )}</div>;
@@ -203,9 +246,6 @@ export function SectionPage({ section, profile, country, focus, notificationThem
           <div className="settings-row"><span>طريقة الحفظ</span><strong className="saved-status"><span /> {isGuest ? 'ضيف · محلي فقط' : 'حفظ متصل'}</strong></div>
           <div className="settings-note"><Icon name="shield" size={17} /><p>{isGuest ? 'عالم الضيف محفوظ على هذا الجهاز. اربط حسابًا لاستعادة العالم على أجهزة أخرى.' : 'يُحفظ العالم على جهازك ويتزامن عند الاتصال؛ اللعب الأساسي متاح دون اتصال.'}</p></div>
           {isGuest && <button className="button button-primary account-link-button" type="button" onClick={onLinkAccount}>ربط الحساب ونسخ العالم واستعادته</button>}
-          <SectionPanel title="استرداد كود مكافأة" description={isGuest ? 'اربط حسابًا أولًا حتى تُسجّل المكافأة عالميًا ولا تُستخدم مرة ثانية.' : 'أدخل كود SULY1 صادرًا من لوحة الإدارة لاستلام المكافأة بأمان.'}>
-            <CodeRedemption profile={profile} onRedeemed={onRedeemed} />
-          </SectionPanel>
           <button className="button button-secondary settings-store-link" type="button" onClick={() => onNavigate('store')}><Icon name="store" size={16} /> فتح متجر المشتريات</button>
           <div className="settings-notice-theme">
             <span>المؤثرات الصوتية</span>
@@ -260,7 +300,25 @@ export function SectionPage({ section, profile, country, focus, notificationThem
 
   if (section.id === 'staff') {
     const activeStaff = profile.staff.filter((member) => member.status === 'active');
-    const roleLabels: Record<StaffRole, string> = { manager: 'مدير شركة', accountant: 'محاسب', lawyer: 'محامٍ', hr: 'مدير موارد بشرية' };
+    const roleLabels: Record<StaffRole, string> = {
+      manager: 'مدير تنفيذي / تشغيلي (COO)',
+      cfo_payroll: 'مدير مالي وشؤون رواتب (CFO)',
+      production_supervisor: 'مدير رقابة إنتاج',
+      accountant: 'محاسب قانوني معتمد',
+      lawyer: 'محامٍ ومستشار عقود',
+      hr: 'مدير موارد بشرية وتوظيف',
+      worker: 'عامل تشغيل وخط إنتاج',
+    };
+    const roleDescriptions: Record<StaffRole, string> = {
+      manager: 'يرفع كفاءة خطوط الإنتاج وجودة المنتجات ويخفض تكلفة التشغيل.',
+      cfo_payroll: 'يتولى دفع الرواتب الشهرية نيابة عنك تلقائياً كل شهر لتجنب توقف التشغيل.',
+      production_supervisor: 'قم بتعيين مدير الإنتاج للإنتاج المستمر',
+      accountant: 'يقلل الضرائب ويشترط وجود 2 محاسبين لكل ترقية وتوسعة للشركة.',
+      lawyer: 'يحمي من الغرامات ويشترط وجود 2 محامين لكل ترقية وتوسعة للشركة.',
+      hr: 'يخفض تكاليف التعاقدات الجديدة ويدرب الكوادر ويرفع خبرتهم.',
+      worker: 'القوة التشغيلية للماكينات، يتطلب كل مستوى توسعة زيادة عدد العمال.',
+    };
+    const isCompanyRequired = staffRole === 'manager' || staffRole === 'cfo_payroll' || staffRole === 'worker' || staffRole === 'production_supervisor';
     const dailyPayroll = activeStaff.reduce((sum, member) => sum + member.dailySalary, 0);
     const nextPayDay = activeStaff.length > 0 ? Math.min(...activeStaff.map((member) => member.nextPayDay)) : profile.day + 1;
     const dueSoonCount = activeStaff.filter((member) => member.nextPayDay <= profile.day + 1).length;
@@ -278,7 +336,7 @@ export function SectionPage({ section, profile, country, focus, notificationThem
           <div className="staff-roster">
             {profile.staff.length === 0 ? <div className="staff-empty"><Icon name="user" size={34} /><strong>ابدأ بتكوين فريقك</strong><span>وظّف مديرًا أو محاسبًا ليساعدك على بناء إمبراطورية أقوى.</span></div> : profile.staff.slice().reverse().map((member, index) => <article className="staff-member-card" key={member.id}>
               <div className={`staff-avatar staff-avatar--${index % 4}`} aria-hidden="true">{employeeInitials(member.name)}</div>
-              <div className="staff-member-copy"><div className="staff-member-name-row"><h3>{member.name}</h3><span className={`staff-status-pill ${member.status === 'active' ? 'is-active' : 'is-ended'}`}><i />{member.status === 'active' ? 'نشط' : 'منتهٍ'}</span></div><span className={`staff-role-chip staff-role-chip--${member.role}`}><Icon name={member.role === 'manager' ? 'settings' : member.role === 'accountant' ? 'report' : member.role === 'lawyer' ? 'shield' : 'user'} size={13} />{roleLabels[member.role]}</span><p><Icon name="company" size={15} />{companyNameFor(member.companyId)}</p><div className="staff-level-row"><span>المستوى {formatNumber(staffLevel(member))}</span><small>{formatNumber(staffExperience(member))}% خبرة</small></div><div className="staff-level-track"><span style={{ width: `${staffLevel(member) >= 5 ? 100 : staffExperience(member)}%` }} /></div></div>
+              <div className="staff-member-copy"><div className="staff-member-name-row"><h3>{member.name}</h3><span className={`staff-status-pill ${member.status === 'active' ? 'is-active' : 'is-ended'}`}><i />{member.status === 'active' ? 'نشط' : 'منتهٍ'}</span></div><span className={`staff-role-chip staff-role-chip--${member.role}`}><Icon name={member.role === 'manager' ? 'settings' : member.role === 'accountant' ? 'report' : member.role === 'lawyer' ? 'shield' : 'user'} size={13} />{roleLabels[member.role] ?? member.role}</span><p><Icon name="company" size={15} />{companyNameFor(member.companyId)}</p><div className="staff-level-row"><span>المستوى {formatNumber(staffLevel(member))}</span><small>{formatNumber(staffExperience(member))}% خبرة</small></div><div className="staff-level-track"><span style={{ width: `${staffLevel(member) >= 5 ? 100 : staffExperience(member)}%` }} /></div></div>
               <div className="staff-member-salary"><span>الراتب اليومي</span><strong>{formatMoney(member.dailySalary, country)}</strong>{member.unpaidSalary ? <small className="staff-due-label">مستحق {formatMoney(member.unpaidSalary, country)}</small> : <small>التالي يوم {formatNumber(member.nextPayDay)}</small>}</div>
               <div className="staff-member-actions">{member.status === 'active' && <><button className="staff-more-button" type="button" aria-label={`إنهاء عقد ${member.name}`} onClick={() => runCommand({ name: 'terminate_staff', args: { staffId: member.id } }, (current) => terminateStaff(current, member.id))}>⋮</button>{staffLevel(member) < 5 && <button className="button button-secondary staff-upgrade-button" type="button" disabled={profile.bankBalance < getStaffUpgradeCost(member)} onClick={() => runCommand({ name: 'upgrade_staff', args: { staffId: member.id } }, (current) => upgradeStaff(current, member.id))}>ترقية · {formatMoney(getStaffUpgradeCost(member), country)}</button>}{member.unpaidSalary ? <button className="button button-primary staff-pay-button" type="button" disabled={profile.bankBalance < member.unpaidSalary} onClick={() => runCommand({ name: 'pay_staff_salary', args: { staffId: member.id } }, (current) => payStaffSalary(current, member.id))}>دفع المستحقات</button> : null}</>}</div>
             </article>)}
@@ -286,7 +344,7 @@ export function SectionPage({ section, profile, country, focus, notificationThem
 
           <button className="staff-hire-cta" type="button" onClick={() => setShowStaffHireForm((value) => !value)}><Icon name="plus" size={23} /><strong>{showStaffHireForm ? 'إغلاق نموذج التوظيف' : 'وظّف موظفًا'}</strong></button>
 
-          {showStaffHireForm && <form className="staff-hire-form" onSubmit={(event: FormEvent<HTMLFormElement>) => { event.preventDefault(); runCommand({ name: 'hire_staff', args: { role: staffRole, name: staffName, companyId: staffRole === 'manager' ? staffCompany : undefined } }, (current) => hireStaff(current, staffRole, staffName, staffRole === 'manager' ? staffCompany : undefined)); }}><div className="staff-form-heading"><div><strong>تعيين عضو جديد</strong><span>اختر الدور والاسم ثم وقّع العقد.</span></div><Icon name="briefcase" size={25} /></div><div className="economy-form-row"><div className="economy-field"><label htmlFor="staff-name">اسم الموظف</label><input id="staff-name" value={staffName} onChange={(event) => setStaffName(event.target.value)} placeholder="مثال: أحمد سالم" /></div><div className="economy-field"><label htmlFor="staff-role">الدور</label><select id="staff-role" value={staffRole} onChange={(event) => setStaffRole(event.target.value as StaffRole)}>{Object.entries(roleLabels).map(([role, label]) => <option value={role} key={role}>{label}</option>)}</select></div>{staffRole === 'manager' && <div className="economy-field"><label htmlFor="staff-company">الشركة</label><select id="staff-company" value={staffCompany} onChange={(event) => setStaffCompany(event.target.value)}><option value="">اختر شركة</option>{profile.companies.map((company) => <option value={company.id} key={company.id}>{company.name}</option>)}</select></div>}</div><button className="button button-primary" type="submit" disabled={staffName.trim().length < 2 || (staffRole === 'manager' && !staffCompany)}>توقيع العقد ودفع يوم التعاقد</button></form>}
+          {showStaffHireForm && <form className="staff-hire-form" onSubmit={(event: FormEvent<HTMLFormElement>) => { event.preventDefault(); runCommand({ name: 'hire_staff', args: { role: staffRole, name: staffName, companyId: isCompanyRequired ? staffCompany : undefined } }, (current) => hireStaff(current, staffRole, staffName, isCompanyRequired ? staffCompany : undefined)); }}><div className="staff-form-heading"><div><strong>تعيين عضو جديد</strong><span>اختر الدور والاسم ثم وقّع العقد.</span></div><Icon name="briefcase" size={25} /></div><div className="economy-form-row"><div className="economy-field"><label htmlFor="staff-name">اسم الموظف</label><input id="staff-name" value={staffName} onChange={(event) => setStaffName(event.target.value)} placeholder="مثال: أحمد سالم" /></div><div className="economy-field"><label htmlFor="staff-role">الدور</label><select id="staff-role" value={staffRole} onChange={(event) => setStaffRole(event.target.value as StaffRole)}>{Object.entries(roleLabels).map(([role, label]) => <option value={role} key={role}>{label}</option>)}</select><small className="text-amber-400 block mt-1 text-[11px] font-semibold">{roleDescriptions[staffRole]}</small></div>{isCompanyRequired && <div className="economy-field"><label htmlFor="staff-company">الشركة التابعة</label><select id="staff-company" value={staffCompany} onChange={(event) => setStaffCompany(event.target.value)}><option value="">اختر صرح الشركة</option>{profile.companies.map((company) => <option value={company.id} key={company.id}>{company.name}</option>)}</select></div>}</div><button className="button button-primary" type="submit" disabled={staffName.trim().length < 2 || (isCompanyRequired && !staffCompany)}>توقيع العقد ودفع مقدم التعاقد</button></form>}
 
           <div className="staff-payroll-summary"><div className="staff-payroll-copy"><span className="staff-summary-icon"><Icon name="tasks" size={27} /></span><div><strong>الرواتب القادمة</strong><small>تستحق خلال {formatNumber(Math.max(1, nextPayDay - profile.day))} يوم</small></div></div><div className="staff-payroll-total"><strong>{formatMoney(dailyPayroll, country)}</strong><small>إجمالي الرواتب اليومية</small></div><div className="staff-payroll-track"><span style={{ width: `${activeStaff.length ? Math.min(100, Math.round((dueSoonCount / activeStaff.length) * 100)) : 0}%` }} /></div><small className="staff-payroll-foot">{formatNumber(dueSoonCount)}/{formatNumber(activeStaff.length)} موظف</small></div>
           <div className="staff-mini-stats"><div><Icon name="user" size={27} /><strong>{formatNumber(activeStaff.length)}</strong><span>إجمالي الموظفين</span></div><div><Icon name="investment" size={27} /><strong>{activeStaff.length ? `${Math.round((activeStaff.filter((member) => member.status === 'active').length / activeStaff.length) * 100)}%` : '0%'}</strong><span>معدل النشاط</span></div></div>
@@ -299,69 +357,227 @@ export function SectionPage({ section, profile, country, focus, notificationThem
   if (section.id === 'auctions') {
     const listings = selectAvailableAuctions(profile);
     const selectedAuction = selectedAuctionId ? listings.find((listing) => listing.id === selectedAuctionId) : undefined;
-    return <div className="section-page">{heading}{pageShell(
-      <>
-        <div className="economy-grid economy-grid--three-mobile">
-          <EconomyStat label="الأراضي المملوكة" value={formatNumber(profile.lands.length)} />
-          <EconomyStat label="المتاح بالمزادات" value={formatNumber(listings.length)} />
-          <EconomyStat label="ميزانية البنك" value={formatMoney(profile.bankBalance, country)} />
+    
+    // Filter listings based on auctionCategoryTab state
+    const filteredListings = listings.filter((listing) => {
+      if (auctionCategoryTab === 'land') return listing.lotType === 'land';
+      if (auctionCategoryTab === 'factory') return listing.lotType === 'factory';
+      if (auctionCategoryTab === 'material') return listing.lotType === 'raw-material';
+      return true;
+    });
+
+    return (
+      <div className="section-page auctions-view-page">
+        {/* Auctions Hero Banner */}
+        <div className="auctions-hero-banner">
+          <div className="auctions-hero-gavel">🔨</div>
+          <h1>المزادات</h1>
+          <p>فرص جديدة لتوسيع إمبراطوريتك.</p>
         </div>
-        <SectionPanel id="auctions-list" title="مزادات الأراضي والمصانع والمواد الخام" description="قدّم عرضًا وتنافس مع شخصيات داخل اللعبة. يُخصم المبلغ فقط عند فوزك.">
-          {listings.length === 0 ? <EconomyEmpty title="لا توجد مزادات متاحة" message="عد لاحقًا لمتابعة الفرص الجديدة." /> : <div className="economy-list">
-            {listings.map((listing, index) => {
-              const recommended = listing.minimumBid + listing.bidIncrement * 3;
-              const value = bidAmounts[listing.id] ?? String(recommended);
-              const material = MATERIAL_CATALOG.find((item) => item.id === listing.materialId);
-              const closeAt = getAuctionCloseAt(profile, listing);
-              const listingHistory = profile.auctionHistory.filter((bid) => bid.listingId === listing.id);
-              const highestBid = listingHistory.reduce((highest, bid) => Math.max(highest, bid.amount), 0);
-              const bidHistory = listingHistory.slice(-3).reverse();
-              const lotSummary = listing.lotType === 'land'
-                ? `${formatNumber(listing.areaSquareMeters)} م² · أرض ${landTypeNames[listing.landType]}`
-                : listing.lotType === 'factory'
-                  ? `توسعة طاقة مصنع بمقدار ${formatNumber(listing.energyCapacityBonus ?? 0)} وحدة`
-                  : `شحنة ${formatNumber(listing.quantity ?? 0)} ${material?.unit ?? 'وحدة'} من ${material?.name ?? 'مواد خام'}`;
-              const canBuyLot = listing.lotType !== 'factory' || profile.companies.length > 0;
-              return <article className="economy-card" key={listing.id}>
-                <div className="economy-card-head">
-                  <div className="economy-card-title"><span className="economy-card-icon"><Icon name={listing.lotType === 'land' ? 'land' : listing.lotType === 'factory' ? 'factory' : 'warehouse'} size={19} /></span><span><strong>{listing.label}</strong><small>{lotSummary}</small></span></div>
-                  <span className="economy-price">{formatMoney(listing.minimumBid, country)}</span>
-                </div>
-                <div className="economy-card-body">
-                  <div className="economy-meta"><span>الحد الأدنى للعرض {formatMoney(listing.minimumBid, country)}</span><span>أعلى عرض حالي {highestBid > 0 ? formatMoney(highestBid, country) : 'لا يوجد'}</span><span>الزيادة {formatMoney(listing.bidIncrement, country)}</span><span className="economy-pill economy-pill--gold">الإغلاق خلال {formatAuctionCountdown(closeAt)}</span></div>
-                  {bidHistory.length > 0 && <div className="economy-inline-note">آخر المنافسات: {bidHistory.map((bid) => `${bid.bidder === 'player' ? 'أنت' : 'منافس'} ${formatMoney(bid.amount, country)}`).join(' · ')}</div>}
-                  <div className="economy-form">
-                    <div className="economy-form-row"><div className="economy-field"><label>عرض آمن مقترح</label><input value={formatMoney(recommended, country)} readOnly /></div><div className="economy-field"><label>نظام الجلسة</label><input value="منافسان آليان" readOnly /></div></div>
-                    {!canBuyLot && <div className="economy-alert"><Icon name="shield" size={16} />أسس شركة أولًا حتى تربط بها المصنع الفائز.</div>}
-                    <button className="button button-primary" type="button" disabled={!canBuyLot || profile.bankBalance < listing.minimumBid} onClick={() => { setBidAmounts((previous) => ({ ...previous, [listing.id]: String(recommended) })); setSelectedAuctionId(listing.id); }}><Icon name="gavel" size={16} /> استخدام العرض الآمن وفتح الطاولة</button>
+
+        {/* Category Segment Tabs */}
+        <div className="auctions-category-tabs" role="tablist">
+          <button
+            type="button"
+            className={`auction-tab-btn ${auctionCategoryTab === 'land' ? 'is-active' : ''}`}
+            onClick={() => setAuctionCategoryTab('land')}
+          >
+            <Icon name="land" size={18} /> أراضي
+          </button>
+          <button
+            type="button"
+            className={`auction-tab-btn ${auctionCategoryTab === 'factory' ? 'is-active' : ''}`}
+            onClick={() => setAuctionCategoryTab('factory')}
+          >
+            <Icon name="factory" size={18} /> مصانع
+          </button>
+          <button
+            type="button"
+            className={`auction-tab-btn ${auctionCategoryTab === 'material' ? 'is-active' : ''}`}
+            onClick={() => setAuctionCategoryTab('material')}
+          >
+            <Icon name="warehouse" size={18} /> مواد خام
+          </button>
+        </div>
+
+        {/* Fair Bidding Guarantee Banner */}
+        <div className="auctions-fair-banner">
+          <div className="fair-banner-icon">⚖️</div>
+          <div className="fair-banner-text">
+            <h3>مزايدة عادلة وواضحة</h3>
+            <p>جميع المزادات شفافة وبأفضل الفرص للجميع.</p>
+          </div>
+          <div className="fair-banner-gavel">🔨</div>
+        </div>
+
+        {/* Auction Items Cards List */}
+        <div className="auctions-items-list">
+          {/* Static Mock Items matching the design image + Dynamic items */}
+          <article className="auction-item-card">
+            <ItemImage type="land" landType="agricultural" name="أرض زراعية" size="md" className="auction-card-thumb-wrap" />
+            <div className="auction-card-body">
+              <div className="auction-card-top">
+                <h3>أرض زراعية</h3>
+                <span className="auction-location">📍 المنطقة الشرقية</span>
+              </div>
+              <p className="auction-desc">موقع متميز مناسب للمحاصيل الزراعية.</p>
+              <div className="auction-card-footer">
+                <div className="auction-meta-info">
+                  <div>
+                    <small>أقل مزايدة</small>
+                    <strong>💰 1,200,000 {country.currency.code}</strong>
+                  </div>
+                  <div>
+                    <small>الوقت المتبقي</small>
+                    <strong className="auction-time-text">⏰ 2س 15د</strong>
                   </div>
                 </div>
-              </article>;
-            })}
-          </div>}
-        </SectionPanel>
-        <SectionPanel title="شراء مباشر من السوق" description="عروض أراضٍ وشركات يطرحها التطبيق مباشرة. يمكنك الشراء فورًا دون انتظار مزاد، وتختفي السلعة من قائمتك بعد الشراء.">
-          <div className="economy-list">
-            {DIRECT_LAND_CATALOG.filter((listing) => listing.id !== 'starter-village-land' && !profile.lands.some((land) => land.id === listing.id)).map((listing) => <article className="economy-card economy-card--soft" key={listing.id}><div className="economy-card-head"><div className="economy-card-title"><span className="economy-card-icon"><Icon name="land" size={18} /></span><span><strong>{listing.label}</strong><small>{formatNumber(listing.areaSquareMeters)} م² · أرض {landTypeNames[listing.landType]}</small></span></div><span className="economy-price">{formatMoney(listing.price, country)}</span></div><PurchaseOptions country={country} cashPrice={listing.price} bankBalance={profile.bankBalance} diamondsBalance={profile.diamonds} onPurchase={(paymentMethod) => runCommand({ name: 'buy_direct_land', args: { listingId: listing.id, paymentMethod } }, (current) => buyDirectLand(current, listing.id, paymentMethod))} /></article>)}
-            {DIRECT_COMPANY_CATALOG.filter((listing) => !profile.companies.some((company) => company.id === listing.id)).map((listing) => { const industry = INDUSTRY_CATALOG.find((item) => item.id === listing.industryId); return <article className="economy-card economy-card--soft" key={listing.id}><div className="economy-card-head"><div className="economy-card-title"><span className="economy-card-icon"><Icon name="factory" size={18} /></span><span><strong>{listing.name}</strong><small>{industry?.name ?? listing.industryId} · شركة مع أرض وتجهيز أولي</small></span></div><span className="economy-price">{formatMoney(listing.price, country)}</span></div><PurchaseOptions country={country} cashPrice={listing.price} bankBalance={profile.bankBalance} diamondsBalance={profile.diamonds} onPurchase={(paymentMethod) => runCommand({ name: 'buy_direct_company', args: { listingId: listing.id, paymentMethod } }, (current) => buyDirectCompany(current, listing.id, paymentMethod))} /></article>; })}
-          </div>
-        </SectionPanel>
-        <SectionPanel title="بيع الأصول" description="يمكنك تصفية الأرض أو الشركة أو أي أصل متحرك. سعر التصفية يساوي 50% من القيمة المسجلة، والأرض المرتبطة بشركة تُباع مع الشركة.">
-          <div className="economy-list">
-            {profile.companies.map((company) => { const industry = INDUSTRY_CATALOG.find((item) => item.id === company.industryId); const land = company.landId ? profile.lands.find((item) => item.id === company.landId) : undefined; const value = (industry?.setupFee ?? 0) + (industry?.licenseFee ?? 0) + (land?.purchasePrice ?? 0); return <article className="economy-card economy-card--soft" key={`sell-company-${company.id}`}><div className="economy-card-head"><div className="economy-card-title"><span className="economy-card-icon"><Icon name="factory" size={18} /></span><span><strong>{company.name}</strong><small>قيمة تقديرية {formatMoney(value, country)} · عائد التصفية {formatMoney(Math.floor(value * 0.5), country)}</small></span></div><button className="button button-secondary" type="button" onClick={() => { if (window.confirm(`هل تريد تأكيد بيع الشركة ${company.name}؟ سيعود إليك ${formatMoney(Math.floor(value * 0.5), country)}.`)) runCommand({ name: 'sell_company', args: { companyId: company.id } }, (current) => sellCompany(current, company.id)); }}>بيع الشركة</button></div></article>; })}
-            {profile.lands.filter((land) => !profile.companies.some((company) => company.landId === land.id)).map((land) => <article className="economy-card economy-card--soft" key={`sell-land-${land.id}`}><div className="economy-card-head"><div className="economy-card-title"><span className="economy-card-icon"><Icon name="land" size={18} /></span><span><strong>{land.label}</strong><small>قيمة الشراء {formatMoney(land.purchasePrice, country)} · التصفية {formatMoney(Math.floor(land.purchasePrice * 0.5), country)}</small></span></div><button className="button button-secondary" type="button" onClick={() => { if (window.confirm(`هل تريد بيع ${land.label} مقابل ${formatMoney(Math.floor(land.purchasePrice * 0.5), country)}؟`)) runCommand({ name: 'sell_land', args: { landId: land.id } }, (current) => sellLand(current, land.id)); }}>بيع الأرض</button></div></article>)}
-            {profile.assets.map((asset) => <article className="economy-card economy-card--soft" key={`sell-asset-${asset.id}`}><div className="economy-card-head"><div className="economy-card-title"><span className="economy-card-icon"><Icon name="briefcase" size={18} /></span><span><strong>{asset.label}</strong><small>قيمة الأصل {formatMoney(asset.value, country)} · التصفية {formatMoney(Math.floor(asset.value * 0.5), country)}</small></span></div><button className="button button-secondary" type="button" onClick={() => { if (window.confirm(`هل تريد تأكيد بيع ${asset.label}؟ سيعود إليك ${formatMoney(Math.floor(asset.value * 0.5), country)}.`)) runCommand({ name: 'sell_asset', args: { assetId: asset.id } }, (current) => sellAsset(current, asset.id)); }}>بيع الأصل</button></div></article>)}
-            {profile.companies.length === 0 && profile.lands.length === 0 && profile.assets.length === 0 && <EconomyEmpty title="لا توجد أصول للبيع" message="اشترِ أرضًا أو شركة أو أصلًا من المزادات أولًا." />}
-          </div>
-        </SectionPanel>
-        <SectionPanel title="سجل المنافسة" description="آخر العروض المسجلة داخل المزادات المحلية دون كشف سقف العروض المنافسة.">
-          {profile.auctionHistory.length === 0 ? <EconomyEmpty title="لا توجد منافسات مسجلة" message="ستظهر عروضك والمنافسات بعد أول عرض ناجح." /> : <div className="economy-table-wrap"><table className="economy-table"><thead><tr><th>المزاد</th><th>المنافس</th><th>العرض</th><th>اليوم</th></tr></thead><tbody>{profile.auctionHistory.slice().reverse().slice(0, 12).map((bid) => <tr key={bid.id}><td><strong>{AUCTION_CATALOG.find((item) => bid.listingId.startsWith(item.id))?.label ?? bid.listingId}</strong></td><td>{bid.bidder === 'player' ? 'أنت' : 'منافس'}</td><td>{formatMoney(bid.amount, country)}</td><td>{formatNumber(bid.day)}</td></tr>)}</tbody></table></div>}
-        </SectionPanel>
-        <SectionPanel title="سجل الملكيات" description="تظهر هنا الأراضي التي فزت بها فعليًا.">
-          {profile.lands.length === 0 ? <EconomyEmpty title="لا توجد أراضٍ مملوكة بعد" message="افتح مزادًا وقدّم عرضًا لتسجيل أول أصل عقاري." /> : <div className="economy-list">{profile.lands.map((land) => <article className="economy-card economy-card--soft" key={land.id}><div className="economy-card-head"><div className="economy-card-title"><span className="economy-card-icon"><Icon name="land" size={18} /></span><span><strong>{land.label}</strong><small>{formatNumber(land.areaSquareMeters)} م² · {land.landType ? landTypeNames[land.landType] : 'أرض'}</small></span></div><span className="economy-price">{formatMoney(land.purchasePrice, country)}</span></div></article>)}</div>}
-        </SectionPanel>
-      </>,
-    )}{selectedAuction && <AuctionRoom profile={profile} country={country} listing={selectedAuction} initialBid={Number(bidAmounts[selectedAuction.id]) || undefined} onClose={() => setSelectedAuctionId(null)} onBid={(amount, targetCompanyId) => { const result = placeBid(profile, selectedAuction.id, amount, targetCompanyId); onAction(result); if (result.ok) setSelectedAuctionId(null); return result; }} />}</div>;
+                <button
+                  type="button"
+                  className="auction-enter-btn"
+                  onClick={() => {
+                    const found = listings.find((item) => item.lotType === 'land') ?? listings[0];
+                    if (found) setSelectedAuctionId(found.id);
+                  }}
+                >
+                  ادخل المزاد 🔨
+                </button>
+              </div>
+            </div>
+          </article>
+
+          <article className="auction-item-card">
+            <ItemImage type="industry" id="electricity" name="مصنع طاقة" size="md" className="auction-card-thumb-wrap" />
+            <div className="auction-card-body">
+              <div className="auction-card-top">
+                <h3>مصنع طاقة</h3>
+                <span className="auction-location">📍 المنطقة الشمالية</span>
+              </div>
+              <p className="auction-desc">محطة طاقة حديثة جاهزة للتشغيل.</p>
+              <div className="auction-card-footer">
+                <div className="auction-meta-info">
+                  <div>
+                    <small>أقل مزايدة</small>
+                    <strong>💰 3,500,000 {country.currency.code}</strong>
+                  </div>
+                  <div>
+                    <small>الوقت المتبقي</small>
+                    <strong className="auction-time-text">⏰ 5س 40د</strong>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className="auction-enter-btn"
+                  onClick={() => {
+                    const found = listings.find((item) => item.lotType === 'factory') ?? listings[0];
+                    if (found) setSelectedAuctionId(found.id);
+                  }}
+                >
+                  ادخل المزاد 🔨
+                </button>
+              </div>
+            </div>
+          </article>
+
+          <article className="auction-item-card">
+            <ItemImage type="material" id="steel" name="شحنة فولاذ" size="md" className="auction-card-thumb-wrap" />
+            <div className="auction-card-body">
+              <div className="auction-card-top">
+                <h3>شحنة فولاذ</h3>
+                <span className="auction-location">📍 ميناء العاصمة</span>
+              </div>
+              <p className="auction-desc">كمية كبيرة عالية الجودة.</p>
+              <div className="auction-card-footer">
+                <div className="auction-meta-info">
+                  <div>
+                    <small>أقل مزايدة</small>
+                    <strong>💰 850,000 {country.currency.code}</strong>
+                  </div>
+                  <div>
+                    <small>الوقت المتبقي</small>
+                    <strong className="auction-time-text">⏰ 1س 30د</strong>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className="auction-enter-btn"
+                  onClick={() => {
+                    const found = listings.find((item) => item.lotType === 'raw-material') ?? listings[0];
+                    if (found) setSelectedAuctionId(found.id);
+                  }}
+                >
+                  ادخل المزاد 🔨
+                </button>
+              </div>
+            </div>
+          </article>
+
+          {/* Dynamic Listings */}
+          {filteredListings.map((listing) => {
+            const material = MATERIAL_CATALOG.find((item) => item.id === listing.materialId);
+            const closeAt = getAuctionCloseAt(profile, listing);
+            const lotSummary = listing.lotType === 'land'
+              ? `${formatNumber(listing.areaSquareMeters)} م² · أرض ${landTypeNames[listing.landType]}`
+              : listing.lotType === 'factory'
+                ? `توسعة طاقة مصنع بمقدار ${formatNumber(listing.energyCapacityBonus ?? 0)} وحدة`
+                : `شحنة ${formatNumber(listing.quantity ?? 0)} ${material?.unit ?? 'وحدة'} من ${material?.name ?? 'مواد خام'}`;
+
+            return (
+              <article className="auction-item-card" key={listing.id}>
+                <div className={`auction-card-thumb auction-thumb--${listing.lotType}`}>
+                  <span className={`auction-tag-badge auction-tag--${listing.lotType}`}>
+                    {listing.lotType === 'land' ? 'أراضي' : listing.lotType === 'factory' ? 'مصانع' : 'مواد خام'}
+                  </span>
+                </div>
+                <div className="auction-card-body">
+                  <div className="auction-card-top">
+                    <h3>{listing.label}</h3>
+                    <span className="auction-location">📍 {listing.lotType === 'land' ? 'منطقة توسعة' : 'مركز لوجستي'}</span>
+                  </div>
+                  <p className="auction-desc">{lotSummary}</p>
+                  <div className="auction-card-footer">
+                    <div className="auction-meta-info">
+                      <div>
+                        <small>أقل مزايدة</small>
+                        <strong>💰 {formatMoney(listing.minimumBid, country)}</strong>
+                      </div>
+                      <div>
+                        <small>الوقت المتبقي</small>
+                        <strong className="auction-time-text">⏰ {formatAuctionCountdown(closeAt)}</strong>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      className="auction-enter-btn"
+                      onClick={() => setSelectedAuctionId(listing.id)}
+                    >
+                      ادخل المزاد 🔨
+                    </button>
+                  </div>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+
+        {/* Live Bidding Modal Room */}
+        {selectedAuction && (
+          <AuctionRoom
+            profile={profile}
+            country={country}
+            listing={selectedAuction}
+            initialBid={Number(bidAmounts[selectedAuction.id]) || undefined}
+            onClose={() => setSelectedAuctionId(null)}
+            onBid={(amount, targetCompanyId) => {
+              const result = placeBid(profile, selectedAuction.id, amount, targetCompanyId);
+              onAction(result);
+              if (result.ok) setSelectedAuctionId(null);
+              return result;
+            }}
+          />
+        )}
+      </div>
+    );
   }
 
   if (section.id === 'lands') {
@@ -389,47 +605,24 @@ export function SectionPage({ section, profile, country, focus, notificationThem
   }
 
   if (section.id === 'companies') {
-    const industry = INDUSTRY_CATALOG.find((item) => item.id === industryId) ?? INDUSTRY_CATALOG[0];
-    const usedLandIds = new Set(profile.companies.map((company) => company.landId).filter(Boolean));
-    const eligibleLands = profile.lands.filter((land) => !usedLandIds.has(land.id) && (land.availableForCompanyOnDay ?? land.acquiredOnDay ?? 1) <= profile.day && (!land.landType || land.landType === industry.requiredLandType));
-    const pendingLandCount = profile.lands.filter((land) => !usedLandIds.has(land.id) && (land.availableForCompanyOnDay ?? land.acquiredOnDay ?? 1) > profile.day).length;
-    const selectedLandId = eligibleLands.some((land) => land.id === landId) ? landId : eligibleLands[0]?.id ?? '';
-    const setupFee = country.economy.companySetupFee ?? industry.setupFee;
-    const licenseFee = country.economy.licenseFeesByIndustry[industry.id] ?? industry.licenseFee;
-    return <div className="section-page">{heading}{pageShell(
-      <>
-        <div className="economy-grid economy-grid--three-mobile"><EconomyStat label="الشركات" value={formatNumber(profile.companies.length)} /><EconomyStat label="تكلفة تأسيس القطاع" value={formatMoney(setupFee + licenseFee, country)} /><EconomyStat label="الأرض المتاحة" value={formatNumber(eligibleLands.length)} /></div>
-        <div className="economy-layout">
-          <SectionPanel title="تأسيس شركة" description="اختر قطاعًا، واسمًا، وأرضًا مناسبة. تُخصم رسوم التأسيس والترخيص عند نجاح العملية.">
-            {profile.lands.length === 0 ? <div className="economy-list"><EconomyEmpty title="تحتاج إلى أرض أولًا" message="اشترِ أرضًا من المزادات؛ بعدها يمكنك تأسيس شركة وتشغيل مصنعها." /><button className="button button-primary" type="button" onClick={onHome}>عرض ملخص الإمبراطورية</button></div> : <div className="economy-form">
-              <div className="economy-field"><label htmlFor="industry-select">القطاع الاقتصادي</label><select id="industry-select" value={industry.id} onChange={(event) => setIndustryId(event.target.value as IndustryId)}>{INDUSTRY_CATALOG.map((item) => <option value={item.id} key={item.id}>{item.name} · {formatMoney((country.economy.companySetupFee ?? item.setupFee) + (country.economy.licenseFeesByIndustry[item.id] ?? item.licenseFee), country)}</option>)}</select></div>
-              <div className="economy-field"><label htmlFor="company-name">اسم الشركة</label><input id="company-name" value={companyName} maxLength={36} onChange={(event) => setCompanyName(event.target.value)} /></div>
-              <div className="economy-field"><label htmlFor="land-select">الأرض المناسبة ({landTypeNames[industry.requiredLandType]})</label><select id="land-select" value={selectedLandId} onChange={(event) => setLandId(event.target.value)} disabled={eligibleLands.length === 0}><option value="">اختر أرضًا</option>{eligibleLands.map((land) => <option key={land.id} value={land.id}>{land.label} · {formatNumber(land.areaSquareMeters)} م²</option>)}</select></div>
-              <div className="economy-meta"><span>رسوم تأسيس {formatMoney(setupFee, country)}</span><span>ترخيص {formatMoney(licenseFee, country)}</span><span>تشغيل يومي {formatMoney(industry.dailyOperatingCost, country)}</span></div>
-              {eligibleLands.length === 0 && <div className="economy-alert"><Icon name="shield" size={16} />{pendingLandCount > 0 ? `توجد ${formatNumber(pendingLandCount)} أرض قيد إنهاء عقود نقل الملكية؛ ستكون متاحة بعد يوم داخل اللعبة.` : `لا تملك أرضًا من النوع المناسب لهذا النشاط؛ اشترِ موقعًا ${landTypeNames[industry.requiredLandType]}.`}</div>}
-              <PurchaseOptions country={country} cashPrice={setupFee + licenseFee} bankBalance={profile.bankBalance} diamondsBalance={profile.diamonds} disabled={!selectedLandId || companyName.trim().length < 1} cashLabel="تأسيس الشركة نقدًا" onPurchase={(paymentMethod) => runCommand({ name: 'found_company', args: { industryId: industry.id, landId: selectedLandId, name: companyName, paymentMethod } }, (current) => foundCompany(current, industry.id, selectedLandId, companyName, paymentMethod))} />
-            </div>}
-          </SectionPanel>
-          <SectionPanel title="شركاتك القائمة" description="الطاقة والمصروفات تتحدث مع تقدم الأيام.">
-            {profile.companies.length === 0 ? <EconomyEmpty title="لم تؤسس شركة بعد" message="ابدأ بشراء أرض مناسبة ثم أكمل نموذج التأسيس." /> : <div className="economy-list">{profile.companies.map((company) => {
-              const definition = INDUSTRY_CATALOG.find((item) => item.id === company.industryId);
-              const land = profile.lands.find((item) => item.id === company.landId);
-              const level = company.upgradeLevel ?? 1;
-              const upgradeCost = Math.round(120_000 * Math.pow(1.55, level - 1));
-              const completedBatches = profile.productionOrders.filter((order) => order.companyId === company.id && order.status === 'completed').reduce((sum, order) => sum + order.batches, 0);
-              const requiredBatches = level * 2;
-              const canUpgrade = level < 5 && completedBatches >= requiredBatches;
-              const staff = profile.staff.filter((member) => member.companyId === company.id && member.status === 'active');
-              const activeOrders = profile.productionOrders.filter((order) => order.companyId === company.id && order.status === 'active');
-              const completedOutput = profile.productionOrders.filter((order) => order.companyId === company.id && order.status === 'completed').reduce((sum, order) => sum + order.outputQuantity, 0);
-              const companyReport = selectCompanyPerformance(profile, company.id);
-              const isExpanded = expandedCompanyId === company.id;
-              return <article className={`economy-card asset-detail-card${isExpanded ? ' asset-detail-card--expanded' : ''}`} key={company.id}><button className="asset-detail-trigger" type="button" aria-expanded={isExpanded} onClick={() => setExpandedCompanyId(isExpanded ? null : company.id)}><span className="economy-card-title"><span className="economy-card-icon"><Icon name="factory" size={19} /></span><span><strong>{company.name}</strong><small>{definition?.name ?? company.industryId} · {land?.label ?? 'دون أرض مسجلة'}</small></span></span><span className="economy-pill economy-pill--green">مستوى {formatNumber(level)}</span></button><div className="economy-card-body"><div className="economy-meta"><span>طاقة {formatNumber(company.energyUnits ?? 0)} / {formatNumber(company.energyCapacity ?? definition?.energyCapacity ?? 0)}</span><span>تشغيل يومي {formatMoney(company.operatingCostPerDay ?? 0, country)}</span><span>الإنتاج {formatNumber(completedBatches)} / {formatNumber(requiredBatches)} دفعات</span></div><div className="economy-progress"><span style={{ width: `${Math.min(100, 100 * (company.energyUnits ?? 0) / Math.max(1, company.energyCapacity ?? 1))}%` }} /></div>{isExpanded && <div className="asset-detail-body"><div className="asset-detail-grid"><div><strong>{formatNumber(staff.length)}</strong><small>موظفون نشطون</small></div><div><strong>{formatNumber(activeOrders.length)}</strong><small>أوامر إنتاج نشطة</small></div><div><strong>{formatNumber(completedOutput)}</strong><small>وحدة مكتملة</small></div><div><strong>{formatNumber(company.maintenanceCondition ?? 100)}%</strong><small>حالة المصنع</small></div></div><div className="company-report-strip"><span>تكلفة الإنتاج <b>{formatMoney(companyReport.productionCost, country)}</b></span><span>رواتب يومية <b>{formatMoney(companyReport.payroll, country)}</b></span><span>تكلفة يومية <b>{formatMoney(companyReport.dailyOperatingCost + companyReport.payroll, country)}</b></span><span>جودة متوسطة <b>{formatNumber(Math.round(companyReport.quality))}%</b></span></div><div className="economy-meta"><span>الأرض: {land?.label ?? 'غير مسجلة'}</span><span>القطاع: {definition?.name ?? company.industryId}</span><span>التطوير التالي {level < 5 ? formatMoney(upgradeCost, country) : 'مكتمل'}</span></div>{activeOrders.length > 0 && <div className="asset-detail-list">{activeOrders.slice(0, 3).map((order) => <span key={order.id}><Icon name="play" size={13} />{order.productName} · {formatNumber(order.outputQuantity)} وحدة · يوم {formatNumber(order.completesOnDay)}</span>)}</div>}</div>}{level >= 5 ? <p className="economy-meta">وصلت الشركة إلى أعلى مستوى.</p> : completedBatches < requiredBatches ? <p className="economy-meta">أكمل {formatNumber(requiredBatches - completedBatches)} دفعات إنتاج قبل التطوير.</p> : <PurchaseOptions country={country} cashPrice={upgradeCost} bankBalance={profile.bankBalance} diamondsBalance={profile.diamonds} disabled={!canUpgrade} cashLabel="تطوير الشركة نقدًا" onPurchase={(paymentMethod) => runCommand({ name: 'upgrade_company', args: { companyId: company.id, paymentMethod } }, (current) => upgradeCompany(current, company.id, paymentMethod))} />}</div></article>;
-            })}</div>}
-          </SectionPanel>
-        </div>
-      </>,
-    )}</div>;
+    return (
+      <div className="section-page companies-empire-view-page">
+        <CompaniesEmpireHub
+          profile={profile}
+          country={country}
+          onNavigate={onNavigate}
+          onUpdateProfile={(updater) => {
+            if (onUpdateProfile) {
+              onUpdateProfile(updater);
+            } else {
+              const next = updater(profile);
+              onAction({ ok: true, profile: next, message: 'تم تحديث الإمبراطورية', data: undefined });
+            }
+          }}
+          onNotice={onNotice}
+        />
+      </div>
+    );
   }
 
   if (section.id === 'production') {
@@ -454,22 +647,38 @@ export function SectionPage({ section, profile, country, focus, notificationThem
     return <div className="section-page">{heading}{pageShell(
       <>
         <div className="economy-grid economy-grid--four-mobile production-overview"><EconomyStat label="المصانع" value={formatNumber(profile.companies.length)} /><EconomyStat label="أوامر نشطة" value={formatNumber(activeProductionCount)} /><EconomyStat label="أوامر مكتملة" value={formatNumber(completedProductionCount)} /><EconomyStat label="الطاقة المتاحة" value={`${formatNumber(totalEnergy)} / ${formatNumber(totalEnergyCapacity)}`} /></div>
-        <SectionPanel title="خطوط الإنتاج" description="ابدأ أمرًا يحجز المواد والطاقة، ثم يستلم المنتج عند اكتماله في يوم لاحق.">
+        <SectionPanel
+          title="خطوط الإنتاج"
+          icon="factory"
+          badge={<span className="economy-pill economy-pill--green">🟢 {formatNumber(profile.companies.length)} مصنع نشط</span>}
+          description="ابدأ أمرًا يحجز المواد والطاقة، ثم يستلم المنتج عند اكتماله في يوم لاحق."
+        >
           {profile.companies.length === 0 ? <EconomyEmpty title="لا توجد مصانع عاملة" message="أسس شركة أولًا؛ يتضمن ترخيصها خط إنتاج للقطاع الذي اخترته." /> : <div className="economy-layout">
             {companyTransferPending && <div className="economy-alert"><Icon name="clock" size={16} /> يجري إنهاء عقود نقل الملكية؛ يبدأ تشغيل هذه الشركة في اليوم {formatNumber(selectedCompany?.operationalFromDay ?? profile.day)}.</div>}<form className="economy-form" onSubmit={(event: FormEvent<HTMLFormElement>) => { event.preventDefault(); if (selectedCompany) runCommand({ name: 'run_production', args: { companyId: selectedCompany.id, batches: Number(productionBatches) } }, (current) => runProduction(current, selectedCompany.id, Number(productionBatches))); }}>
               <div className="economy-field"><label htmlFor="factory-select">الشركة / المصنع</label><select id="factory-select" value={selectedCompany?.id ?? ''} onChange={(event) => setCompanyId(event.target.value)}>{profile.companies.map((company) => <option key={company.id} value={company.id}>{company.name} · {INDUSTRY_CATALOG.find((item) => item.id === company.industryId)?.name}</option>)}</select></div>
               <div className="economy-field"><label htmlFor="production-batches">دفعات الإنتاج</label><input id="production-batches" type="number" min="1" max="100" step="1" value={productionBatches} onChange={(event) => setProductionBatches(event.target.value)} /></div>
               <button className="button button-primary" type="submit" disabled={!recipe || companyTransferPending}><Icon name="play" size={16} /> بدء أمر الإنتاج</button>
             </form>
-            {recipe && selectedCompany ? <div className="economy-card economy-card--soft"><div className="economy-card-head"><div className="economy-card-title"><span className="economy-card-icon"><Icon name="factory" size={18} /></span><span><strong>{recipe.productName}</strong><small>{formatNumber(estimatedOutput)} {recipe.outputUnit} متوقعة · {formatNumber(estimatedDuration)} يوم</small></span></div><span className="economy-pill economy-pill--gold">{formatNumber(selectedCompany.energyUnits ?? 0)} طاقة</span></div><div className="economy-card-body"><p className="economy-card-description">متطلبات الدفعة: {recipe.inputs.map((input) => `${input.quantity} ${MATERIAL_CATALOG.find((material) => material.id === input.materialId)?.unit ?? ''} ${MATERIAL_CATALOG.find((material) => material.id === input.materialId)?.name ?? input.materialId}`).join('، ')}. هذه معاينة قبل حجز السيولة والمخزون.</p><div className="economy-meta">{recipe.inputs.map((input) => { const material = MATERIAL_CATALOG.find((item) => item.id === input.materialId); const lot = profile.inventory.find((item) => item.materialOrProductId === input.materialId); return <span key={input.materialId}>{material?.name}: {formatNumber(lot?.quantity ?? 0)} / {input.quantity} لكل دفعة</span>; })}</div><div className="economy-meta"><span>تكلفة الوحدة المتوقعة {formatMoney(estimatedUnitCost, country)}</span><span>الإيراد المتوقع {formatMoney(Math.round(estimatedOutput * (marketForecast?.currentPrice ?? 0)), country)}</span><span>السيولة بعد الحجز تقريبًا {formatMoney(Math.max(0, profile.bankBalance - selectedBatches * recipe.energyCost), country)}</span><span>الطلب المتوقع عند التسليم {formatNumber(marketForecast?.demandUnits ?? 0)} {recipe.outputUnit}</span><span>الجودة {formatNumber(Math.max(70, Math.min(100, 86 + (hasManager ? 10 : 0) - ((selectedCompany.maintenanceCondition ?? 100) < 60 ? 10 : 0))))}%</span></div></div></div> : <EconomyEmpty title="لا توجد وصفة متاحة" message="لا تتوفر وصفة إنتاج لهذا القطاع حاليًا." />}
+            {recipe && selectedCompany ? <div className="economy-card economy-card--soft"><div className="economy-card-head"><div className="economy-card-title"><span className="economy-card-icon icon-production-amber"><Icon name="factory" size={18} /></span><span><strong>{recipe.productName}</strong><small>{formatNumber(estimatedOutput)} {recipe.outputUnit} متوقعة · {formatNumber(estimatedDuration)} يوم</small></span></div><span className="economy-pill economy-pill--gold">{formatNumber(selectedCompany.energyUnits ?? 0)} طاقة</span></div><div className="economy-card-body"><p className="economy-card-description">متطلبات الدفعة: {recipe.inputs.map((input) => `${input.quantity} ${MATERIAL_CATALOG.find((material) => material.id === input.materialId)?.unit ?? ''} ${MATERIAL_CATALOG.find((material) => material.id === input.materialId)?.name ?? input.materialId}`).join('، ')}. هذه معاينة قبل حجز السيولة والمخزون.</p><div className="economy-meta">{recipe.inputs.map((input) => { const material = MATERIAL_CATALOG.find((item) => item.id === input.materialId); const lot = profile.inventory.find((item) => item.materialOrProductId === input.materialId); return <span key={input.materialId}>{material?.name}: {formatNumber(lot?.quantity ?? 0)} / {input.quantity} لكل دفعة</span>; })}</div><div className="economy-meta"><span>تكلفة الوحدة المتوقعة {formatMoney(estimatedUnitCost, country)}</span><span>الإيراد المتوقع {formatMoney(Math.round(estimatedOutput * (marketForecast?.currentPrice ?? 0)), country)}</span><span>السيولة بعد الحجز تقريبًا {formatMoney(Math.max(0, profile.bankBalance - selectedBatches * recipe.energyCost), country)}</span><span>الطلب المتوقع عند التسليم {formatNumber(marketForecast?.demandUnits ?? 0)} {recipe.outputUnit}</span><span>الجودة {formatNumber(Math.max(70, Math.min(100, 86 + (hasManager ? 10 : 0) - ((selectedCompany.maintenanceCondition ?? 100) < 60 ? 10 : 0))))}%</span></div></div></div> : <EconomyEmpty title="لا توجد وصفة متاحة" message="لا تتوفر وصفة إنتاج لهذا القطاع حاليًا." />}
           </div>}
         </SectionPanel>
-        <SectionPanel id="production-queue" title="طابور الإنتاج" description="المواد والطاقة المحجوزة لا تعود للمخزن حتى يكتمل الأمر أو يُلغى في مرحلة لاحقة.">
+        <SectionPanel
+          id="production-queue"
+          title="طابور الإنتاج"
+          icon="conveyor"
+          badge={<span className={`economy-pill ${activeProductionCount > 0 ? 'economy-pill--cyan' : ''}`}>{activeProductionCount > 0 ? `⚙️ ${formatNumber(activeProductionCount)} أمر نشط` : '⚪ الطابور فارغ'}</span>}
+          description="المواد والطاقة المحجوزة لا تعود للمخزن حتى يكتمل الأمر أو يُلغى في مرحلة لاحقة."
+        >
           <div className="production-filters" role="group" aria-label="فلترة أوامر الإنتاج">{([['all', 'الكل'], ['active', 'نشطة'], ['completed', 'مكتملة'], ['cancelled', 'ملغاة']] as const).map(([value, label]) => <button key={value} className={productionStatusFilter === value ? 'is-selected' : ''} type="button" onClick={() => { setProductionStatusFilter(value); if (value !== 'active') setShowProductionHistory(true); }}>{label}</button>)}</div>
           {visibleProductionOrders.length === 0 ? <EconomyEmpty title={hiddenProductionHistoryCount > 0 ? 'لا توجد أوامر مطابقة' : 'لا توجد أوامر إنتاج'} message={hiddenProductionHistoryCount > 0 ? 'غيّر الفلتر أو اعرض سجل الإنتاج السابق.' : 'ابدأ أول أمر من لوحة خطوط الإنتاج لتظهر هنا مواعيد التسليم.'} /> : <div className="economy-list">{visibleProductionOrders.map((order) => { const forecastPrice = getMarketQuote(profile, order.productId, order.completesOnDay)?.currentPrice ?? 0; const qualityMultiplier = 0.85 + order.qualityScore / 100 * 0.15; const expectedMargin = Math.round(order.outputQuantity * forecastPrice * qualityMultiplier - order.materialCost - order.energyCost - order.maintenanceCost); return <article className="economy-card economy-card--soft" key={order.id}><div className="economy-card-head"><div className="economy-card-title"><span><strong>{order.productName}</strong><small>{formatNumber(order.outputQuantity)} {order.outputUnit} · بدأ في اليوم {formatNumber(order.startedOnDay)}</small></span></div><span className={`economy-pill ${order.status === 'active' ? 'economy-pill--gold' : order.status === 'completed' ? 'economy-pill--green' : 'economy-pill--red'}`}>{order.status === 'active' ? `يكتمل يوم ${formatNumber(order.completesOnDay)}` : order.status === 'completed' ? 'اكتمل' : 'ملغى'}</span></div><div className="economy-meta"><span>تكلفة الوحدة {formatMoney(order.expectedUnitCost, country)}</span><span>طلب متوقع {formatNumber(order.demandForecast)} {order.outputUnit}</span><span>جودة {formatNumber(order.qualityScore)}%</span><span className={expectedMargin >= 0 ? 'economy-pill economy-pill--green' : 'economy-pill economy-pill--red'}>هامش متوقع {formatMoney(expectedMargin, country)}</span></div>{order.status === 'active' && <div className="economy-actions"><button className="button button-secondary" type="button" onClick={() => runCommand({ name: 'cancel_production', args: { orderId: order.id } }, (current) => cancelProductionOrder(current, order.id))}>إلغاء الأمر واسترداد جزئي</button>{(['production-25', 'production-50', 'production-instant'] as const).map((kind) => { const available = profile.speedCards.find((card) => card.kind === kind)?.quantity ?? 0; return available > 0 && <button className="button button-secondary" type="button" key={kind} onClick={() => runCommand({ name: 'use_speed_card', args: { orderId: order.id, kind } }, (current) => useProductionSpeedCard(current, order.id, kind))}>{kind === 'production-25' ? 'بطاقة 25%' : kind === 'production-50' ? 'بطاقة 50%' : 'إكمال فوري'} ({available})</button>; })}</div>}</article>; })}</div>}{hiddenProductionHistoryCount > 0 && <button className="button button-secondary production-history-toggle" type="button" onClick={() => setShowProductionHistory((value) => !value)}>{showProductionHistory ? 'إخفاء سجل الإنتاج' : `عرض سجل الإنتاج السابق (${formatNumber(hiddenProductionHistoryCount)})`}</button>}
         </SectionPanel>
-        <SectionPanel title="الطاقة المتاحة" description="تُستعاد الطاقة عند انتقال اليوم.">
-          {profile.companies.length === 0 ? <EconomyEmpty title="لا توجد طاقة صناعية" message="تظهر الطاقة بعد تأسيس أول شركة." /> : <div className="economy-list">{profile.companies.map((company) => { const condition = company.maintenanceCondition ?? 100; const maintenanceCost = Math.max(5_000, Math.round((company.operatingCostPerDay ?? 0) * 0.4)); return <div className="economy-card" key={company.id}><div className="economy-card-head"><div className="economy-card-title"><span className="economy-card-icon"><Icon name="factory" size={17} /></span><span><strong>{company.name}</strong><small>{INDUSTRY_CATALOG.find((item) => item.id === company.industryId)?.name}</small></span></div><span className={`economy-pill ${condition < 25 ? 'economy-pill--red' : condition < 60 ? 'economy-pill--gold' : 'economy-pill--green'}`}>صيانة {formatNumber(condition)}%</span></div><div className="economy-card-body"><div className="economy-meta"><span>طاقة {formatNumber(company.energyUnits ?? 0)} / {formatNumber(company.energyCapacity ?? 0)}</span><span>خدمة كاملة {formatMoney(maintenanceCost, country)}</span></div><div className="economy-progress"><span style={{ width: `${Math.min(100, 100 * condition / 100)}%` }} /></div><button className="button button-secondary" type="button" onClick={() => runCommand({ name: 'service_company', args: { companyId: company.id } }, (current) => serviceCompany(current, company.id))} disabled={profile.bankBalance < maintenanceCost || condition >= 100}>صيانة المصنع</button></div></div>; })}</div>}
+        <SectionPanel
+          title="الطاقة المتاحة"
+          icon="lightning"
+          badge={<span className="economy-pill economy-pill--yellow">⚡ {formatNumber(totalEnergy)} / {formatNumber(totalEnergyCapacity)} وحدة</span>}
+          description="تُستعاد الطاقة وتتجدد تلقائيًا مع انتهاء كل دورة يوم."
+        >
+          {profile.companies.length === 0 ? <EconomyEmpty title="لا توجد طاقة صناعية" message="تظهر الطاقة بعد تأسيس أول شركة." /> : <div className="economy-list">{profile.companies.map((company) => { const condition = company.maintenanceCondition ?? 100; const maintenanceCost = Math.max(5_000, Math.round((company.operatingCostPerDay ?? 0) * 0.4)); return <div className="economy-card" key={company.id}><div className="economy-card-head"><div className="economy-card-title"><span className="economy-card-icon icon-energy-yellow"><Icon name="lightning" size={17} /></span><span><strong>{company.name}</strong><small>{INDUSTRY_CATALOG.find((item) => item.id === company.industryId)?.name}</small></span></div><span className={`economy-pill ${condition < 25 ? 'economy-pill--red' : condition < 60 ? 'economy-pill--gold' : 'economy-pill--green'}`}>صيانة {formatNumber(condition)}%</span></div><div className="economy-card-body"><div className="economy-meta"><span>طاقة {formatNumber(company.energyUnits ?? 0)} / {formatNumber(company.energyCapacity ?? 0)}</span><span>خدمة كاملة {formatMoney(maintenanceCost, country)}</span></div><div className="economy-progress"><span style={{ width: `${Math.min(100, 100 * condition / 100)}%` }} /></div><button className="button button-secondary" type="button" onClick={() => runCommand({ name: 'service_company', args: { companyId: company.id } }, (current) => serviceCompany(current, company.id))} disabled={profile.bankBalance < maintenanceCost || condition >= 100}>صيانة المصنع</button></div></div>; })}</div>}
         </SectionPanel>
       </>,
     )}</div>;
@@ -519,49 +728,19 @@ export function SectionPage({ section, profile, country, focus, notificationThem
   }
 
   if (section.id === 'investments') {
-    const activeInvestments = selectActiveInvestments(profile);
-    const sales = selectSalesSummary(profile);
-    const goldQuantity = Number(goldAmount);
-    const goldBuyEstimate = Math.round(goldQuantity * GOLD_PRICE_PER_GRAM);
-    const goldSellEstimate = Math.round(goldQuantity * GOLD_PRICE_PER_GRAM * 0.97);
-    const goldHoldingMarketValue = Math.round(profile.goldGrams * GOLD_PRICE_PER_GRAM);
-    const goldHoldingSellEstimate = Math.round(profile.goldGrams * GOLD_PRICE_PER_GRAM * 0.97);
-    return <div className="section-page">{heading}{pageShell(
-      <>
-        <div className="economy-grid economy-grid--three-mobile"><EconomyStat label="استثمارات نشطة" value={formatNumber(activeInvestments.length)} /><EconomyStat label="إجمالي المبيعات" value={formatMoney(sales.grossRevenue, country)} /><EconomyStat label="صافي بعد الضريبة" value={formatMoney(sales.netRevenue, country)} /></div>
-        <SectionPanel title="تداول الذهب" description="احتياطي داخل اللعبة فقط؛ السعر ثابت ومحاكى ولا يتصل بأسعار السوق أو بجهة مالية.">
-          <div className="economy-grid economy-grid--three-mobile">
-            <EconomyStat label="الذهب المملوك" value={`${formatNumber(profile.goldGrams)} غ`} />
-            <EconomyStat label="سعر اللعبة للغرام" value={formatMoney(GOLD_PRICE_PER_GRAM, country)} />
-            <EconomyStat label="قيمة الاحتياطي بالسعر المحاكى" value={formatMoney(goldHoldingMarketValue, country)} />
-          </div>
-          <div className="economy-meta"><span>القيمة الدفترية للذهب {formatMoney(profile.goldCostBasis, country)}</span><span>المتحصل المتوقع عند بيع الاحتياطي الآن بعد فرق 3%: {formatMoney(goldHoldingSellEstimate, country)}</span></div>
-          <div className="economy-card-body">
-            <div className="economy-form-row">
-              <div className="economy-field"><label htmlFor="gold-quantity">الكمية (غرام، بخطوة 0.1)</label><input id="gold-quantity" type="number" min="0.1" step="0.1" value={goldAmount} onChange={(event) => setGoldAmount(event.target.value)} /></div>
-              <div className="economy-field"><label>شراء تقديري</label><input value={formatMoney(goldBuyEstimate, country)} readOnly /></div>
-              <div className="economy-field"><label>بيع تقديري بعد فرق 3%</label><input value={formatMoney(goldSellEstimate, country)} readOnly /></div>
-            </div>
-            <div className="economy-form-actions">
-              <PurchaseOptions country={country} cashPrice={goldBuyEstimate} diamondPrice={Number.isInteger(goldQuantity * 0.5) ? goldQuantity * 0.5 : 0} bankBalance={profile.bankBalance} diamondsBalance={profile.diamonds} disabled={!Number.isFinite(goldQuantity) || goldQuantity <= 0} cashLabel="شراء الذهب نقدًا" diamondLabel="شراء الذهب بالماس" note="سعر الصرف: ١٠٠ غرام = ٥٠ ماسة، مقابل ٦٬٠٠٠ ج.م لكل غرام نقدًا." onPurchase={(paymentMethod) => paymentMethod === 'diamonds' ? runCommand({ name: 'buy_gold_with_diamonds', args: { grams: goldQuantity } }, (current) => buyGoldWithDiamonds(current, goldQuantity)) : runCommand({ name: 'buy_gold', args: { grams: goldQuantity } }, (current) => buyGold(current, goldQuantity))} />
-              <button className="button button-secondary" type="button" disabled={!Number.isFinite(goldQuantity) || goldQuantity <= 0 || goldQuantity > profile.goldGrams} onClick={() => runCommand({ name: 'sell_gold', args: { grams: goldQuantity } }, (current) => sellGold(current, goldQuantity))}>بيع كمية</button>
-            </div>
-          </div>
-        </SectionPanel>
-        <SectionPanel title="أدوات الاستثمار داخل اللعبة" description="تُحجز المبالغ حتى موعد الاستحقاق. كل العوائد والمخاطر افتراضية ولا تمثل منتجًا ماليًا حقيقيًا.">
-          <div className="economy-list">{INVESTMENT_CATALOG.map((investment) => {
-            const amount = investmentAmounts[investment.id] ?? String(investment.minimumAmount);
-            return <article className="economy-card" key={investment.id}><div className="economy-card-head"><div className="economy-card-title"><span className="economy-card-icon"><Icon name="investment" size={18} /></span><span><strong>{investment.name}</strong><small>{formatNumber(investment.durationDays)} أيام · عائد متوقع {Math.round(getInvestmentPayoutRate(investment.returnRate, investment.durationDays) * 100)}%</small></span></div><span className={`economy-pill ${investment.riskRate > 0 ? 'economy-pill--gold' : 'economy-pill--green'}`}>{investment.riskRate > 0 ? `مخاطرة ${Math.round(investment.riskRate * 100)}%` : 'مخاطر منخفضة'}</span></div><div className="economy-card-body"><form className="economy-form" onSubmit={(event: FormEvent<HTMLFormElement>) => { event.preventDefault(); runCommand({ name: 'create_investment', args: { investmentId: investment.id, amount: Number(amount) } }, (current) => createInvestment(current, investment.id, Number(amount))); }}><div className="economy-form-row"><div className="economy-field"><label htmlFor={`invest-${investment.id}`}>مبلغ الاستثمار</label><input id={`invest-${investment.id}`} type="number" min={investment.minimumAmount} max={investment.maximumAmount} step="1000" value={amount} onChange={(event) => setInvestmentAmounts((previous) => ({ ...previous, [investment.id]: event.target.value }))} /></div><div className="economy-field"><label>المتاح في البنك</label><input value={formatMoney(profile.bankBalance, country)} readOnly /></div></div><div className="economy-meta"><span>الحد {formatMoney(investment.minimumAmount, country)}</span><span>الحد الأعلى {formatMoney(investment.maximumAmount, country)}</span></div><button className="button button-primary" type="submit" disabled={Number(amount) < investment.minimumAmount || Number(amount) > investment.maximumAmount || Number(amount) > profile.bankBalance}>إنشاء استثمار</button></form></div></article>;
-          })}</div>
-        </SectionPanel>
-        <SectionPanel title="محفظتك" description="يُعاد رأس المال والعائد عند استحقاق الاستثمار بعد مرور الأيام.">
-          {profile.investments.length === 0 ? <EconomyEmpty title="لا توجد استثمارات مسجلة" message="اختر أداة من الأعلى لتبدأ بتنويع رأس المال." /> : <div className="economy-list">{profile.investments.slice().reverse().map((investment) => {
-            const definition = INVESTMENT_CATALOG.find((item) => item.id === investment.investmentTypeId);
-            return <article className="economy-card economy-card--soft" key={investment.id}><div className="economy-card-head"><div className="economy-card-title"><span className="economy-card-icon"><Icon name="investment" size={18} /></span><span><strong>{definition?.name ?? investment.investmentTypeId}</strong><small>{formatMoney(investment.principal, country)} · يستحق يوم {formatNumber(investment.maturityDay)}</small></span></div><span className={`economy-pill ${investment.status === 'active' ? 'economy-pill--gold' : 'economy-pill--green'}`}>{investment.status === 'active' ? 'نشط' : investment.status === 'paid' ? 'تمت التسوية' : 'تسوية بخسارة'}</span></div>{investment.settledAmount !== undefined && <div className="economy-card-body"><div className="economy-meta"><span>قيمة التسوية {formatMoney(investment.settledAmount, country)}</span></div></div>}</article>;
-          })}</div>}
-        </SectionPanel>
-      </>,
-    )}</div>;
+    return (
+      <div className="section-page">
+        {heading}
+        {pageShell(
+          <StockExchangeTerminal
+            profile={profile}
+            country={country}
+            onCommand={onCommand}
+            onAction={onAction}
+          />
+        )}
+      </div>
+    );
   }
 
   if (section.id === 'reports') {
@@ -634,6 +813,132 @@ export function SectionPage({ section, profile, country, focus, notificationThem
         </SectionPanel>
       </>,
     )}</div>;
+  }
+
+  if (section.id === 'territory') {
+    return (
+      <div className="section-page">
+        {heading}
+        {pageShell(
+          <TerritoryConquestMap
+            profile={profile}
+            expansion={expansionState}
+            onUpdate={(updatedProf, updatedExp) => {
+              setExpansionState(updatedExp);
+              onAction({ ok: true, profile: updatedProf, message: 'تم تحديث السيطرة الإقليمية', data: undefined });
+            }}
+          />
+        )}
+      </div>
+    );
+  }
+
+  if (section.id === 'tech_tree') {
+    return (
+      <div className="section-page">
+        {heading}
+        {pageShell(
+          <TechTreeRND
+            profile={profile}
+            expansion={expansionState}
+            onUpdate={(updatedProf, updatedExp) => {
+              setExpansionState(updatedExp);
+              onAction({ ok: true, profile: updatedProf, message: 'تم تحديث أبحاث الأتمتة والتكنولوجيا', data: undefined });
+            }}
+          />
+        )}
+      </div>
+    );
+  }
+
+  if (section.id === 'luxury') {
+    return (
+      <div className="section-page">
+        {heading}
+        {pageShell(
+          <CeoLuxurySuite
+            profile={profile}
+            expansion={expansionState}
+            onUpdate={(updatedProf, updatedExp) => {
+              setExpansionState(updatedExp);
+              onAction({ ok: true, profile: updatedProf, message: 'تم تحديث جناح الرفاهية والأصول الفاخرة', data: undefined });
+            }}
+          />
+        )}
+      </div>
+    );
+  }
+
+  if (section.id === 'cartel') {
+    return (
+      <div className="section-page">
+        {heading}
+        {pageShell(
+          <CartelSyndicate
+            profile={profile}
+            expansion={megaExpState}
+            onUpdate={(updatedProf, updatedExp) => {
+              setMegaExpState(updatedExp);
+              onAction({ ok: true, profile: updatedProf, message: 'تم تحديث التكتل التجاري والتحالفات', data: undefined });
+            }}
+          />
+        )}
+      </div>
+    );
+  }
+
+  if (section.id === 'maritime') {
+    return (
+      <div className="section-page">
+        {heading}
+        {pageShell(
+          <MaritimeTradeRoutes
+            profile={profile}
+            expansion={megaExpState}
+            onUpdate={(updatedProf, updatedExp) => {
+              setMegaExpState(updatedExp);
+              onAction({ ok: true, profile: updatedProf, message: 'تم تحديث الأسطول الملاحي والخطوط البحرية', data: undefined });
+            }}
+          />
+        )}
+      </div>
+    );
+  }
+
+  if (section.id === 'megaprojects') {
+    return (
+      <div className="section-page">
+        {heading}
+        {pageShell(
+          <GovernmentMegaprojects
+            profile={profile}
+            expansion={megaExpState}
+            onUpdate={(updatedProf, updatedExp) => {
+              setMegaExpState(updatedExp);
+              onAction({ ok: true, profile: updatedProf, message: 'تم تحديث المناقصات القومية والنفوذ السياسي', data: undefined });
+            }}
+          />
+        )}
+      </div>
+    );
+  }
+
+  if (section.id === 'incubator') {
+    return (
+      <div className="section-page">
+        {heading}
+        {pageShell(
+          <StartupIncubatorVC
+            profile={profile}
+            expansion={megaExpState}
+            onUpdate={(updatedProf, updatedExp) => {
+              setMegaExpState(updatedExp);
+              onAction({ ok: true, profile: updatedProf, message: 'تم تحديث محفظة الاستثمار الجريء والحاضنات', data: undefined });
+            }}
+          />
+        )}
+      </div>
+    );
   }
 
   return <div className="section-page">{heading}{pageShell(

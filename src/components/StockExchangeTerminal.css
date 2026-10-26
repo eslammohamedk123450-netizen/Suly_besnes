@@ -1,0 +1,411 @@
+/* Professional Wall Street / TradingView Style Stock Exchange Terminal CSS */
+.stock-terminal-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  direction: rtl;
+  color: #f8fafc;
+  max-width: 1280px;
+  margin: 0 auto;
+}
+
+/* 1. Live Ticker Tape Header */
+.stock-ticker-tape {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  overflow-x: auto;
+  padding: 10px 16px;
+  background: #091322;
+  border: 1px solid rgba(234, 179, 8, 0.25);
+  border-radius: 12px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+}
+
+.stock-ticker-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.stock-ticker-symbol {
+  color: #94a3b8;
+  font-family: monospace;
+}
+
+.stock-ticker-price {
+  color: #ffffff;
+}
+
+.stock-ticker-change {
+  font-size: 0.78rem;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 800;
+}
+
+.stock-ticker-change--up {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+}
+
+.stock-ticker-change--down {
+  background: rgba(239, 68, 68, 0.15);
+  color: #fca5a5;
+}
+
+/* 2. Main Terminal Layout Grid */
+.stock-terminal-grid {
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr) 320px;
+  gap: 16px;
+  align-items: start;
+}
+
+/* Column 1: Asset Selector Sidebar */
+.stock-sidebar {
+  background: linear-gradient(145deg, #101c2f 0%, #0a1424 100%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.stock-sidebar-title {
+  font-size: 0.9rem;
+  font-weight: 800;
+  color: #fbbf24;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.stock-asset-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.stock-asset-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.stock-asset-card:hover {
+  background: rgba(234, 179, 8, 0.08);
+  border-color: rgba(234, 179, 8, 0.3);
+}
+
+.stock-asset-card.is-selected {
+  background: linear-gradient(135deg, rgba(234, 179, 8, 0.18) 0%, rgba(202, 138, 4, 0.08) 100%);
+  border-color: #eab308;
+  box-shadow: 0 0 12px rgba(234, 179, 8, 0.2);
+}
+
+.stock-asset-meta {
+  display: flex;
+  flex-direction: column;
+}
+
+.stock-asset-meta strong {
+  font-size: 0.88rem;
+  color: #ffffff;
+}
+
+.stock-asset-meta small {
+  font-size: 0.72rem;
+  color: #94a3b8;
+  font-family: monospace;
+}
+
+.stock-asset-price-box {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.stock-asset-price-box strong {
+  font-size: 0.88rem;
+  color: #ffffff;
+}
+
+/* Column 2: Center Pro Chart View */
+.stock-chart-panel {
+  background: linear-gradient(145deg, #101c2f 0%, #0a1424 100%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.stock-chart-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.stock-chart-headline {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.stock-chart-symbol-badge {
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  background: rgba(234, 179, 8, 0.15);
+  color: #fbbf24;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.3rem;
+  border: 1px solid rgba(234, 179, 8, 0.3);
+}
+
+.stock-chart-title-box h2 {
+  margin: 0;
+  font-size: 1.15rem;
+  color: #ffffff;
+  font-weight: 800;
+}
+
+.stock-chart-title-box span {
+  font-size: 0.78rem;
+  color: #94a3b8;
+  font-family: monospace;
+}
+
+.stock-chart-big-price {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.stock-chart-big-price strong {
+  font-size: 1.5rem;
+  font-weight: 900;
+  color: #ffffff;
+}
+
+.stock-timeframe-selector {
+  display: flex;
+  gap: 4px;
+  background: rgba(0, 0, 0, 0.3);
+  padding: 3px;
+  border-radius: 8px;
+}
+
+.stock-tf-btn {
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: #94a3b8;
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.stock-tf-btn.is-active {
+  background: #eab308;
+  color: #0f172a;
+}
+
+/* SVG Chart Box */
+.stock-svg-chart-container {
+  width: 100%;
+  height: 240px;
+  background: #060e19;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  position: relative;
+  overflow: hidden;
+  padding: 10px 0;
+}
+
+.stock-chart-svg {
+  width: 100%;
+  height: 100%;
+}
+
+/* Column 3: Trading Order Form & Order Book */
+.stock-trading-panel {
+  background: linear-gradient(145deg, #101c2f 0%, #0a1424 100%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.stock-trade-type-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  background: rgba(0, 0, 0, 0.3);
+  padding: 4px;
+  border-radius: 10px;
+}
+
+.stock-trade-tab {
+  padding: 10px;
+  border-radius: 8px;
+  border: none;
+  font-size: 0.9rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.stock-trade-tab--buy {
+  background: transparent;
+  color: #34d399;
+}
+
+.stock-trade-tab--buy.is-active {
+  background: linear-gradient(135deg, #10b981 0%, #047857 100%);
+  color: #ffffff;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+}
+
+.stock-trade-tab--sell {
+  background: transparent;
+  color: #fca5a5;
+}
+
+.stock-trade-tab--sell.is-active {
+  background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%);
+  color: #ffffff;
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+}
+
+.stock-order-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.stock-field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.stock-field-group label {
+  font-size: 0.78rem;
+  color: #94a3b8;
+  font-weight: 700;
+}
+
+.stock-field-group input {
+  width: 100%;
+  padding: 10px 12px;
+  background: #060e19;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  color: #ffffff;
+  font-size: 0.95rem;
+  font-weight: 800;
+}
+
+.stock-field-group input:focus {
+  border-color: #eab308;
+  outline: none;
+}
+
+.stock-btn-trade-execute {
+  width: 100%;
+  padding: 14px;
+  border-radius: 10px;
+  border: none;
+  font-size: 0.98rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-top: 4px;
+}
+
+.stock-btn-trade-execute--buy {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: #ffffff;
+  box-shadow: 0 6px 18px rgba(16, 185, 129, 0.3);
+}
+
+.stock-btn-trade-execute--buy:hover {
+  background: linear-gradient(135deg, #34d399 0%, #047857 100%);
+}
+
+.stock-btn-trade-execute--sell {
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  color: #ffffff;
+  box-shadow: 0 6px 18px rgba(239, 68, 68, 0.3);
+}
+
+.stock-btn-trade-execute--sell:hover {
+  background: linear-gradient(135deg, #f87171 0%, #b91c1c 100%);
+}
+
+/* Order Book Depth Table */
+.stock-orderbook-box {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding-top: 12px;
+}
+
+.stock-orderbook-title {
+  font-size: 0.8rem;
+  font-weight: 800;
+  color: #94a3b8;
+}
+
+.stock-orderbook-table {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-family: monospace;
+  font-size: 0.78rem;
+}
+
+.stock-orderbook-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 2px 4px;
+  border-radius: 4px;
+}
+
+.stock-orderbook-row--ask {
+  background: rgba(239, 68, 68, 0.08);
+  color: #fca5a5;
+}
+
+.stock-orderbook-row--bid {
+  background: rgba(16, 185, 129, 0.08);
+  color: #6ee7b7;
+}
+
+/* Responsive adjustments */
+@media (max-width: 1024px) {
+  .stock-terminal-grid {
+    grid-template-columns: 1fr;
+  }
+}

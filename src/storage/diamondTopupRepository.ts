@@ -1,6 +1,6 @@
 import { supabase } from './supabaseClient';
 
-export type DiamondPackageId = 'starter' | 'builder' | 'executive' | 'empire';
+export type DiamondPackageId = 'starter' | 'builder' | 'executive' | 'empire' | 'titan' | 'sovereign';
 export type DiamondTopupStatus = 'pending' | 'approved' | 'rejected';
 
 export interface DiamondTopupOrder {
@@ -9,7 +9,9 @@ export interface DiamondTopupOrder {
   packageId: DiamondPackageId;
   packageName: string;
   diamonds: number;
-  amountEgp: number;
+  amountUsd?: number;
+  /** Legacy RPC response field retained while the backend migrates to USD pricing. */
+  amountEgp?: number;
   status: DiamondTopupStatus;
   createdAt: string;
   reviewedAt: string | null;

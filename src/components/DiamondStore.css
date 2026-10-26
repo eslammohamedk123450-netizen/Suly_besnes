@@ -1,10 +1,507 @@
+/* ==========================================================================
+   EXACT 1:1 SULY-OFFICIAL DIAMOND STORE REPLICATION CSS
+   ========================================================================== */
 
-.diamond-package-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-.diamond-package { aspect-ratio: 1 / 1; justify-items: center; align-content: center; gap: 7px; padding: 14px 10px; text-align: center; }
-.diamond-package-gem { display: grid; place-items: center; width: 54px; height: 54px; color: #fff6c9; background: linear-gradient(145deg, #9fe9ff, #4b8edb 48%, #344e9b); border: 2px solid #d9f8ff; border-radius: 16px; box-shadow: 0 8px 16px rgba(43, 105, 173, .28), inset 0 0 0 4px rgba(255,255,255,.18); font-size: 28px; transform: rotate(45deg); }
-.diamond-package-gem::first-letter { transform: rotate(-45deg); }
-.diamond-package > strong { margin-top: 4px; }
-.diamond-package > b { color: #f4d77f; font-size: 15px; }
-.diamond-package > span:not(.diamond-package-gem) { color: #fff; font-size: 13px; font-weight: 900; }
-.diamond-package .diamond-package-bonus, .diamond-package > small { max-width: 100%; font-size: 8px; }
-@media (max-width: 720px) { .diamond-package-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .diamond-package { aspect-ratio: 1 / .92; } }
+.suly-diamond-store {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 18px 16px 30px;
+  background:
+    radial-gradient(circle at 50% 10%, rgba(246, 196, 83, 0.12) 0%, transparent 45%),
+    radial-gradient(circle at 50% 80%, rgba(22, 199, 154, 0.08) 0%, transparent 50%),
+    linear-gradient(180deg, #061122 0%, #091a32 50%, #050d1a 100%);
+  border-radius: 20px;
+  border: 1px solid rgba(246, 196, 83, 0.35);
+  box-shadow: 0 15px 40px rgba(0, 0, 0, 0.6);
+  color: #ffffff;
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+/* TOP HEADER BAR */
+.suly-header-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: linear-gradient(180deg, rgba(16, 38, 64, 0.95), rgba(7, 21, 38, 0.98));
+  border: 1px solid rgba(246, 196, 83, 0.4);
+  border-radius: 16px;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
+}
+
+.suly-back-btn {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  background: linear-gradient(145deg, rgba(246, 196, 83, 0.15), rgba(16, 38, 64, 0.8));
+  border: 1px solid rgba(246, 196, 83, 0.5);
+  border-radius: 12px;
+  color: #f6c453;
+  font-size: 18px;
+  font-weight: 900;
+  cursor: pointer;
+  transition: transform 0.18s;
+}
+
+.suly-back-btn:hover {
+  transform: scale(1.08);
+}
+
+.suly-header-center {
+  text-align: center;
+}
+
+.suly-header-center h2 {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 900;
+  color: #f6c453;
+  letter-spacing: -0.5px;
+  text-shadow: 0 2px 8px rgba(246, 196, 83, 0.3);
+}
+
+.suly-header-sub {
+  font-size: 11px;
+  color: #cbd5e1;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+.suly-diamond-counter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  background: linear-gradient(145deg, #0d253f, #071728);
+  border: 1px solid rgba(246, 196, 83, 0.5);
+  border-radius: 99px;
+  box-shadow: inset 0 0 10px rgba(246, 196, 83, 0.15);
+}
+
+.suly-counter-gem {
+  font-size: 18px;
+  filter: drop-shadow(0 2px 6px rgba(255, 255, 255, 0.4));
+}
+
+.suly-counter-val {
+  font-size: 16px;
+  font-weight: 900;
+  color: #ffffff;
+}
+
+/* SUBHEADER KICKER BANNER */
+.suly-kicker-banner {
+  text-align: center;
+  padding: 6px;
+  border-bottom: 1px solid rgba(246, 196, 83, 0.2);
+}
+
+.suly-kicker-banner span {
+  font-size: 12px;
+  color: #e2e8f0;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+}
+
+/* CARDS 2x3 GRID */
+.suly-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px 14px;
+  padding-top: 10px;
+}
+
+.suly-package-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 22px 12px 14px;
+  background: linear-gradient(180deg, #0e2038 0%, #08172b 100%);
+  border: 1.5px solid rgba(246, 196, 83, 0.45);
+  border-radius: 18px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5), inset 0 0 15px rgba(246, 196, 83, 0.08);
+  cursor: pointer;
+  transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s;
+}
+
+.suly-package-card:hover,
+.suly-package-card.is-selected {
+  transform: translateY(-3px);
+  border-color: #f6c453;
+  box-shadow: 0 14px 35px rgba(246, 196, 83, 0.35), inset 0 0 20px rgba(246, 196, 83, 0.15);
+}
+
+/* Crest Gem at top center border */
+.suly-crest-gem {
+  position: absolute;
+  top: -12px;
+  font-size: 16px;
+  filter: drop-shadow(0 2px 6px rgba(246, 196, 83, 0.5));
+  z-index: 2;
+}
+
+/* Top Ribbon Badge */
+.suly-top-ribbon {
+  position: absolute;
+  top: -14px;
+  padding: 3px 12px;
+  background: linear-gradient(135deg, #f6c453 0%, #d9a022 100%);
+  color: #000000;
+  font-size: 10px;
+  font-weight: 900;
+  border-radius: 6px;
+  box-shadow: 0 4px 10px rgba(246, 196, 83, 0.4);
+  z-index: 3;
+}
+
+/* Bottom Ribbon Badge */
+.suly-bottom-ribbon {
+  position: absolute;
+  bottom: -10px;
+  padding: 2px 10px;
+  background: linear-gradient(135deg, #f6c453, #b88210);
+  color: #000000;
+  font-size: 9px;
+  font-weight: 900;
+  border-radius: 4px;
+  z-index: 3;
+}
+
+/* Graphic Diamond */
+.suly-diamond-graphic-wrap {
+  margin: 6px 0 4px;
+  display: grid;
+  place-items: center;
+}
+
+.suly-crystal-gem {
+  font-size: 52px;
+  filter: drop-shadow(0 6px 18px rgba(120, 190, 255, 0.5));
+  transform: scale(1.1);
+  line-height: 1;
+}
+
+/* Titles */
+.suly-diamond-title {
+  margin: 4px 0 2px;
+  font-size: 20px;
+  font-weight: 900;
+  color: #ffffff;
+  letter-spacing: -0.5px;
+}
+
+.suly-crown-icon {
+  font-size: 18px;
+}
+
+.suly-diamond-bonus {
+  margin: 0 0 8px;
+  font-size: 11px;
+  color: #cbd5e1;
+  font-weight: 700;
+}
+
+/* Price Tag */
+.suly-price-tag {
+  font-size: 18px;
+  font-weight: 900;
+  color: #f6c453;
+  margin-bottom: 8px;
+  text-shadow: 0 2px 6px rgba(246, 196, 83, 0.3);
+}
+
+/* Buy Golden Pill Button */
+.suly-buy-btn {
+  width: 85%;
+  padding: 8px 16px;
+  background: linear-gradient(135deg, #f6c453 0%, #e0ab28 100%);
+  border: none;
+  border-radius: 99px;
+  color: #000000;
+  font-size: 13px;
+  font-weight: 900;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(246, 196, 83, 0.35);
+  transition: transform 0.18s, filter 0.18s;
+}
+
+.suly-buy-btn:hover {
+  transform: scale(1.04);
+  filter: brightness(1.08);
+}
+
+/* CHECKOUT PANEL */
+.suly-checkout-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  background: linear-gradient(180deg, rgba(16, 38, 64, 0.95), rgba(8, 23, 43, 0.98));
+  border: 1px solid rgba(246, 196, 83, 0.4);
+  border-radius: 16px;
+  margin-top: 8px;
+}
+
+.suly-checkout-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.suly-checkout-head strong {
+  font-size: 15px;
+  color: #ffffff;
+  display: block;
+}
+
+.suly-checkout-head small {
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+.suly-checkout-price {
+  font-size: 20px;
+  font-weight: 900;
+  color: #f6c453;
+}
+
+.suly-payment-box p {
+  margin: 0 0 8px;
+  font-size: 11px;
+  color: #cbd5e1;
+}
+
+.suly-vodafone-pill {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  width: 100%;
+  padding: 12px;
+  background: rgba(246, 196, 83, 0.12);
+  border: 1px dashed rgba(246, 196, 83, 0.5);
+  border-radius: 12px;
+  color: #ffffff;
+  cursor: pointer;
+}
+
+.suly-vodafone-pill strong {
+  font-size: 22px;
+  color: #f6c453;
+  letter-spacing: 1px;
+}
+
+.suly-vodafone-pill small {
+  font-size: 10px;
+  color: #94a3b8;
+}
+
+.suly-confirm-btn {
+  width: 100%;
+  padding: 12px;
+  font-size: 14px;
+}
+
+.suly-order-confirm {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 12px;
+  background: rgba(22, 199, 154, 0.12);
+  border: 1px solid rgba(22, 199, 154, 0.3);
+  border-radius: 12px;
+  text-align: center;
+}
+
+.suly-order-confirm strong {
+  font-size: 20px;
+  color: #16c79a;
+}
+
+.suly-order-confirm p {
+  margin: 0;
+  font-size: 11px;
+  color: #cbd5e1;
+}
+
+.suly-wa-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 10px;
+  margin-top: 4px;
+  background: linear-gradient(135deg, #25d366, #128c7e);
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 900;
+  border-radius: 99px;
+  text-decoration: none;
+  box-shadow: 0 4px 12px rgba(37, 211, 102, 0.3);
+}
+
+/* SPEED CARDS */
+.suly-cards-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.suly-section-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.suly-section-title h3 {
+  margin: 0;
+  font-size: 15px;
+  color: #ffffff;
+}
+
+.suly-section-title span {
+  font-size: 11px;
+  color: #f6c453;
+  font-weight: 800;
+}
+
+.suly-speed-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.suly-speed-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(22, 199, 154, 0.2);
+  border-radius: 12px;
+  text-align: center;
+}
+
+.suly-speed-icon {
+  font-size: 24px;
+}
+
+.suly-speed-card strong {
+  font-size: 12px;
+  color: #ffffff;
+}
+
+.suly-speed-price {
+  font-size: 12px;
+  font-weight: 800;
+  color: #f6c453;
+}
+
+.suly-owned {
+  font-size: 9px;
+  color: #16c79a;
+}
+
+.suly-speed-buy {
+  width: 100%;
+  padding: 6px;
+  font-size: 11px;
+}
+
+.suly-speed-buy:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* HISTORY SECTION */
+.suly-history-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.suly-history-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.suly-history-head h3 {
+  margin: 0;
+  font-size: 13px;
+  color: #ffffff;
+}
+
+.suly-refresh-link {
+  background: none;
+  border: none;
+  color: #16c79a;
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.suly-empty-text {
+  font-size: 11px;
+  color: #94a3b8;
+  margin: 0;
+}
+
+.suly-orders-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.suly-order-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 8px;
+}
+
+.suly-order-item strong {
+  font-size: 12px;
+  color: #ffffff;
+  display: block;
+}
+
+.suly-order-item small {
+  font-size: 10px;
+  color: #94a3b8;
+}
+
+.suly-status-pill {
+  font-size: 10px;
+  font-weight: 800;
+  color: #f6c453;
+}
+
+/* FOOTER SECURITY BANNER */
+.suly-security-footer {
+  text-align: center;
+  padding: 10px;
+  background: linear-gradient(180deg, rgba(246, 196, 83, 0.1), rgba(7, 21, 38, 0.95));
+  border: 1px solid rgba(246, 196, 83, 0.3);
+  border-radius: 12px;
+  margin-top: 6px;
+}
+
+.suly-security-footer span {
+  font-size: 11px;
+  color: #cbd5e1;
+  font-weight: 700;
+}
