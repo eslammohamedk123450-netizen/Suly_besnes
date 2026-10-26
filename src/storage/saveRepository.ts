@@ -122,9 +122,20 @@ function isLoan(value: unknown): value is LoanRecord {
     && (value.status === 'active' || value.status === 'paid' || value.status === 'defaulted');
 }
 
+const VALID_STAFF_ROLES = new Set([
+  'manager',
+  'accountant',
+  'lawyer',
+  'hr',
+  'foreman',
+  'cfo',
+  'general_manager',
+  'operations_director',
+]);
+
 function isStaffContract(value: unknown): value is StaffContract {
   return isRecord(value) && isNonEmptyString(value.id) && isNonEmptyString(value.name)
-    && (value.role === 'manager' || value.role === 'accountant' || value.role === 'lawyer' || value.role === 'hr')
+    && typeof value.role === 'string' && VALID_STAFF_ROLES.has(value.role)
     && (value.companyId === undefined || isNonEmptyString(value.companyId)) && isFiniteNonNegative(value.dailySalary)
     && (value.level === undefined || (Number.isInteger(value.level) && (value.level as number) >= 1 && (value.level as number) <= 5))
     && (value.experience === undefined || (isFiniteNonNegative(value.experience) && value.experience <= 100))
@@ -446,6 +457,21 @@ function migrateProfile(value: unknown): PlayerProfile | null {
           .map(([k, v]) => [k, Math.min(100, Math.round(v as number))]),
       ),
     } : {}),
+    automationDirectives: isRecord(value.automationDirectives) ? {
+      autoPaySalaries: Boolean(value.automationDirectives.autoPaySalaries),
+      autoPurchaseMaterials: Boolean(value.automationDirectives.autoPurchaseMaterials),
+      autoPurchaseThreshold: isFiniteNonNegative(value.automationDirectives.autoPurchaseThreshold) ? Math.max(0, Math.floor(value.automationDirectives.autoPurchaseThreshold as number)) : 50,
+      autoPurchaseBudget: isFiniteNonNegative(value.automationDirectives.autoPurchaseBudget) ? Math.max(0, Math.floor(value.automationDirectives.autoPurchaseBudget as number)) : 50_000,
+      autoRunProduction: Boolean(value.automationDirectives.autoRunProduction),
+      autoProduceCompanyIds: Array.isArray(value.automationDirectives.autoProduceCompanyIds) ? value.automationDirectives.autoProduceCompanyIds.filter(isNonEmptyString) : [],
+    } : {
+      autoPaySalaries: false,
+      autoPurchaseMaterials: false,
+      autoPurchaseThreshold: 50,
+      autoPurchaseBudget: 50_000,
+      autoRunProduction: false,
+      autoProduceCompanyIds: [],
+    },
     avatarId: typeof value.avatarId === 'string' && value.avatarId ? value.avatarId : 'avatar_free_male_1',
     unlockedAvatarIds: Array.isArray(value.unlockedAvatarIds) && value.unlockedAvatarIds.length > 0
       ? Array.from(new Set(['avatar_free_male_1', 'avatar_free_male_2', 'avatar_free_female_1', 'avatar_free_female_2', ...value.unlockedAvatarIds.filter(isNonEmptyString)]))

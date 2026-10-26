@@ -1,6 +1,6 @@
 import { findCountry, type IndustryId } from '../domain/countries';
-import type { PlayerAsset, PlayerCompany, PlayerLand, PlayerProfile } from '../domain/player';
-import type { AuctionBidRecord, BusinessContract, DepositRecord, DepositTranche, FinanceLedgerEntry, ForwardSupplyContract, GameEventRecord, GlobalPaymentTerm, GlobalShipmentRecord, GlobalShippingMode, InventoryLot, InvestmentRecord, LoanRecord, ProductSale, ProductionOrder, StaffContract, StaffRole, AchievementRecord } from '../domain/futureSystems';
+import { type PlayerAsset, type PlayerCompany, type PlayerLand, type PlayerProfile, getDefaultAutomationDirectives } from '../domain/player';
+import type { AuctionBidRecord, BusinessContract, DepositRecord, DepositTranche, FinanceLedgerEntry, ForwardSupplyContract, GameEventRecord, GlobalPaymentTerm, GlobalShipmentRecord, GlobalShippingMode, InventoryLot, InvestmentRecord, LoanRecord, ProductSale, ProductionOrder, StaffContract, StaffRole, AchievementRecord, AutomationDirectives } from '../domain/futureSystems';
 import {
   DIRECT_COMPANY_CATALOG,
   DIRECT_LAND_CATALOG,
@@ -32,19 +32,6 @@ import { SPEED_CARD_DIAMOND_COSTS, SPEED_CARD_LABELS, type SpeedCardKind } from 
 import { getWarehouseCapacity, getWarehouseItemCapacity, getWarehouseMaterialQuantity, getWarehouseUsage, normalizeWarehouseLevel, removeWarehouseMaterials, WAREHOUSE_UPGRADE_REQUIREMENTS } from './warehouse';
 import { getCashPriceForDiamondPrice, getDiscountedDiamondPrice, type PurchasePaymentMethod } from './purchasePricing';
 import { claimLoginReward, claimSeasonChallenge, chooseSeasonEvent, LOGIN_REWARDS } from './season';
-import {
-  listPlayerAssetForAuction,
-  settlePlayerAssetAuction,
-  cancelPlayerAssetAuction,
-  executeSellPlayerAsset,
-} from './dynamicAuctions';
-import {
-  claimStarterMission,
-  getStarterMissions,
-  getCompletedStarterMissions,
-  getCurrentStarterMissionStage,
-  STARTER_MISSION_SPECS,
-} from './onboarding';
 
 export type GameErrorCode =
   | 'invalid-input'
@@ -1046,7 +1033,11 @@ export function runProduction(profile: PlayerProfile, companyId: string, batches
   const companies = profile.companies.map((item) => item.id === companyId ? { ...item, energyUnits: energyAvailable - batches * recipe.energyUnits } : item);
   const manager = profile.staff.find((member) => member.status === 'active' && member.role === 'manager' && member.companyId === companyId);
   const managerLevel = staffLevel(manager);
-  const durationDays = Math.min(3, Math.max(1, Math.ceil(batches / 3) - (manager ? 1 : 0)));
+  const foreman = profile.staff.find((member) => member.status === 'active' && member.role === 'foreman' && member.companyId === companyId);
+  const foremanLevel = staffLevel(foreman);
+  const baseDays = Math.ceil(batches / 3);
+  const timeReduction = (manager ? 1 : 0) + (foreman && batches >= 2 ? 1 : 0);
+  const durationDays = Math.min(3, Math.max(1, baseDays - timeReduction));
   const inputQualities = recipe.inputs.map((input) => {
     const lot = profile.inventory.find((item) => item.materialOrProductId === input.materialId);
     return lot?.qualityScore ?? 88;
@@ -1057,14 +1048,17 @@ export function runProduction(profile: PlayerProfile, companyId: string, batches
       : 88;
   const materialQualityDelta = Math.round((avgInputQuality - 88) * 0.7);
   const marketForecast = getMarketQuote(profile, recipe.productId, profile.day + durationDays);
-  const qualityScore = Math.max(70, Math.min(100, 86 + materialQualityDelta + (manager ? 10 + (managerLevel - 1) * 3 : 0) - (maintenanceCondition < 60 ? 10 : 0)));
-  const expectedUnitCost = (materialCost + energyCost + maintenanceCost) / outputQuantity;
+  const foremanQualityBonus = foreman ? 5 + (foremanLevel - 1) * 2 : 0;
+  const qualityScore = Math.max(70, Math.min(100, 86 + materialQualityDelta + (manager ? 10 + (managerLevel - 1) * 3 : 0) + foremanQualityBonus - (maintenanceCondition < 60 ? 10 : 0)));
+  const materialWasteDiscount = foreman ? 0.05 + (foremanLevel - 1) * 0.025 : 0;
+  const effectiveMaterialCost = Math.round(materialCost * (1 - materialWasteDiscount));
+  const expectedUnitCost = (effectiveMaterialCost + energyCost + maintenanceCost) / outputQuantity;
   const nextMaintenanceCondition = Math.max(0, maintenanceCondition - Math.max(8, Math.ceil(batches / 2)));
-  const order: ProductionOrder = { id: nextId(profile, 'production', profile.productionOrders.length), companyId, productId: recipe.productId, productName: recipe.productName, batches, outputQuantity, outputUnit: recipe.outputUnit, materialCost, energyCost, expectedUnitCost, demandForecast: marketForecast?.demandUnits ?? 0, qualityScore, maintenanceCost, startedOnDay: profile.day, completesOnDay: profile.day + durationDays, status: 'active' };
+  const order: ProductionOrder = { id: nextId(profile, 'production', profile.productionOrders.length), companyId, productId: recipe.productId, productName: recipe.productName, batches, outputQuantity, outputUnit: recipe.outputUnit, materialCost: effectiveMaterialCost, energyCost, expectedUnitCost, demandForecast: marketForecast?.demandUnits ?? 0, qualityScore, maintenanceCost, startedOnDay: profile.day, completesOnDay: profile.day + durationDays, status: 'active' };
   const companiesWithMaintenance = companies.map((item) => item.id === companyId ? { ...item, maintenanceCondition: nextMaintenanceCondition } : item);
   const nextProfile = addLedger(
     { ...profile, inventory, companies: companiesWithMaintenance, productionOrders: [...profile.productionOrders, order] },
-    [ledgerEntry(profile, 'expense', energyCost, `حجز طاقة لأمر إنتاج ${recipe.productName}`, 0), ledgerEntry(profile, 'expense', maintenanceCost, `صيانة وقائية لأمر إنتاج ${recipe.productName}`, 1), ledgerEntry(profile, 'asset', materialCost, `حجز مواد لأمر إنتاج ${recipe.productName}`, 2)],
+    [ledgerEntry(profile, 'expense', energyCost, `حجز طاقة لأمر إنتاج ${recipe.productName}`, 0), ledgerEntry(profile, 'expense', maintenanceCost, `صيانة وقائية لأمر إنتاج ${recipe.productName}`, 1), ledgerEntry(profile, 'asset', effectiveMaterialCost, `حجز مواد لأمر إنتاج ${recipe.productName}${foreman ? ' (مع وفورات رئيس العمال)' : ''}`, 2)],
     profile.bankBalance - energyCost - maintenanceCost,
   );
   return success(syncTasks(nextProfile), `بدأ أمر إنتاج ${recipe.productName} ويكتمل في اليوم ${order.completesOnDay}.`, { orderId: order.id, companyId, productId: recipe.productId, batches, outputQuantity, completesOnDay: order.completesOnDay });
@@ -1340,11 +1334,78 @@ export function getDayBriefing(profile: PlayerProfile): DayBriefing {
   return { day, operatingCost, existingPayables: profile.payables + outstandingSalary, maturingInvestments, event, availableEnergy, energyPaused: profile.payables > 0 || outstandingSalary > 0 };
 }
 
-const STAFF_ROLE_OPTIONS: Record<StaffRole, { label: string; dailySalary: number; companyRequired: boolean }> = {
-  manager: { label: 'مدير شركة', dailySalary: 7_000, companyRequired: true },
-  accountant: { label: 'محاسب', dailySalary: 4_500, companyRequired: false },
-  lawyer: { label: 'محامٍ', dailySalary: 4_000, companyRequired: false },
-  hr: { label: 'مدير موارد بشرية', dailySalary: 3_500, companyRequired: false },
+export const STAFF_ROLE_OPTIONS: Record<StaffRole, {
+  label: string;
+  dailySalary: number;
+  companyRequired: boolean;
+  department: 'executive' | 'operations' | 'finance' | 'legal';
+  description: string;
+  perks: string[];
+}> = {
+  manager: {
+    label: 'مدير شركة',
+    dailySalary: 7_000,
+    companyRequired: true,
+    department: 'operations',
+    description: 'إدارة تشغيلية مخصصة للشركة لتسريع دورات الإنتاج ورفع جودة المنتج النهائي.',
+    perks: ['تسريع زمن الإنتاج بمقدار يوم كامل', 'زيادة نقاط الجودة (+10 نقاط)', 'تقليل استهلاك الطاقة'],
+  },
+  foreman: {
+    label: 'رئيس عمال الإنتاج',
+    dailySalary: 3_200,
+    companyRequired: true,
+    department: 'operations',
+    description: 'ملاحظة ومراقبة خطوط المصنع لتقليل هدر الخامات وزيادة كفاءة وجودة الدفعات.',
+    perks: ['تقليل هدر المواد الخام بنسبة 5% - 15%', 'رفع جودة المنتجات (+5 إلى +13 نقطة)', 'تسريع إنجاز الدفعات الكبيرة'],
+  },
+  accountant: {
+    label: 'محاسب قانوني معتمد',
+    dailySalary: 4_500,
+    companyRequired: false,
+    department: 'finance',
+    description: 'تدقيق القيود والدفاتر لخفض الضرائب الرسمية وتفادي غرامات الفحص المفاجئة.',
+    perks: ['خفض ضرائب المبيعات بنسبة 15% - 40%', 'حماية من غرامات الفحص الضريبي بنسبة تصل 60%', 'فتح لوحة التقارير المالية الذكية'],
+  },
+  lawyer: {
+    label: 'مستشار قانوني وعقود',
+    dailySalary: 4_000,
+    companyRequired: false,
+    department: 'legal',
+    description: 'صياغة العقود التجارية الكبرى وتوفير حماية قانونية ضد صدمات القرارات الحكومية.',
+    perks: ['زيادة أرباح وعلاوات العقود بنسبة 10% - 30%', 'حماية السيولة من صدمات البنك المركزي والقرارات', 'تخفيض تكاليف التراخيص والنزاعات'],
+  },
+  cfo: {
+    label: 'مدير مالي تنفيذي (CFO)',
+    dailySalary: 9_500,
+    companyRequired: false,
+    department: 'executive',
+    description: 'إدارة السيولة النقدية والمحفظة المصرفية وتحسين فوائد القروض والودائع.',
+    perks: ['زيادة عوائد الودائع البنكية بنسبة تصل إلى +35%', 'خفض الفوائد التراكمية للقروض بنسبة 20%', 'لوحة تدفقات نقدية ذكية وتنبيهات سيولة استباقية'],
+  },
+  general_manager: {
+    label: 'مدير تنفيذي مفوض (CEO)',
+    dailySalary: 12_000,
+    companyRequired: false,
+    department: 'executive',
+    description: 'تفويض الإدارة اليومية: أتمتة سداد الرواتب في موعدها وإعادة شراء الخامات آلياً.',
+    perks: ['أتمتة سداد الرواتب لتفادي تعطل المصانع وتوقف الطاقة', 'أتمتة إعادة تموين الخامات الناقصة بحسب الحد الأدنى المحدد', 'إشراف شامل على خطة النمو اليومية'],
+  },
+  operations_director: {
+    label: 'مدير تشغيل المصانع (COO)',
+    dailySalary: 10_000,
+    companyRequired: false,
+    department: 'executive',
+    description: 'التشغيل الذاتي المتواصل لكافة المصانع وخطوط الإنتاج دون توقف.',
+    perks: ['بدء دورات إنتاج جديدة فور اكتمال السابقة تلقائياً', 'تشغيل دفعات الإنتاج الأوفلاين أثناء غياب اللاعب', 'تحسين كفاءة استخدام الآلات والصيانة الوقائية'],
+  },
+  hr: {
+    label: 'مدير الموارد البشرية',
+    dailySalary: 3_500,
+    companyRequired: false,
+    department: 'operations',
+    description: 'استقطاب الكفاءات وتخفيض تكاليف استقدام وتوقيع عقود الموظفين الجدد.',
+    perks: ['خصم حتى 32% من تكلفة تعيين أي موظف جديد', 'رفع سرعة اكتساب الموظفين للخبرة', 'تحسين استقرار الفريق والولاء'],
+  },
 };
 
 const MAX_STAFF_LEVEL = 5;
@@ -1364,7 +1425,7 @@ export function getStaffUpgradeCost(employee: StaffContract): number {
 
 function developStaff(employee: StaffContract): StaffContract {
   let level = staffLevel(employee);
-  let experience = staffExperience(employee) + (employee.role === 'manager' ? 12 : 10);
+  let experience = staffExperience(employee) + (employee.role === 'manager' || employee.role === 'foreman' ? 12 : 10);
   while (level < MAX_STAFF_LEVEL && experience >= STAFF_EXPERIENCE_PER_LEVEL) {
     experience -= STAFF_EXPERIENCE_PER_LEVEL;
     level += 1;
@@ -1375,8 +1436,15 @@ function developStaff(employee: StaffContract): StaffContract {
 export function hireStaff(profile: PlayerProfile, role: StaffRole, name: string, companyId?: string): GameResult<StaffContract> {
   const option = STAFF_ROLE_OPTIONS[role];
   if (!option || name.trim().length < 2) return failure(profile, 'invalid-input', 'أدخل اسمًا صحيحًا واختر دورًا معروفًا.');
-  if (option.companyRequired && !profile.companies.some((company) => company.id === companyId)) return failure(profile, 'not-found', 'المدير يجب أن يرتبط بشركة موجودة.');
-  if (role === 'manager' && profile.staff.some((member) => member.status === 'active' && member.role === 'manager' && member.companyId === companyId)) return failure(profile, 'invalid-input', 'هذه الشركة لديها مدير نشط بالفعل.');
+  if (option.companyRequired && !profile.companies.some((company) => company.id === companyId)) {
+    return failure(profile, 'not-found', `${option.label} يجب أن يرتبط بشركة موجودة.`);
+  }
+  if ((role === 'manager' || role === 'foreman') && profile.staff.some((member) => member.status === 'active' && member.role === role && member.companyId === companyId)) {
+    return failure(profile, 'invalid-input', `هذه الشركة لديها ${option.label} نشط بالفعل.`);
+  }
+  if (['cfo', 'general_manager', 'operations_director', 'hr', 'accountant', 'lawyer'].includes(role) && profile.staff.some((m) => m.status === 'active' && m.role === role)) {
+    return failure(profile, 'already-owned', `لديك بالفعل ${option.label} في قيادة إمبراطوريتك.`);
+  }
   const hr = profile.staff.find((member) => member.status === 'active' && member.role === 'hr');
   const contractCost = Math.round(option.dailySalary * (hr ? Math.max(0.68, 0.8 - (staffLevel(hr) - 1) * 0.03) : 1));
   if (profile.bankBalance < contractCost) return failure(profile, 'insufficient-funds', 'لا يكفي الرصيد لتوقيع عقد الموظف ودفع يوم التعاقد.');
@@ -1438,13 +1506,15 @@ export function createDeposit(profile: PlayerProfile, amount: number, durationDa
   if (profile.banking.deposits.filter((deposit) => deposit.status === 'active').length >= 5) return failure(profile, 'condition-not-met', 'وصلت إلى الحد الأقصى: 5 ودائع نشطة. ادمج الودائع أو استرد وديعة مستحقة أولًا.');
   if (!Number.isInteger(amount) || amount < 50_000) return failure(profile, 'invalid-input', 'الحد الأدنى للوديعة 50,000 جنيه محاكاة.');
   if (amount > profile.bankBalance) return failure(profile, 'insufficient-funds', 'لا يكفي الرصيد لإنشاء هذه الوديعة.');
-  const deposit: DepositRecord = { id: nextId(profile, 'deposit', profile.banking.deposits.length), principal: amount, annualRate: option.annualRate, startedOnDay: profile.day, maturityDay: profile.day + durationDays, status: 'active' };
+  const cfo = profile.staff.find((member) => member.status === 'active' && member.role === 'cfo');
+  const cfoRateBonus = cfo ? 0.02 + (staffLevel(cfo) - 1) * 0.006 : 0;
+  const deposit: DepositRecord = { id: nextId(profile, 'deposit', profile.banking.deposits.length), principal: amount, annualRate: option.annualRate + cfoRateBonus, startedOnDay: profile.day, maturityDay: profile.day + durationDays, status: 'active' };
   const nextProfile = addLedger(
     { ...profile, banking: { ...profile.banking, deposits: [...profile.banking.deposits, deposit] } },
-    [ledgerEntry(profile, 'asset', amount, `إيداع وديعة لمدة ${durationDays} أيام`, 0)],
+    [ledgerEntry(profile, 'asset', amount, `إيداع وديعة لمدة ${durationDays} أيام${cfo ? ' (مع عوائد إضافية من المدير المالي)' : ''}`, 0)],
     profile.bankBalance - amount,
   );
-  return success(nextProfile, `تم إنشاء وديعة محاكاة تستحق في اليوم ${deposit.maturityDay}.`, deposit);
+  return success(nextProfile, `تم إنشاء وديعة محاكاة تستحق في اليوم ${deposit.maturityDay}${cfo ? ' بمعدل فائدة معزز بفضل المدير المالي' : ''}.`, deposit);
 }
 
 function activeDepositTranches(deposit: DepositRecord): DepositTranche[] {
@@ -1605,15 +1675,19 @@ export function advanceDay(profile: PlayerProfile): GameResult<DayOutcome> {
     payables -= paidPriorPayables;
     entries.push(ledgerEntry(profile, 'settlement', paidPriorPayables, 'سداد التزامات سابقة', entries.length));
   }
+  const cfo = profile.staff.find((member) => member.status === 'active' && member.role === 'cfo');
+  const cfoLevel = staffLevel(cfo);
   const loans = profile.banking.loans.map((loan) => {
     if (loan.status !== 'active' || loan.nextPaymentDay > nextDay) return loan;
     const due = Math.min(loan.remainingBalance, loan.installmentAmount);
     const paid = Math.min(balance, due);
     balance -= paid;
     const unpaid = due - paid;
-    const interestShare = Math.min(due, Math.max(0, loan.totalRepayment - loan.principal) / loan.termDays);
+    const rawInterestShare = Math.min(due, Math.max(0, loan.totalRepayment - loan.principal) / loan.termDays);
+    const interestDiscount = cfo ? Math.min(0.35, 0.15 + (cfoLevel - 1) * 0.04) : 0;
+    const interestShare = Math.round(rawInterestShare * (1 - interestDiscount));
     const principalShare = due - interestShare;
-    if (interestShare > 0) entries.push(ledgerEntry(profile, 'expense', Math.round(interestShare), `فائدة قسط القرض ${loan.id}`, entries.length));
+    if (interestShare > 0) entries.push(ledgerEntry(profile, 'expense', Math.round(interestShare), `فائدة قسط القرض ${loan.id}${cfo ? ' (مخفضة بفضل CFO)' : ''}`, entries.length));
     if (principalShare > 0 && paid > 0) entries.push(ledgerEntry(profile, 'settlement', Math.min(paid, Math.round(principalShare)), `سداد أصل قسط القرض ${loan.id}`, entries.length));
     if (unpaid > 0) {
       payables += unpaid;
@@ -1622,20 +1696,33 @@ export function advanceDay(profile: PlayerProfile): GameResult<DayOutcome> {
     const remainingBalance = Math.max(0, loan.remainingBalance - due);
     return { ...loan, remainingBalance, nextPaymentDay: nextDay + 1, status: remainingBalance === 0 ? 'paid' as const : 'active' as const };
   });
-  const staff = profile.staff.map((employee) => {
+  const rawStaff = profile.staff.map((employee) => {
     if (employee.status !== 'active') return employee;
     const developed = developStaff(employee);
     if (employee.nextPayDay > nextDay) return developed;
     const dueDays = Math.max(1, nextDay - employee.nextPayDay + 1);
     return { ...developed, nextPayDay: nextDay + 1, unpaidSalary: (employee.unpaidSalary ?? 0) + employee.dailySalary * dueDays };
   });
-  const salaryAccrued = staff.reduce((sum, employee) => {
+  const salaryAccrued = rawStaff.reduce((sum, employee) => {
     const previous = profile.staff.find((item) => item.id === employee.id);
     return sum + Math.max(0, (employee.unpaidSalary ?? 0) - (previous?.unpaidSalary ?? 0));
   }, 0);
   if (salaryAccrued > 0) {
     entries.push(ledgerEntry(profile, 'expense', salaryAccrued, 'رواتب مستحقة عن اليوم', entries.length));
     entries.push(ledgerEntry(profile, 'liability', salaryAccrued, 'التزام رواتب غير مسدد', entries.length));
+  }
+
+  // Directive 1: Executive Director auto-pays salaries if authorized
+  const directives: AutomationDirectives = profile.automationDirectives ?? getDefaultAutomationDirectives();
+  const generalManager = profile.staff.find((m) => m.status === 'active' && m.role === 'general_manager');
+  let staff = rawStaff;
+  if (generalManager && directives.autoPaySalaries) {
+    const totalDue = staff.reduce((sum, e) => sum + (e.unpaidSalary ?? 0), 0);
+    if (totalDue > 0 && balance >= totalDue) {
+      balance -= totalDue;
+      staff = staff.map((e) => ({ ...e, unpaidSalary: 0 }));
+      entries.push(ledgerEntry(profile, 'settlement', totalDue, `سداد رواتب تلقائي بتفويض المدير التنفيذي: ${generalManager.name}`, entries.length));
+    }
   }
   let inventory = [...profile.inventory];
   const newlyCompletedProductionIds: string[] = [];
@@ -1748,11 +1835,15 @@ export function advanceDay(profile: PlayerProfile): GameResult<DayOutcome> {
     entries.push(ledgerEntry(profile, 'revenue', briefing.event.cashImpact, briefing.event.title, entries.length));
   } else if (ownsEventIndustry && briefing.event.cashImpact < 0) {
     const lawyer = profile.staff.find((member) => member.status === 'active' && member.role === 'lawyer');
-    const eventCost = Math.round(Math.abs(briefing.event.cashImpact) * (lawyer ? Math.max(0.73, 0.85 - (staffLevel(lawyer) - 1) * 0.03) : 1));
+    const accountant = profile.staff.find((member) => member.status === 'active' && member.role === 'accountant');
+    const lawyerFactor = lawyer ? Math.max(0.70, 0.85 - (staffLevel(lawyer) - 1) * 0.03) : 1;
+    const accountantFactor = accountant ? Math.max(0.55, 0.75 - (staffLevel(accountant) - 1) * 0.05) : 1;
+    const combinedFactor = Math.min(lawyerFactor, accountantFactor);
+    const eventCost = Math.round(Math.abs(briefing.event.cashImpact) * combinedFactor);
     const paidEventCost = Math.min(balance, eventCost);
     balance -= paidEventCost;
     eventImpact = -paidEventCost;
-    entries.push(ledgerEntry(profile, 'expense', eventCost, briefing.event.title, entries.length));
+    entries.push(ledgerEntry(profile, 'expense', eventCost, `${briefing.event.title}${combinedFactor < 1 ? ' (مع حماية المستشار/المحاسب)' : ''}`, entries.length));
     if (paidEventCost < eventCost) {
       const unpaidEventCost = eventCost - paidEventCost;
       payables += unpaidEventCost;
@@ -1773,6 +1864,119 @@ export function advanceDay(profile: PlayerProfile): GameResult<DayOutcome> {
     const supply = industry?.dailyEnergySupply ?? capacity;
     return { ...company, energyUnits: energyPaused ? 0 : Math.min(capacity, (company.energyUnits ?? 0) + supply) };
   });
+
+  // Directive 2: Executive Director auto-purchases raw materials when stock is below threshold
+  if (generalManager && directives.autoPurchaseMaterials && balance > 5_000) {
+    const targetThreshold = directives.autoPurchaseThreshold || 50;
+    const budgetLimit = directives.autoPurchaseBudget || 50_000;
+    let spentOnMaterials = 0;
+
+    for (const company of companies) {
+      const recipe = findRecipeForIndustry(company.industryId);
+      if (!recipe) continue;
+      for (const input of recipe.inputs) {
+        const lot = inventory.find((item) => item.materialOrProductId === input.materialId);
+        const currentQty = lot?.quantity ?? 0;
+        if (currentQty < targetThreshold) {
+          const needed = targetThreshold - currentQty;
+          const mat = findMaterial(input.materialId);
+          const unitPrice = mat?.pricePerUnit ?? 100;
+          const purchaseCost = needed * unitPrice;
+          if (spentOnMaterials + purchaseCost <= budgetLimit && balance >= purchaseCost) {
+            const warehouseUsage = getWarehouseUsage(inventory, productionOrders);
+            const warehouseCap = getWarehouseCapacity(warehouseLevel);
+            if (warehouseUsage.materials + needed <= warehouseCap.materials) {
+              balance -= purchaseCost;
+              spentOnMaterials += purchaseCost;
+              const existingIdx = inventory.findIndex((item) => item.materialOrProductId === input.materialId);
+              if (existingIdx >= 0) {
+                const prev = inventory[existingIdx];
+                const newQty = prev.quantity + needed;
+                const newUnitCost = (prev.quantity * prev.unitCost + purchaseCost) / newQty;
+                inventory[existingIdx] = { ...prev, quantity: newQty, unitCost: newUnitCost };
+              } else {
+                inventory.push({
+                  id: nextId(profile, 'inventory', inventory.length),
+                  materialOrProductId: input.materialId,
+                  quantity: needed,
+                  unit: mat?.unit ?? 'وحدة',
+                  unitCost: unitPrice,
+                  qualityScore: 90,
+                });
+              }
+              entries.push(ledgerEntry(profile, 'expense', purchaseCost, `تموين خامات آلي بتفويض المدير التنفيذي: ${mat?.name ?? input.materialId} (${needed} وحدة)`, entries.length));
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // Directive 3: Operations Director continuous auto-production
+  const operationsDirector = profile.staff.find((member) => member.status === 'active' && member.role === 'operations_director');
+  if (operationsDirector && directives.autoRunProduction && !energyPaused) {
+    for (let i = 0; i < companies.length; i++) {
+      const company = companies[i];
+      if (directives.autoProduceCompanyIds && directives.autoProduceCompanyIds.length > 0 && !directives.autoProduceCompanyIds.includes(company.id)) {
+        continue;
+      }
+      const hasActiveOrder = productionOrders.some((order) => order.companyId === company.id && order.status === 'active');
+      if (!hasActiveOrder && (company.maintenanceCondition ?? 100) >= 30) {
+        const recipe = findRecipeForIndustry(company.industryId);
+        if (recipe) {
+          const batches = 1;
+          const energyAvailable = company.energyUnits ?? 0;
+          const energyCost = batches * recipe.energyCost;
+          const maintenanceCost = Math.round((company.operatingCostPerDay ?? 0) * 0.15 * getOperatingCostProgression(nextDay));
+
+          let hasMaterials = true;
+          for (const input of recipe.inputs) {
+            const lot = inventory.find((item) => item.materialOrProductId === input.materialId);
+            if (!lot || lot.quantity < input.quantity * batches) {
+              hasMaterials = false;
+              break;
+            }
+          }
+
+          if (hasMaterials && energyAvailable >= batches * recipe.energyUnits && balance >= energyCost + maintenanceCost) {
+            inventory = inventory.map((lot) => {
+              const input = recipe.inputs.find((item) => item.materialId === lot.materialOrProductId);
+              return input ? { ...lot, quantity: lot.quantity - input.quantity * batches } : lot;
+            }).filter((lot) => lot.quantity > 0);
+
+            balance -= (energyCost + maintenanceCost);
+            companies[i] = {
+              ...company,
+              energyUnits: energyAvailable - batches * recipe.energyUnits,
+              maintenanceCondition: Math.max(0, (company.maintenanceCondition ?? 100) - 8),
+            };
+
+            const outputQuantity = Math.max(recipe.outputQuantity, Math.round(batches * recipe.outputQuantity * getSynergyProductionMultiplier(profile)));
+            const autoOrder: ProductionOrder = {
+              id: nextId(profile, 'production', productionOrders.length),
+              companyId: company.id,
+              productId: recipe.productId,
+              productName: recipe.productName,
+              batches,
+              outputQuantity,
+              outputUnit: recipe.outputUnit,
+              materialCost: 0,
+              energyCost,
+              expectedUnitCost: (energyCost + maintenanceCost) / outputQuantity,
+              demandForecast: 25,
+              qualityScore: 92,
+              maintenanceCost,
+              startedOnDay: nextDay,
+              completesOnDay: nextDay + 1,
+              status: 'active',
+            };
+            productionOrders.push(autoOrder);
+            entries.push(ledgerEntry(profile, 'expense', energyCost + maintenanceCost, `تشغيل خط إنتاج آلي بإشراف مدير التشغيل: ${recipe.productName}`, entries.length));
+          }
+        }
+      }
+    }
+  }
   const expiredContracts = (profile.contracts ?? []).filter((contract) => contract.status === 'active' && contract.deadlineDay < nextDay);
   const contracts = (profile.contracts ?? []).map((contract) => contract.status === 'active' && contract.deadlineDay < nextDay
     ? { ...contract, status: 'failed' as const, failedOnDay: nextDay }
@@ -1858,14 +2062,19 @@ export function deliverContract(profile: PlayerProfile, contractId: string): Gam
   if (actualQuality < minimumQuality) return failure(profile, 'condition-not-met', `جودة المنتج ${Math.round(actualQuality)}%، بينما يشترط العميل ${minimumQuality}% على الأقل.`);
   const nextInventory = profile.inventory.flatMap((item) => item.id !== lot.id ? [item] : item.quantity === contract.quantity ? [] : [{ ...item, quantity: item.quantity - contract.quantity }]);
   const grossRevenue = contract.quantity * contract.unitPrice;
-  const hasAccountant = profile.staff.some((member) => member.status === 'active' && member.role === 'accountant');
   const accountant = profile.staff.find((member) => member.status === 'active' && member.role === 'accountant');
-  const taxRate = (findCountry(profile.countryId)?.economy.taxRate ?? 0) * (accountant ? Math.max(0.82, 0.9 - (staffLevel(accountant) - 1) * 0.02) : 1);
+  const accountantLevel = staffLevel(accountant);
+  const taxReduction = accountant ? Math.min(0.45, 0.18 + (accountantLevel - 1) * 0.05) : 0;
+  const taxRate = (findCountry(profile.countryId)?.economy.taxRate ?? 0) * (1 - taxReduction);
   const tax = Math.round(grossRevenue * taxRate);
   const costOfGoods = Math.round(lot.unitCost * contract.quantity);
   const sale: ProductSale = { id: nextId(profile, 'sale', profile.sales.length), productId: contract.productId, quantity: contract.quantity, unitPrice: contract.unitPrice, grossRevenue, tax, costOfGoods, soldOnDay: profile.day, contractId: contract.id, soldAt: timestampFor(profile) };
-  const revenue = grossRevenue + contract.reward;
-  const completed: BusinessContract = { ...contract, status: 'completed', completedOnDay: profile.day };
+  const lawyer = profile.staff.find((member) => member.status === 'active' && member.role === 'lawyer');
+  const lawyerLevel = staffLevel(lawyer);
+  const lawyerBonusMult = lawyer ? 1 + (0.10 + (lawyerLevel - 1) * 0.04) : 1;
+  const contractReward = Math.round(contract.reward * lawyerBonusMult);
+  const revenue = grossRevenue + contractReward;
+  const completed: BusinessContract = { ...contract, reward: contractReward, status: 'completed', completedOnDay: profile.day };
   const contracts = (profile.contracts ?? []).map((item) => item.id === contract.id ? completed : item);
   const base = { ...profile, inventory: nextInventory, sales: [...profile.sales, sale], contracts, reputation: Math.min(100, (profile.reputation ?? 50) + contract.reputationReward) };
   const achievements = awardAchievements(base);
@@ -1873,25 +2082,28 @@ export function deliverContract(profile: PlayerProfile, contractId: string): Gam
     { ...base, achievements: achievements.achievements },
     [
       ledgerEntry(profile, 'revenue', grossRevenue, `بيع عقد ${contract.clientName} · ${contract.productName}`, 0),
-      ledgerEntry(profile, 'revenue', contract.reward, `علاوة عقد ${contract.clientName}`, 1),
-      ledgerEntry(profile, 'expense', tax, 'ضريبة مبيعات محاكاة على العقد', 2),
+      ledgerEntry(profile, 'revenue', contractReward, `علاوة عقد ${contract.clientName}${lawyer ? ' (مع علاوة صياغة المحامي)' : ''}`, 1),
+      ledgerEntry(profile, 'expense', tax, `ضريبة مبيعات محاكاة على العقد${accountant ? ' (مخفضة بفضل المحاسب)' : ''}`, 2),
       ledgerEntry(profile, 'expense', costOfGoods, `تكلفة البضاعة المباعة بعقد: ${contract.productName}`, 3),
       ...(achievements.bonus > 0 ? [ledgerEntry(profile, 'revenue', achievements.bonus, 'مكافأة إنجازات العقود', 4)] : []),
     ],
     profile.bankBalance + revenue - tax + achievements.bonus,
   );
-  return success(syncTasks(nextProfile), `تم تسليم العقد بنجاح. الإيراد ${grossRevenue.toLocaleString('ar-EG')} $ والعلاوة ${contract.reward.toLocaleString('ar-EG')} $ بعد احتساب الضريبة والتكلفة.`, completed);
+  return success(syncTasks(nextProfile), `تم تسليم العقد بنجاح. الإيراد ${grossRevenue.toLocaleString('ar-EG')} $ والعلاوة ${contractReward.toLocaleString('ar-EG')} $ بعد احتساب الضريبة والتكلفة.`, completed);
 }
 
 export function negotiateContract(profile: PlayerProfile, contractId: string, mode: 'price' | 'deadline' | 'quality'): GameResult<BusinessContract> {
   const contract = (profile.contracts ?? []).find((item) => item.id === contractId && item.status === 'active');
   if (!contract) return failure(profile, 'not-found', 'العقد غير موجود أو تمت تسويته.');
   if (contract.negotiated) return failure(profile, 'already-owned', 'تم التفاوض على هذا العقد من قبل.');
+  const lawyer = profile.staff.find((member) => member.status === 'active' && member.role === 'lawyer');
+  const priceMult = lawyer ? 1.12 : 1.08;
+  const deadlinePenalty = lawyer ? 0.98 : 0.95;
   const changes = mode === 'price'
-    ? { unitPrice: Math.round(contract.unitPrice * 1.08), negotiationNote: 'رفع السعر 8% مقابل قبول العميل بمهلة وشروط العقد نفسها.' }
+    ? { unitPrice: Math.round(contract.unitPrice * priceMult), negotiationNote: `رفع السعر ${lawyer ? '12%' : '8%'} بحماية وخبرة المستشار القانوني.` }
     : mode === 'deadline'
-      ? { deadlineDay: contract.deadlineDay + 1, reward: Math.round(contract.reward * 0.95), negotiationNote: 'تمديد يوم واحد مقابل خفض علاوة التسليم 5%.' }
-      : { minimumQuality: Math.max(0, (contract.minimumQuality ?? 90) - 5), reward: Math.round(contract.reward * 0.92), negotiationNote: 'خفض الجودة المطلوبة 5 نقاط مقابل خفض العلاوة 8%.' };
+      ? { deadlineDay: contract.deadlineDay + 1, reward: Math.round(contract.reward * deadlinePenalty), negotiationNote: `تمديد يوم واحد مع صياغة قانونية متوازنة.` }
+      : { minimumQuality: Math.max(0, (contract.minimumQuality ?? 90) - (lawyer ? 7 : 5)), reward: Math.round(contract.reward * 0.94), negotiationNote: 'خفض اشتراطات الجودة بمرونة تعاقدية.' };
   const updated = { ...contract, ...changes, negotiated: true };
   return success({ ...profile, contracts: profile.contracts.map((item) => item.id === contractId ? updated : item) }, `تم التفاوض: ${updated.negotiationNote}`, updated);
 }
@@ -1938,6 +2150,22 @@ export function updateNotificationState(profile: PlayerProfile, action: unknown,
   return success(nextProfile, action === 'read' ? 'تم تعليم التنبيه كمقروء.' : 'تم إخفاء التنبيه.', { action, notificationIds: ids });
 }
 
+export function updateAutomationDirectives(
+  profile: PlayerProfile,
+  directives: Partial<AutomationDirectives>,
+): GameResult<AutomationDirectives> {
+  const current = profile.automationDirectives ?? getDefaultAutomationDirectives();
+  const updated: AutomationDirectives = {
+    ...current,
+    ...directives,
+  };
+  const nextProfile: PlayerProfile = {
+    ...profile,
+    automationDirectives: updated,
+  };
+  return success(nextProfile, 'تم حفظ تفويضات الإدارة المؤتمتة بنجاح.', updated);
+}
+
 /** Serializable intent sent by authenticated clients; it deliberately contains no profile/save data. */
 export type GameCommand =
   | { name: 'place_bid'; args: { listingId: string; amount: number; targetCompanyId?: string } }
@@ -1970,6 +2198,7 @@ export type GameCommand =
   | { name: 'upgrade_staff'; args: { staffId: string } }
   | { name: 'pay_staff_salary'; args: { staffId: string } }
   | { name: 'terminate_staff'; args: { staffId: string } }
+  | { name: 'update_automation_directives'; args: { directives: Partial<AutomationDirectives> } }
   | { name: 'create_deposit'; args: { amount: number; durationDays: number } }
   | { name: 'merge_deposits'; args: { depositIds: string[] } }
   | { name: 'withdraw_deposit'; args: { depositId: string } }
@@ -2025,6 +2254,7 @@ export function executeGameCommand(profile: PlayerProfile, command: GameCommand)
     case 'upgrade_staff': return upgradeStaff(profile, command.args.staffId);
     case 'pay_staff_salary': return payStaffSalary(profile, command.args.staffId);
     case 'terminate_staff': return terminateStaff(profile, command.args.staffId);
+    case 'update_automation_directives': return updateAutomationDirectives(profile, command.args.directives);
     case 'create_deposit': return createDeposit(profile, command.args.amount, command.args.durationDays);
     case 'merge_deposits': return mergeDeposits(profile, command.args.depositIds);
     case 'withdraw_deposit': return withdrawDeposit(profile, command.args.depositId);
@@ -2052,9 +2282,12 @@ export {
   settlePlayerAssetAuction,
   cancelPlayerAssetAuction,
   executeSellPlayerAsset,
+} from './dynamicAuctions';
+
+export {
   claimStarterMission,
   getStarterMissions,
   getCompletedStarterMissions,
   getCurrentStarterMissionStage,
   STARTER_MISSION_SPECS,
-};
+} from './onboarding';

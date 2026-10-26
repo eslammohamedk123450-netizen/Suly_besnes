@@ -167,7 +167,6 @@ describe('starter missions multi-stage progression and reward safety', () => {
     profile.contracts.push({
       id: 'contract-test-1',
       clientName: 'متاجر الأمل',
-      clientType: 'budget',
       productId: 'food-pack',
       productName: 'وجبات غذائية',
       quantity: 100,

@@ -95,7 +95,7 @@ describe('player asset auction listing and anti-duplication system', () => {
     expect(profile.bankBalance).toBe(initialBalance + saleAmount);
 
     // 4. Attempt direct sell on the already sold asset -> MUST FAIL and NOT credit balance
-    const dupDirectSell = executeSellPlayerAsset(profile, 'land', 'land-million-1', 1_000_000, 'مشتري تجريبي');
+    const dupDirectSell = executeSellPlayerAsset(profile, 'land', 'land-million-1', 1_000_000);
     expect(dupDirectSell.ok).toBe(false);
     expect(profile.bankBalance).toBe(initialBalance + saleAmount);
 

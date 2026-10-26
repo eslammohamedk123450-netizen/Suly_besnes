@@ -19,6 +19,7 @@ import type {
   GlobalShipmentRecord,
   ForwardSupplyContract,
   PlayerAuctionListing,
+  AutomationDirectives,
 } from './futureSystems';
 import type { SpeedCardStack } from './accountFeatures';
 import { FREE_AVATAR_IDS, DEFAULT_AVATAR_ID } from './avatars';
@@ -127,6 +128,18 @@ export interface PlayerProfile {
   playerAuctions?: PlayerAuctionListing[];
   soldAssetIds?: string[];
   processedAuctionSaleIds?: string[];
+  automationDirectives?: AutomationDirectives;
+}
+
+export function getDefaultAutomationDirectives(): AutomationDirectives {
+  return {
+    autoPaySalaries: false,
+    autoPurchaseMaterials: false,
+    autoPurchaseThreshold: 50,
+    autoPurchaseBudget: 50_000,
+    autoRunProduction: false,
+    autoProduceCompanyIds: [],
+  };
 }
 
 function createId(): string {
@@ -318,6 +331,7 @@ export function createNewPlayer(
     bio: 'ابنِ إمبراطوريتك الاستثمارية بعزيمة لا تلين ورؤية لا تعرف المستحيل.',
     renameCountThisWeek: 0,
     lastRenameWeekTimestamp: now.getTime(),
+    automationDirectives: getDefaultAutomationDirectives(),
   };
 }
 

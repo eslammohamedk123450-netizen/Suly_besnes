@@ -46,7 +46,7 @@ export interface PlayerAuctionBid {
 
 export interface PlayerAuctionListing {
   id: string;
-  assetType: 'land' | 'company' | 'asset';
+  assetType: 'land' | 'company';
   assetId: string;
   assetName: string;
   assetSpecs: string;
@@ -56,7 +56,6 @@ export interface PlayerAuctionListing {
   status: 'active' | 'sold' | 'cancelled';
   leadingBidderName: string;
   leadingBidderType: string;
-  winningBidderName?: string;
   totalBidsCount: number;
   closesAtMs: number;
   listedAt: string;
@@ -166,7 +165,24 @@ export interface LoanRecord {
   status: 'active' | 'paid' | 'defaulted';
 }
 
-export type StaffRole = 'manager' | 'accountant' | 'lawyer' | 'hr';
+export type StaffRole =
+  | 'manager'
+  | 'accountant'
+  | 'lawyer'
+  | 'hr'
+  | 'foreman'
+  | 'cfo'
+  | 'general_manager'
+  | 'operations_director';
+
+export interface AutomationDirectives {
+  autoPaySalaries: boolean;
+  autoPurchaseMaterials: boolean;
+  autoPurchaseThreshold: number;
+  autoPurchaseBudget: number;
+  autoRunProduction: boolean;
+  autoProduceCompanyIds?: string[];
+}
 
 export interface StaffContract {
   id: string;

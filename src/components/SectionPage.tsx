@@ -43,6 +43,7 @@ import { BankTerminal } from './BankTerminal';
 import { getPlayerProgress, getSectionRequiredLevel, getSectionUnlockHint, isSectionUnlocked } from '../game/onboarding';
 import { getCountryScenario } from '../game/countryScenarios';
 import { ListAssetAuctionModal } from './DynamicAuctionModal';
+import { StaffManagementView } from './StaffManagementView';
 import { generateLiveAuctions, RIVAL_INVESTORS, settlePlayerAssetAuction, cancelPlayerAssetAuction } from '../game/dynamicAuctions';
 import { GlobalMarketTerminal } from './GlobalMarketTerminal';
 
@@ -396,41 +397,20 @@ export function SectionPage({ section, profile, country, focus, notificationThem
   }
 
   if (section.id === 'staff') {
-    const activeStaff = profile.staff.filter((member) => member.status === 'active');
-    const roleLabels: Record<StaffRole, string> = { manager: 'مدير شركة', accountant: 'محاسب', lawyer: 'محامٍ', hr: 'مدير موارد بشرية' };
-    const dailyPayroll = activeStaff.reduce((sum, member) => sum + member.dailySalary, 0);
-    const nextPayDay = activeStaff.length > 0 ? Math.min(...activeStaff.map((member) => member.nextPayDay)) : profile.day + 1;
-    const dueSoonCount = activeStaff.filter((member) => member.nextPayDay <= profile.day + 1).length;
-    const employeeInitials = (name: string) => name.trim().split(/\s+/).slice(0, 2).map((part) => part[0] ?? '').join('');
-    const companyNameFor = (companyId?: string) => profile.companies.find((company) => company.id === companyId)?.name ?? 'الإدارة الرئيسية';
-    return <div className="section-page staff-section-page">{heading}{pageShell(
-      <>
-        <div className="staff-command-surface">
-          <div className="staff-command-head">
-            <button className="staff-back-button" type="button" onClick={onHome} aria-label="العودة للرئيسية"><Icon name="arrow" size={25} /></button>
-            <div className="staff-command-title"><span className="staff-command-icon"><Icon name="user" size={30} /></span><div><h2>الإدارة والرواتب</h2><p>فريق قوي... مستقبل أكبر</p></div></div>
-            <div className="staff-count-badge"><Icon name="company" size={21} /><strong>{formatNumber(activeStaff.length)}</strong><small>موظف{activeStaff.length === 1 ? '' : 'ون'}</small></div>
-          </div>
-
-          <div className="staff-roster">
-            {profile.staff.length === 0 ? <div className="staff-empty"><Icon name="user" size={34} /><strong>ابدأ بتكوين فريقك</strong><span>وظّف مديرًا أو محاسبًا ليساعدك على بناء إمبراطورية أقوى.</span></div> : profile.staff.slice().reverse().map((member, index) => <article className="staff-member-card" key={member.id}>
-              <div className={`staff-avatar staff-avatar--${index % 4}`} aria-hidden="true">{employeeInitials(member.name)}</div>
-              <div className="staff-member-copy"><div className="staff-member-name-row"><h3>{member.name}</h3><span className={`staff-status-pill ${member.status === 'active' ? 'is-active' : 'is-ended'}`}><i />{member.status === 'active' ? 'نشط' : 'منتهٍ'}</span></div><span className={`staff-role-chip staff-role-chip--${member.role}`}><Icon name={member.role === 'manager' ? 'settings' : member.role === 'accountant' ? 'report' : member.role === 'lawyer' ? 'shield' : 'user'} size={13} />{roleLabels[member.role]}</span><p><Icon name="company" size={15} />{companyNameFor(member.companyId)}</p><div className="staff-level-row"><span>المستوى {formatNumber(staffLevel(member))}</span><small>{formatNumber(staffExperience(member))}% خبرة</small></div><div className="staff-level-track"><span style={{ width: `${staffLevel(member) >= 5 ? 100 : staffExperience(member)}%` }} /></div></div>
-              <div className="staff-member-salary"><span>الراتب اليومي</span><strong>{formatMoney(member.dailySalary, country)}</strong>{member.unpaidSalary ? <small className="staff-due-label">مستحق {formatMoney(member.unpaidSalary, country)}</small> : <small>التالي يوم {formatNumber(member.nextPayDay)}</small>}</div>
-              <div className="staff-member-actions">{member.status === 'active' && <><button className="staff-more-button" type="button" aria-label={`إنهاء عقد ${member.name}`} onClick={() => runCommand({ name: 'terminate_staff', args: { staffId: member.id } }, (current) => terminateStaff(current, member.id))}>⋮</button>{staffLevel(member) < 5 && <button className="button button-secondary staff-upgrade-button" type="button" disabled={profile.bankBalance < getStaffUpgradeCost(member)} onClick={() => runCommand({ name: 'upgrade_staff', args: { staffId: member.id } }, (current) => upgradeStaff(current, member.id))}>ترقية · {formatMoney(getStaffUpgradeCost(member), country)}</button>}{member.unpaidSalary ? <button className="button button-primary staff-pay-button" type="button" disabled={profile.bankBalance < member.unpaidSalary} onClick={() => runCommand({ name: 'pay_staff_salary', args: { staffId: member.id } }, (current) => payStaffSalary(current, member.id))}>دفع المستحقات</button> : null}</>}</div>
-            </article>)}
-          </div>
-
-          <button className="staff-hire-cta" type="button" onClick={() => setShowStaffHireForm((value) => !value)}><Icon name="plus" size={23} /><strong>{showStaffHireForm ? 'إغلاق نموذج التوظيف' : 'وظّف موظفًا'}</strong></button>
-
-          {showStaffHireForm && <form className="staff-hire-form" onSubmit={(event: FormEvent<HTMLFormElement>) => { event.preventDefault(); runCommand({ name: 'hire_staff', args: { role: staffRole, name: staffName, companyId: staffRole === 'manager' ? staffCompany : undefined } }, (current) => hireStaff(current, staffRole, staffName, staffRole === 'manager' ? staffCompany : undefined)); }}><div className="staff-form-heading"><div><strong>تعيين عضو جديد</strong><span>اختر الدور والاسم ثم وقّع العقد.</span></div><Icon name="briefcase" size={25} /></div><div className="economy-form-row"><div className="economy-field"><label htmlFor="staff-name">اسم الموظف</label><input id="staff-name" value={staffName} onChange={(event) => setStaffName(event.target.value)} placeholder="مثال: أحمد سالم" /></div><div className="economy-field"><label htmlFor="staff-role">الدور</label><select id="staff-role" value={staffRole} onChange={(event) => setStaffRole(event.target.value as StaffRole)}>{Object.entries(roleLabels).map(([role, label]) => <option value={role} key={role}>{label}</option>)}</select></div>{staffRole === 'manager' && <div className="economy-field"><label htmlFor="staff-company">الشركة</label><select id="staff-company" value={staffCompany} onChange={(event) => setStaffCompany(event.target.value)}><option value="">اختر شركة</option>{profile.companies.map((company) => <option value={company.id} key={company.id}>{company.name}</option>)}</select></div>}</div><button className="button button-primary" type="submit" disabled={staffName.trim().length < 2 || (staffRole === 'manager' && !staffCompany)}>توقيع العقد ودفع يوم التعاقد</button></form>}
-
-          <div className="staff-payroll-summary"><div className="staff-payroll-copy"><span className="staff-summary-icon"><Icon name="tasks" size={27} /></span><div><strong>الرواتب القادمة</strong><small>تستحق خلال {formatNumber(Math.max(1, nextPayDay - profile.day))} يوم</small></div></div><div className="staff-payroll-total"><strong>{formatMoney(dailyPayroll, country)}</strong><small>إجمالي الرواتب اليومية</small></div><div className="staff-payroll-track"><span style={{ width: `${activeStaff.length ? Math.min(100, Math.round((dueSoonCount / activeStaff.length) * 100)) : 0}%` }} /></div><small className="staff-payroll-foot">{formatNumber(dueSoonCount)}/{formatNumber(activeStaff.length)} موظف</small></div>
-          <div className="staff-mini-stats"><div><Icon name="user" size={27} /><strong>{formatNumber(activeStaff.length)}</strong><span>إجمالي الموظفين</span></div><div><Icon name="investment" size={27} /><strong>{activeStaff.length ? `${Math.round((activeStaff.filter((member) => member.status === 'active').length / activeStaff.length) * 100)}%` : '0%'}</strong><span>معدل النشاط</span></div></div>
-          <div className="staff-empire-note"><Icon name="crown" size={23} /><span>الموظفون الأكفاء يصنعون إمبراطوريات عظيمة.</span></div>
-        </div>
-      </>,
-    )}</div>;
+    return (
+      <div className="section-page staff-section-page">
+        {heading}
+        {pageShell(
+          <StaffManagementView
+            profile={profile}
+            country={country}
+            onCommand={runCommand}
+            onOpenFinancialReports={() => onNavigate('reports')}
+            onHome={onHome}
+          />
+        )}
+      </div>
+    );
   }
 
   if (section.id === 'auctions') {
