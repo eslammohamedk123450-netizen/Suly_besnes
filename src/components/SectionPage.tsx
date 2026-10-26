@@ -14,6 +14,8 @@ import { getInvestmentPayoutRate, getOperatingCostProgression } from '../game/ec
 import { getContractOffers, getCustomerSegmentLabel } from '../game/contracts';
 import { selectActiveInvestments, selectAdvancedStatistics, selectAvailableAuctions, selectCompanyPerformance, selectEmpirePoints, selectFinancialReport, selectInventorySummary, selectObligations, selectSalesSummary, selectTaskBoard } from '../game/selectors';
 import { Icon, type IconName } from './Icon';
+import { Warehouse, Boxes, ShoppingBag } from 'lucide-react';
+import { triggerHaptic } from '../services/nativeMobileService';
 import { isSoundEnabled, setSoundEnabled, playSound } from '../game/soundEffects';
 import { EconomyEmpty, EconomyPageShell, EconomyPanel as BaseEconomyPanel, EconomyStat, type EconomyPanelProps } from './EconomyUI';
 import { DiamondStore } from './DiamondStore';
@@ -131,6 +133,23 @@ export function SectionPage({ section, profile, country, focus, notificationThem
   const [staffRole, setStaffRole] = useState<StaffRole>('manager');
   const [staffCompany, setStaffCompany] = useState('');
   const [showStaffHireForm, setShowStaffHireForm] = useState(false);
+  type InventoryTab = 'warehouse' | 'materials' | 'sales';
+  const [inventoryTab, setInventoryTab] = useState<InventoryTab>(() => {
+    if (focus?.includes('sales') || focus?.includes('sell') || focus?.includes('product')) return 'sales';
+    if (focus?.includes('material') || focus?.includes('global') || focus?.includes('market') || focus?.includes('grain')) return 'materials';
+    if (focus?.includes('warehouse')) return 'warehouse';
+    return 'warehouse';
+  });
+
+  useEffect(() => {
+    if (focus?.includes('sales') || focus?.includes('sell') || focus?.includes('product')) {
+      setInventoryTab('sales');
+    } else if (focus?.includes('material') || focus?.includes('global') || focus?.includes('market') || focus?.includes('grain')) {
+      setInventoryTab('materials');
+    } else if (focus?.includes('warehouse')) {
+      setInventoryTab('warehouse');
+    }
+  }, [focus]);
   const [auctionCompanyIds, setAuctionCompanyIds] = useState<Record<string, string>>({});
   const [selectedAuctionId, setSelectedAuctionId] = useState<string | null>(null);
   const [negotiatedMarketPrices, setNegotiatedMarketPrices] = useState<Record<string, number>>({});
@@ -943,44 +962,452 @@ export function SectionPage({ section, profile, country, focus, notificationThem
   if (section.id === 'inventory') {
     const inventorySummary = selectInventorySummary(profile);
     const productRows = inventorySummary.rows.filter((row) => row.kind === 'product');
-    const materialStock = new Map(inventorySummary.rows.filter((row) => row.kind === 'material').map((row) => [row.itemId, row]));
+    const materialRows = inventorySummary.rows.filter((row) => row.kind === 'material');
+    const materialStock = new Map(materialRows.map((row) => [row.itemId, row]));
+    const materialRowsCount = materialRows.length;
+    const materialTotalValue = materialRows.reduce((sum, r) => sum + r.totalValue, 0);
+    const productsTotalValue = productRows.reduce((sum, r) => sum + r.totalValue, 0);
     const warehouseLevel = normalizeWarehouseLevel(profile.warehouseLevel);
     const warehouseCapacity = getWarehouseCapacity(warehouseLevel);
     const warehouseUsage = getWarehouseUsage(profile.inventory, profile.productionOrders);
     const upgradeRequirement = WAREHOUSE_UPGRADE_REQUIREMENTS[warehouseLevel + 1];
-    const missingUpgradeMaterials = upgradeRequirement ? Object.entries(upgradeRequirement.materials).filter(([materialId, required]) => (materialStock.get(materialId)?.quantity ?? 0) < required) : [];
+    const missingUpgradeMaterials = upgradeRequirement
+      ? Object.entries(upgradeRequirement.materials).filter(([materialId, required]) => (materialStock.get(materialId)?.quantity ?? 0) < required)
+      : [];
     const canUpgradeWarehouse = Boolean(upgradeRequirement && missingUpgradeMaterials.length === 0);
-    return <div className="section-page">{heading}{pageShell(
-      <>
-        <div className="economy-grid economy-grid--three-mobile"><EconomyStat label="أنواع المخزون" value={formatNumber(inventorySummary.rows.length)} /><EconomyStat label="مواد خام" value={formatNumber(inventorySummary.rows.filter((row) => row.kind === 'material').length)} /><EconomyStat label="قيمة المخزون" value={formatMoney(inventorySummary.totalValue, country)} /></div>
-        <SectionPanel id="warehouse-overview" title={`المخزن · المستوى ${formatNumber(warehouseLevel)}`} description="السعة مشتركة بين أنواع المواد الخام وبين المنتجات. تطوير المستوى يوسّع الفئتين ويرفع حد كل صنف، مقابل نقد ومواد محددة.">
-          <div className="warehouse-capacity-grid">
-            <article><span>المواد الخام</span><strong>{formatNumber(warehouseUsage.materials)} / {formatNumber(warehouseCapacity.materials)}</strong><div className="economy-progress"><span style={{ width: `${Math.min(100, warehouseUsage.materials / warehouseCapacity.materials * 100)}%` }} /></div></article>
-            <article><span>المنتجات مع الإنتاج المحجوز</span><strong>{formatNumber(warehouseUsage.products)} / {formatNumber(warehouseCapacity.products)}</strong><div className="economy-progress"><span style={{ width: `${Math.min(100, warehouseUsage.products / warehouseCapacity.products * 100)}%` }} /></div></article>
-          </div>
-          {upgradeRequirement ? <div className="warehouse-upgrade-card"><div><strong>تطوير إلى المستوى {formatNumber(warehouseLevel + 1)}</strong><small>التكلفة {formatMoney(upgradeRequirement.cash, country)} · المتطلبات:</small></div><div className="economy-meta">{Object.entries(upgradeRequirement.materials).map(([materialId, required]) => { const material = MATERIAL_CATALOG.find((item) => item.id === materialId); const owned = materialStock.get(materialId)?.quantity ?? 0; return <span className={owned >= required ? 'economy-pill economy-pill--green' : 'economy-pill economy-pill--gold'} key={materialId}>{material?.name ?? materialId} {formatNumber(owned)} / {formatNumber(required)}</span>; })}</div><PurchaseOptions country={country} cashPrice={upgradeRequirement.cash} bankBalance={profile.bankBalance} diamondsBalance={profile.diamonds} disabled={!canUpgradeWarehouse} cashLabel="تطوير المخزن نقدًا" onPurchase={(paymentMethod) => runCommand({ name: 'upgrade_warehouse', args: { paymentMethod } }, (current) => upgradeWarehouse(current, paymentMethod))} /></div> : <p className="economy-card-description">وصل المخزن إلى أعلى مستوى تطوير.</p>}
-        </SectionPanel>
-        <SectionPanel id="inventory-materials" title="مخزون المواد الخام" description="تظهر هنا المواد الموجودة في مخزونك. تُتاح مشتريات المواد عبر عروض السوق والمزادات فقط.">
-          <div className="economy-list">{MATERIAL_CATALOG.map((material) => {
-            const stock = materialStock.get(material.id);
-            if (!stock) return null;
-            return <article className="economy-card economy-card--soft" key={material.id}><div className="economy-card-head"><div className="economy-card-title"><span className="economy-card-icon"><Icon name="warehouse" size={18} /></span><span><strong>{material.name}</strong><small>قيمة المخزون {formatMoney(stock.totalValue, country)}</small></span></div><span className="economy-pill">{formatNumber(stock.quantity)} {material.unit}</span></div></article>;
-          })}</div>
-        </SectionPanel>
-        <SectionPanel id="inventory-global-market" title="السوق العالمي · بورصة السلع والتجارة الدولية" description="استيراد الخامات بشروط الشحن الدولي Incoterms، التفاوض التجاري المباشر، التصدير للموانئ العالمية، وعقود التحوط الآجلة.">
-          <GlobalMarketTerminal profile={profile} country={country} onCommand={runCommand} onAction={onAction} />
-        </SectionPanel>
-        <SectionPanel id="inventory-sales" title="المنتجات الجاهزة للبيع" description="الطلب والسعر يتغيران يوميًا داخل محاكاة اللعبة؛ تُخصم الضريبة من حصيلة البيع.">
-          {productRows.length === 0 ? <EconomyEmpty title="لا توجد منتجات جاهزة" message="أنشئ شركة، اشترِ مدخلاتها، ثم شغّل خط الإنتاج." /> : <div className="economy-list">{productRows.map((row) => {
-            const product = PRODUCT_CATALOG.find((item) => item.id === row.itemId);
-            const quantity = productQuantities[row.itemId] ?? '1';
-            const marketQuote = getMarketQuote(profile, row.itemId);
-            const maxSellable = Math.min(row.quantity, marketQuote?.demandUnits ?? row.quantity);
-            return <article className="economy-card" key={row.id}><div className="economy-card-head"><div className="economy-card-title"><span className="economy-card-icon"><Icon name="briefcase" size={18} /></span><span><strong>{row.name}</strong><small>المخزون {formatNumber(row.quantity)} {row.unit} · سعر السوق {formatMoney(marketQuote?.currentPrice ?? product?.baseSellPrice ?? 0, country)}</small></span></div><span className={`economy-pill economy-pill--${marketQuote?.trend === 'up' ? 'green' : marketQuote?.trend === 'down' ? 'red' : 'gold'}`}>{marketQuote?.trendLabel ?? 'السوق'}</span></div><div className="economy-card-body"><div className="economy-meta"><span>الطلب المتاح اليوم {formatNumber(marketQuote?.demandUnits ?? 0)} {row.unit}</span><span>القيمة الدفترية {formatMoney(row.totalValue, country)}</span></div><form className="economy-form" onSubmit={(event: FormEvent<HTMLFormElement>) => { event.preventDefault(); runCommand({ name: 'sell_product', args: { productId: row.itemId, quantity: Number(quantity) } }, (current) => sellProduct(current, row.itemId, Number(quantity))); }}><div className="economy-field"><label htmlFor={`sell-${row.itemId}`}>كمية البيع ({row.unit})</label><input id={`sell-${row.itemId}`} type="number" min="1" max={maxSellable} step="1" value={quantity} onChange={(event) => setProductQuantities((previous) => ({ ...previous, [row.itemId]: event.target.value }))} /></div><button className="button button-primary" type="submit" data-guide-target="sell-product-btn" disabled={!quantity || Number(quantity) < 1 || Number(quantity) > maxSellable}><Icon name="investment" size={15} /> بيع بسعر السوق</button></form></div></article>;
-          })}</div>}
-        </SectionPanel>
-      </>,
-    )}</div>;
+
+    return (
+      <div className="section-page">
+        {heading}
+        {pageShell(
+          <>
+            {/* الثلاث أيقونات الرئيسية المنفصلة غير المدمجة (مخزن / المواد الخام والمخزنة / المنتجات الجاهزة) */}
+            <div className="grid grid-cols-3 gap-2 sm:gap-4 mb-6" role="tablist" aria-label="أقسام السوق والمخازن">
+              {/* أيقونة 1: مخزن */}
+              <button
+                type="button"
+                role="tab"
+                id="tab-btn-warehouse"
+                aria-selected={inventoryTab === 'warehouse'}
+                data-guide-target="tab-warehouse"
+                onClick={() => {
+                  playSound('click');
+                  void triggerHaptic('light');
+                  setInventoryTab('warehouse');
+                }}
+                className={`relative p-3 sm:p-4 rounded-2xl border transition-all text-center flex flex-col items-center justify-between gap-2 cursor-pointer select-none ${
+                  inventoryTab === 'warehouse'
+                    ? 'bg-gradient-to-b from-amber-500/25 via-slate-900 to-slate-950 border-amber-500 shadow-xl shadow-amber-500/20 text-white ring-2 ring-amber-500/40'
+                    : 'bg-slate-900/80 hover:bg-slate-800/90 border-slate-800 text-slate-400 hover:text-slate-200 hover:border-slate-700'
+                }`}
+              >
+                <div
+                  className={`w-11 h-11 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center transition-all ${
+                    inventoryTab === 'warehouse'
+                      ? 'bg-gradient-to-tr from-amber-500 to-yellow-400 text-slate-950 shadow-lg shadow-amber-500/35 scale-105'
+                      : 'bg-slate-800 text-amber-400/80'
+                  }`}
+                >
+                  <Warehouse className="w-6 h-6 sm:w-7 sm:h-7" />
+                </div>
+                <div className="flex flex-col items-center">
+                  <span className={`text-xs sm:text-base font-black ${inventoryTab === 'warehouse' ? 'text-amber-300' : 'text-slate-200'}`}>
+                    مخزن
+                  </span>
+                  <span className="text-[10px] sm:text-xs text-slate-400 hidden sm:inline">السعة والترقية</span>
+                </div>
+                <span
+                  className={`text-[9px] sm:text-[11px] px-2 sm:px-2.5 py-0.5 rounded-full font-mono font-bold ${
+                    inventoryTab === 'warehouse'
+                      ? 'bg-amber-500/25 text-amber-300 border border-amber-500/60'
+                      : 'bg-slate-800/80 text-slate-400 border border-slate-700/80'
+                  }`}
+                >
+                  المستوى {warehouseLevel}
+                </span>
+                {inventoryTab === 'warehouse' && (
+                  <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-8 h-1 bg-amber-400 rounded-full shadow-sm shadow-amber-400" />
+                )}
+              </button>
+
+              {/* أيقونة 2: المواد الخام والمخزنة */}
+              <button
+                type="button"
+                role="tab"
+                id="tab-btn-materials"
+                aria-selected={inventoryTab === 'materials'}
+                data-guide-target="tab-materials"
+                onClick={() => {
+                  playSound('click');
+                  void triggerHaptic('light');
+                  setInventoryTab('materials');
+                }}
+                className={`relative p-3 sm:p-4 rounded-2xl border transition-all text-center flex flex-col items-center justify-between gap-2 cursor-pointer select-none ${
+                  inventoryTab === 'materials'
+                    ? 'bg-gradient-to-b from-blue-500/25 via-slate-900 to-slate-950 border-blue-500 shadow-xl shadow-blue-500/20 text-white ring-2 ring-blue-500/40'
+                    : 'bg-slate-900/80 hover:bg-slate-800/90 border-slate-800 text-slate-400 hover:text-slate-200 hover:border-slate-700'
+                }`}
+              >
+                <div
+                  className={`w-11 h-11 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center transition-all ${
+                    inventoryTab === 'materials'
+                      ? 'bg-gradient-to-tr from-blue-500 to-cyan-400 text-slate-950 shadow-lg shadow-blue-500/35 scale-105'
+                      : 'bg-slate-800 text-blue-400/80'
+                  }`}
+                >
+                  <Boxes className="w-6 h-6 sm:w-7 sm:h-7" />
+                </div>
+                <div className="flex flex-col items-center">
+                  <span className={`text-xs sm:text-base font-black ${inventoryTab === 'materials' ? 'text-blue-300' : 'text-slate-200'}`}>
+                    المواد الخام والمخزنة
+                  </span>
+                  <span className="text-[10px] sm:text-xs text-slate-400 hidden sm:inline">البورصة والتوريد</span>
+                </div>
+                <span
+                  className={`text-[9px] sm:text-[11px] px-2 sm:px-2.5 py-0.5 rounded-full font-mono font-bold ${
+                    inventoryTab === 'materials'
+                      ? 'bg-blue-500/25 text-blue-300 border border-blue-500/60'
+                      : 'bg-slate-800/80 text-slate-400 border border-slate-700/80'
+                  }`}
+                >
+                  {materialRowsCount} صنف
+                </span>
+                {inventoryTab === 'materials' && (
+                  <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-8 h-1 bg-blue-400 rounded-full shadow-sm shadow-blue-400" />
+                )}
+              </button>
+
+              {/* أيقونة 3: المنتجات الجاهزة */}
+              <button
+                type="button"
+                role="tab"
+                id="tab-btn-sales"
+                aria-selected={inventoryTab === 'sales'}
+                data-guide-target="tab-sales"
+                onClick={() => {
+                  playSound('click');
+                  void triggerHaptic('light');
+                  setInventoryTab('sales');
+                }}
+                className={`relative p-3 sm:p-4 rounded-2xl border transition-all text-center flex flex-col items-center justify-between gap-2 cursor-pointer select-none ${
+                  inventoryTab === 'sales'
+                    ? 'bg-gradient-to-b from-emerald-500/25 via-slate-900 to-slate-950 border-emerald-500 shadow-xl shadow-emerald-500/20 text-white ring-2 ring-emerald-500/40'
+                    : 'bg-slate-900/80 hover:bg-slate-800/90 border-slate-800 text-slate-400 hover:text-slate-200 hover:border-slate-700'
+                }`}
+              >
+                <div
+                  className={`w-11 h-11 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center transition-all ${
+                    inventoryTab === 'sales'
+                      ? 'bg-gradient-to-tr from-emerald-500 to-teal-400 text-slate-950 shadow-lg shadow-emerald-500/35 scale-105'
+                      : 'bg-slate-800 text-emerald-400/80'
+                  }`}
+                >
+                  <ShoppingBag className="w-6 h-6 sm:w-7 sm:h-7" />
+                </div>
+                <div className="flex flex-col items-center">
+                  <span className={`text-xs sm:text-base font-black ${inventoryTab === 'sales' ? 'text-emerald-300' : 'text-slate-200'}`}>
+                    المنتجات الجاهزة
+                  </span>
+                  <span className="text-[10px] sm:text-xs text-slate-400 hidden sm:inline">البيع والأسعار</span>
+                </div>
+                <span
+                  className={`text-[9px] sm:text-[11px] px-2 sm:px-2.5 py-0.5 rounded-full font-mono font-bold ${
+                    inventoryTab === 'sales'
+                      ? 'bg-emerald-500/25 text-emerald-300 border border-emerald-500/60'
+                      : 'bg-slate-800/80 text-slate-400 border border-slate-700/80'
+                  }`}
+                >
+                  {productRows.length} جاهز
+                </span>
+                {inventoryTab === 'sales' && (
+                  <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-8 h-1 bg-emerald-400 rounded-full shadow-sm shadow-emerald-400" />
+                )}
+              </button>
+            </div>
+
+            {/* تفاصيل القسم الأول: مخزن */}
+            {inventoryTab === 'warehouse' && (
+              <div className="space-y-4 animate-fade-in">
+                <div className="economy-grid economy-grid--three-mobile">
+                  <EconomyStat
+                    label="سعة المواد الخام"
+                    value={`${formatNumber(warehouseUsage.materials)} / ${formatNumber(warehouseCapacity.materials)}`}
+                    note={`المتبقي: ${formatNumber(Math.max(0, warehouseCapacity.materials - warehouseUsage.materials))}`}
+                  />
+                  <EconomyStat
+                    label="سعة المنتجات"
+                    value={`${formatNumber(warehouseUsage.products)} / ${formatNumber(warehouseCapacity.products)}`}
+                    note={`المتبقي: ${formatNumber(Math.max(0, warehouseCapacity.products - warehouseUsage.products))}`}
+                  />
+                  <EconomyStat
+                    label="إجمالي قيمة المخزون"
+                    value={formatMoney(inventorySummary.totalValue, country)}
+                    note={`المستوى: ${formatNumber(warehouseLevel)}`}
+                  />
+                </div>
+
+                <SectionPanel
+                  id="warehouse-overview"
+                  title={`المخزن · المستوى ${formatNumber(warehouseLevel)}`}
+                  description="السعة مشتركة بين أنواع المواد الخام وبين المنتجات. تطوير المستوى يوسّع الفئتين ويرفع حد كل صنف، مقابل نقد ومواد محددة."
+                >
+                  <div className="warehouse-capacity-grid">
+                    <article>
+                      <span>المواد الخام</span>
+                      <strong>
+                        {formatNumber(warehouseUsage.materials)} / {formatNumber(warehouseCapacity.materials)}
+                      </strong>
+                      <div className="economy-progress">
+                        <span
+                          style={{
+                            width: `${Math.min(100, (warehouseUsage.materials / warehouseCapacity.materials) * 100)}%`,
+                          }}
+                        />
+                      </div>
+                    </article>
+                    <article>
+                      <span>المنتجات مع الإنتاج المحجوز</span>
+                      <strong>
+                        {formatNumber(warehouseUsage.products)} / {formatNumber(warehouseCapacity.products)}
+                      </strong>
+                      <div className="economy-progress">
+                        <span
+                          style={{
+                            width: `${Math.min(100, (warehouseUsage.products / warehouseCapacity.products) * 100)}%`,
+                          }}
+                        />
+                      </div>
+                    </article>
+                  </div>
+                  {upgradeRequirement ? (
+                    <div className="warehouse-upgrade-card">
+                      <div>
+                        <strong>تطوير إلى المستوى {formatNumber(warehouseLevel + 1)}</strong>
+                        <small>التكلفة {formatMoney(upgradeRequirement.cash, country)} · المتطلبات:</small>
+                      </div>
+                      <div className="economy-meta">
+                        {Object.entries(upgradeRequirement.materials).map(([materialId, required]) => {
+                          const material = MATERIAL_CATALOG.find((item) => item.id === materialId);
+                          const owned = materialStock.get(materialId)?.quantity ?? 0;
+                          return (
+                            <span
+                              className={owned >= required ? 'economy-pill economy-pill--green' : 'economy-pill economy-pill--gold'}
+                              key={materialId}
+                            >
+                              {material?.name ?? materialId} {formatNumber(owned)} / {formatNumber(required)}
+                            </span>
+                          );
+                        })}
+                      </div>
+                      <PurchaseOptions
+                        country={country}
+                        cashPrice={upgradeRequirement.cash}
+                        bankBalance={profile.bankBalance}
+                        diamondsBalance={profile.diamonds}
+                        disabled={!canUpgradeWarehouse}
+                        cashLabel="تطوير المخزن نقدًا"
+                        onPurchase={(paymentMethod) =>
+                          runCommand(
+                            { name: 'upgrade_warehouse', args: { paymentMethod } },
+                            (current) => upgradeWarehouse(current, paymentMethod),
+                          )
+                        }
+                      />
+                    </div>
+                  ) : (
+                    <p className="economy-card-description">وصل المخزن إلى أعلى مستوى تطوير.</p>
+                  )}
+                </SectionPanel>
+              </div>
+            )}
+
+            {/* تفاصيل القسم الثاني: المواد الخام والمخزنة */}
+            {inventoryTab === 'materials' && (
+              <div className="space-y-4 animate-fade-in">
+                <div className="economy-grid economy-grid--three-mobile">
+                  <EconomyStat
+                    label="أنواع المواد الخام"
+                    value={formatNumber(materialRowsCount)}
+                    note="الخامات المتوفرة بالمخزن"
+                  />
+                  <EconomyStat
+                    label="المساحة المشغولة"
+                    value={`${formatNumber(warehouseUsage.materials)} / ${formatNumber(warehouseCapacity.materials)}`}
+                    note="استهلاك مساحة الخامات"
+                  />
+                  <EconomyStat
+                    label="قيمة المواد الخام"
+                    value={formatMoney(materialTotalValue, country)}
+                    note="تقييم دفتري للمخزون"
+                  />
+                </div>
+
+                <SectionPanel
+                  id="inventory-materials"
+                  title="مخزون المواد الخام"
+                  description="تظهر هنا المواد الموجودة في مخزونك. تُتاح مشتريات المواد عبر عروض السوق والمزادات فقط."
+                >
+                  {materialRowsCount === 0 ? (
+                    <EconomyEmpty
+                      title="لا توجد خامات بالمخزن"
+                      message="اشترِ المواد الخام اللازمة لتشغيل مصانعك من بورصة السوق العالمي أدناه."
+                    />
+                  ) : (
+                    <div className="economy-list">
+                      {MATERIAL_CATALOG.map((material) => {
+                        const stock = materialStock.get(material.id);
+                        if (!stock) return null;
+                        return (
+                          <article className="economy-card economy-card--soft" key={material.id}>
+                            <div className="economy-card-head">
+                              <div className="economy-card-title">
+                                <span className="economy-card-icon">
+                                  <Icon name="warehouse" size={18} />
+                                </span>
+                                <span>
+                                  <strong>{material.name}</strong>
+                                  <small>قيمة المخزون {formatMoney(stock.totalValue, country)}</small>
+                                </span>
+                              </div>
+                              <span className="economy-pill">
+                                {formatNumber(stock.quantity)} {material.unit}
+                              </span>
+                            </div>
+                          </article>
+                        );
+                      })}
+                    </div>
+                  )}
+                </SectionPanel>
+
+                <SectionPanel
+                  id="inventory-global-market"
+                  title="السوق العالمي · بورصة السلع والتجارة الدولية"
+                  description="استيراد الخامات بشروط الشحن الدولي Incoterms، التفاوض التجاري المباشر، التصدير للموانئ العالمية، وعقود التحوط الآجلة."
+                >
+                  <GlobalMarketTerminal profile={profile} country={country} onCommand={runCommand} onAction={onAction} />
+                </SectionPanel>
+              </div>
+            )}
+
+            {/* تفاصيل القسم الثالث: المنتجات الجاهزة */}
+            {inventoryTab === 'sales' && (
+              <div className="space-y-4 animate-fade-in">
+                <div className="economy-grid economy-grid--three-mobile">
+                  <EconomyStat
+                    label="المنتجات الجاهزة"
+                    value={formatNumber(productRows.length)}
+                    note="أصناف جاهزة للبيع الفوري"
+                  />
+                  <EconomyStat
+                    label="مساحة المنتجات"
+                    value={`${formatNumber(warehouseUsage.products)} / ${formatNumber(warehouseCapacity.products)}`}
+                    note="مخزون المنتجات التامة"
+                  />
+                  <EconomyStat
+                    label="قيمة المنتجات التامة"
+                    value={formatMoney(productsTotalValue, country)}
+                    note="القيمة الدفترية الإجمالية"
+                  />
+                </div>
+
+                <SectionPanel
+                  id="inventory-sales"
+                  title="المنتجات الجاهزة للبيع"
+                  description="الطلب والسعر يتغيران يوميًا داخل محاكاة اللعبة؛ تُخصم الضريبة من حصيلة البيع."
+                >
+                  {productRows.length === 0 ? (
+                    <EconomyEmpty
+                      title="لا توجد منتجات جاهزة"
+                      message="أنشئ شركة، اشترِ مدخلاتها من المواد الخام، ثم شغّل خط الإنتاج."
+                    />
+                  ) : (
+                    <div className="economy-list">
+                      {productRows.map((row) => {
+                        const product = PRODUCT_CATALOG.find((item) => item.id === row.itemId);
+                        const quantity = productQuantities[row.itemId] ?? '1';
+                        const marketQuote = getMarketQuote(profile, row.itemId);
+                        const maxSellable = Math.min(row.quantity, marketQuote?.demandUnits ?? row.quantity);
+                        return (
+                          <article className="economy-card" key={row.id}>
+                            <div className="economy-card-head">
+                              <div className="economy-card-title">
+                                <span className="economy-card-icon">
+                                  <Icon name="briefcase" size={18} />
+                                </span>
+                                <span>
+                                  <strong>{row.name}</strong>
+                                  <small>
+                                    المخزون {formatNumber(row.quantity)} {row.unit} · سعر السوق{' '}
+                                    {formatMoney(marketQuote?.currentPrice ?? product?.baseSellPrice ?? 0, country)}
+                                  </small>
+                                </span>
+                              </div>
+                              <span
+                                className={`economy-pill economy-pill--${
+                                  marketQuote?.trend === 'up'
+                                    ? 'green'
+                                    : marketQuote?.trend === 'down'
+                                    ? 'red'
+                                    : 'gold'
+                                }`}
+                              >
+                                {marketQuote?.trendLabel ?? 'السوق'}
+                              </span>
+                            </div>
+                            <div className="economy-card-body">
+                              <div className="economy-meta">
+                                <span>
+                                  الطلب المتاح اليوم {formatNumber(marketQuote?.demandUnits ?? 0)} {row.unit}
+                                </span>
+                                <span>القيمة الدفترية {formatMoney(row.totalValue, country)}</span>
+                              </div>
+                              <form
+                                className="economy-form"
+                                onSubmit={(event: FormEvent<HTMLFormElement>) => {
+                                  event.preventDefault();
+                                  runCommand(
+                                    { name: 'sell_product', args: { productId: row.itemId, quantity: Number(quantity) } },
+                                    (current) => sellProduct(current, row.itemId, Number(quantity)),
+                                  );
+                                }}
+                              >
+                                <div className="economy-field">
+                                  <label htmlFor={`sell-${row.itemId}`}>كمية البيع ({row.unit})</label>
+                                  <input
+                                    id={`sell-${row.itemId}`}
+                                    type="number"
+                                    min="1"
+                                    max={maxSellable}
+                                    step="1"
+                                    value={quantity}
+                                    onChange={(event) =>
+                                      setProductQuantities((previous) => ({ ...previous, [row.itemId]: event.target.value }))
+                                    }
+                                  />
+                                </div>
+                                <button
+                                  className="button button-primary"
+                                  type="submit"
+                                  data-guide-target="sell-product-btn"
+                                  disabled={!quantity || Number(quantity) < 1 || Number(quantity) > maxSellable}
+                                >
+                                  <Icon name="investment" size={15} /> بيع بسعر السوق
+                                </button>
+                              </form>
+                            </div>
+                          </article>
+                        );
+                      })}
+                    </div>
+                  )}
+                </SectionPanel>
+              </div>
+            )}
+          </>,
+        )}
+      </div>
+    );
   }
 
   if (section.id === 'investments') {
