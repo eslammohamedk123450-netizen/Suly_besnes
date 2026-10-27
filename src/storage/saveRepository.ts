@@ -52,7 +52,8 @@ function isLand(value: unknown): value is PlayerLand {
     && isDateString(value.acquiredAt)
     && (value.acquiredOnDay === undefined || (Number.isInteger(value.acquiredOnDay) && (value.acquiredOnDay as number) >= 1))
     && (value.availableForCompanyOnDay === undefined || (Number.isInteger(value.availableForCompanyOnDay) && (value.availableForCompanyOnDay as number) >= 1))
-    && (value.landType === undefined || value.landType === 'industrial' || value.landType === 'agricultural' || value.landType === 'commercial');
+    && (value.landType === undefined || value.landType === 'industrial' || value.landType === 'agricultural' || value.landType === 'commercial')
+    && (value.plotId === undefined || isNonEmptyString(value.plotId));
 }
 
 function isCompany(value: unknown): value is PlayerCompany {
@@ -338,6 +339,7 @@ function migrateProfile(value: unknown): PlayerProfile | null {
     availableForCompanyOnDay: Number.isInteger(land.availableForCompanyOnDay)
       ? land.availableForCompanyOnDay
       : (Number.isInteger(land.acquiredOnDay) ? land.acquiredOnDay! : day),
+    ...(isNonEmptyString(land.plotId) ? { plotId: land.plotId } : {}),
   }));
   const assignedLandIds = new Set<string>();
   const companies = originalCompanies.map((company) => {
@@ -483,6 +485,8 @@ function migrateProfile(value: unknown): PlayerProfile | null {
     ...(Array.isArray(value.soldAssetIds) ? { soldAssetIds: Array.from(new Set(value.soldAssetIds.filter(isNonEmptyString))) } : {}),
     ...(Array.isArray(value.processedAuctionSaleIds) ? { processedAuctionSaleIds: Array.from(new Set(value.processedAuctionSaleIds.filter(isNonEmptyString))) } : {}),
     ...(Array.isArray(value.processedBotOfferIds) ? { processedBotOfferIds: Array.from(new Set(value.processedBotOfferIds.filter(isNonEmptyString))) } : {}),
+    ...(typeof value.hqLevel === 'number' && Number.isInteger(value.hqLevel) && value.hqLevel >= 1 && value.hqLevel <= 5 ? { hqLevel: value.hqLevel } : {}),
+    ...(isRecord(value.cityConstructions) ? { cityConstructions: value.cityConstructions as any } : {}),
   }, typeof value.accountCode === 'string' ? value.accountCode : value.id as string);
 }
 

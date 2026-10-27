@@ -10,6 +10,7 @@ import type { PlayerProfile } from '../../domain/player';
 import {
   resolveCityGrid,
   loadCityConstructions,
+  loadHQLevel,
   type CityPlotDefinition,
   type CityConstructionState,
 } from '../../game/cityGridSystem';
@@ -237,7 +238,9 @@ export const CityCanvas: React.FC<CityCanvasProps> = ({
     trim.position.y = 1.2;
     hqGroup.add(trim);
 
-    // Part 3: Lower tower tier
+    const hqLevel = loadHQLevel(profile);
+
+    // Part 3: Lower tower tier (Level 1+)
     const tier1Geo = new THREE.BoxGeometry(7, 10, 7);
     const glassMat = new THREE.MeshStandardMaterial({
       color: '#0284c7',
@@ -249,38 +252,68 @@ export const CityCanvas: React.FC<CityCanvasProps> = ({
     tier1.castShadow = !isSoftwareGl;
     hqGroup.add(tier1);
 
-    // Part 4: Mid tower tier
-    const tier2Geo = new THREE.BoxGeometry(5.2, 8, 5.2);
-    const tier2 = new THREE.Mesh(tier2Geo, glassMat);
-    tier2.position.y = 15.2;
-    tier2.castShadow = !isSoftwareGl;
-    hqGroup.add(tier2);
+    if (hqLevel === 1) {
+      const capGeo = new THREE.BoxGeometry(7.4, 0.6, 7.4);
+      const cap = new THREE.Mesh(capGeo, goldMat);
+      cap.position.y = 11.5;
+      hqGroup.add(cap);
+    }
 
-    // Part 5: Top luxury penthouse
-    const tier3Geo = new THREE.BoxGeometry(3.6, 5, 3.6);
-    const tier3 = new THREE.Mesh(tier3Geo, glassMat);
-    tier3.position.y = 21.7;
-    tier3.castShadow = !isSoftwareGl;
-    hqGroup.add(tier3);
+    // Part 4: Mid tower tier (Level 2+)
+    if (hqLevel >= 2) {
+      const tier2Geo = new THREE.BoxGeometry(5.2, 8, 5.2);
+      const tier2 = new THREE.Mesh(tier2Geo, glassMat);
+      tier2.position.y = 15.2;
+      tier2.castShadow = !isSoftwareGl;
+      hqGroup.add(tier2);
 
-    // Part 6: Spire & Crown beacon
-    const spireGeo = new THREE.CylinderGeometry(0.1, 0.6, 5, 8);
-    const spire = new THREE.Mesh(spireGeo, goldMat);
-    spire.position.y = 26.7;
-    hqGroup.add(spire);
+      if (hqLevel === 2) {
+        const capGeo = new THREE.BoxGeometry(5.6, 0.6, 5.6);
+        const cap = new THREE.Mesh(capGeo, goldMat);
+        cap.position.y = 19.5;
+        hqGroup.add(cap);
+      }
+    }
 
-    const beaconGeo = new THREE.SphereGeometry(0.5, 12, 12);
-    const beaconMat = new THREE.MeshBasicMaterial({ color: '#fbbf24' });
-    const beacon = new THREE.Mesh(beaconGeo, beaconMat);
-    beacon.position.y = 29.2;
-    hqGroup.add(beacon);
+    // Part 5: Top luxury penthouse (Level 3+)
+    if (hqLevel >= 3) {
+      const tier3Geo = new THREE.BoxGeometry(3.6, 5, 3.6);
+      const tier3 = new THREE.Mesh(tier3Geo, glassMat);
+      tier3.position.y = 21.7;
+      tier3.castShadow = !isSoftwareGl;
+      hqGroup.add(tier3);
 
-    // Part 7: Floating Crown / Logo holographic badge
-    const crownRingGeo = new THREE.TorusGeometry(1.2, 0.15, 16, 32);
-    const crownRing = new THREE.Mesh(crownRingGeo, goldMat);
-    crownRing.position.y = 31.5;
-    crownRing.rotation.x = Math.PI / 2;
-    hqGroup.add(crownRing);
+      if (hqLevel === 3) {
+        const capGeo = new THREE.BoxGeometry(4.0, 0.5, 4.0);
+        const cap = new THREE.Mesh(capGeo, goldMat);
+        cap.position.y = 24.4;
+        hqGroup.add(cap);
+      }
+    }
+
+    // Part 6: Spire & Crown beacon (Level 4+)
+    if (hqLevel >= 4) {
+      const spireGeo = new THREE.CylinderGeometry(0.1, 0.6, 5, 8);
+      const spire = new THREE.Mesh(spireGeo, goldMat);
+      spire.position.y = 26.7;
+      hqGroup.add(spire);
+
+      const beaconGeo = new THREE.SphereGeometry(0.5, 12, 12);
+      const beaconMat = new THREE.MeshBasicMaterial({ color: '#fbbf24' });
+      const beacon = new THREE.Mesh(beaconGeo, beaconMat);
+      beacon.position.y = 29.2;
+      hqGroup.add(beacon);
+    }
+
+    // Part 7: Floating Crown / Logo holographic badge (Level 5)
+    let crownRing: THREE.Mesh | null = null;
+    if (hqLevel >= 5) {
+      const crownRingGeo = new THREE.TorusGeometry(1.2, 0.15, 16, 32);
+      crownRing = new THREE.Mesh(crownRingGeo, goldMat);
+      crownRing.position.y = 31.5;
+      crownRing.rotation.x = Math.PI / 2;
+      hqGroup.add(crownRing);
+    }
 
     scene.add(hqGroup);
     registerClickable(hqGroup, { type: 'landmark', id: 'hq' });
@@ -405,7 +438,7 @@ export const CityCanvas: React.FC<CityCanvasProps> = ({
     registerClickable(factoryGroup, { type: 'landmark', id: 'factory' });
 
     // D. DYNAMIC CITY PLOTS (Grid mapping from player profile)
-    const constructions = loadCityConstructions();
+    const constructions = loadCityConstructions(profile);
     const cityData = resolveCityGrid(profile, constructions);
 
     const plotMeshes: THREE.Group[] = [];
@@ -855,7 +888,9 @@ export const CityCanvas: React.FC<CityCanvasProps> = ({
       });
 
       // Subtle rotation on HQ halo beacon
-      crownRing.rotation.z += dt * 0.5;
+      if (crownRing) {
+        crownRing.rotation.z += dt * 0.5;
+      }
 
       renderer.render(scene, camera);
       animationFrameId = requestAnimationFrame(animate);
