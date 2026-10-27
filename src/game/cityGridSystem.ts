@@ -17,6 +17,7 @@ import {
   failure,
   timestampFor,
   syncTasks,
+  foundCompany,
 } from './engine';
 
 export type PlotStatus = 'empty_for_sale' | 'owned_empty' | 'paperwork' | 'clearing' | 'constructing' | 'developed' | 'locked';
@@ -43,6 +44,7 @@ export interface CityPlotDefinition {
 export interface CityConstructionState {
   plotId: string;
   landId: string;
+  companyId?: string;
   industryId: IndustryId;
   companyName: string;
   startedAt: number; // Date.now()
@@ -338,26 +340,38 @@ export function releaseTransactionLock(actionKey: string): void {
 }
 
 /**
- * Loads active construction jobs from local storage
+ * Loads active construction jobs from local storage or profile
  */
-export function loadCityConstructions(): Record<string, CityConstructionState> {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY_CONSTRUCTIONS);
-    if (!raw) return {};
-    return JSON.parse(raw) as Record<string, CityConstructionState>;
-  } catch {
-    return {};
+export function loadCityConstructions(profile?: PlayerProfile): Record<string, CityConstructionState> {
+  const profileConstructions = (profile?.cityConstructions as Record<string, CityConstructionState>) || {};
+  let localConstructions: Record<string, CityConstructionState> = {};
+  if (typeof localStorage !== 'undefined') {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY_CONSTRUCTIONS);
+      if (raw) localConstructions = JSON.parse(raw) as Record<string, CityConstructionState>;
+    } catch {
+      // fallback
+    }
   }
+  return { ...localConstructions, ...profileConstructions };
 }
 
 /**
- * Saves active construction jobs to local storage
+ * Saves active construction jobs to local storage and profile
  */
-export function saveCityConstructions(constructions: Record<string, CityConstructionState>): void {
-  try {
-    localStorage.setItem(STORAGE_KEY_CONSTRUCTIONS, JSON.stringify(constructions));
-  } catch {
-    // Local storage error fallback
+export function saveCityConstructions(
+  constructions: Record<string, CityConstructionState>,
+  profile?: PlayerProfile
+): void {
+  if (profile) {
+    profile.cityConstructions = constructions;
+  }
+  if (typeof localStorage !== 'undefined') {
+    try {
+      localStorage.setItem(STORAGE_KEY_CONSTRUCTIONS, JSON.stringify(constructions));
+    } catch {
+      // Local storage error fallback
+    }
   }
 }
 
@@ -367,6 +381,9 @@ let memoryHQLevel = 1;
  * Loads the Imperial Tower HQ level from persistent storage
  */
 export function loadHQLevel(profile?: PlayerProfile): number {
+  if (profile?.hqLevel && profile.hqLevel >= 1 && profile.hqLevel <= 5) {
+    return profile.hqLevel;
+  }
   if (typeof localStorage !== 'undefined') {
     try {
       const stored = localStorage.getItem(STORAGE_KEY_HQ_LEVEL);
@@ -391,8 +408,11 @@ export function loadHQLevel(profile?: PlayerProfile): number {
 /**
  * Saves the Imperial Tower HQ level
  */
-export function saveHQLevel(level: number): void {
+export function saveHQLevel(level: number, profile?: PlayerProfile): void {
   memoryHQLevel = level;
+  if (profile) {
+    profile.hqLevel = level;
+  }
   if (typeof localStorage !== 'undefined') {
     try {
       localStorage.setItem(STORAGE_KEY_HQ_LEVEL, String(level));
@@ -436,12 +456,13 @@ export function upgradeEmpireHQ(
   }
 
   // Save new HQ level
-  saveHQLevel(nextHQLevel);
+  saveHQLevel(nextHQLevel, profile);
 
   // Add ledger entry and update profile level & reputation
   const nextProfile = addLedger(
     {
       ...profile,
+      hqLevel: nextHQLevel,
       level: Math.max(profile.level, nextHQLevel),
       reputation: (profile.reputation ?? 0) + targetSpec.reputationBonus,
     },
@@ -492,12 +513,118 @@ export function accelerateLandTransfer(
 }
 
 /**
+ * Start building/founding construction on a specific owned plot
+ */
+export function startPlotConstruction(
+  profile: PlayerProfile,
+  plotId: string,
+  industryId: IndustryId,
+  companyName: string,
+  paymentMethod: PurchasePaymentMethod = 'cash'
+): GameResult<{ plotId: string; companyId: string; durationSeconds: number; cashCost: number }> {
+  const grid = resolveCityGrid(profile);
+  const plot = grid.plots.find((p) => p.id === plotId);
+  if (!plot) return failure(profile, 'not-found', 'الموقع غير موجود.');
+  if (plot.status !== 'owned_empty') {
+    return failure(profile, 'condition-not-met', 'الموقع ليس جاهزاً للبناء.');
+  }
+  const land = plot.land;
+  if (!land) return failure(profile, 'land-required', 'تحتاج إلى أرض مملوكة للبناء.');
+
+  // Check if already constructing
+  const existingConstructions = loadCityConstructions(profile);
+  const activeJob = existingConstructions[plotId];
+  if (activeJob && Date.now() - activeJob.startedAt < activeJob.durationMs) {
+    return failure(profile, 'condition-not-met', 'تجري أعمال بناء بالفعل في هذا الموقع.');
+  }
+
+  // 1. Authoritative foundCompany from game engine
+  const trimmedName = companyName.trim() || `${findIndustry(industryId)?.name || 'منشأة'} الإمبراطورية`;
+  const foundRes = foundCompany(profile, industryId, land.id, trimmedName, paymentMethod);
+  if (!foundRes.ok) return foundRes as any;
+
+  // 2. Register construction job
+  const specs = getConstructionSpecs(industryId, profile.level);
+  const newJob: CityConstructionState = {
+    plotId,
+    landId: land.id,
+    companyId: foundRes.data.companyId,
+    industryId,
+    companyName: trimmedName,
+    startedAt: Date.now(),
+    durationMs: specs.durationSeconds * 1000,
+    costCash: foundRes.data.totalCost,
+    costDiamonds: foundRes.data.diamondsSpent,
+    status: 'clearing',
+  };
+
+  const updatedConstructions = { ...existingConstructions, [plotId]: newJob };
+  saveCityConstructions(updatedConstructions, foundRes.profile);
+
+  const nextProfile: PlayerProfile = {
+    ...foundRes.profile,
+    cityConstructions: updatedConstructions,
+  };
+
+  return success(
+    syncTasks(nextProfile),
+    `بدأت أعمال التمهيد والتشييد في الموقع بنجاح! ستكتمل المنشأة خلال ${specs.durationSeconds} ثانية.`,
+    {
+      plotId,
+      companyId: foundRes.data.companyId,
+      durationSeconds: specs.durationSeconds,
+      cashCost: foundRes.data.totalCost,
+    }
+  );
+}
+
+/**
+ * Accelerate active plot construction with diamonds
+ */
+export function accelerateConstruction(
+  profile: PlayerProfile,
+  plotId: string
+): GameResult<{ plotId: string; diamondsSpent: number }> {
+  const constructions = loadCityConstructions(profile);
+  const job = constructions[plotId];
+  if (!job) {
+    return failure(profile, 'not-found', 'لا توجد أعمال بناء جارية في هذا الموقع.');
+  }
+
+  const diamondsCost = Math.max(3, job.costDiamonds || 5);
+  if (profile.diamonds < diamondsCost) {
+    return failure(profile, 'insufficient-funds', `تحتاج إلى ${diamondsCost} ماسات لتسريع البناء والإتمام فوراً.`);
+  }
+
+  // Mark construction completed
+  const completedJob: CityConstructionState = {
+    ...job,
+    startedAt: 0,
+    status: 'completed',
+  };
+  const updatedConstructions = { ...constructions, [plotId]: completedJob };
+  saveCityConstructions(updatedConstructions, profile);
+
+  const nextProfile: PlayerProfile = {
+    ...profile,
+    diamonds: profile.diamonds - diamondsCost,
+    cityConstructions: updatedConstructions,
+  };
+
+  return success(
+    syncTasks(nextProfile),
+    `تم تسريع البناء وإتمام تشييد ${job.companyName} فوراً بنجاح!`,
+    { plotId, diamondsSpent: diamondsCost }
+  );
+}
+
+/**
  * Maps player lands and companies cleanly to 3D city plots.
  * Matches unowned plots to real direct catalog listings so buyDirectLand works authentically.
  */
 export function resolveCityGrid(
   profile: PlayerProfile,
-  constructions: Record<string, CityConstructionState> = loadCityConstructions()
+  constructions: Record<string, CityConstructionState> = loadCityConstructions(profile)
 ): {
   plots: Array<
     CityPlotDefinition & {
@@ -523,25 +650,37 @@ export function resolveCityGrid(
   const playerLands = profile.lands ?? [];
   const playerCompanies = profile.companies ?? [];
 
-  // Match each base plot to player lands or unowned direct lands
+  // Match each base plot deterministically to player lands or unowned direct lands
   const mappedPlots = CITY_BASE_PLOTS.map((basePlot, index) => {
-    // 1. Check if player owns a land already matched to this slot ID or assigned sequentially
-    let matchedLand = playerLands.find((l) => l.id === basePlot.id);
-    if (!matchedLand && index < playerLands.length) {
-      const candidateLand = playerLands[index];
-      const isClaimedByOther = CITY_BASE_PLOTS.slice(0, index).some((p) => p.id === candidateLand.id);
-      if (!isClaimedByOther) {
-        matchedLand = candidateLand;
-      }
+    // 1. Direct land listing for this plot slot
+    const catalogListing = directLands[index] || {
+      id: basePlot.id,
+      label: basePlot.label,
+      landType: basePlot.zoning,
+      areaSquareMeters: basePlot.areaSquareMeters,
+      price: basePlot.defaultPrice,
+    };
+
+    // 2. Check if player owns a land explicitly tagged with this plotId
+    let matchedLand = playerLands.find((l) => l.plotId === basePlot.id);
+
+    // 3. Match by catalogListingId if land was bought with this ID
+    if (!matchedLand && catalogListing) {
+      matchedLand = playerLands.find((l) => l.id === catalogListing.id);
     }
 
-    // 2. Select an unowned direct land listing from the country catalog for empty plots
-    const unownedCatalogLands = directLands.filter(
-      (dl) => !playerLands.some((pl) => pl.id === dl.id)
-    );
-    const catalogListing =
-      unownedCatalogLands[index % Math.max(1, unownedCatalogLands.length)] ||
-      directLands[index % directLands.length];
+    // 4. Match by basePlot.id (slot id)
+    if (!matchedLand) {
+      matchedLand = playerLands.find((l) => l.id === basePlot.id);
+    }
+
+    // 5. Initial starter inherited land fallback (first industrial plot: plot-ind-1)
+    if (!matchedLand && basePlot.id === 'plot-ind-1') {
+      const inherited = playerLands.find((l) => l.id === 'inherited-factory-land');
+      if (inherited && !playerLands.some((otherL) => otherL !== inherited && otherL.plotId === basePlot.id)) {
+        matchedLand = inherited;
+      }
+    }
 
     const effectiveCatalogId = catalogListing?.id;
     const effectiveLabel = matchedLand?.label ?? catalogListing?.label ?? basePlot.label;

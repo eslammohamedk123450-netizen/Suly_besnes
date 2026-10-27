@@ -40,6 +40,8 @@ const OPTIONAL_PROFILE_KEYS = new Set([
   'automationDirectives',
   'luckyWheelLevel',
   'fastStarterProductionUsed',
+  'hqLevel',
+  'cityConstructions',
 ]);
 
 const PROFILE_KEYS = new Set([
@@ -53,6 +55,7 @@ const PROFILE_KEYS = new Set([
   'playerAuctions', 'soldAssetIds', 'processedAuctionSaleIds', 'processedBotOfferIds',
   'completedMissionIds', 'claimedRewardIds', 'dismissedStoryEventIds',
   'automationDirectives', 'luckyWheelLevel', 'fastStarterProductionUsed',
+  'hqLevel', 'cityConstructions',
 ]);
 
 const REQUIRED_PROFILE_KEYS = [...PROFILE_KEYS].filter((key) => !OPTIONAL_PROFILE_KEYS.has(key));
@@ -257,13 +260,16 @@ export function validatePlayerProfile(profile: unknown, previousProfile?: unknow
   const inventory = requireArray(profile.inventory, 'profile.inventory', errors);
   const productionOrders = requireArray(profile.productionOrders, 'profile.productionOrders', errors);
   const assetsIds = validateEntityIds(assets, 'profile.assets', errors, ['id', 'label', 'value', 'acquiredAt']);
-  const landIds = validateEntityIds(lands, 'profile.lands', errors, ['id', 'label', 'areaSquareMeters', 'purchasePrice', 'acquiredAt', 'acquiredOnDay', 'availableForCompanyOnDay', 'landType', 'upgradeLevel']);
+  const landIds = validateEntityIds(lands, 'profile.lands', errors, ['id', 'label', 'areaSquareMeters', 'purchasePrice', 'acquiredAt', 'acquiredOnDay', 'availableForCompanyOnDay', 'landType', 'upgradeLevel', 'plotId']);
   const companyIds = validateEntityIds(companies, 'profile.companies', errors, ['id', 'name', 'industryId', 'countryId', 'foundedAt', 'foundedOnDay', 'operationalFromDay', 'landId', 'licenseIds', 'energyUnits', 'energyCapacity', 'operatingCostPerDay', 'maintenanceCondition', 'upgradeLevel']);
   const inventoryIds = validateEntityIds(inventory, 'profile.inventory', errors, ['id', 'materialOrProductId', 'quantity', 'unit', 'unitCost', 'qualityScore']);
   const orderIds = validateEntityIds(productionOrders, 'profile.productionOrders', errors, ['id', 'companyId', 'productId', 'productName', 'batches', 'outputQuantity', 'outputUnit', 'materialCost', 'energyCost', 'expectedUnitCost', 'demandForecast', 'qualityScore', 'maintenanceCost', 'startedOnDay', 'completesOnDay', 'status']);
   void assetsIds;
   void inventoryIds;
   void orderIds;
+
+  if (profile.hqLevel !== undefined) requireNumber(profile.hqLevel, 'profile.hqLevel', errors, { min: 1, max: 10, integer: true });
+  if (profile.cityConstructions !== undefined) requireRecord(profile.cityConstructions, 'profile.cityConstructions', errors);
 
   const usedLandIds = new Set<string>();
   for (let index = 0; index < lands.length; index += 1) {
@@ -275,6 +281,7 @@ export function validatePlayerProfile(profile: unknown, previousProfile?: unknow
     if (land.acquiredOnDay !== undefined) requireNumber(land.acquiredOnDay, `profile.lands[${index}].acquiredOnDay`, errors, { min: 1, max: MAX_GAME_DAY, integer: true });
     if (land.availableForCompanyOnDay !== undefined) requireNumber(land.availableForCompanyOnDay, `profile.lands[${index}].availableForCompanyOnDay`, errors, { min: 1, max: MAX_GAME_DAY, integer: true });
     if (land.landType !== undefined && !['industrial', 'agricultural', 'commercial'].includes(String(land.landType))) addError(errors, `profile.lands[${index}].landType:invalid_value`);
+    if (land.plotId !== undefined) requireString(land.plotId, `profile.lands[${index}].plotId`, errors, 64);
   }
 
   const completedOutputByProduct = new Map<string, number>();

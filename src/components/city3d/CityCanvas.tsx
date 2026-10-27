@@ -201,7 +201,7 @@ export const CityCanvas: React.FC<CityCanvasProps> = ({
     // -------------------------------------------------------------
     // BUILD CENTRAL IMPERIAL LANDMARKS
     // -------------------------------------------------------------
-    const gridData = resolveCityGrid(profile, loadCityConstructions());
+    const gridData = resolveCityGrid(profile, loadCityConstructions(profile));
     const hqLevel = gridData.hqLevel;
 
     // A. IMPERIAL HEADQUARTERS

@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import type { PlayerProfile } from '../../domain/player';
 import type { SectionId } from '../../domain/navigation';
 import { formatMoney } from '../../domain/formatters';
@@ -23,6 +23,8 @@ import {
   loadHQLevel,
   upgradeEmpireHQ,
   accelerateLandTransfer,
+  startPlotConstruction,
+  accelerateConstruction,
   HQ_TIERS,
 } from '../../game/cityGridSystem';
 import {
@@ -85,6 +87,14 @@ export const BuildingDetailSheet: React.FC<BuildingDetailSheetProps> = ({
   const [selectedIndustryId, setSelectedIndustryId] = useState<string>('');
   const [customCompanyName, setCustomCompanyName] = useState<string>('');
   const [actionNotice, setActionNotice] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+  const [nowClock, setNowClock] = useState(Date.now());
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setNowClock(Date.now());
+    }, 500);
+    return () => clearInterval(timer);
+  }, []);
 
   if (!selectedItem) return null;
 
@@ -120,7 +130,7 @@ export const BuildingDetailSheet: React.FC<BuildingDetailSheetProps> = ({
           if (res.ok) {
             onCommand(
               {
-                name: 'upgrade_warehouse', // internal command wrapper or generic updater
+                name: 'upgrade_empire_hq',
                 args: { paymentMethod },
               },
               () => res
@@ -635,9 +645,9 @@ export const BuildingDetailSheet: React.FC<BuildingDetailSheetProps> = ({
       onCommand(
         {
           name: 'buy_direct_land',
-          args: { listingId: targetListingId, paymentMethod },
+          args: { listingId: targetListingId, paymentMethod, plotId: plot.id },
         },
-        (current) => buyDirectLand(current, targetListingId, paymentMethod)
+        (current) => buyDirectLand(current, targetListingId, paymentMethod, plot.id)
       );
 
       showFeedback(`تم شراء ${plot.label} بنجاح!`, 'success');
@@ -705,45 +715,76 @@ export const BuildingDetailSheet: React.FC<BuildingDetailSheetProps> = ({
     const companyName = customCompanyName.trim() || `${industry?.name || 'منشأة'} الإمبراطورية`;
 
     try {
-      // 1. Authoritative engine command
-      onCommand(
-        {
-          name: 'found_company',
-          args: {
-            industryId: selectedIndustryId as any,
-            landId,
-            name: companyName,
-            paymentMethod: 'cash',
-          },
-        },
-        (current) =>
-          foundCompany(current, selectedIndustryId as any, landId, companyName, 'cash')
-      );
-
-      // 2. Save active 3D construction job
-      const specs = getConstructionSpecs(selectedIndustryId as any, profile.level);
-      const activeConstructions = loadCityConstructions();
-      activeConstructions[plot.id] = {
-        plotId: plot.id,
-        landId,
-        industryId: selectedIndustryId as any,
+      const res = startPlotConstruction(
+        profile,
+        plot.id,
+        selectedIndustryId as any,
         companyName,
-        startedAt: Date.now(),
-        durationMs: specs.durationSeconds * 1000,
-        costCash: specs.cashCost,
-        costDiamonds: specs.diamondsCost,
-        status: 'constructing',
-      };
-      saveCityConstructions(activeConstructions);
+        'cash'
+      );
+      if (res.ok) {
+        onCommand(
+          {
+            name: 'found_company',
+            args: {
+              industryId: selectedIndustryId as any,
+              landId,
+              name: companyName,
+              paymentMethod: 'cash',
+            },
+          },
+          () => res
+        );
 
-      showFeedback('بدأت أعمال التمهيد والتشييد في الموقع بنجاح!', 'success');
-      setTimeout(() => {
+        showFeedback(res.message, 'success');
+        setTimeout(() => {
+          setIsSubmitting(false);
+          releaseTransactionLock(lockKey);
+          onRefreshGrid();
+        }, 400);
+      } else {
+        showFeedback(res.message, 'error');
         setIsSubmitting(false);
         releaseTransactionLock(lockKey);
-        onRefreshGrid();
-      }, 400);
+      }
     } catch (err: any) {
       showFeedback(err?.message || 'تعذر بدء البناء', 'error');
+      setIsSubmitting(false);
+      releaseTransactionLock(lockKey);
+    }
+  };
+
+  // Handle accelerating construction with diamonds
+  const handleAccelerateConstruction = () => {
+    const lockKey = `accel-const-${plot.id}`;
+    if (!acquireTransactionLock(lockKey)) return;
+
+    setIsSubmitting(true);
+    setActionNotice(null);
+
+    try {
+      const res = accelerateConstruction(profile, plot.id);
+      if (res.ok) {
+        onCommand(
+          {
+            name: 'use_day_speed_card',
+            args: { kind: 'day-speed-2x' },
+          },
+          () => res
+        );
+        showFeedback(res.message, 'success');
+        setTimeout(() => {
+          setIsSubmitting(false);
+          releaseTransactionLock(lockKey);
+          onRefreshGrid();
+        }, 300);
+      } else {
+        showFeedback(res.message, 'error');
+        setIsSubmitting(false);
+        releaseTransactionLock(lockKey);
+      }
+    } catch (err: any) {
+      showFeedback(err?.message || 'تعذر تسريع البناء', 'error');
       setIsSubmitting(false);
       releaseTransactionLock(lockKey);
     }
@@ -1027,47 +1068,70 @@ export const BuildingDetailSheet: React.FC<BuildingDetailSheetProps> = ({
       )}
 
       {/* 4. UNDER CONSTRUCTION */}
-      {(plot.status === 'constructing' || plot.status === 'clearing') && (
-        <div className="space-y-4">
-          <div className="p-4 rounded-xl bg-slate-950 border border-amber-500/40 space-y-3">
-            <div className="flex items-center justify-between text-xs">
-              <span className="text-amber-400 font-bold flex items-center gap-2">
-                <Clock className="w-4 h-4 animate-spin text-amber-400" />
-                <span>
-                  {plot.status === 'clearing' ? 'جاري تمهيد وتسوية الموقع...' : 'جاري تشييد وبناء المنشأة...'}
+      {(plot.status === 'constructing' || plot.status === 'clearing') && (() => {
+        const construction = plot.construction;
+        const elapsedMs = construction ? Math.max(0, nowClock - construction.startedAt) : 0;
+        const totalDuration = construction ? Math.max(1000, construction.durationMs) : 10000;
+        const progressPercent = Math.min(100, Math.floor((elapsedMs / totalDuration) * 100));
+        const remainingSeconds = Math.max(0, Math.ceil((totalDuration - elapsedMs) / 1000));
+        const diamondsCost = Math.max(3, construction?.costDiamonds || 5);
+
+        return (
+          <div className="space-y-4">
+            <div className="p-4 rounded-xl bg-slate-950 border border-amber-500/40 space-y-3">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-amber-400 font-bold flex items-center gap-2">
+                  <Clock className="w-4 h-4 animate-spin text-amber-400" />
+                  <span>
+                    {plot.status === 'clearing' ? 'جاري تمهيد وتسوية الموقع...' : 'جاري تشييد وبناء المنشأة...'}
+                  </span>
                 </span>
-              </span>
-              <span className="text-slate-400 font-bold">
-                {plot.construction?.companyName || 'منشأة صناعية'}
-              </span>
+                <span className="text-slate-400 font-bold">
+                  {construction?.companyName || 'منشأة صناعية'}
+                </span>
+              </div>
+
+              {/* Live Remaining Time & Progress */}
+              <div className="space-y-1.5">
+                <div className="flex justify-between items-center text-[11px]">
+                  <span className="text-amber-300 font-mono">
+                    {remainingSeconds > 0 ? `الوقت المتبقي: ${remainingSeconds} ثانية` : 'اكتملت أعمال التشييد!'}
+                  </span>
+                  <span className="text-slate-400 font-bold">{progressPercent}%</span>
+                </div>
+                <div className="w-full bg-slate-800 rounded-full h-3 overflow-hidden border border-slate-700">
+                  <div
+                    className="bg-gradient-to-r from-amber-500 to-amber-300 h-full rounded-full transition-all duration-300"
+                    style={{ width: `${progressPercent}%` }}
+                  />
+                </div>
+              </div>
             </div>
 
-            {/* Live Progress Bar */}
-            <div className="w-full bg-slate-800 rounded-full h-3 overflow-hidden border border-slate-700">
-              <div
-                className="bg-gradient-to-r from-amber-500 to-amber-300 h-full rounded-full transition-all duration-500 animate-pulse"
-                style={{ width: '80%' }}
-              />
-            </div>
+            {remainingSeconds > 0 ? (
+              <button
+                onClick={handleAccelerateConstruction}
+                disabled={isSubmitting || profile.diamonds < diamondsCost}
+                className="w-full py-2.5 px-4 rounded-xl bg-sky-600 hover:bg-sky-500 disabled:opacity-50 text-white font-bold text-xs flex items-center justify-center gap-2 transition-colors border border-sky-400/30 shadow-lg shadow-sky-600/20"
+              >
+                <Zap className="w-4 h-4 text-amber-300" />
+                <span>تسريع البناء والإتمام فوراً بالماس ({diamondsCost} 💎)</span>
+              </button>
+            ) : (
+              <button
+                onClick={() => {
+                  onRefreshGrid();
+                  showFeedback('تم تسليم المنشأة وجاهزيتها للعمل والإنتاج!', 'success');
+                }}
+                className="w-full py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-2 transition-colors shadow-lg shadow-emerald-600/20"
+              >
+                <CheckCircle2 className="w-4 h-4 text-white" />
+                <span>استلام المنشأة ودخولها خط الإنتاج فوراً</span>
+              </button>
+            )}
           </div>
-
-          <button
-            onClick={() => {
-              const active = loadCityConstructions();
-              if (active[plot.id]) {
-                active[plot.id].startedAt = 0; // finished
-                saveCityConstructions(active);
-                showFeedback('تم تسريع البناء واكتمال تشييد المنشأة فوراً!', 'success');
-                onRefreshGrid();
-              }
-            }}
-            className="w-full py-2.5 px-4 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs flex items-center justify-center gap-2 transition-colors border border-sky-400/30"
-          >
-            <Zap className="w-4 h-4 text-amber-300" />
-            <span>تسريع البناء والإتمام فوراً بالماس</span>
-          </button>
-        </div>
-      )}
+        );
+      })()}
 
       {/* 5. DEVELOPED (Finished Active Company) */}
       {plot.status === 'developed' && plot.company && (

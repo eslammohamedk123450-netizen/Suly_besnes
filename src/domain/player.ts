@@ -43,6 +43,7 @@ export interface PlayerLand {
   availableForCompanyOnDay?: number;
   landType?: 'industrial' | 'agricultural' | 'commercial';
   upgradeLevel?: number;
+  plotId?: string;
 }
 
 export interface PlayerCompany {
@@ -135,6 +136,8 @@ export interface PlayerProfile {
   automationDirectives?: AutomationDirectives;
   luckyWheelLevel?: number;
   fastStarterProductionUsed?: boolean;
+  hqLevel?: number;
+  cityConstructions?: Record<string, any>;
 }
 
 export function getDefaultAutomationDirectives(): AutomationDirectives {
@@ -226,6 +229,7 @@ export function createNewPlayer(
     availableForCompanyOnDay: 1,
     landType: 'industrial',
     upgradeLevel: 1,
+    plotId: 'plot-ind-1',
   };
 
   // Initial collapsing company
@@ -350,6 +354,8 @@ export function createNewPlayer(
     claimedRewardIds: [],
     dismissedStoryEventIds: [],
     automationDirectives: getDefaultAutomationDirectives(),
+    hqLevel: 1,
+    cityConstructions: {},
   };
 }
 

@@ -42,6 +42,7 @@ import { claimStarterMission, isSectionUnlocked } from './onboarding';
 import type { SectionId } from '../domain/navigation';
 import { acceptBotMarketOffer } from './economyBots';
 import { claimMissionReward } from './missionsEngine';
+import { upgradeEmpireHQ, CITY_BASE_PLOTS } from './cityGridSystem';
 
 export type GameErrorCode =
   | 'invalid-input'
@@ -352,17 +353,39 @@ export function placeBid(profile: PlayerProfile, listingId: string, amount: numb
   });
 }
 
-export function buyDirectLand(profile: PlayerProfile, listingId: string, paymentMethod: PurchasePaymentMethod = 'cash'): GameResult<{ landId: string; price: number; diamondsSpent: number }> {
+export function buyDirectLand(profile: PlayerProfile, listingId: string, paymentMethod: PurchasePaymentMethod = 'cash', plotId?: string): GameResult<{ landId: string; price: number; diamondsSpent: number }> {
   const countryError = ensureEgypt(profile);
   if (countryError) return countryError;
   const countryLands = getDirectLandsForCountry(profile.countryId);
-  const listing = countryLands.find((entry) => entry.id === listingId) || DIRECT_LAND_CATALOG.find((entry) => entry.id === listingId);
+  let listing = countryLands.find((entry) => entry.id === listingId) || DIRECT_LAND_CATALOG.find((entry) => entry.id === listingId);
+  if (!listing) {
+    const basePlot = CITY_BASE_PLOTS.find((p) => p.id === listingId);
+    if (basePlot) {
+      listing = {
+        id: basePlot.id,
+        label: basePlot.label,
+        landType: basePlot.zoning,
+        areaSquareMeters: basePlot.areaSquareMeters,
+        price: basePlot.defaultPrice,
+      };
+    }
+  }
   if (!listing) return failure(profile, 'not-found', 'عرض الأرض غير موجود.');
   if (profile.lands.some((land) => land.id === listing.id)) return failure(profile, 'already-owned', 'تم شراء هذه الأرض بالفعل.');
   const price = listing.price;
   const payment = resolvePurchaseDebit(profile, price, paymentMethod);
   if ('message' in payment) return failure(profile, 'insufficient-funds', payment.message);
-  const land: PlayerLand = { id: listing.id, label: listing.label, areaSquareMeters: listing.areaSquareMeters, purchasePrice: price, acquiredAt: timestampFor(profile), acquiredOnDay: profile.day, availableForCompanyOnDay: profile.day + 1, landType: listing.landType };
+  const land: PlayerLand = {
+    id: listing.id,
+    label: listing.label,
+    areaSquareMeters: listing.areaSquareMeters,
+    purchasePrice: price,
+    acquiredAt: timestampFor(profile),
+    acquiredOnDay: profile.day,
+    availableForCompanyOnDay: profile.day + 1,
+    landType: listing.landType,
+    ...(plotId ? { plotId } : {}),
+  };
   const nextProfile = addLedger(
     { ...profile, lands: [...profile.lands, land] },
     [ledgerEntry(profile, 'asset', price, `شراء أرض مباشر: ${listing.label}`, 0)],
@@ -2636,7 +2659,8 @@ export function updateAutomationDirectives(
 /** Serializable intent sent by authenticated clients; it deliberately contains no profile/save data. */
 export type GameCommand =
   | { name: 'place_bid'; args: { listingId: string; amount: number; targetCompanyId?: string } }
-  | { name: 'buy_direct_land'; args: { listingId: string; paymentMethod?: PurchasePaymentMethod } }
+  | { name: 'buy_direct_land'; args: { listingId: string; paymentMethod?: PurchasePaymentMethod; plotId?: string } }
+  | { name: 'upgrade_empire_hq'; args: { paymentMethod?: PurchasePaymentMethod } }
   | { name: 'buy_direct_company'; args: { listingId: string; paymentMethod?: PurchasePaymentMethod } }
   | { name: 'sell_land'; args: { landId: string } }
   | { name: 'upgrade_land'; args: { landId: string; paymentMethod?: PurchasePaymentMethod } }
@@ -2696,7 +2720,8 @@ export type GameCommandHandler = (command: GameCommand, fallback: (profile: Play
 export function executeGameCommand(profile: PlayerProfile, command: GameCommand): GameResult<unknown> {
   switch (command.name) {
     case 'place_bid': return placeBid(profile, command.args.listingId, command.args.amount, command.args.targetCompanyId);
-    case 'buy_direct_land': return buyDirectLand(profile, command.args.listingId, command.args.paymentMethod);
+    case 'buy_direct_land': return buyDirectLand(profile, command.args.listingId, command.args.paymentMethod, command.args.plotId);
+    case 'upgrade_empire_hq': return upgradeEmpireHQ(profile, command.args.paymentMethod);
     case 'buy_direct_company': return buyDirectCompany(profile, command.args.listingId, command.args.paymentMethod);
     case 'sell_land': return sellLand(profile, command.args.landId);
     case 'upgrade_land': return upgradeLand(profile, command.args.landId, command.args.paymentMethod);

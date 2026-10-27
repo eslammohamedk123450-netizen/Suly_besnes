@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
   acquireTransactionLock,
   releaseTransactionLock,
@@ -11,6 +11,8 @@ import {
   getConstructionSpecs,
   upgradeEmpireHQ,
   accelerateLandTransfer,
+  startPlotConstruction,
+  accelerateConstruction,
   loadHQLevel,
   saveHQLevel,
   CITY_BASE_PLOTS,
@@ -21,6 +23,16 @@ import { createNewPlayer, type PlayerProfile } from '../domain/player';
 import { COUNTRIES } from '../domain/countries';
 import { buyDirectLand, foundCompany, upgradeLand } from './engine';
 
+class MemoryStorage implements Storage {
+  private readonly store = new Map<string, string>();
+  get length(): number { return this.store.size; }
+  clear(): void { this.store.clear(); }
+  getItem(key: string): string | null { return this.store.get(key) ?? null; }
+  key(index: number): string | null { return Array.from(this.store.keys())[index] ?? null; }
+  removeItem(key: string): void { this.store.delete(key); }
+  setItem(key: string, value: string): void { this.store.set(key, String(value)); }
+}
+
 function getMockProfile(overrides: Partial<PlayerProfile> = {}): PlayerProfile {
   return {
     ...createNewPlayer(COUNTRIES[0], 'مستثمر تجريبي', new Date('2026-01-01T00:00:00.000Z')),
@@ -30,6 +42,7 @@ function getMockProfile(overrides: Partial<PlayerProfile> = {}): PlayerProfile {
 
 describe('cityGridSystem and Real Functional Bindings', () => {
   beforeEach(() => {
+    vi.stubGlobal('localStorage', new MemoryStorage());
     // Reset locks before each test
     releaseTransactionLock('test-action');
     releaseTransactionLock('buy-plot-1');
@@ -173,5 +186,116 @@ describe('cityGridSystem and Real Functional Bindings', () => {
     expect(specs.cashCost).toBeGreaterThan(0);
     expect(specs.diamondsCost).toBeGreaterThan(0);
     expect(specs.industryName).toBe('الأغذية والزراعة');
+  });
+
+  it('starts plot construction authentically with startPlotConstruction', () => {
+    const extraLand = {
+      id: 'owned-land-agri-1',
+      label: 'أرض زراعية جديدة',
+      areaSquareMeters: 520,
+      purchasePrice: 3600,
+      acquiredAt: new Date().toISOString(),
+      acquiredOnDay: 1,
+      availableForCompanyOnDay: 1,
+      landType: 'agricultural' as const,
+      plotId: 'plot-agri-1',
+    };
+    const base = getMockProfile({
+      bankBalance: 100_000,
+      lands: [...getMockProfile().lands, extraLand],
+    });
+    const grid = resolveCityGrid(base);
+    const ownedEmptyPlot = grid.plots.find((p) => p.id === 'plot-agri-1');
+    expect(ownedEmptyPlot).toBeDefined();
+    expect(ownedEmptyPlot?.status).toBe('owned_empty');
+    if (!ownedEmptyPlot) return;
+
+    const res = startPlotConstruction(base, ownedEmptyPlot.id, 'food', 'مجمع النخيل الغذائي', 'cash');
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+
+    expect(res.data.plotId).toBe(ownedEmptyPlot.id);
+    expect(res.profile.companies.some((c) => c.name === 'مجمع النخيل الغذائي')).toBe(true);
+    expect(res.profile.cityConstructions?.[ownedEmptyPlot.id]).toBeDefined();
+
+    // Verify grid resolution marks it as clearing or constructing
+    const updatedGrid = resolveCityGrid(res.profile);
+    const updatedPlot = updatedGrid.plots.find((p) => p.id === ownedEmptyPlot.id);
+    expect(['clearing', 'constructing']).toContain(updatedPlot?.status);
+
+    // Duplicate construction attempt on the same plot must be rejected
+    const duplicateRes = startPlotConstruction(res.profile, ownedEmptyPlot.id, 'food', 'محاولة ثانية', 'cash');
+    expect(duplicateRes.ok).toBe(false);
+  });
+
+  it('accelerates construction with diamonds using accelerateConstruction', () => {
+    const extraLand = {
+      id: 'owned-land-agri-1',
+      label: 'أرض زراعية جديدة',
+      areaSquareMeters: 520,
+      purchasePrice: 3600,
+      acquiredAt: new Date().toISOString(),
+      acquiredOnDay: 1,
+      availableForCompanyOnDay: 1,
+      landType: 'agricultural' as const,
+      plotId: 'plot-agri-1',
+    };
+    const base = getMockProfile({
+      bankBalance: 100_000,
+      diamonds: 25,
+      lands: [...getMockProfile().lands, extraLand],
+    });
+
+    const startRes = startPlotConstruction(base, 'plot-agri-1', 'food', 'مجمع الدلتا', 'cash');
+    expect(startRes.ok).toBe(true);
+    if (!startRes.ok) return;
+
+    const accelRes = accelerateConstruction(startRes.profile, 'plot-agri-1');
+    expect(accelRes.ok).toBe(true);
+    if (!accelRes.ok) return;
+
+    expect(accelRes.profile.diamonds).toBeLessThan(25);
+    expect(accelRes.profile.cityConstructions?.['plot-agri-1'].status).toBe('completed');
+
+    // Upon re-resolving grid, plot must be developed
+    const developedGrid = resolveCityGrid(accelRes.profile);
+    const developedPlot = developedGrid.plots.find((p) => p.id === 'plot-agri-1');
+    expect(developedPlot?.status).toBe('developed');
+  });
+
+  it('persists hqLevel, plotId, and cityConstructions across saveRepository migrations', async () => {
+    const { saveGame, loadSavedGame } = await import('../storage/saveRepository');
+    const profile = getMockProfile({
+      hqLevel: 3,
+      bankBalance: 250_000,
+      lands: [
+        {
+          ...getMockProfile().lands[0],
+          plotId: 'plot-ind-1',
+        },
+      ],
+      cityConstructions: {
+        'plot-ind-1': {
+          plotId: 'plot-ind-1',
+          landId: 'land-test',
+          industryId: 'food',
+          companyName: 'مصنع الأمل',
+          startedAt: 1234567,
+          durationMs: 30000,
+          costCash: 5000,
+          costDiamonds: 5,
+          status: 'constructing',
+        },
+      },
+    });
+
+    const saveRes = saveGame(profile);
+    expect(saveRes.ok).toBe(true);
+    const loaded = loadSavedGame(profile.accountCode);
+    expect(loaded).toBeDefined();
+    expect(loaded?.hqLevel).toBe(3);
+    expect(loaded?.lands[0].plotId).toBe('plot-ind-1');
+    expect(loaded?.cityConstructions?.['plot-ind-1']).toBeDefined();
+    expect(loaded?.cityConstructions?.['plot-ind-1'].companyName).toBe('مصنع الأمل');
   });
 });
