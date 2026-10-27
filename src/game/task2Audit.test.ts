@@ -30,7 +30,7 @@ import {
   calculateTotalAssets,
   calculateNetWorth,
 } from '../domain/player';
-import { findCountry } from '../domain/countries';
+import { COUNTRIES, findCountry } from '../domain/countries';
 import { getDirectLandsForCountry } from './catalog';
 import { verifyCountryAndLandIntegrity } from '../domain/countryAuditCatalog';
 import { enqueueGameCommand, loadQueuedGameCommands, acknowledgeGameCommand } from '../storage/commandOutbox';
@@ -293,11 +293,16 @@ describe('Task 2 — Comprehensive Internal Systems, Economy, and Persistence Au
 
   // 6. Supported Countries, Jordan Integration, and Unique Land IDs
   describe('6. Country and Land Catalog Integrity', () => {
+    it('defines a non-default currency for every supported country', () => {
+      const expected = { egypt: 'EGP', saudi: 'SAR', uae: 'AED', usa: 'USD', kuwait: 'KWD', qatar: 'QAR', uk: 'GBP', germany: 'EUR', japan: 'JPY', jordan: 'JOD', palestine: 'ILS', china: 'CNY', spain: 'EUR', russia: 'RUB' };
+      for (const country of COUNTRIES) expect(country.currency.code).toBe(expected[country.id]);
+    });
+
     it('verifies Jordan starting landmarks, land IDs, company IDs, and Arab Bank', () => {
       const jordanDef = findCountry('jordan')!;
       expect(jordanDef).toBeDefined();
       expect(jordanDef.name).toBe('المملكة الأردنية الهاشمية');
-      expect(jordanDef.currency.symbol).toBe('$');
+      expect(jordanDef.currency.symbol).toBe('د.أ');
 
       const player = createNewPlayer(jordanDef, 'سالم');
       expect(player.lands[0].label).toContain('مدينة سحاب الصناعية');
@@ -306,15 +311,15 @@ describe('Task 2 — Comprehensive Internal Systems, Economy, and Persistence Au
 
       // Verify Jordan direct lands have unique IDs
       const jordanLands = getDirectLandsForCountry('jordan');
-      expect(jordanLands).toHaveLength(4);
+      expect(jordanLands).toHaveLength(7);
       const landIds = new Set(jordanLands.map((l) => l.id));
-      expect(landIds.size).toBe(4);
+      expect(landIds.size).toBe(7);
       expect(landIds.has('direct-land-jordan-sahab')).toBe(true);
 
       // Verify all 10 countries pass integrity checks
       const audit = verifyCountryAndLandIntegrity();
       expect(audit.isValid).toBe(true);
-      expect(audit.totalCountries).toBe(10);
+      expect(audit.totalCountries).toBe(14);
       expect(audit.issues).toHaveLength(0);
     });
   });
