@@ -53,7 +53,11 @@ import {
   buildPrestigeConsulateMesh,
 } from './cityMeshBuilders';
 import { buildCityRoadNetwork, type TrafficVehicle } from './cityRoadNetwork';
-import { CityTouchController } from './cityTouchControls';
+import {
+  CityTouchController,
+  CITY_CAMERA_LIMITS,
+  focusCityCamera,
+} from './cityTouchControls';
 import {
   classifyIndustryToFacility,
   resolvePlotVisualStage,
@@ -105,9 +109,15 @@ export const CityCanvas: React.FC<CityCanvasProps> = ({
   const onSelectItemRef = useRef(onSelectItem);
   onSelectItemRef.current = onSelectItem;
 
-  // Camera targets for smooth frame-rate independent exponential damping
-  const cameraTargetPos = useRef(new THREE.Vector3(0, 42, 60));
-  const cameraLookAtPos = useRef(new THREE.Vector3(0, 0, 5));
+  // Fixed-height camera rail: only the city focus and zoom level can change.
+  const cameraTargetPos = useRef(new THREE.Vector3(
+    0,
+    CITY_CAMERA_LIMITS.cameraHeight,
+    CITY_CAMERA_LIMITS.headingOffsetZ
+  ));
+  const cameraLookAtPos = useRef(new THREE.Vector3(0, CITY_CAMERA_LIMITS.lookAtHeight, 0));
+  const cameraCurrentLookAtPos = useRef(new THREE.Vector3(0, CITY_CAMERA_LIMITS.lookAtHeight, 0));
+  const cameraTargetFov = useRef(CITY_CAMERA_LIMITS.defaultFov);
 
   // Touch controller instance ref
   const touchControllerRef = useRef<CityTouchController | null>(null);
@@ -143,9 +153,10 @@ export const CityCanvas: React.FC<CityCanvasProps> = ({
     scene.fog = new THREE.FogExp2(fogColor, isNightMode ? 0.003 : 0.0026);
 
     // 2. Camera with expanded view frustum for enlarged city
-    const camera = new THREE.PerspectiveCamera(45, width / height, 0.5, 600);
-    camera.position.set(0, 48, 70);
-    camera.lookAt(0, 0, 5);
+    const camera = new THREE.PerspectiveCamera(cameraTargetFov.current, width / height, 0.5, 600);
+    cameraCurrentLookAtPos.current.copy(cameraLookAtPos.current);
+    camera.position.copy(cameraTargetPos.current);
+    camera.lookAt(cameraCurrentLookAtPos.current);
 
     // 3. WebGL Renderer
     const renderer = new THREE.WebGLRenderer({
@@ -514,9 +525,9 @@ export const CityCanvas: React.FC<CityCanvasProps> = ({
 
     const touchCtrl = new CityTouchController({
       domElement: renderer.domElement,
-      camera,
       cameraTargetPos,
       cameraLookAtPos,
+      cameraTargetFov,
       onTapRaycast: handleTapRaycast,
     });
     touchControllerRef.current = touchCtrl;
@@ -574,8 +585,32 @@ export const CityCanvas: React.FC<CityCanvasProps> = ({
       camera.position.y = THREE.MathUtils.damp(camera.position.y, cameraTargetPos.current.y, 7.5, dt);
       camera.position.z = THREE.MathUtils.damp(camera.position.z, cameraTargetPos.current.z, 7.5, dt);
 
-      // Smooth camera target orientation
-      camera.lookAt(cameraLookAtPos.current);
+      const nextFov = THREE.MathUtils.damp(camera.fov, cameraTargetFov.current, 8, dt);
+      if (Math.abs(nextFov - camera.fov) > 0.001) {
+        camera.fov = nextFov;
+        camera.updateProjectionMatrix();
+      }
+
+      // Move the aim point with the camera so district changes never orbit.
+      cameraCurrentLookAtPos.current.x = THREE.MathUtils.damp(
+        cameraCurrentLookAtPos.current.x,
+        cameraLookAtPos.current.x,
+        7.5,
+        dt
+      );
+      cameraCurrentLookAtPos.current.y = THREE.MathUtils.damp(
+        cameraCurrentLookAtPos.current.y,
+        cameraLookAtPos.current.y,
+        7.5,
+        dt
+      );
+      cameraCurrentLookAtPos.current.z = THREE.MathUtils.damp(
+        cameraCurrentLookAtPos.current.z,
+        cameraLookAtPos.current.z,
+        7.5,
+        dt
+      );
+      camera.lookAt(cameraCurrentLookAtPos.current);
 
       // Update mobile touch inertia
       touchCtrl.updateInertia(dt);
@@ -684,50 +719,40 @@ export const CityCanvas: React.FC<CityCanvasProps> = ({
     };
   }, [profile, isNightMode]);
 
-  // Handle camera presets changes smoothly
+  // Move between districts without changing the fixed camera heading or height.
   useEffect(() => {
     if (!cameraPreset) return;
     switch (cameraPreset) {
       case 'center':
       case 'hq':
-        cameraTargetPos.current.set(0, 36, 44);
-        cameraLookAtPos.current.set(0, 4, 0);
+        focusCityCamera(cameraTargetPos.current, cameraLookAtPos.current, 0, 0);
         break;
       case 'bank':
-        cameraTargetPos.current.set(-24, 20, 32);
-        cameraLookAtPos.current.set(-24, 4, 12);
+        focusCityCamera(cameraTargetPos.current, cameraLookAtPos.current, -24, 12);
         break;
       case 'stock_exchange':
-        cameraTargetPos.current.set(24, 20, 32);
-        cameraLookAtPos.current.set(24, 4, 12);
+        focusCityCamera(cameraTargetPos.current, cameraLookAtPos.current, 24, 12);
         break;
       case 'factory':
-        cameraTargetPos.current.set(45, 22, 70);
-        cameraLookAtPos.current.set(45, 4, 52);
+        focusCityCamera(cameraTargetPos.current, cameraLookAtPos.current, 45, 52);
         break;
       case 'tech':
-        cameraTargetPos.current.set(-45, 28, -25);
-        cameraLookAtPos.current.set(-45, 6, -45);
+        focusCityCamera(cameraTargetPos.current, cameraLookAtPos.current, -45, -45);
         break;
       case 'maritime':
-        cameraTargetPos.current.set(65, 42, 83);
-        cameraLookAtPos.current.set(80, 4, 32);
+        focusCityCamera(cameraTargetPos.current, cameraLookAtPos.current, 80, 32);
         break;
       case 'gov':
-        cameraTargetPos.current.set(45, 28, -25);
-        cameraLookAtPos.current.set(45, 6, -45);
+        focusCityCamera(cameraTargetPos.current, cameraLookAtPos.current, 45, -45);
         break;
       case 'trade':
-        cameraTargetPos.current.set(-45, 26, 42);
-        cameraLookAtPos.current.set(-45, 4, 32);
+        focusCityCamera(cameraTargetPos.current, cameraLookAtPos.current, -45, 32);
         break;
       case 'luxury':
-        cameraTargetPos.current.set(-74, 24, 52);
-        cameraLookAtPos.current.set(-74, 4, 32);
+        focusCityCamera(cameraTargetPos.current, cameraLookAtPos.current, -74, 32);
         break;
       case 'plots':
-        cameraTargetPos.current.set(16, 26, -5);
-        cameraLookAtPos.current.set(16, 0, -18);
+        focusCityCamera(cameraTargetPos.current, cameraLookAtPos.current, 16, -18);
         break;
       default:
         break;
@@ -740,21 +765,27 @@ export const CityCanvas: React.FC<CityCanvasProps> = ({
     if (selectedItem?.type === 'landmark') {
       const def = ALL_CITY_LANDMARKS.find((l) => l.id === selectedItem.id);
       if (def) {
-        cameraTargetPos.current.set(def.coordinates.x, 22, def.coordinates.z + 24);
-        cameraLookAtPos.current.set(def.coordinates.x, 3, def.coordinates.z);
+        focusCityCamera(
+          cameraTargetPos.current,
+          cameraLookAtPos.current,
+          def.coordinates.x,
+          def.coordinates.z
+        );
       }
     } else if (selectedItem?.type === 'plot') {
-      cameraTargetPos.current.set(selectedItem.plot.gridX, 18, selectedItem.plot.gridZ + 18);
-      cameraLookAtPos.current.set(selectedItem.plot.gridX, 1, selectedItem.plot.gridZ);
+      focusCityCamera(
+        cameraTargetPos.current,
+        cameraLookAtPos.current,
+        selectedItem.plot.gridX,
+        selectedItem.plot.gridZ
+      );
     }
   }, [selectedItem]);
 
-  // Expose quick zoom & rotation helpers for mobile overlay buttons
+  // Expose bounded zoom and a safe return-to-center control.
   const handleZoomIn = () => touchControllerRef.current?.zoomStep('in');
   const handleZoomOut = () => touchControllerRef.current?.zoomStep('out');
-  const handleRotateLeft = () => touchControllerRef.current?.rotateAroundLookAt(0.35);
-  const handleRotateRight = () => touchControllerRef.current?.rotateAroundLookAt(-0.35);
-  const handleResetNorth = () => touchControllerRef.current?.resetToNorth();
+  const handleResetView = () => touchControllerRef.current?.resetView();
 
   return (
     <div className="relative w-full h-[520px] md:h-[620px] rounded-2xl overflow-hidden shadow-2xl border border-amber-500/30 bg-slate-950 select-none">
@@ -779,27 +810,12 @@ export const CityCanvas: React.FC<CityCanvasProps> = ({
           -
         </button>
         <button
-          onClick={handleRotateLeft}
-          className="w-7 h-7 rounded-lg bg-slate-900/90 border border-amber-500/40 text-amber-400 font-bold text-xs flex items-center justify-center hover:bg-slate-800 transition-colors shadow-md active:scale-95"
-          title="تدوير لليسار"
-          aria-label="Rotate left"
-        >
-          ↺
-        </button>
-        <button
-          onClick={handleRotateRight}
-          className="w-7 h-7 rounded-lg bg-slate-900/90 border border-amber-500/40 text-amber-400 font-bold text-xs flex items-center justify-center hover:bg-slate-800 transition-colors shadow-md active:scale-95"
-          title="تدوير لليمين"
-          aria-label="Rotate right"
-        >
-          ↻
-        </button>
-        <button
-          onClick={handleResetNorth}
+          onClick={handleResetView}
           className="px-2 h-7 rounded-lg bg-slate-900/90 border border-amber-500/40 text-amber-400 font-bold text-[11px] flex items-center gap-0.5 hover:bg-slate-800 transition-colors shadow-md active:scale-95"
-          title="إعادة توجيه الشمال"
+          title="إعادة الكاميرا إلى مركز المدينة"
+          aria-label="Reset camera view"
         >
-          <span>🧭</span>
+          <span>⌂</span>
         </button>
       </div>
     </div>
