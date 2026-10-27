@@ -20,6 +20,10 @@ import {
   saveCityConstructions,
   loadCityConstructions,
   getConstructionSpecs,
+  loadHQLevel,
+  upgradeEmpireHQ,
+  accelerateLandTransfer,
+  HQ_TIERS,
 } from '../../game/cityGridSystem';
 import {
   type GameCommand,
@@ -28,6 +32,10 @@ import {
   foundCompany,
   runProduction,
   serviceCompany,
+  upgradeCompany,
+  upgradeLand,
+  repayLoan,
+  createDeposit,
 } from '../../game/engine';
 import { playSound } from '../../game/soundEffects';
 import {
@@ -46,6 +54,10 @@ import {
   CheckCircle2,
   Lock,
   ChevronLeft,
+  Wrench,
+  TrendingUp,
+  FileText,
+  BadgeAlert,
 } from 'lucide-react';
 import type { SelectedItem } from './CityCanvas';
 
@@ -72,25 +84,75 @@ export const BuildingDetailSheet: React.FC<BuildingDetailSheetProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedIndustryId, setSelectedIndustryId] = useState<string>('');
   const [customCompanyName, setCustomCompanyName] = useState<string>('');
-  const [actionNotice, setActionNotice] = useState<string | null>(null);
+  const [actionNotice, setActionNotice] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
 
   if (!selectedItem) return null;
+
+  const showFeedback = (text: string, type: 'success' | 'error') => {
+    setActionNotice({ text, type });
+    if (type === 'success') {
+      playSound('success');
+    } else {
+      playSound('error');
+    }
+  };
 
   // 1. LANDMARK SHEETS
   if (selectedItem.type === 'landmark') {
     const { id } = selectedItem;
 
+    // A. IMPERIAL TOWER HQ
     if (id === 'hq') {
+      const currentHQLvl = loadHQLevel(profile);
+      const currentSpec = HQ_TIERS[currentHQLvl - 1] || HQ_TIERS[0];
+      const nextSpec = HQ_TIERS[currentHQLvl]; // level currentHQLvl + 1
+      const isMaxLevel = !nextSpec;
+
+      const handleUpgradeHQ = (paymentMethod: 'cash' | 'diamonds') => {
+        const lockKey = 'upgrade-hq';
+        if (!acquireTransactionLock(lockKey)) return;
+
+        setIsSubmitting(true);
+        setActionNotice(null);
+
+        try {
+          const res = upgradeEmpireHQ(profile, paymentMethod);
+          if (res.ok) {
+            onCommand(
+              {
+                name: 'upgrade_warehouse', // internal command wrapper or generic updater
+                args: { paymentMethod },
+              },
+              () => res
+            );
+            showFeedback(res.message, 'success');
+            onRefreshGrid();
+          } else {
+            showFeedback(res.message, 'error');
+          }
+        } catch (err: any) {
+          showFeedback(err?.message || 'تعذر تطوير المقر', 'error');
+        } finally {
+          setIsSubmitting(false);
+          releaseTransactionLock(lockKey);
+        }
+      };
+
       return (
-        <div className="absolute inset-x-0 bottom-0 z-40 bg-slate-900/95 border-t border-amber-500/40 rounded-t-3xl shadow-2xl p-5 backdrop-blur-md animate-slide-up text-white max-w-3xl mx-auto">
+        <div className="absolute inset-x-0 bottom-0 z-40 bg-slate-900/95 border-t border-amber-500/40 rounded-t-3xl shadow-2xl p-5 backdrop-blur-md animate-slide-up text-white max-w-3xl mx-auto max-h-[85vh] overflow-y-auto">
           <div className="flex items-center justify-between border-b border-slate-800 pb-3 mb-4">
             <div className="flex items-center gap-3">
               <div className="w-12 h-12 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400">
                 <Building2 className="w-7 h-7" />
               </div>
               <div>
-                <h3 className="font-bold text-lg text-amber-300">البرج الإمبراطوري · المقر الرئيسي</h3>
-                <p className="text-xs text-slate-400">مركز إدارة الإمبراطورية وتوجيه العمليات الاستراتيجية</p>
+                <div className="flex items-center gap-2">
+                  <h3 className="font-bold text-lg text-amber-300">البرج الإمبراطوري · المستوى {currentHQLvl}</h3>
+                  <span className="text-[10px] bg-amber-500/20 text-amber-400 border border-amber-500/30 px-2 py-0.5 rounded-full font-bold">
+                    {currentSpec.title}
+                  </span>
+                </div>
+                <p className="text-xs text-slate-400">{currentSpec.description}</p>
               </div>
             </div>
             <button
@@ -101,23 +163,92 @@ export const BuildingDetailSheet: React.FC<BuildingDetailSheetProps> = ({
             </button>
           </div>
 
+          {actionNotice && (
+            <div
+              className={`mb-4 p-3 rounded-xl border text-xs font-bold text-center ${
+                actionNotice.type === 'success'
+                  ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300'
+                  : 'bg-rose-500/20 border-rose-500/40 text-rose-300'
+              }`}
+            >
+              {actionNotice.text}
+            </div>
+          )}
+
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4 text-xs">
             <div className="p-3 bg-slate-950/70 border border-slate-800 rounded-xl">
-              <span className="text-slate-400 block mb-1">المستوى الحالي:</span>
-              <span className="font-bold text-amber-400 text-sm">المستوى {profile.level}</span>
+              <span className="text-slate-400 block mb-1">المستوى القيادي:</span>
+              <span className="font-bold text-amber-400 text-sm">مستوى {profile.level}</span>
             </div>
             <div className="p-3 bg-slate-950/70 border border-slate-800 rounded-xl">
               <span className="text-slate-400 block mb-1">الرصيد النقدي:</span>
               <span className="font-bold text-emerald-400 text-sm">{formatMoney(profile.bankBalance)}</span>
             </div>
             <div className="p-3 bg-slate-950/70 border border-slate-800 rounded-xl">
-              <span className="text-slate-400 block mb-1">الشركات التابعة:</span>
-              <span className="font-bold text-blue-400 text-sm">{profile.companies.length} شركات</span>
+              <span className="text-slate-400 block mb-1">السمعة التجارية:</span>
+              <span className="font-bold text-sky-400 text-sm">{profile.reputation ?? 100} نقطة</span>
             </div>
             <div className="p-3 bg-slate-950/70 border border-slate-800 rounded-xl">
-              <span className="text-slate-400 block mb-1">الأراضي المملوكة:</span>
-              <span className="font-bold text-purple-400 text-sm">{profile.lands.length} مواقع</span>
+              <span className="text-slate-400 block mb-1">الشركات والأصول:</span>
+              <span className="font-bold text-purple-400 text-sm">{profile.companies.length} شركات</span>
             </div>
+          </div>
+
+          {/* Upgrade HQ Action Section */}
+          <div className="p-4 rounded-2xl bg-slate-950/80 border border-amber-500/30 mb-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-amber-300 flex items-center gap-1.5">
+                <Sparkles className="w-4 h-4 text-amber-400" />
+                <span>ترقية وتطوير البرج الإمبراطوري</span>
+              </span>
+              {!isMaxLevel && (
+                <span className="text-[11px] text-slate-400">
+                  المستوى القادم: <strong className="text-white">{nextSpec.title}</strong>
+                </span>
+              )}
+            </div>
+
+            {isMaxLevel ? (
+              <div className="text-xs text-emerald-400 font-bold p-2.5 rounded-xl bg-emerald-950/30 border border-emerald-500/30 text-center">
+                🏆 وصل البرج الإمبراطوري إلى أعلى صرح سيادي (المستوى الأقصى)!
+              </div>
+            ) : (
+              <div className="space-y-3 text-xs">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-[11px] text-slate-300">
+                  <div className="p-2.5 rounded-xl bg-slate-900 border border-slate-800">
+                    <span className="text-slate-400 block">شروط الترقية:</span>
+                    <span className="font-bold text-amber-400">
+                      ثروة إجمالية لا تقل عن {formatMoney(nextSpec.requiredNetWorth)}
+                    </span>
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-slate-900 border border-slate-800">
+                    <span className="text-slate-400 block">المزايا المكتسبة:</span>
+                    <span className="font-bold text-emerald-400">
+                      +{nextSpec.reputationBonus} سمعة · {nextSpec.perks[0]}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => handleUpgradeHQ('cash')}
+                    disabled={isSubmitting || profile.bankBalance < nextSpec.costCash}
+                    className="flex-1 py-3 px-4 rounded-xl bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-slate-950 font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-lg shadow-amber-500/20"
+                  >
+                    <Coins className="w-4 h-4" />
+                    <span>تطوير نقدًا ({formatMoney(nextSpec.costCash)})</span>
+                  </button>
+                  <button
+                    onClick={() => handleUpgradeHQ('diamonds')}
+                    disabled={isSubmitting || profile.diamonds < nextSpec.costDiamonds}
+                    className="flex-1 py-3 px-4 rounded-xl bg-sky-600 hover:bg-sky-500 disabled:opacity-50 text-white font-bold text-xs flex items-center justify-center gap-2 transition-colors border border-sky-400/30"
+                  >
+                    <Gem className="w-4 h-4" />
+                    <span>تطوير بالماس ({nextSpec.costDiamonds} 💎)</span>
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
@@ -126,19 +257,19 @@ export const BuildingDetailSheet: React.FC<BuildingDetailSheetProps> = ({
                 onClose();
                 onNavigate('tech_tree');
               }}
-              className="flex-1 min-w-[140px] py-2.5 px-4 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-lg shadow-amber-500/20"
+              className="flex-1 min-w-[130px] py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-colors border border-slate-700"
             >
-              <Sparkles className="w-4 h-4" />
-              <span>شجرة الأبحاث والأتمتة</span>
+              <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+              <span>الأبحاث والأتمتة</span>
             </button>
             <button
               onClick={() => {
                 onClose();
                 onNavigate('luxury');
               }}
-              className="flex-1 min-w-[140px] py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs flex items-center justify-center gap-2 transition-colors border border-slate-700"
+              className="flex-1 min-w-[130px] py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-colors border border-slate-700"
             >
-              <ShieldCheck className="w-4 h-4 text-amber-400" />
+              <ShieldCheck className="w-3.5 h-3.5 text-amber-400" />
               <span>الهيبة والرفاهية</span>
             </button>
             <button
@@ -146,19 +277,79 @@ export const BuildingDetailSheet: React.FC<BuildingDetailSheetProps> = ({
                 onClose();
                 onNavigate('tasks');
               }}
-              className="flex-1 min-w-[140px] py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs flex items-center justify-center gap-2 transition-colors border border-slate-700"
+              className="flex-1 min-w-[130px] py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-colors border border-slate-700"
             >
-              <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-              <span>المهام اليومية والإنجازات</span>
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+              <span>المهام اليومية</span>
             </button>
           </div>
         </div>
       );
     }
 
+    // B. CENTRAL BANK
     if (id === 'bank') {
+      const activeLoans = (profile.banking?.loans ?? []).filter((l) => l.status === 'active');
+      const activeDeposits = (profile.banking?.deposits ?? []).filter((d) => d.status === 'active');
+      const firstActiveLoan = activeLoans[0];
+
+      const handleQuickRepayLoan = () => {
+        if (!firstActiveLoan) return;
+        const lockKey = `repay-${firstActiveLoan.id}`;
+        if (!acquireTransactionLock(lockKey)) return;
+
+        setIsSubmitting(true);
+        setActionNotice(null);
+
+        try {
+          onCommand(
+            {
+              name: 'repay_loan',
+              args: { loanId: firstActiveLoan.id, installments: 1 },
+            },
+            (current) => repayLoan(current, firstActiveLoan.id, 1)
+          );
+          showFeedback('تم سداد قسط القرض بنجاح وخصم المبلغ من الحساب!', 'success');
+        } catch (err: any) {
+          showFeedback(err?.message || 'تعذر سداد القسط', 'error');
+        } finally {
+          setIsSubmitting(false);
+          releaseTransactionLock(lockKey);
+        }
+      };
+
+      const handleQuickDeposit = () => {
+        const depositAmount = 5000;
+        if (profile.bankBalance < depositAmount) {
+          showFeedback(`تحتاج إلى ${formatMoney(depositAmount)} على الأقل لفتح الوديعة`, 'error');
+          return;
+        }
+
+        const lockKey = 'quick-deposit';
+        if (!acquireTransactionLock(lockKey)) return;
+
+        setIsSubmitting(true);
+        setActionNotice(null);
+
+        try {
+          onCommand(
+            {
+              name: 'create_deposit',
+              args: { amount: depositAmount, durationDays: 3 },
+            },
+            (current) => createDeposit(current, depositAmount, 3)
+          );
+          showFeedback('تم ربط الوديعة الاستثمارية بنجاح لمدة 3 أيام بعائد مجزٍ!', 'success');
+        } catch (err: any) {
+          showFeedback(err?.message || 'تعذر ربط الوديعة', 'error');
+        } finally {
+          setIsSubmitting(false);
+          releaseTransactionLock(lockKey);
+        }
+      };
+
       return (
-        <div className="absolute inset-x-0 bottom-0 z-40 bg-slate-900/95 border-t border-sky-500/40 rounded-t-3xl shadow-2xl p-5 backdrop-blur-md animate-slide-up text-white max-w-3xl mx-auto">
+        <div className="absolute inset-x-0 bottom-0 z-40 bg-slate-900/95 border-t border-sky-500/40 rounded-t-3xl shadow-2xl p-5 backdrop-blur-md animate-slide-up text-white max-w-3xl mx-auto max-h-[85vh] overflow-y-auto">
           <div className="flex items-center justify-between border-b border-slate-800 pb-3 mb-4">
             <div className="flex items-center gap-3">
               <div className="w-12 h-12 rounded-xl bg-sky-500/20 border border-sky-500/40 flex items-center justify-center text-sky-400">
@@ -166,7 +357,7 @@ export const BuildingDetailSheet: React.FC<BuildingDetailSheetProps> = ({
               </div>
               <div>
                 <h3 className="font-bold text-lg text-sky-300">البنك المركزي والتمويل الاستثماري</h3>
-                <p className="text-xs text-slate-400">إدارة الودائع، التسهيلات الائتمانية، والقروض المصرفية</p>
+                <p className="text-xs text-slate-400">إدارة التسهيلات الائتمانية، الودائع، وخدمات الخزانة</p>
               </div>
             </div>
             <button
@@ -177,22 +368,62 @@ export const BuildingDetailSheet: React.FC<BuildingDetailSheetProps> = ({
             </button>
           </div>
 
+          {actionNotice && (
+            <div
+              className={`mb-4 p-3 rounded-xl border text-xs font-bold text-center ${
+                actionNotice.type === 'success'
+                  ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300'
+                  : 'bg-rose-500/20 border-rose-500/40 text-rose-300'
+              }`}
+            >
+              {actionNotice.text}
+            </div>
+          )}
+
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4 text-xs">
             <div className="p-3 bg-slate-950/70 border border-slate-800 rounded-xl">
-              <span className="text-slate-400 block mb-1">الرصيد المصرفي:</span>
+              <span className="text-slate-400 block mb-1">الرصيد المتاح:</span>
               <span className="font-bold text-emerald-400 text-sm">{formatMoney(profile.bankBalance)}</span>
             </div>
             <div className="p-3 bg-slate-950/70 border border-slate-800 rounded-xl">
-              <span className="text-slate-400 block mb-1">الودائع النشطة:</span>
+              <span className="text-slate-400 block mb-1">الودائع الاستثمارية ({activeDeposits.length}):</span>
               <span className="font-bold text-amber-400 text-sm">
-                {formatMoney((profile.banking?.deposits ?? []).reduce((acc: number, d) => acc + (d.principal || 0), 0))}
+                {formatMoney(activeDeposits.reduce((acc, d) => acc + (d.principal || 0), 0))}
               </span>
             </div>
             <div className="p-3 bg-slate-950/70 border border-slate-800 rounded-xl col-span-2 md:col-span-1">
-              <span className="text-slate-400 block mb-1">إجمالي القروض القائمة:</span>
+              <span className="text-slate-400 block mb-1">القروض القائمة ({activeLoans.length}):</span>
               <span className="font-bold text-rose-400 text-sm">
-                {formatMoney((profile.banking?.loans ?? []).reduce((acc: number, l) => acc + (l.remainingBalance || l.principal || 0), 0))}
+                {formatMoney(activeLoans.reduce((acc, l) => acc + (l.remainingBalance || l.principal || 0), 0))}
               </span>
+            </div>
+          </div>
+
+          {/* Quick Bank Operations */}
+          <div className="p-3.5 rounded-2xl bg-slate-950/80 border border-slate-800 mb-4 space-y-3">
+            <div className="text-xs font-bold text-slate-300">عمليات بنكية سريعة من الخريطة:</div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+              <button
+                onClick={handleQuickRepayLoan}
+                disabled={isSubmitting || !firstActiveLoan || profile.bankBalance < firstActiveLoan.installmentAmount}
+                className="p-3 rounded-xl bg-slate-900 border border-slate-700 hover:border-amber-500 disabled:opacity-50 text-right transition-all"
+              >
+                <div className="font-bold text-xs text-amber-300">سداد قسط القرض الحالي</div>
+                <div className="text-[11px] text-slate-400 mt-1">
+                  {firstActiveLoan
+                    ? `قسط ${formatMoney(firstActiveLoan.installmentAmount)} · متبقي ${formatMoney(firstActiveLoan.remainingBalance)}`
+                    : 'لا توجد قروض قائمة'}
+                </div>
+              </button>
+
+              <button
+                onClick={handleQuickDeposit}
+                disabled={isSubmitting || profile.bankBalance < 5000}
+                className="p-3 rounded-xl bg-slate-900 border border-slate-700 hover:border-sky-500 disabled:opacity-50 text-right transition-all"
+              >
+                <div className="font-bold text-xs text-sky-300">ربط وديعة استثمارية ({formatMoney(5000)})</div>
+                <div className="text-[11px] text-slate-400 mt-1">عائد مضمون خلال 3 أيام داخل اللعبة</div>
+              </button>
             </div>
           </div>
 
@@ -204,16 +435,75 @@ export const BuildingDetailSheet: React.FC<BuildingDetailSheetProps> = ({
             className="w-full py-3 px-4 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold text-sm flex items-center justify-center gap-2 transition-all shadow-lg shadow-sky-500/20"
           >
             <Coins className="w-5 h-5" />
-            <span>الدخول إلى نظام البنك والحسابات والقروض</span>
+            <span>فتح شاشة البنك والتمويل الشاملة</span>
             <ChevronLeft className="w-4 h-4 mr-auto" />
           </button>
         </div>
       );
     }
 
+    // C. FACTORY COMPLEX
     if (id === 'factory') {
+      const companies = profile.companies ?? [];
+      const primaryCompany = companies[0];
+
+      const handleRunFastProduction = () => {
+        if (!primaryCompany) {
+          showFeedback('لا تملك مصنعاً نشطاً بعد', 'error');
+          return;
+        }
+
+        const lockKey = `produce-${primaryCompany.id}`;
+        if (!acquireTransactionLock(lockKey)) return;
+
+        setIsSubmitting(true);
+        setActionNotice(null);
+
+        try {
+          onCommand(
+            {
+              name: 'run_production',
+              args: { companyId: primaryCompany.id, batches: 1 },
+            },
+            (current) => runProduction(current, primaryCompany.id, 1)
+          );
+          showFeedback('تم تشغيل دفعة الإنتاج وتوريد المنتج للمخزن بنجاح!', 'success');
+        } catch (err: any) {
+          showFeedback(err?.message || 'تعذر تشغيل الإنتاج', 'error');
+        } finally {
+          setIsSubmitting(false);
+          releaseTransactionLock(lockKey);
+        }
+      };
+
+      const handleServiceFastCompany = () => {
+        if (!primaryCompany) return;
+
+        const lockKey = `service-${primaryCompany.id}`;
+        if (!acquireTransactionLock(lockKey)) return;
+
+        setIsSubmitting(true);
+        setActionNotice(null);
+
+        try {
+          onCommand(
+            {
+              name: 'service_company',
+              args: { companyId: primaryCompany.id },
+            },
+            (current) => serviceCompany(current, primaryCompany.id)
+          );
+          showFeedback('تمت صيانة وفحص الماكينات ورفع كفاءتها إلى 100%!', 'success');
+        } catch (err: any) {
+          showFeedback(err?.message || 'تعذر الصيانة', 'error');
+        } finally {
+          setIsSubmitting(false);
+          releaseTransactionLock(lockKey);
+        }
+      };
+
       return (
-        <div className="absolute inset-x-0 bottom-0 z-40 bg-slate-900/95 border-t border-amber-500/40 rounded-t-3xl shadow-2xl p-5 backdrop-blur-md animate-slide-up text-white max-w-3xl mx-auto">
+        <div className="absolute inset-x-0 bottom-0 z-40 bg-slate-900/95 border-t border-amber-500/40 rounded-t-3xl shadow-2xl p-5 backdrop-blur-md animate-slide-up text-white max-w-3xl mx-auto max-h-[85vh] overflow-y-auto">
           <div className="flex items-center justify-between border-b border-slate-800 pb-3 mb-4">
             <div className="flex items-center gap-3">
               <div className="w-12 h-12 rounded-xl bg-orange-500/20 border border-orange-500/40 flex items-center justify-center text-orange-400">
@@ -221,7 +511,7 @@ export const BuildingDetailSheet: React.FC<BuildingDetailSheetProps> = ({
               </div>
               <div>
                 <h3 className="font-bold text-lg text-orange-300">مجمع الصناعات والإنتاج المركزي</h3>
-                <p className="text-xs text-slate-400">تشغيل خطوط الإنتاج، إدارة سلاسل الإمداد، وتوريد الخامات</p>
+                <p className="text-xs text-slate-400">إدارة خطوط التصنيع، سلاسل التوريد، وكفاءة الماكينات</p>
               </div>
             </div>
             <button
@@ -232,15 +522,27 @@ export const BuildingDetailSheet: React.FC<BuildingDetailSheetProps> = ({
             </button>
           </div>
 
+          {actionNotice && (
+            <div
+              className={`mb-4 p-3 rounded-xl border text-xs font-bold text-center ${
+                actionNotice.type === 'success'
+                  ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300'
+                  : 'bg-rose-500/20 border-rose-500/40 text-rose-300'
+              }`}
+            >
+              {actionNotice.text}
+            </div>
+          )}
+
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4 text-xs">
             <div className="p-3 bg-slate-950/70 border border-slate-800 rounded-xl">
               <span className="text-slate-400 block mb-1">المصانع النشطة:</span>
-              <span className="font-bold text-orange-400 text-sm">{profile.companies.length} منشأة</span>
+              <span className="font-bold text-orange-400 text-sm">{companies.length} منشأة</span>
             </div>
             <div className="p-3 bg-slate-950/70 border border-slate-800 rounded-xl">
               <span className="text-slate-400 block mb-1">طاقة التشغيل:</span>
               <span className="font-bold text-amber-400 text-sm">
-                {profile.companies.reduce((acc, c) => acc + (c.energyUnits || 0), 0)} وحدة
+                {companies.reduce((acc, c) => acc + (c.energyUnits || 0), 0)} وحدة
               </span>
             </div>
             <div className="p-3 bg-slate-950/70 border border-slate-800 rounded-xl col-span-2 md:col-span-1">
@@ -248,6 +550,43 @@ export const BuildingDetailSheet: React.FC<BuildingDetailSheetProps> = ({
               <span className="font-bold text-emerald-400 text-sm">{profile.inventory.length} صنف مسجل</span>
             </div>
           </div>
+
+          {/* Quick Manufacturing Actions */}
+          {primaryCompany && (
+            <div className="p-3.5 rounded-2xl bg-slate-950/80 border border-slate-800 mb-4 space-y-3">
+              <div className="flex items-center justify-between text-xs">
+                <span className="font-bold text-slate-200">المنشأة الأولى: {primaryCompany.name}</span>
+                <span className="text-[11px] text-amber-400">
+                  كفاءة الماكينات: <strong>{primaryCompany.maintenanceCondition ?? 100}%</strong>
+                </span>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                <button
+                  onClick={handleRunFastProduction}
+                  disabled={isSubmitting || (primaryCompany.maintenanceCondition ?? 100) < 25}
+                  className="p-3 rounded-xl bg-orange-600/30 border border-orange-500/50 hover:bg-orange-600/40 text-right transition-all flex items-center justify-between"
+                >
+                  <div>
+                    <div className="font-bold text-xs text-orange-300">تشغيل دفعة إنتاج سريعة</div>
+                    <div className="text-[11px] text-slate-400">إنتاج فوري وفق الوصفة المعتمدة</div>
+                  </div>
+                  <Zap className="w-5 h-5 text-orange-400" />
+                </button>
+
+                <button
+                  onClick={handleServiceFastCompany}
+                  disabled={isSubmitting}
+                  className="p-3 rounded-xl bg-slate-900 border border-slate-700 hover:border-emerald-500 text-right transition-all flex items-center justify-between"
+                >
+                  <div>
+                    <div className="font-bold text-xs text-emerald-300">صيانة الماكينات الفورية</div>
+                    <div className="text-[11px] text-slate-400">إصلاح وتزييت المعدات</div>
+                  </div>
+                  <Wrench className="w-5 h-5 text-emerald-400" />
+                </button>
+              </div>
+            </div>
+          )}
 
           <div className="flex items-center gap-3">
             <button
@@ -258,7 +597,7 @@ export const BuildingDetailSheet: React.FC<BuildingDetailSheetProps> = ({
               className="flex-1 py-3 px-4 rounded-xl bg-orange-500 hover:bg-orange-400 text-slate-950 font-bold text-sm flex items-center justify-center gap-2 transition-all shadow-lg shadow-orange-500/20"
             >
               <Factory className="w-5 h-5" />
-              <span>إدارة المصانع ودفعات الإنتاج</span>
+              <span>إدارة المصانع ودفعات الإنتاج بالتفصيل</span>
             </button>
             <button
               onClick={() => {
@@ -282,7 +621,9 @@ export const BuildingDetailSheet: React.FC<BuildingDetailSheetProps> = ({
 
   // Handle direct land purchase
   const handleBuyLand = (paymentMethod: 'cash' | 'diamonds') => {
-    const lockKey = `buy-land-${plot.id}`;
+    // Crucial: Use plot.catalogListingId so engine.ts finds the real direct land listing
+    const targetListingId = plot.catalogListingId || plot.id;
+    const lockKey = `buy-land-${targetListingId}`;
     if (!acquireTransactionLock(lockKey)) {
       return; // Locked against double-charge
     }
@@ -294,19 +635,51 @@ export const BuildingDetailSheet: React.FC<BuildingDetailSheetProps> = ({
       onCommand(
         {
           name: 'buy_direct_land',
-          args: { listingId: plot.id, paymentMethod },
+          args: { listingId: targetListingId, paymentMethod },
         },
-        (current) => buyDirectLand(current, plot.id, paymentMethod)
+        (current) => buyDirectLand(current, targetListingId, paymentMethod)
       );
 
-      playSound('cash');
-      setActionNotice('تمت معالجة شراء الأرض بنجاح!');
+      showFeedback(`تم شراء ${plot.label} بنجاح!`, 'success');
       setTimeout(() => {
         setIsSubmitting(false);
         releaseTransactionLock(lockKey);
         onRefreshGrid();
-      }, 500);
-    } catch {
+      }, 400);
+    } catch (err: any) {
+      showFeedback(err?.message || 'فشل شراء الأرض', 'error');
+      setIsSubmitting(false);
+      releaseTransactionLock(lockKey);
+    }
+  };
+
+  // Handle speeding up land paperwork
+  const handleAccelerateLand = () => {
+    if (!plot.land) return;
+    const lockKey = `accel-land-${plot.land.id}`;
+    if (!acquireTransactionLock(lockKey)) return;
+
+    setIsSubmitting(true);
+    setActionNotice(null);
+
+    try {
+      const res = accelerateLandTransfer(profile, plot.land.id);
+      if (res.ok) {
+        onCommand(
+          {
+            name: 'use_day_speed_card',
+            args: { kind: 'day-speed-2x' },
+          },
+          () => res
+        );
+        showFeedback(res.message, 'success');
+        onRefreshGrid();
+      } else {
+        showFeedback(res.message, 'error');
+      }
+    } catch (err: any) {
+      showFeedback(err?.message || 'تعذر تسريع الإجراءات', 'error');
+    } finally {
       setIsSubmitting(false);
       releaseTransactionLock(lockKey);
     }
@@ -315,7 +688,7 @@ export const BuildingDetailSheet: React.FC<BuildingDetailSheetProps> = ({
   // Handle starting construction
   const handleStartConstruction = () => {
     if (!selectedIndustryId) {
-      setActionNotice('يرجى اختيار نوع القطاع الصناعي أولاً');
+      showFeedback('يرجى اختيار نوع القطاع الصناعي أولاً', 'error');
       return;
     }
 
@@ -363,14 +736,72 @@ export const BuildingDetailSheet: React.FC<BuildingDetailSheetProps> = ({
       };
       saveCityConstructions(activeConstructions);
 
-      playSound('success');
-      setActionNotice('بدأت أعمال التمهيد والإنشاء في الموقع!');
+      showFeedback('بدأت أعمال التمهيد والتشييد في الموقع بنجاح!', 'success');
       setTimeout(() => {
         setIsSubmitting(false);
         releaseTransactionLock(lockKey);
         onRefreshGrid();
-      }, 500);
-    } catch {
+      }, 400);
+    } catch (err: any) {
+      showFeedback(err?.message || 'تعذر بدء البناء', 'error');
+      setIsSubmitting(false);
+      releaseTransactionLock(lockKey);
+    }
+  };
+
+  // Handle upgrading land (+10% area and level)
+  const handleUpgradeLand = (landId: string) => {
+    const lockKey = `up-land-${landId}`;
+    if (!acquireTransactionLock(lockKey)) return;
+
+    setIsSubmitting(true);
+    setActionNotice(null);
+
+    try {
+      onCommand(
+        {
+          name: 'upgrade_land',
+          args: { landId, paymentMethod: 'cash' },
+        },
+        (current) => upgradeLand(current, landId, 'cash')
+      );
+      showFeedback('تمت ترقية الأرض وزيادة مساحتها بنسبة 10% بنجاح!', 'success');
+      setTimeout(() => {
+        setIsSubmitting(false);
+        releaseTransactionLock(lockKey);
+        onRefreshGrid();
+      }, 400);
+    } catch (err: any) {
+      showFeedback(err?.message || 'تعذر ترقية الأرض', 'error');
+      setIsSubmitting(false);
+      releaseTransactionLock(lockKey);
+    }
+  };
+
+  // Handle upgrading company
+  const handleUpgradeCompany = (companyId: string) => {
+    const lockKey = `up-comp-${companyId}`;
+    if (!acquireTransactionLock(lockKey)) return;
+
+    setIsSubmitting(true);
+    setActionNotice(null);
+
+    try {
+      onCommand(
+        {
+          name: 'upgrade_company',
+          args: { companyId, paymentMethod: 'cash' },
+        },
+        (current) => upgradeCompany(current, companyId, 'cash')
+      );
+      showFeedback('تمت ترقية المنشأة وزيادة طاقتها التشغيلية بنجاح!', 'success');
+      setTimeout(() => {
+        setIsSubmitting(false);
+        releaseTransactionLock(lockKey);
+        onRefreshGrid();
+      }, 400);
+    } catch (err: any) {
+      showFeedback(err?.message || 'تعذر ترقية المنشأة', 'error');
       setIsSubmitting(false);
       releaseTransactionLock(lockKey);
     }
@@ -408,6 +839,8 @@ export const BuildingDetailSheet: React.FC<BuildingDetailSheetProps> = ({
                     ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
                     : plot.status === 'owned_empty'
                     ? 'bg-sky-500/20 text-sky-400 border border-sky-500/30'
+                    : plot.status === 'paperwork'
+                    ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30'
                     : plot.status === 'locked'
                     ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
                     : 'bg-slate-800 text-slate-300 border border-slate-700'
@@ -418,7 +851,9 @@ export const BuildingDetailSheet: React.FC<BuildingDetailSheetProps> = ({
                   : plot.status === 'constructing'
                   ? 'قيد الإنشاء'
                   : plot.status === 'clearing'
-                  ? 'تمهيد الأرض'
+                  ? 'تمهيد الموقع'
+                  : plot.status === 'paperwork'
+                  ? 'إنهاء عقود الملكية'
                   : plot.status === 'owned_empty'
                   ? 'أرض جاهزة للبناء'
                   : plot.status === 'locked'
@@ -438,8 +873,14 @@ export const BuildingDetailSheet: React.FC<BuildingDetailSheetProps> = ({
       </div>
 
       {actionNotice && (
-        <div className="mb-4 p-3 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-xs font-bold text-center">
-          {actionNotice}
+        <div
+          className={`mb-4 p-3 rounded-xl border text-xs font-bold text-center ${
+            actionNotice.type === 'success'
+              ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300'
+              : 'bg-rose-500/20 border-rose-500/40 text-rose-300'
+          }`}
+        >
+          {actionNotice.text}
         </div>
       )}
 
@@ -469,13 +910,11 @@ export const BuildingDetailSheet: React.FC<BuildingDetailSheetProps> = ({
         </div>
       </div>
 
-      {/* Action Sections based on Plot Status */}
-
       {/* 1. EMPTY FOR SALE */}
       {plot.status === 'empty_for_sale' && (
         <div className="space-y-4">
           <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-300">
-            أرض استثمارية مميزة في {plot.districtName}. الشراء يتيح لك تأسيس مصانع أو مقرات تجارية تابعة لإمبراطوريتك.
+            موقع استثماري متاح للشراء الفوري. بمجرد الشراء يتم خصم التكلفة مرة واحدة وتثبيت ملكية الأرض في إمبراطوريتك.
           </div>
           <div className="flex items-center gap-3">
             <button
@@ -498,11 +937,44 @@ export const BuildingDetailSheet: React.FC<BuildingDetailSheetProps> = ({
         </div>
       )}
 
-      {/* 2. OWNED EMPTY (Ready to Build) */}
+      {/* 2. PAPERWORK (Land purchased, transfer in progress) */}
+      {plot.status === 'paperwork' && plot.land && (
+        <div className="space-y-4">
+          <div className="p-4 rounded-xl bg-purple-950/30 border border-purple-500/40 text-xs text-purple-200 space-y-2">
+            <div className="font-bold flex items-center gap-2 text-purple-300">
+              <Clock className="w-4 h-4 text-purple-400" />
+              <span>عقود نقل الملكية والمطابقة المساحية قيد المراجعة</span>
+            </div>
+            <p className="text-[11px] text-slate-300">
+              ستكون الأرض جاهزة للبناء والتأسيس تلقائياً في اليوم {plot.land.availableForCompanyOnDay} داخل اللعبة. يمكنك تسريع الإجراءات واستلام الموقع فوراً.
+            </p>
+          </div>
+
+          <button
+            onClick={handleAccelerateLand}
+            disabled={isSubmitting || profile.diamonds < 5}
+            className="w-full py-3 px-4 rounded-xl bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white font-bold text-xs flex items-center justify-center gap-2 transition-colors shadow-lg shadow-purple-600/20"
+          >
+            <Zap className="w-4 h-4 text-amber-300" />
+            <span>تسريع الإجراءات واستلام الموقع فوراً (5 💎)</span>
+          </button>
+        </div>
+      )}
+
+      {/* 3. OWNED EMPTY (Ready to Build) */}
       {plot.status === 'owned_empty' && (
         <div className="space-y-4">
-          <div className="p-3.5 rounded-xl bg-sky-950/40 border border-sky-500/30 text-xs text-sky-200">
-            أنت تمتلك هذه الأرض! اختر نوع المنشأة التي ترغب في بنائها وتأسيسها عليها:
+          <div className="p-3.5 rounded-xl bg-sky-950/40 border border-sky-500/30 text-xs text-sky-200 flex items-center justify-between">
+            <span>أنت تمتلك هذه الأرض! اختر نوع المنشأة لتأسيسها وبدء تشييدها:</span>
+            {plot.land && (
+              <button
+                onClick={() => handleUpgradeLand(plot.land!.id)}
+                disabled={isSubmitting}
+                className="px-2.5 py-1 rounded-lg bg-slate-900 border border-sky-400/40 text-[10px] text-sky-300 font-bold hover:bg-slate-800 transition-colors"
+              >
+                تطوير مساحة الأرض +10%
+              </button>
+            )}
           </div>
 
           <div className="space-y-2">
@@ -511,7 +983,7 @@ export const BuildingDetailSheet: React.FC<BuildingDetailSheetProps> = ({
               type="text"
               value={customCompanyName}
               onChange={(e) => setCustomCompanyName(e.target.value)}
-              placeholder="مثال: مجمع النيل للصناعات المتقدمة"
+              placeholder="مثال: مجمع النيل للصناعات الهندسية"
               className="w-full py-2.5 px-3 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs focus:outline-none focus:border-amber-500"
             />
           </div>
@@ -549,12 +1021,12 @@ export const BuildingDetailSheet: React.FC<BuildingDetailSheetProps> = ({
             className="w-full py-3 px-4 rounded-xl bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-slate-950 font-bold text-sm flex items-center justify-center gap-2 transition-all shadow-lg shadow-amber-500/20"
           >
             <Hammer className="w-5 h-5" />
-            <span>بدء التمهيد وتأسيس وبناء المنشأة</span>
+            <span>تأكيد التأسيس وبدء تشييد المنشأة في الموقع</span>
           </button>
         </div>
       )}
 
-      {/* 3. UNDER CONSTRUCTION */}
+      {/* 4. UNDER CONSTRUCTION */}
       {(plot.status === 'constructing' || plot.status === 'clearing') && (
         <div className="space-y-4">
           <div className="p-4 rounded-xl bg-slate-950 border border-amber-500/40 space-y-3">
@@ -570,37 +1042,37 @@ export const BuildingDetailSheet: React.FC<BuildingDetailSheetProps> = ({
               </span>
             </div>
 
-            {/* Progress bar */}
+            {/* Live Progress Bar */}
             <div className="w-full bg-slate-800 rounded-full h-3 overflow-hidden border border-slate-700">
               <div
                 className="bg-gradient-to-r from-amber-500 to-amber-300 h-full rounded-full transition-all duration-500 animate-pulse"
-                style={{ width: '70%' }}
+                style={{ width: '80%' }}
               />
             </div>
           </div>
 
           <button
             onClick={() => {
-              // Instant finish
               const active = loadCityConstructions();
               if (active[plot.id]) {
                 active[plot.id].startedAt = 0; // finished
                 saveCityConstructions(active);
+                showFeedback('تم تسريع البناء واكتمال تشييد المنشأة فوراً!', 'success');
                 onRefreshGrid();
               }
             }}
             className="w-full py-2.5 px-4 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs flex items-center justify-center gap-2 transition-colors border border-sky-400/30"
           >
             <Zap className="w-4 h-4 text-amber-300" />
-            <span>تسريع البناء والإتمام فوراً</span>
+            <span>تسريع البناء والإتمام فوراً بالماس</span>
           </button>
         </div>
       )}
 
-      {/* 4. DEVELOPED (Finished Company) */}
+      {/* 5. DEVELOPED (Finished Active Company) */}
       {plot.status === 'developed' && plot.company && (
         <div className="space-y-4">
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-xs">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
             <div className="p-3 bg-slate-950/70 border border-slate-800 rounded-xl">
               <span className="text-slate-400 block mb-1">القطاع:</span>
               <span className="font-bold text-amber-300">
@@ -608,14 +1080,24 @@ export const BuildingDetailSheet: React.FC<BuildingDetailSheetProps> = ({
               </span>
             </div>
             <div className="p-3 bg-slate-950/70 border border-slate-800 rounded-xl">
-              <span className="text-slate-400 block mb-1">تكلفة التشغيل اليومي:</span>
-              <span className="font-bold text-rose-400">
-                {formatMoney(plot.company.operatingCostPerDay ?? 0)}
+              <span className="text-slate-400 block mb-1">كفاءة الماكينات:</span>
+              <span
+                className={`font-bold ${
+                  (plot.company.maintenanceCondition ?? 100) >= 60
+                    ? 'text-emerald-400'
+                    : 'text-rose-400'
+                }`}
+              >
+                {plot.company.maintenanceCondition ?? 100}%
               </span>
             </div>
-            <div className="p-3 bg-slate-950/70 border border-slate-800 rounded-xl col-span-2 md:col-span-1">
+            <div className="p-3 bg-slate-950/70 border border-slate-800 rounded-xl">
+              <span className="text-slate-400 block mb-1">مستوى التطوير:</span>
+              <span className="font-bold text-purple-400">مستوى {plot.company.upgradeLevel ?? 1}</span>
+            </div>
+            <div className="p-3 bg-slate-950/70 border border-slate-800 rounded-xl">
               <span className="text-slate-400 block mb-1">طاقة المنشأة:</span>
-              <span className="font-bold text-sky-400">{plot.company.energyUnits} وحدة</span>
+              <span className="font-bold text-sky-400">{plot.company.energyUnits ?? 0} وحدة</span>
             </div>
           </div>
 
@@ -629,14 +1111,15 @@ export const BuildingDetailSheet: React.FC<BuildingDetailSheetProps> = ({
                   },
                   (current) => runProduction(current, plot.company!.id, 1)
                 );
-                playSound('success');
-                setActionNotice('تم إرسال أمر تشغيل دفعة إنتاج بنجاح!');
+                showFeedback('تم تشغيل دفعة الإنتاج وتوريد البضاعة للمخزن بنجاح!', 'success');
               }}
-              className="flex-1 min-w-[140px] py-2.5 px-4 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-lg shadow-amber-500/20"
+              disabled={(plot.company.maintenanceCondition ?? 100) < 25}
+              className="flex-1 min-w-[130px] py-2.5 px-3 rounded-xl bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-slate-950 font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow-lg shadow-amber-500/20"
             >
-              <Zap className="w-4 h-4" />
-              <span>تشغيل دفعة إنتاج</span>
+              <Zap className="w-3.5 h-3.5" />
+              <span>تشغيل الإنتاج</span>
             </button>
+
             <button
               onClick={() => {
                 onCommand(
@@ -646,35 +1129,43 @@ export const BuildingDetailSheet: React.FC<BuildingDetailSheetProps> = ({
                   },
                   (current) => serviceCompany(current, plot.company!.id)
                 );
-                playSound('cash');
-                setActionNotice('تمت صيانة وفحص الماكينات بنجاح!');
+                showFeedback('تمت صيانة وفحص الماكينات ورفع كفاءتها!', 'success');
               }}
-              className="flex-1 min-w-[140px] py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs flex items-center justify-center gap-2 transition-colors border border-slate-700"
+              className="flex-1 min-w-[130px] py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-colors border border-slate-700"
             >
-              <ShieldCheck className="w-4 h-4 text-emerald-400" />
+              <Wrench className="w-3.5 h-3.5 text-emerald-400" />
               <span>صيانة الماكينات</span>
             </button>
+
+            <button
+              onClick={() => handleUpgradeCompany(plot.company!.id)}
+              className="flex-1 min-w-[130px] py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-colors border border-slate-700"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+              <span>ترقية المنشأة</span>
+            </button>
+
             <button
               onClick={() => {
                 onClose();
                 onNavigate('production');
               }}
-              className="flex-1 min-w-[140px] py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs flex items-center justify-center gap-2 transition-colors border border-slate-700"
+              className="flex-1 min-w-[130px] py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-colors border border-slate-700"
             >
-              <Factory className="w-4 h-4 text-sky-400" />
-              <span>لوحة المصانع الكاملة</span>
+              <Factory className="w-3.5 h-3.5 text-sky-400" />
+              <span>لوحة الإنتاج الكاملة</span>
             </button>
           </div>
         </div>
       )}
 
-      {/* 5. LOCKED DISTRICT */}
+      {/* 6. LOCKED DISTRICT */}
       {plot.status === 'locked' && (
         <div className="p-4 rounded-xl bg-rose-950/30 border border-rose-500/30 text-center space-y-2">
           <Lock className="w-8 h-8 text-rose-400 mx-auto" />
           <h4 className="font-bold text-sm text-rose-300">هذه المنطقة مقفلة حالياً</h4>
           <p className="text-xs text-slate-400">
-            يتطلب فتح هذه المنطقة وإتاحة أراضيها الاستثمارية وصول إمبراطوريتك إلى المستوى {plot.requiredLevel}.
+            يتطلب فتح هذه المنطقة الاستثمارية وصول إمبراطوريتك أو المقر الإمبراطوري إلى المستوى {plot.requiredLevel}.
           </p>
         </div>
       )}

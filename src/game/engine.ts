@@ -134,7 +134,7 @@ export type GameResult<T = undefined> =
 
 const DAY_MS = GAME_DAY_MS;
 
-function timestampFor(profile: PlayerProfile): string {
+export function timestampFor(profile: PlayerProfile): string {
   const base = Date.parse(profile.createdAt);
   return new Date((Number.isFinite(base) ? base : 0) + Math.max(0, profile.day - 1) * DAY_MS).toISOString();
 }
@@ -143,11 +143,11 @@ function nextId(profile: PlayerProfile, prefix: string, collectionLength: number
   return `${prefix}-${profile.day}-${collectionLength + 1}`;
 }
 
-function success<T>(profile: PlayerProfile, message: string, data: T): GameResult<T> {
+export function success<T>(profile: PlayerProfile, message: string, data: T): GameResult<T> {
   return { ok: true, profile, message, data };
 }
 
-function failure<T>(profile: PlayerProfile, reason: GameErrorCode, message: string): GameResult<T> {
+export function failure<T>(profile: PlayerProfile, reason: GameErrorCode, message: string): GameResult<T> {
   return { ok: false, profile, reason, message };
 }
 
@@ -161,7 +161,7 @@ interface PurchaseDebit {
   diamondsSpent: number;
 }
 
-function resolvePurchaseDebit(
+export function resolvePurchaseDebit(
   profile: PlayerProfile,
   cashPrice: number,
   paymentMethod: PurchasePaymentMethod = 'cash',
@@ -183,7 +183,7 @@ function unpaidSalaryTotal(profile: PlayerProfile): number {
   return profile.staff.filter((employee) => employee.status === 'active').reduce((sum, employee) => sum + (employee.unpaidSalary ?? 0), 0);
 }
 
-function addLedger(
+export function addLedger(
   profile: PlayerProfile,
   entries: readonly FinanceLedgerEntry[],
   bankBalance: number,
@@ -208,7 +208,7 @@ function addLedger(
   };
 }
 
-function ledgerEntry(
+export function ledgerEntry(
   profile: PlayerProfile,
   category: FinanceLedgerEntry['category'],
   amount: number,
@@ -218,7 +218,7 @@ function ledgerEntry(
   return { id: nextId(profile, 'ledger', (profile.ledger ?? []).length + index), category, amount, countryId: profile.countryId, occurredAt: timestampFor(profile), note };
 }
 
-function syncTasks(profile: PlayerProfile): PlayerProfile {
+export function syncTasks(profile: PlayerProfile): PlayerProfile {
   const existing = new Map((profile.tasks ?? []).map((task) => [task.taskId, task]));
   const completedSet = new Set(profile.completedTaskIds ?? []);
   const automaticBadges = [
