@@ -93,6 +93,7 @@ interface CityCanvasProps {
   isNightMode?: boolean;
   cameraPreset?: CityCameraPreset;
   onResetPreset?: () => void;
+  cameraSpeed?: number;
 }
 
 export const CityCanvas: React.FC<CityCanvasProps> = ({
@@ -102,6 +103,7 @@ export const CityCanvas: React.FC<CityCanvasProps> = ({
   isNightMode = true,
   cameraPreset,
   onResetPreset,
+  cameraSpeed = 1,
 }) => {
   const mountRef = useRef<HTMLDivElement>(null);
   const selectedItemRef = useRef(selectedItem);
@@ -529,6 +531,7 @@ export const CityCanvas: React.FC<CityCanvasProps> = ({
       cameraLookAtPos,
       cameraTargetFov,
       onTapRaycast: handleTapRaycast,
+      speedMultiplier: cameraSpeed,
     });
     touchControllerRef.current = touchCtrl;
 
@@ -718,6 +721,10 @@ export const CityCanvas: React.FC<CityCanvasProps> = ({
       }
     };
   }, [profile, isNightMode]);
+
+  useEffect(() => {
+    touchControllerRef.current?.setSpeed(cameraSpeed);
+  }, [cameraSpeed]);
 
   // Move between districts without changing the fixed camera heading or height.
   useEffect(() => {

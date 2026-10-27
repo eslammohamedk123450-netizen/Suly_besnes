@@ -18,7 +18,7 @@ export const CITY_CAMERA_LIMITS = {
   cameraHeight: 60,
   lookAtHeight: 26,
   headingOffsetZ: 65,
-  minFov: 42,
+  minFov: 34,
   maxFov: 62,
   defaultFov: 52,
   zoomStep: 5,
@@ -87,6 +87,7 @@ export interface CityTouchControllerOptions {
   cameraLookAtPos: React.MutableRefObject<THREE.Vector3>;
   cameraTargetFov: React.MutableRefObject<number>;
   onTapRaycast: (normalizedX: number, normalizedY: number) => void;
+  speedMultiplier?: number;
 }
 
 export class CityTouchController {
@@ -108,6 +109,7 @@ export class CityTouchController {
   // Pan velocity is measured in world units per second.
   private velocityX = 0;
   private velocityZ = 0;
+  private speedMultiplier = 1;
 
   constructor(options: CityTouchControllerOptions) {
     this.dom = options.domElement;
@@ -115,6 +117,7 @@ export class CityTouchController {
     this.lookAtPos = options.cameraLookAtPos;
     this.targetFov = options.cameraTargetFov;
     this.onTapRaycast = options.onTapRaycast;
+    this.speedMultiplier = options.speedMultiplier ?? 1;
 
     this.bindEvents();
   }
@@ -164,7 +167,7 @@ export class CityTouchController {
       // Spreading fingers narrows the FOV; pinching them together widens it.
       this.targetFov.current = adjustCityCameraFov(
         this.targetFov.current,
-        -deltaDistance * 0.055
+        -deltaDistance * 0.055 * this.speedMultiplier
       );
       this.dragDistance += Math.abs(deltaDistance);
       return;
@@ -178,7 +181,7 @@ export class CityTouchController {
     this.dragDistance += Math.hypot(deltaX, deltaY);
 
     const zoomScale = this.targetFov.current / CITY_CAMERA_LIMITS.defaultFov;
-    const panSpeed = 0.08 * zoomScale;
+    const panSpeed = 0.08 * zoomScale * this.speedMultiplier;
     const applied = panCityCamera(
       this.targetPos.current,
       this.lookAtPos.current,
@@ -219,14 +222,14 @@ export class CityTouchController {
     e.preventDefault();
     this.targetFov.current = adjustCityCameraFov(
       this.targetFov.current,
-      e.deltaY * 0.03
+      e.deltaY * 0.03 * this.speedMultiplier
     );
   };
 
   public zoomStep(direction: 'in' | 'out') {
     const delta = direction === 'in'
-      ? -CITY_CAMERA_LIMITS.zoomStep
-      : CITY_CAMERA_LIMITS.zoomStep;
+      ? -CITY_CAMERA_LIMITS.zoomStep * this.speedMultiplier
+      : CITY_CAMERA_LIMITS.zoomStep * this.speedMultiplier;
     this.targetFov.current = adjustCityCameraFov(this.targetFov.current, delta);
   }
 
@@ -235,6 +238,10 @@ export class CityTouchController {
     this.targetFov.current = CITY_CAMERA_LIMITS.defaultFov;
     this.velocityX = 0;
     this.velocityZ = 0;
+  }
+
+  public setSpeed(multiplier: number) {
+    this.speedMultiplier = THREE.MathUtils.clamp(multiplier, 0.5, 2);
   }
 
   public updateInertia(dt: number) {

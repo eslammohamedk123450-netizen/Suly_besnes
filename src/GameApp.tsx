@@ -1102,6 +1102,7 @@ export default function App() {
       <ResourceBar
         profile={profile}
         country={country}
+        minimal3D
         onNavigate={navigate}
         syncState={!account || account.isGuest ? 'local' : syncState}
         pendingCommandCount={pendingCommandCount}

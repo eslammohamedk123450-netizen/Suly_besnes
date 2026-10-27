@@ -29,6 +29,7 @@ import {
   ChevronLeft,
   Ship,
   Gavel,
+  Settings,
 } from 'lucide-react';
 
 interface CityHomeViewProps {
@@ -58,6 +59,8 @@ export const CityHomeView: React.FC<CityHomeViewProps> = (props) => {
   const [cameraPreset, setCameraPreset] = useState<CityCameraPreset>(null);
   const [isBranchShopOpen, setIsBranchShopOpen] = useState(false);
   const [gridRefreshKey, setGridRefreshKey] = useState(0);
+  const [cameraSpeed, setCameraSpeed] = useState(1);
+  const [showCameraSettings, setShowCameraSettings] = useState(false);
 
   useEffect(() => {
     if (!props.focusSection) return;
@@ -96,9 +99,9 @@ export const CityHomeView: React.FC<CityHomeViewProps> = (props) => {
   };
 
   return (
-    <div className="w-full space-y-4" dir="rtl">
+    <div className="w-full" dir="rtl">
       {/* 3D City View Header / Status Banner */}
-      <div className="flex flex-wrap items-center justify-between gap-3 p-3.5 rounded-2xl bg-slate-900/80 border border-amber-500/30 backdrop-blur-md shadow-lg">
+      <div className="hidden flex-wrap items-center justify-between gap-3 p-3.5 rounded-2xl bg-slate-900/80 border border-amber-500/30 backdrop-blur-md shadow-lg">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-amber-600 to-amber-400 flex items-center justify-center text-slate-950 font-black shadow-md shadow-amber-500/20">
             <Building2 className="w-6 h-6" />
@@ -143,17 +146,46 @@ export const CityHomeView: React.FC<CityHomeViewProps> = (props) => {
               onSelectItem={handleSelectItem}
               isNightMode={isNightMode}
               cameraPreset={cameraPreset}
+              cameraSpeed={cameraSpeed}
               onResetPreset={() => setCameraPreset(null)}
             />
 
             {/* Instruction badge over canvas for first-time / touch feedback */}
-            <div className="absolute top-3 right-3 pointer-events-none bg-slate-950/80 border border-slate-800/80 backdrop-blur-md px-3 py-1.5 rounded-xl text-[11px] text-slate-300 flex items-center gap-2 shadow-lg">
+            <div className="hidden absolute top-3 right-3 pointer-events-none bg-slate-950/80 border border-slate-800/80 backdrop-blur-md px-3 py-1.5 rounded-xl text-[11px] text-slate-300 flex items-center gap-2 shadow-lg">
               <span className="w-2 h-2 rounded-full bg-emerald-400" />
               <span>خريطة 3D حية: اضغط على أي مبنى للتفاعل مع نظامه</span>
             </div>
 
             {/* Active Landmark Quick Floating Bar */}
-            <div className="absolute top-3 left-3 flex flex-wrap items-center gap-1.5 max-w-[80vw] overflow-x-auto no-scrollbar pb-1">
+            <div className="absolute top-3 left-3 z-20">
+              <button
+                type="button"
+                onClick={() => setShowCameraSettings((open) => !open)}
+                className="w-9 h-9 rounded-xl bg-slate-950/85 border border-amber-500/40 text-amber-300 flex items-center justify-center shadow-lg backdrop-blur-md"
+                aria-label="إعدادات حركة الكاميرا"
+                title="إعدادات حركة الكاميرا"
+              >
+                <Settings className="w-4 h-4" />
+              </button>
+              {showCameraSettings && (
+                <div className="mt-2 w-40 rounded-2xl bg-slate-950/95 border border-amber-500/35 p-2 shadow-2xl backdrop-blur-md">
+                  <div className="text-[10px] text-slate-400 font-bold mb-1.5">سرعة حركة الكاميرا</div>
+                  <div className="grid grid-cols-3 gap-1">
+                    {[0.5, 1, 2].map((speed) => (
+                      <button
+                        key={speed}
+                        type="button"
+                        onClick={() => setCameraSpeed(speed)}
+                        className={`px-1 py-1.5 rounded-lg text-[10px] font-black ${cameraSpeed === speed ? 'bg-amber-500 text-slate-950' : 'bg-slate-800 text-slate-300'}`}
+                      >
+                        {speed === 0.5 ? 'بطيء' : speed === 1 ? 'طبيعي' : 'سريع'}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+            <div className="hidden absolute top-3 left-3 flex flex-wrap items-center gap-1.5 max-w-[80vw] overflow-x-auto no-scrollbar pb-1">
               <button
                 onClick={() => {
                   setCameraPreset('hq');
@@ -254,6 +286,7 @@ export const CityHomeView: React.FC<CityHomeViewProps> = (props) => {
           </div>
 
           {/* Unified Bottom Controls Bar */}
+          <div className="hidden">
           <CityControlsBar
             onSelectPreset={setCameraPreset}
             isNightMode={isNightMode}
@@ -261,9 +294,10 @@ export const CityHomeView: React.FC<CityHomeViewProps> = (props) => {
             activeView={activeView}
             onToggleView={setActiveView}
           />
+          </div>
 
           {/* Quick-Action Tiles connecting to other parts of the empire */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-2">
+          <div className="hidden grid grid-cols-2 md:grid-cols-4 gap-3 pt-2">
             <button
               onClick={() => onNavigate('lands')}
               className="p-3.5 rounded-2xl bg-slate-900/70 hover:bg-slate-800/80 border border-slate-800 text-right transition-all group flex flex-col justify-between"

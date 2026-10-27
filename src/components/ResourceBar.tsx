@@ -23,6 +23,7 @@ export interface ResourceBarProps {
   unreadNotificationsCount?: number;
   onOpenNotifications?: () => void;
   forceBellVibrate?: boolean;
+  minimal3D?: boolean;
 }
 
 export function ResourceBar({
@@ -38,6 +39,7 @@ export function ResourceBar({
   unreadNotificationsCount = 0,
   onOpenNotifications,
   forceBellVibrate = false,
+  minimal3D = false,
 }: ResourceBarProps) {
   const progress = getPlayerProgress(profile);
   const cashTargetSection: SectionId = isSectionUnlocked(profile, 'bank') ? 'bank' : 'obligations';
@@ -75,7 +77,7 @@ export function ResourceBar({
                 </span>
 
                 {/* Wardrobe quick button */}
-                {onOpenWardrobe && (
+                {onOpenWardrobe && !minimal3D && (
                   <button
                     type="button"
                     onClick={(e) => {
@@ -112,6 +114,7 @@ export function ResourceBar({
                     {formatMoney(profile.bankBalance, country)}
                   </strong>
                 </div>
+                {!minimal3D && (
                 <button
                   type="button"
                   onClick={(e) => {
@@ -123,6 +126,7 @@ export function ResourceBar({
                 >
                   +
                 </button>
+                )}
               </div>
 
               {/* Diamonds Balance (الماس) */}
@@ -144,6 +148,7 @@ export function ResourceBar({
                     {formatNumber(profile.diamonds)}
                   </strong>
                 </div>
+                {!minimal3D && (
                 <button
                   type="button"
                   onClick={(e) => {
@@ -155,6 +160,7 @@ export function ResourceBar({
                 >
                   +
                 </button>
+                )}
               </div>
 
               {/* Gold Bullion Balance (سبائك الذهب) */}
@@ -176,6 +182,7 @@ export function ResourceBar({
                     {formatGold(profile.goldGrams)}
                   </strong>
                 </div>
+                {!minimal3D && (
                 <button
                   type="button"
                   onClick={(e) => {
@@ -187,12 +194,12 @@ export function ResourceBar({
                 >
                   +
                 </button>
+                )}
               </div>
             </div>
           </div>
 
-          {/* Left Cluster: Notifications */}
-          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+          {!minimal3D && <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
             {onOpenNotifications && (
               <NotificationBell
                 unreadCount={unreadNotificationsCount}
@@ -200,11 +207,11 @@ export function ResourceBar({
                 forceVibrate={forceBellVibrate}
               />
             )}
-          </div>
+          </div>}
         </div>
 
         {/* ROW 2: Underneath: The Days & Country (تحتها الأيام) */}
-        {onDaysElapsed && (
+        {!minimal3D && onDaysElapsed && (
           <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-800/60">
             <div className="flex items-center gap-2 flex-1 min-w-0">
               <GameDayTimer profile={profile} onDaysElapsed={onDaysElapsed} />
