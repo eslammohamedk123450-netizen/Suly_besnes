@@ -535,6 +535,168 @@ export function Dashboard({
         onStartGuidedWalkthrough={onStartGuidedWalkthrough}
       />
 
+      <button
+        type="button"
+        onClick={() => {
+          playSound('click');
+          onOpenStrategicPillars?.();
+        }}
+        className="w-full flex items-center justify-between gap-3 rounded-2xl border border-emerald-500/30 bg-gradient-to-r from-emerald-950/70 to-cyan-950/50 px-4 py-3 text-right shadow-lg transition hover:border-emerald-400/70 hover:from-emerald-900/70 hover:to-cyan-900/60 active:scale-[.99]"
+        aria-label="فتح المركز المحوري"
+      >
+        <span className="flex items-center gap-3">
+          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/20 text-emerald-300">
+            <Building2 className="h-5 w-5" />
+          </span>
+          <span>
+            <strong className="block text-sm font-black text-white">المركز المحوري</strong>
+            <small className="block text-[11px] text-slate-400">الشركة الأم والقرارات الاستراتيجية</small>
+          </span>
+        </span>
+        <ChevronLeft className="h-5 w-5 text-emerald-300" />
+      </button>
+
+      {/* 2. Executive Command Operations Bar with explicit unlock levels & lock badges */}
+      <div id="central-operations" className="bg-slate-900/95 border border-slate-800 rounded-3xl p-4 sm:p-6 shadow-2xl backdrop-blur-md">
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-4 pb-3 border-b border-slate-800/80">
+          <div className="flex items-center gap-2">
+            <h3 className="font-extrabold text-sm sm:text-base text-white">
+              غرفة العمليات المركزية
+            </h3>
+            <span className="text-xs text-slate-400 hidden sm:inline">
+              · تفتح الأقسام تدريجياً وفق تقدمك في القصة والمستوى
+            </span>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center bg-slate-950/80 border border-slate-800 p-1 rounded-xl text-[11px] font-bold">
+              <button
+                type="button"
+                onClick={() => setOpsFilter('all')}
+                className={`px-2.5 py-1 rounded-lg transition cursor-pointer whitespace-nowrap ${opsFilter === 'all' ? 'bg-amber-500 text-slate-950 font-black shadow' : 'text-slate-400 hover:text-white'}`}
+              >
+                الكل ({commandItems.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setOpsFilter('available')}
+                className={`px-2.5 py-1 rounded-lg transition cursor-pointer whitespace-nowrap ${opsFilter === 'available' ? 'bg-amber-500 text-slate-950 font-black shadow' : 'text-slate-400 hover:text-white'}`}
+              >
+                المتاح ({availableCount})
+              </button>
+              <button
+                type="button"
+                onClick={() => setOpsFilter('core')}
+                className={`px-2.5 py-1 rounded-lg transition cursor-pointer whitespace-nowrap ${opsFilter === 'core' ? 'bg-amber-500 text-slate-950 font-black shadow' : 'text-slate-400 hover:text-white'}`}
+              >
+                الأساسية
+              </button>
+              <button
+                type="button"
+                onClick={() => setOpsFilter('expansion')}
+                className={`px-2.5 py-1 rounded-lg transition cursor-pointer whitespace-nowrap ${opsFilter === 'expansion' ? 'bg-amber-500 text-slate-950 font-black shadow' : 'text-slate-400 hover:text-white'}`}
+              >
+                التوسع
+              </button>
+            </div>
+
+            <span className="text-xs text-amber-300 font-bold px-2.5 py-1">
+              مستواك الحالي: {profile.level ?? 1}
+            </span>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-10 gap-2 sm:gap-2.5">
+          {filteredItems.map((item) => {
+            return (
+              <button
+                type="button"
+                key={item.id}
+                onClick={() => {
+                  if (!item.isUnlocked) {
+                    playSound('click');
+                    setLockedGateModal({
+                      title: item.title,
+                      sectionId: item.sectionId ?? 'home',
+                      requiredLevel: item.requiredLevel,
+                      hint: item.hint,
+                    });
+                    return;
+                  }
+                  if (item.id === 'leaderboard') {
+                    playSound('click');
+                    setIsLeaderboardOpen(true);
+                  } else if (item.id === 'finance_modal') {
+                    playSound('click');
+                    setIsFinanceModalOpen(true);
+                  } else if (item.id === 'lucky_wheel') {
+                    playSound('click');
+                    onOpenLuckyWheel?.();
+                  } else if (item.id === 'story_campaign') {
+                    playSound('click');
+                    onOpenCampaignHub?.();
+                  } else if (item.id === 'strategic_pillars') {
+                    playSound('click');
+                    if (onOpenStrategicPillars) {
+                      onOpenStrategicPillars();
+                    } else {
+                      setIsStrategicPillarsOpen(true);
+                    }
+                  } else if (item.sectionId) {
+                    handleNav(item.sectionId);
+                  }
+                }}
+                data-guide-nav={item.sectionId}
+                className={`flex flex-col items-center justify-between p-2 rounded-2xl transition group cursor-pointer shadow-md relative min-h-[105px] ${
+                  item.isUnlocked
+                    ? 'bg-slate-950/70 border border-slate-800 hover:border-amber-400 hover:bg-slate-900 active:scale-95'
+                    : 'bg-slate-950/40 border border-slate-800/80 hover:border-amber-500/60 hover:bg-slate-900/50'
+                }`}
+                title={item.isUnlocked ? item.title : `يفتح في مستوى ${item.requiredLevel} · ${item.hint}`}
+              >
+                {item.id === 'lucky_wheel' && (
+                  spinState.isFree ? (
+                    <span className="absolute -top-1.5 -right-1.5 px-1.5 py-0.5 rounded-full bg-emerald-500 text-white font-extrabold text-[9px] shadow-sm z-10">
+                      مجاناً
+                    </span>
+                  ) : (
+                    <span className="absolute -top-1.5 -right-1.5 px-1.5 py-0.5 rounded-full bg-slate-800 text-amber-300 font-bold text-[8px] border border-amber-500/30 font-mono z-10">
+                      {spinState.formattedCountdown}
+                    </span>
+                  )
+                )}
+
+                <div className="relative mt-1">
+                  <div className={`w-11 h-11 sm:w-12 sm:h-12 rounded-2xl ${item.gradient} flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform ${!item.isUnlocked ? 'grayscale-[45%] opacity-70' : ''}`}>
+                    {item.icon}
+                  </div>
+                  {!item.isUnlocked && (
+                    <div className="absolute -bottom-1 -left-1 w-5 h-5 rounded-full bg-slate-950 border border-amber-500 flex items-center justify-center text-[10px] text-amber-400 shadow-md">
+                      🔒
+                    </div>
+                  )}
+                </div>
+
+                <span className="text-[11px] font-bold text-slate-200 mt-1.5 text-center leading-tight group-hover:text-amber-300 truncate w-full px-1">
+                  {item.title}
+                </span>
+
+                {!item.isUnlocked ? (
+                  <span className="text-[9px] font-black text-amber-300 bg-amber-950/90 px-1.5 py-0.5 rounded-md border border-amber-500/40 mt-1 flex items-center gap-0.5 shadow-sm whitespace-nowrap">
+                    <Lock className="w-2.5 h-2.5 text-amber-400 shrink-0" />
+                    <span>يفتح في مستوى {item.requiredLevel}</span>
+                  </span>
+                ) : (
+                  <span className="text-[9px] text-emerald-400/90 font-bold mt-1">
+                    متاح ✓
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
       {/* 4. Balanced Two-Column Operational Hub */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         {/* LEFT COLUMN: Active Companies & Factories Status */}

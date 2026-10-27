@@ -1439,7 +1439,10 @@ export default function App() {
         onNavigate={navigate}
         onOpenCentralOperations={() => {
           triggerHaptic('light');
-          setIsStrategicPillarsOpen(true);
+          navigate('home');
+          window.requestAnimationFrame(() => {
+            document.getElementById('central-operations')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          });
         }}
         profile={profile}
       />

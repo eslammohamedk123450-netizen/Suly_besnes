@@ -70,20 +70,20 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
         <span className="text-[10px]">المصانع</span>
       </button>
 
-      {/* 3. Imperial Hub (Center Highlight) */}
+      {/* 3. Central Operations Room */}
       <button
         onClick={() => {
           playSound('click');
           onOpenCentralOperations();
         }}
         className="relative -top-3 flex flex-col items-center justify-center"
-        aria-label="الشركة الأم - المركز المحوري الإمبراطوري"
-        title="الشركة الأم - المركز المحوري الإمبراطوري"
+        aria-label="غرفة العمليات المركزية"
+        title="غرفة العمليات المركزية - جميع أنظمة اللعبة"
       >
-        <div className="w-12 h-12 rounded-full bg-gradient-to-tr from-emerald-500 to-cyan-400 text-slate-950 flex items-center justify-center shadow-lg shadow-emerald-500/30 border-2 border-slate-900 transition-transform active:scale-95">
+        <div className="w-12 h-12 rounded-full bg-gradient-to-tr from-amber-500 to-yellow-300 text-slate-950 flex items-center justify-center shadow-lg shadow-amber-500/30 border-2 border-slate-900 transition-transform active:scale-95">
           <Building2 className="w-6 h-6" />
         </div>
-        <span className="text-[10px] font-bold text-emerald-300 mt-0.5">المركز المحوري</span>
+        <span className="text-[10px] font-bold text-amber-300 mt-0.5">غرفة العمليات المركزية</span>
       </button>
 
       {/* 4. Market / Inventory */}
