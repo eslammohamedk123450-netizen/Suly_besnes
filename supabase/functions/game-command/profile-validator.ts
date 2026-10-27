@@ -44,6 +44,7 @@ const OPTIONAL_PROFILE_KEYS = new Set([
   'cityConstructions',
   'branches',
   'shops',
+  'empireExpansion',
 ]);
 
 const PROFILE_KEYS = new Set([
@@ -57,7 +58,7 @@ const PROFILE_KEYS = new Set([
   'playerAuctions', 'soldAssetIds', 'processedAuctionSaleIds', 'processedBotOfferIds',
   'completedMissionIds', 'claimedRewardIds', 'dismissedStoryEventIds',
   'automationDirectives', 'luckyWheelLevel', 'fastStarterProductionUsed',
-  'hqLevel', 'cityConstructions', 'branches', 'shops',
+  'hqLevel', 'cityConstructions', 'branches', 'shops', 'empireExpansion',
 ]);
 
 const REQUIRED_PROFILE_KEYS = [...PROFILE_KEYS].filter((key) => !OPTIONAL_PROFILE_KEYS.has(key));
@@ -629,6 +630,22 @@ export function validatePlayerProfile(profile: unknown, previousProfile?: unknow
         requireString(cId, `profile.automationDirectives.autoProduceCompanyIds[${idx}]`, errors, 128);
       });
     }
+  }
+  if (profile.empireExpansion !== undefined) {
+    const exp = requireRecord(profile.empireExpansion, 'profile.empireExpansion', errors);
+    checkAllowedKeys(
+      exp,
+      ['facilityCities', 'facilityStaffAssignments', 'processedOperationIds', 'operationsLog', 'internationalIntentLog'],
+      'profile.empireExpansion',
+      errors,
+    );
+    if (exp.facilityCities !== undefined) requireRecord(exp.facilityCities, 'profile.empireExpansion.facilityCities', errors);
+    if (exp.facilityStaffAssignments !== undefined) requireRecord(exp.facilityStaffAssignments, 'profile.empireExpansion.facilityStaffAssignments', errors);
+    if (exp.processedOperationIds !== undefined) {
+      uniqueStrings(requireArray(exp.processedOperationIds, 'profile.empireExpansion.processedOperationIds', errors), 'profile.empireExpansion.processedOperationIds', errors);
+    }
+    if (exp.operationsLog !== undefined) requireArray(exp.operationsLog, 'profile.empireExpansion.operationsLog', errors);
+    if (exp.internationalIntentLog !== undefined) requireArray(exp.internationalIntentLog, 'profile.empireExpansion.internationalIntentLog', errors);
   }
   if (previousProfile !== undefined) {
     if (!isRecord(previousProfile) || typeof previousProfile.day !== 'number' || typeof profile.day !== 'number') {

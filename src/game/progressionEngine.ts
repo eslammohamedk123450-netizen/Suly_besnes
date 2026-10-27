@@ -21,6 +21,7 @@ export const EXPERIENCE_PER_LEVEL = 150;
 
 export const INTRO_UNLOCKED_SECTIONS: readonly SectionId[] = [
   'home',
+  'empire',
   'store',
   'profile',
   'lands',
@@ -42,6 +43,18 @@ export const SECTION_DEPENDENCY_MAP: Record<SectionId, SectionDependencySpec> = 
     relatedQuestIds: ['sq-repair-factory'],
     allowedNotificationIds: ['badges-earned'],
     relatedEventTypes: ['general'],
+  },
+  empire: {
+    sectionId: 'empire',
+    requiredLevel: 1,
+    storyStage: 1,
+    chapterNumber: 1,
+    badgeLabel: 'متاح',
+    storyHint: 'إدارة المنشآت والتوسع بين المدن والدول',
+    prerequisiteDescription: 'متاح لمتابعة الشركات والمصانع والفروع والمحلات والأراضي والتوسع الاستراتيجي.',
+    relatedQuestIds: ['sq-repair-factory', 'sq-expand-company'],
+    allowedNotificationIds: ['empire-halted-facilities', 'empire-material-shortage'],
+    relatedEventTypes: ['factory', 'supply-chain'],
   },
   profile: {
     sectionId: 'profile',

@@ -46,6 +46,7 @@ import { ListAssetAuctionModal } from './DynamicAuctionModal';
 import { StaffManagementView } from './StaffManagementView';
 import { generateLiveAuctions, RIVAL_INVESTORS, settlePlayerAssetAuction, cancelPlayerAssetAuction } from '../game/dynamicAuctions';
 import { GlobalMarketTerminal } from './GlobalMarketTerminal';
+import { EmpireManagementCenter } from './EmpireManagementCenter';
 
 interface SectionPageProps {
   section: SectionItem;
@@ -87,7 +88,7 @@ function panelIconFor(sectionId: SectionId, title: string): IconName {
   if (normalized.includes('التزام') || normalized.includes('سداد')) return 'shield';
   if (normalized.includes('سوق') || normalized.includes('شراء') || normalized.includes('بيع')) return 'store';
   const fallback: Record<SectionId, IconName> = {
-    home: 'home', auctions: 'gavel', companies: 'company', investments: 'investment', lands: 'land', production: 'factory', inventory: 'warehouse', reports: 'report', tasks: 'tasks', profile: 'user', bank: 'bank', staff: 'users', obligations: 'shield', store: 'store', contracts: 'briefcase', territory: 'land', tech_tree: 'factory', luxury: 'crown', cartel: 'company', maritime: 'land', megaprojects: 'gavel', incubator: 'investment',
+    home: 'home', empire: 'crown', auctions: 'gavel', companies: 'company', investments: 'investment', lands: 'land', production: 'factory', inventory: 'warehouse', reports: 'report', tasks: 'tasks', profile: 'user', bank: 'bank', staff: 'users', obligations: 'shield', store: 'store', contracts: 'briefcase', territory: 'land', tech_tree: 'factory', luxury: 'crown', cartel: 'company', maritime: 'land', megaprojects: 'gavel', incubator: 'investment',
   };
   return fallback[sectionId];
 }
@@ -293,6 +294,24 @@ export function SectionPage({ section, profile, country, focus, notificationThem
               </button>
             </div>
           </div>
+        )}
+      </div>
+    );
+  }
+
+  if (section.id === 'empire') {
+    return (
+      <div className="section-page w-full min-w-0">
+        {heading}
+        {pageShell(
+          <EmpireManagementCenter
+            profile={profile}
+            country={country}
+            focus={focus}
+            onNavigate={onNavigate}
+            onAction={onAction}
+            onCommand={runCommand}
+          />,
         )}
       </div>
     );

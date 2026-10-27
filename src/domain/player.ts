@@ -1,5 +1,6 @@
 import type { CountryDefinition, CountryId, IndustryId } from './countries';
 import type { CompanyBranch, RetailShop } from './branchAndShop';
+import type { EmpireExpansionState } from './empireExpansion';
 import type {
   FinanceLedgerEntry,
   AuctionBidRecord,
@@ -141,6 +142,7 @@ export interface PlayerProfile {
   cityConstructions?: Record<string, any>;
   branches?: CompanyBranch[];
   shops?: RetailShop[];
+  empireExpansion?: EmpireExpansionState;
 }
 
 export function getDefaultAutomationDirectives(): AutomationDirectives {

@@ -2,6 +2,7 @@ import type { SectionId } from '../domain/navigation';
 import type { PlayerProfile } from '../domain/player';
 import { isNotificationAllowedForProfile } from './progressionEngine';
 import { selectAvailableAuctions, selectEmpirePulse } from './selectors';
+import { selectEmpireOperationalAlerts } from './empireExpansionEngine';
 
 export type NotificationTone = 'warning' | 'success' | 'info' | 'danger';
 export interface GameNotification {
@@ -207,6 +208,37 @@ export function selectNotifications(profile: PlayerProfile): GameNotification[] 
       tone: 'info',
       section: 'inventory',
     });
+  }
+
+  // 12. Empire Facility Halts & Raw Material Shortages
+  if (isNotificationAllowedForProfile(profile, { section: 'empire' })) {
+    const empireAlerts = selectEmpireOperationalAlerts(profile);
+    const prodHalts = empireAlerts.filter(
+      (a) => a.category === 'production' && a.severity === 'critical',
+    );
+    if (prodHalts.length > 0) {
+      notifications.unshift({
+        id: `empire-halted-facilities:${prodHalts.map((a) => a.facilityId ?? a.id).join(',')}`,
+        title: 'منشآت متوقفة عن الإنتاج',
+        detail: `${prodHalts[0].title} — افتح مركز إدارة الإمبراطورية لمعالجة السبب.`,
+        tone: 'danger',
+        section: 'empire',
+        count: prodHalts.length,
+        target: 'alerts',
+      });
+    }
+    const rawShortages = empireAlerts.filter((a) => a.category === 'inventory');
+    if (rawShortages.length > 0) {
+      notifications.push({
+        id: `empire-material-shortage:${rawShortages.map((a) => a.facilityId ?? a.id).join(',')}`,
+        title: 'تنبيه نقص مخزون التشغيل',
+        detail: `${rawShortages.length} تنبيه مخزون نشط (${rawShortages[0].title}).`,
+        tone: 'warning',
+        section: 'empire',
+        count: rawShortages.length,
+        target: 'alerts',
+      });
+    }
   }
 
   // Deduplicate by ID and exclude dismissed notifications

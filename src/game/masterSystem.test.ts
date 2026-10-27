@@ -257,8 +257,9 @@ describe('Suly Business Empire — Master System Verification (17 Suites)', () =
     expect(resolveSafeSection(profile, 'bank')).toBe('obligations');
     expect(resolveSafeSection(profile, 'investments')).toBe('home');
 
-    // Every single one of the 22 sections has a dependency spec and an 8-point contextual guide
-    expect(GAME_SECTIONS).toHaveLength(22);
+    // Every single one of the 23 sections (including Empire Management Center) has a dependency spec and an 8-point contextual guide
+    expect(unlockedDay60).toContain('empire');
+    expect(GAME_SECTIONS).toHaveLength(23);
     for (const sec of GAME_SECTIONS) {
       expect(SECTION_DEPENDENCY_MAP[sec.id]).toBeDefined();
       const guide = getSystemGuide(sec.id);

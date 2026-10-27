@@ -1,5 +1,6 @@
 import { findCountry, type CountryId, type IndustryId } from '../domain/countries';
 import type { PlayerAsset, PlayerCompany, PlayerLand, PlayerProfile } from '../domain/player';
+import type { EmpireExpansionState, EmpireExpansionOperationRecord, InternationalExpansionIntent } from '../domain/empireExpansion';
 import type { AchievementRecord, AuctionBidRecord, BusinessContract, DepositRecord, FinanceLedgerEntry, ForwardSupplyContract, GlobalShipmentRecord, InventoryLot, InvestmentRecord, LicenseRecord, LoanRecord, OnboardingProgress, PlayerAuctionListing, ProductSale, ProductionOrder, StaffContract, TaskProgress } from '../domain/futureSystems';
 import { findIndustry, GOLD_PRICE_PER_GRAM } from '../game/catalog';
 import { normalizeAccountFeatures } from '../domain/accountFeatures';
@@ -293,6 +294,65 @@ function isForwardContract(value: unknown): value is ForwardSupplyContract {
     && (value.status === 'active' || value.status === 'completed' || value.status === 'expired');
 }
 
+function normalizeEmpireExpansion(value: unknown): EmpireExpansionState | undefined {
+  if (!isRecord(value)) return undefined;
+  const sanitizeStringMap = (raw: unknown): Record<string, string> => {
+    if (!isRecord(raw)) return {};
+    return Object.fromEntries(
+      Object.entries(raw).filter(
+        ([k, v]) => isNonEmptyString(k) && k.length <= 64 && isNonEmptyString(v) && (v as string).length <= 128,
+      ) as [string, string][],
+    );
+  };
+  const processedOperationIds = Array.isArray(value.processedOperationIds)
+    ? Array.from(new Set(value.processedOperationIds.filter((id): id is string => isNonEmptyString(id) && id.length <= 128))).slice(-500)
+    : [];
+  const operationsLog: EmpireExpansionOperationRecord[] = Array.isArray(value.operationsLog)
+    ? value.operationsLog
+        .filter((op): op is EmpireExpansionOperationRecord => (
+          isRecord(op)
+          && isNonEmptyString(op.operationId)
+          && (op.kind === 'branch' || op.kind === 'factory' || op.kind === 'shop')
+          && isNonEmptyString(op.cityId)
+          && isNonEmptyString(op.cityName)
+          && typeof op.countryId === 'string' && findCountry(op.countryId as CountryId) !== undefined
+          && isNonEmptyString(op.facilityId)
+          && isNonEmptyString(op.facilityName)
+          && isNonEmptyString(op.landId)
+          && isFiniteNonNegative(op.amountPaidCash)
+          && isFiniteNonNegative(op.diamondsSpent)
+          && (op.paymentMethod === 'cash' || op.paymentMethod === 'diamonds')
+          && Number.isInteger(op.day) && (op.day as number) >= 1
+          && isDateString(op.occurredAt)
+        ))
+        .slice(-250)
+    : [];
+  const internationalIntentLog: InternationalExpansionIntent[] = Array.isArray(value.internationalIntentLog)
+    ? value.internationalIntentLog
+        .filter((intent): intent is InternationalExpansionIntent => (
+          isRecord(intent)
+          && isNonEmptyString(intent.intentId)
+          && typeof intent.targetCountryId === 'string' && findCountry(intent.targetCountryId as CountryId) !== undefined
+          && isNonEmptyString(intent.targetCityId)
+          && (intent.activityKind === 'branch' || intent.activityKind === 'factory' || intent.activityKind === 'shop')
+          && isFiniteNonNegative(intent.estimatedTotalUsd)
+          && isFiniteNonNegative(intent.estimatedTotalTargetLocal)
+          && isNonEmptyString(intent.targetCurrencyCode)
+          && Number.isInteger(intent.registeredOnDay) && (intent.registeredOnDay as number) >= 1
+          && isDateString(intent.registeredAt)
+          && intent.gatewayStatus === 'incomplete_multi_currency_runtime'
+        ))
+        .slice(-100)
+    : [];
+  return {
+    facilityCities: sanitizeStringMap(value.facilityCities),
+    facilityStaffAssignments: sanitizeStringMap(value.facilityStaffAssignments),
+    processedOperationIds,
+    operationsLog,
+    internationalIntentLog,
+  };
+}
+
 function inferLandType(label: string): PlayerLand['landType'] | undefined {
   const normalized = label.toLocaleLowerCase();
   if (normalized.includes('زراع') || normalized.includes('farm') || normalized.includes('agric')) return 'agricultural';
@@ -489,6 +549,7 @@ function migrateProfile(value: unknown): PlayerProfile | null {
     ...(isRecord(value.cityConstructions) ? { cityConstructions: value.cityConstructions as any } : {}),
     branches: Array.isArray(value.branches) ? (value.branches as any) : [],
     shops: Array.isArray(value.shops) ? (value.shops as any) : [],
+    ...(normalizeEmpireExpansion(value.empireExpansion) ? { empireExpansion: normalizeEmpireExpansion(value.empireExpansion) } : {}),
   }, typeof value.accountCode === 'string' ? value.accountCode : value.id as string);
 }
 

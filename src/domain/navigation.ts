@@ -2,6 +2,7 @@ import type { IconName } from '../components/Icon';
 
 export type SectionId =
   | 'home'
+  | 'empire'
   | 'store'
   | 'auctions'
   | 'companies'
@@ -40,6 +41,7 @@ export interface SectionGroup {
 
 export const GAME_SECTIONS: readonly SectionItem[] = [
   { id: 'home', label: 'الرئيسية', shortLabel: 'الرئيسية', subtitle: 'ملخص إمبراطوريتك', icon: 'home' },
+  { id: 'empire', label: 'مركز إدارة الإمبراطورية', shortLabel: 'الإمبراطورية', subtitle: 'الشركات والمصانع والفروع والمحلات والأراضي والتوسع بين المدن والدول', icon: 'crown' },
   { id: 'territory', label: 'السيطرة الإقليمية', shortLabel: 'الخريطة', subtitle: 'خريطة السيطرة والتوسع الجغرافي', icon: 'land' },
   { id: 'tech_tree', label: 'الأبحاث والأتمتة', shortLabel: 'الأبحاث', subtitle: 'شجرة التكنولوجيا والأتمتة الذكية', icon: 'factory' },
   { id: 'luxury', label: 'الهيبة والرفاهية', shortLabel: 'الرفاهية', subtitle: 'أصول المدير التنفيذي ونقاط الهيبة', icon: 'user' },
@@ -64,7 +66,7 @@ export const GAME_SECTIONS: readonly SectionItem[] = [
 ];
 
 export const SECTION_GROUPS: readonly SectionGroup[] = [
-  { id: 'home_group', label: 'الرئيسية والتوسع الإمبراطوري', sections: ['home', 'territory', 'tech_tree', 'luxury', 'cartel', 'maritime', 'megaprojects', 'incubator'] },
+  { id: 'home_group', label: 'الرئيسية والتوسع الإمبراطوري', sections: ['home', 'empire', 'territory', 'tech_tree', 'luxury', 'cartel', 'maritime', 'megaprojects', 'incubator'] },
   { id: 'business_group', label: 'الأعمال والأصول', sections: ['companies', 'lands', 'production', 'inventory'] },
   { id: 'market_group', label: 'السوق والمالية والبورصة', sections: ['auctions', 'investments', 'bank', 'contracts'] },
   { id: 'management_group', label: 'الإدارة والتقدم', sections: ['staff', 'tasks', 'reports', 'obligations'] },

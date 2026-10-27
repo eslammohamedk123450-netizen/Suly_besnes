@@ -578,6 +578,13 @@ export function StrategicPillarsModal({
                   </button>
                   <button
                     type="button"
+                    onClick={() => handleAction('empire')}
+                    className="py-1.5 px-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs transition cursor-pointer"
+                  >
+                    👑 مركز إدارة الإمبراطورية والتوسع
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => handleAction('inventory')}
                     className="py-1.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs transition cursor-pointer"
                   >

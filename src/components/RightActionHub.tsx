@@ -554,6 +554,14 @@ export function RightActionHub({
                 <div className="right-hub-shortcuts-grid">
                   <div
                     className="right-hub-shortcut-card"
+                    onClick={() => handleNavigate('empire')}
+                  >
+                    <span className="right-hub-shortcut-icon">👑</span>
+                    <span>مركز الإمبراطورية</span>
+                  </div>
+
+                  <div
+                    className="right-hub-shortcut-card"
                     onClick={() => handleNavigate('tasks')}
                   >
                     <span className="right-hub-shortcut-icon">📋</span>
