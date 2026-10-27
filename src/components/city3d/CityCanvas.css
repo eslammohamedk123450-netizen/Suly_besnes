@@ -1,0 +1,31 @@
+.city-canvas-shell {
+  min-height: 520px;
+  height: calc(100dvh - 4.5rem);
+  height: calc(100svh - 4.5rem);
+}
+
+@supports (height: 100dvh) {
+  .city-canvas-shell { height: calc(100dvh - 4.5rem); }
+}
+
+@media (min-width: 768px) {
+  .city-canvas-shell {
+    height: calc(100dvh - 5.5rem);
+    min-height: 620px;
+  }
+}
+
+@media (max-height: 650px) and (orientation: landscape) {
+  .city-canvas-shell {
+    min-height: 360px;
+    height: calc(100dvh - 3.5rem);
+  }
+}
+
+@media (max-width: 430px) {
+  .city-canvas-shell {
+    min-height: 480px;
+    margin-inline: -0.25rem;
+    width: calc(100% + 0.5rem);
+  }
+}

@@ -18,10 +18,10 @@ export const CITY_CAMERA_LIMITS = {
   cameraHeight: 60,
   lookAtHeight: 26,
   headingOffsetZ: 65,
-  minFov: 34,
+  minFov: 22,
   maxFov: 62,
   defaultFov: 52,
-  zoomStep: 5,
+  zoomStep: 3,
 } as const;
 
 export interface CameraPanDelta {

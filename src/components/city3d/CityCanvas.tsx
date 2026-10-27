@@ -67,6 +67,7 @@ import {
   type LandmarkSystemDefinition,
 } from './cityWorldData';
 import { createBuildingLabelSprite } from './cityLabels';
+import './CityCanvas.css';
 
 export type SelectedItem =
   | { type: 'landmark'; id: LandmarkId }
@@ -795,7 +796,7 @@ export const CityCanvas: React.FC<CityCanvasProps> = ({
   const handleResetView = () => touchControllerRef.current?.resetView();
 
   return (
-    <div className="relative w-full h-[520px] md:h-[620px] rounded-2xl overflow-hidden shadow-2xl border border-amber-500/30 bg-slate-950 select-none">
+    <div className="city-canvas-shell relative w-full h-[calc(100dvh-4.5rem)] min-h-[520px] md:h-[calc(100dvh-5.5rem)] md:min-h-[620px] rounded-2xl md:rounded-3xl overflow-hidden shadow-2xl border border-amber-500/30 bg-slate-950 select-none">
       <div ref={mountRef} className="w-full h-full cursor-grab active:cursor-grabbing touch-none" />
 
       {/* Minimal Touch Navigation Helpers (Bottom-Right, non-intrusive) */}
