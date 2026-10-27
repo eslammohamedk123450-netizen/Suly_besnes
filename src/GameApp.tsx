@@ -15,6 +15,7 @@ import { Capacitor } from '@capacitor/core';
 import { AccountGate } from './components/AccountGate';
 import { CountrySelection } from './components/CountrySelection';
 import { Dashboard } from './components/Dashboard';
+import { CityHomeView } from './components/CityHomeView';
 import { ProfilePage } from './components/ProfilePage';
 import { Icon } from './components/Icon';
 import { FlyingToast, type ToastAlert } from './components/FlyingToast';
@@ -1141,7 +1142,7 @@ export default function App() {
 
         <main className="main-content flex-1 w-full min-w-0 pb-24 md:pb-8">
           {activeSection === 'home' ? (
-            <Dashboard
+            <CityHomeView
               profile={profile}
               country={country}
               onNavigate={navigate}
