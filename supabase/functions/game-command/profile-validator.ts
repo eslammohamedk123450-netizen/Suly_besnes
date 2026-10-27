@@ -42,6 +42,8 @@ const OPTIONAL_PROFILE_KEYS = new Set([
   'fastStarterProductionUsed',
   'hqLevel',
   'cityConstructions',
+  'branches',
+  'shops',
 ]);
 
 const PROFILE_KEYS = new Set([
@@ -55,7 +57,7 @@ const PROFILE_KEYS = new Set([
   'playerAuctions', 'soldAssetIds', 'processedAuctionSaleIds', 'processedBotOfferIds',
   'completedMissionIds', 'claimedRewardIds', 'dismissedStoryEventIds',
   'automationDirectives', 'luckyWheelLevel', 'fastStarterProductionUsed',
-  'hqLevel', 'cityConstructions',
+  'hqLevel', 'cityConstructions', 'branches', 'shops',
 ]);
 
 const REQUIRED_PROFILE_KEYS = [...PROFILE_KEYS].filter((key) => !OPTIONAL_PROFILE_KEYS.has(key));

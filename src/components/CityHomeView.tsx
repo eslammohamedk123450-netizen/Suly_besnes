@@ -10,6 +10,7 @@ import type { SectionId } from '../domain/navigation';
 import type { GameCommand, GameResult } from '../game/engine';
 import { CityCanvas, type SelectedItem } from './city3d/CityCanvas';
 import { BuildingDetailSheet } from './city3d/BuildingDetailSheet';
+import { BranchAndShopSheet } from './city3d/BranchAndShopSheet';
 import { CityControlsBar } from './city3d/CityControlsBar';
 import { Dashboard } from './Dashboard';
 import { formatMoney } from '../domain/formatters';
@@ -17,6 +18,7 @@ import {
   Building2,
   Landmark,
   Factory,
+  Store,
   MapPin,
   TrendingUp,
   Sparkles,
@@ -52,10 +54,28 @@ export const CityHomeView: React.FC<CityHomeViewProps> = (props) => {
   const [cameraPreset, setCameraPreset] = useState<
     'center' | 'hq' | 'bank' | 'factory' | 'plots' | null
   >(null);
+  const [isBranchShopOpen, setIsBranchShopOpen] = useState(false);
   const [gridRefreshKey, setGridRefreshKey] = useState(0);
 
   const handleRefreshGrid = () => {
     setGridRefreshKey((k) => k + 1);
+  };
+
+  const handleProfileUpdate = (updated: PlayerProfile) => {
+    if (props.onUpdateProfile) {
+      props.onUpdateProfile(() => updated);
+    }
+    handleRefreshGrid();
+  };
+
+  const handleCloseSheets = () => {
+    setSelectedItem(null);
+    setIsBranchShopOpen(false);
+  };
+
+  const handleSelectItem = (item: SelectedItem | null) => {
+    setIsBranchShopOpen(false);
+    setSelectedItem(item);
   };
 
   return (
@@ -103,7 +123,7 @@ export const CityHomeView: React.FC<CityHomeViewProps> = (props) => {
               key={`city-canvas-${gridRefreshKey}`}
               profile={profile}
               selectedItem={selectedItem}
-              onSelectItem={setSelectedItem}
+              onSelectItem={handleSelectItem}
               isNightMode={isNightMode}
               cameraPreset={cameraPreset}
               onResetPreset={() => setCameraPreset(null)}
@@ -120,7 +140,7 @@ export const CityHomeView: React.FC<CityHomeViewProps> = (props) => {
               <button
                 onClick={() => {
                   setCameraPreset('hq');
-                  setSelectedItem({ type: 'landmark', id: 'hq' });
+                  handleSelectItem({ type: 'landmark', id: 'hq' });
                 }}
                 className="px-2.5 py-1.5 rounded-xl bg-slate-950/85 hover:bg-slate-900 border border-amber-500/40 text-amber-300 text-xs font-bold flex items-center gap-1 shadow-lg backdrop-blur-md transition-all"
               >
@@ -130,7 +150,7 @@ export const CityHomeView: React.FC<CityHomeViewProps> = (props) => {
               <button
                 onClick={() => {
                   setCameraPreset('bank');
-                  setSelectedItem({ type: 'landmark', id: 'bank' });
+                  handleSelectItem({ type: 'landmark', id: 'bank' });
                 }}
                 className="px-2.5 py-1.5 rounded-xl bg-slate-950/85 hover:bg-slate-900 border border-sky-500/40 text-sky-300 text-xs font-bold flex items-center gap-1 shadow-lg backdrop-blur-md transition-all"
               >
@@ -140,7 +160,7 @@ export const CityHomeView: React.FC<CityHomeViewProps> = (props) => {
               <button
                 onClick={() => {
                   setCameraPreset('factory');
-                  setSelectedItem({ type: 'landmark', id: 'factory' });
+                  handleSelectItem({ type: 'landmark', id: 'factory' });
                 }}
                 className="px-2.5 py-1.5 rounded-xl bg-slate-950/85 hover:bg-slate-900 border border-orange-500/40 text-orange-300 text-xs font-bold flex items-center gap-1 shadow-lg backdrop-blur-md transition-all"
               >
@@ -150,14 +170,26 @@ export const CityHomeView: React.FC<CityHomeViewProps> = (props) => {
             </div>
 
             {/* Slide-up Detail Sheet for Selected Building or Plot */}
-            <BuildingDetailSheet
-              selectedItem={selectedItem}
-              profile={profile}
-              onClose={() => setSelectedItem(null)}
-              onNavigate={onNavigate}
-              onCommand={onCommand}
-              onRefreshGrid={handleRefreshGrid}
-            />
+            {selectedItem?.type === 'plot' &&
+            (isBranchShopOpen || selectedItem.plot.branch || selectedItem.plot.shop) ? (
+              <BranchAndShopSheet
+                plot={selectedItem.plot}
+                profile={profile}
+                onClose={handleCloseSheets}
+                onRefreshGrid={handleRefreshGrid}
+                onProfileUpdate={handleProfileUpdate}
+              />
+            ) : (
+              <BuildingDetailSheet
+                selectedItem={selectedItem}
+                profile={profile}
+                onClose={handleCloseSheets}
+                onNavigate={onNavigate}
+                onCommand={onCommand}
+                onRefreshGrid={handleRefreshGrid}
+                onOpenBranchShop={() => setIsBranchShopOpen(true)}
+              />
+            )}
           </div>
 
           {/* Unified Bottom Controls Bar */}

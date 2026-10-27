@@ -60,6 +60,7 @@ import {
   TrendingUp,
   FileText,
   BadgeAlert,
+  Store,
 } from 'lucide-react';
 import type { SelectedItem } from './CityCanvas';
 
@@ -73,6 +74,7 @@ interface BuildingDetailSheetProps {
     fallback: (current: PlayerProfile) => GameResult<unknown>
   ) => void;
   onRefreshGrid: () => void;
+  onOpenBranchShop?: () => void;
 }
 
 export const BuildingDetailSheet: React.FC<BuildingDetailSheetProps> = ({
@@ -82,6 +84,7 @@ export const BuildingDetailSheet: React.FC<BuildingDetailSheetProps> = ({
   onNavigate,
   onCommand,
   onRefreshGrid,
+  onOpenBranchShop,
 }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedIndustryId, setSelectedIndustryId] = useState<string>('');
@@ -1017,6 +1020,20 @@ export const BuildingDetailSheet: React.FC<BuildingDetailSheetProps> = ({
               </button>
             )}
           </div>
+
+          {onOpenBranchShop && (
+            <button
+              type="button"
+              onClick={onOpenBranchShop}
+              className="w-full py-2.5 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 border border-amber-500/40 text-amber-300 font-bold text-xs flex items-center justify-between transition-colors shadow-md"
+            >
+              <div className="flex items-center gap-2">
+                <Store className="w-4 h-4 text-amber-400" />
+                <span>افتتاح فرع شركة أو متجر تجزئة في هذا الموقع</span>
+              </div>
+              <ChevronLeft className="w-4 h-4 text-amber-400" />
+            </button>
+          )}
 
           <div className="space-y-2">
             <label className="text-xs text-slate-400 block font-bold">اسم الشركة أو المصنع الجديد:</label>

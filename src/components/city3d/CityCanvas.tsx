@@ -280,47 +280,56 @@ export const CityCanvas: React.FC<CityCanvasProps> = ({
         );
         plotGroup.add(constructionMesh);
       } else {
-        // COMPLETED FACILITY: Classify based on company industry
-        const category = classifyIndustryToFacility(plot.company?.industryId);
+        // COMPLETED FACILITY: Company, Branch office, or Retail shop
         let completedFacilityMesh: THREE.Group;
 
-        switch (category) {
-          case 'factory': {
-            const res = buildFactoryMesh(palette, isSoftwareGl);
-            res.group.scale.set(0.75, 0.75, 0.75);
-            completedFacilityMesh = res.group;
-            break;
-          }
-          case 'store': {
-            completedFacilityMesh = buildStoreMesh(palette, isSoftwareGl);
-            completedFacilityMesh.scale.set(0.85, 0.85, 0.85);
-            break;
-          }
-          case 'warehouse': {
-            completedFacilityMesh = buildWarehouseMesh(palette, isSoftwareGl);
-            completedFacilityMesh.scale.set(0.8, 0.8, 0.8);
-            break;
-          }
-          case 'tech_hub': {
-            completedFacilityMesh = buildTechHubMesh(palette, isSoftwareGl);
-            completedFacilityMesh.scale.set(0.8, 0.8, 0.8);
-            break;
-          }
-          case 'central_bank': {
-            completedFacilityMesh = buildBankMesh(palette, isSoftwareGl);
-            completedFacilityMesh.scale.set(0.75, 0.75, 0.75);
-            break;
-          }
-          case 'agricultural_farm': {
-            completedFacilityMesh = buildAgroFarmMesh(palette, isSoftwareGl);
-            completedFacilityMesh.scale.set(0.8, 0.8, 0.8);
-            break;
-          }
-          case 'regional_branch':
-          default: {
-            completedFacilityMesh = buildBranchMesh(palette, isSoftwareGl);
-            completedFacilityMesh.scale.set(0.85, 0.85, 0.85);
-            break;
+        if (plot.branch) {
+          completedFacilityMesh = buildBranchMesh(palette, isSoftwareGl);
+          completedFacilityMesh.scale.set(0.9, 0.9, 0.9);
+        } else if (plot.shop) {
+          completedFacilityMesh = buildStoreMesh(palette, isSoftwareGl);
+          completedFacilityMesh.scale.set(0.9, 0.9, 0.9);
+        } else {
+          const category = classifyIndustryToFacility(plot.company?.industryId);
+
+          switch (category) {
+            case 'factory': {
+              const res = buildFactoryMesh(palette, isSoftwareGl);
+              res.group.scale.set(0.75, 0.75, 0.75);
+              completedFacilityMesh = res.group;
+              break;
+            }
+            case 'store': {
+              completedFacilityMesh = buildStoreMesh(palette, isSoftwareGl);
+              completedFacilityMesh.scale.set(0.85, 0.85, 0.85);
+              break;
+            }
+            case 'warehouse': {
+              completedFacilityMesh = buildWarehouseMesh(palette, isSoftwareGl);
+              completedFacilityMesh.scale.set(0.8, 0.8, 0.8);
+              break;
+            }
+            case 'tech_hub': {
+              completedFacilityMesh = buildTechHubMesh(palette, isSoftwareGl);
+              completedFacilityMesh.scale.set(0.8, 0.8, 0.8);
+              break;
+            }
+            case 'central_bank': {
+              completedFacilityMesh = buildBankMesh(palette, isSoftwareGl);
+              completedFacilityMesh.scale.set(0.75, 0.75, 0.75);
+              break;
+            }
+            case 'agricultural_farm': {
+              completedFacilityMesh = buildAgroFarmMesh(palette, isSoftwareGl);
+              completedFacilityMesh.scale.set(0.8, 0.8, 0.8);
+              break;
+            }
+            case 'regional_branch':
+            default: {
+              completedFacilityMesh = buildBranchMesh(palette, isSoftwareGl);
+              completedFacilityMesh.scale.set(0.85, 0.85, 0.85);
+              break;
+            }
           }
         }
 

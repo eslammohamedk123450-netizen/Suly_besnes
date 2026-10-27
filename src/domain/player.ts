@@ -1,4 +1,5 @@
 import type { CountryDefinition, CountryId, IndustryId } from './countries';
+import type { CompanyBranch, RetailShop } from './branchAndShop';
 import type {
   FinanceLedgerEntry,
   AuctionBidRecord,
@@ -138,6 +139,8 @@ export interface PlayerProfile {
   fastStarterProductionUsed?: boolean;
   hqLevel?: number;
   cityConstructions?: Record<string, any>;
+  branches?: CompanyBranch[];
+  shops?: RetailShop[];
 }
 
 export function getDefaultAutomationDirectives(): AutomationDirectives {
@@ -356,6 +359,8 @@ export function createNewPlayer(
     automationDirectives: getDefaultAutomationDirectives(),
     hqLevel: 1,
     cityConstructions: {},
+    branches: [],
+    shops: [],
   };
 }
 
@@ -363,8 +368,12 @@ export function calculateTotalAssets(profile: PlayerProfile): number {
   const liquidCash = profile.bankBalance || 0;
   const movableAssets = (profile.assets ?? []).reduce((sum, asset) => sum + (asset.value || 0), 0);
 
-  const companyLandIds = new Set((profile.companies ?? []).map((c) => c.landId).filter(Boolean));
-  const unlinkedLands = (profile.lands ?? []).filter((l) => !companyLandIds.has(l.id));
+  const occupiedLandIds = new Set([
+    ...(profile.companies ?? []).map((c) => c.landId).filter(Boolean),
+    ...(profile.branches ?? []).map((b) => b.landId).filter(Boolean),
+    ...(profile.shops ?? []).map((s) => s.landId).filter(Boolean),
+  ]);
+  const unlinkedLands = (profile.lands ?? []).filter((l) => !occupiedLandIds.has(l.id));
   const landAssets = unlinkedLands.reduce(
     (sum, land) => sum + Math.round((land.purchasePrice || 0) * (1 + ((land.upgradeLevel ?? 1) * 0.15))),
     0,
@@ -385,6 +394,18 @@ export function calculateTotalAssets(profile: PlayerProfile): number {
     return sum + Math.max(15_000, Math.round(bookValue - conditionDiscount));
   }, 0);
 
+  const branchesTotalValue = (profile.branches ?? []).reduce((sum, branch) => {
+    return sum + (12_000 * Math.max(1, branch.level || 1));
+  }, 0);
+
+  const shopsTotalValue = (profile.shops ?? []).reduce((sum, shop) => {
+    const shelfInventoryVal = (shop.inventory ?? []).reduce(
+      (acc, item) => acc + (item.quantity || 0) * (item.unitCost || 0),
+      0
+    );
+    return sum + (10_000 * Math.max(1, shop.level || 1)) + shelfInventoryVal;
+  }, 0);
+
   const inventoryAssets = (profile.inventory ?? []).reduce((sum, lot) => sum + (lot.quantity || 0) * (lot.unitCost || 0), 0);
   const activeInvestments = (profile.investments ?? [])
     .filter((investment) => investment.status === 'active')
@@ -399,6 +420,8 @@ export function calculateTotalAssets(profile: PlayerProfile): number {
     movableAssets +
     landAssets +
     companiesTotalValue +
+    branchesTotalValue +
+    shopsTotalValue +
     inventoryAssets +
     activeInvestments +
     activeDeposits +
