@@ -468,8 +468,14 @@ export function landmarkForSection(sectionId: SectionId): LandmarkId {
 }
 
 export const CITY_WORLD_CONFIG = {
-  worldRadius: 130,
+  worldRadius: 270,
   groundSize: 320,
+  coastlineX: 70,
+  harborAccessZ: 35,
+  harborWaterSize: {
+    width: 200,
+    depth: 320,
+  },
   districts: [
     {
       id: 'district_downtown',

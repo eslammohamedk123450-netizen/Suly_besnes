@@ -67,6 +67,9 @@ import { StrategicPillarsModal } from './components/StrategicPillarsModal';
 import { acceptBotMarketOffer } from './game/economyBots';
 import { triggerHaptic } from './services/nativeMobileService';
 
+// Re-enable after the legacy onboarding tour is replaced with the updated version.
+const LEGACY_ONBOARDING_TUTORIALS_ENABLED = false;
+
 function getPendingSyncCount(accountId: string): number {
   return loadQueuedGameCommands(accountId).length + (loadPendingInitialProfile(accountId) ? 1 : 0);
 }
@@ -144,13 +147,15 @@ export default function App() {
       loadedProfile.onboarding?.countryIntroSeen || loadedProfile.onboarding?.introCompleted,
     );
     if (!introAlreadySeen) {
-      setIsTutorialOpen(true);
+      setIsTutorialOpen(LEGACY_ONBOARDING_TUTORIALS_ENABLED);
       setIsWalkthroughActive(false);
     } else {
       setIsTutorialOpen(false);
       const stepIdx = getSavedWalkthroughStepIndex(loadedProfile);
       setWalkthroughStepIndex(stepIdx);
-      setIsWalkthroughActive(!isWalkthroughCompleted(loadedProfile));
+      setIsWalkthroughActive(
+        LEGACY_ONBOARDING_TUTORIALS_ENABLED && !isWalkthroughCompleted(loadedProfile),
+      );
     }
   };
 
@@ -804,8 +809,8 @@ export default function App() {
     setProfile(newProfile);
     setActiveSection('home');
     setMobileMenuOpen(false);
-    // Step 5 of the 7-Step Flow: Open Country-Specific StoryIntro once!
-    setIsTutorialOpen(true);
+    // The legacy introduction and spotlight walkthrough are temporarily disabled.
+    setIsTutorialOpen(false);
     setIsWalkthroughActive(false);
     setWalkthroughOverrideStep(null);
     setWalkthroughStepIndex(0);
@@ -836,7 +841,7 @@ export default function App() {
     playSound('success');
 
     // Step 7 of the 7-Step Flow: Begin Chapter 1 + First Main Quest + Interactive Spotlight Walkthrough
-    if (!isWalkthroughCompleted(nextProfile)) {
+    if (LEGACY_ONBOARDING_TUTORIALS_ENABLED && !isWalkthroughCompleted(nextProfile)) {
       const stepIdx = getSavedWalkthroughStepIndex(nextProfile);
       setWalkthroughStepIndex(stepIdx);
       setWalkthroughOverrideStep(null);
@@ -1026,7 +1031,7 @@ export default function App() {
   }
 
   const handleRestartWalkthrough = () => {
-    if (!profile) return;
+    if (!LEGACY_ONBOARDING_TUTORIALS_ENABLED || !profile) return;
     resetWalkthrough();
     const stepIdx = getSavedWalkthroughStepIndex({
       ...profile,
@@ -1087,7 +1092,9 @@ export default function App() {
     );
   }
 
-  const showStoryIntroModal = isTutorialOpen || (!profile.onboarding.countryIntroSeen && !profile.onboarding.introCompleted);
+  const showStoryIntroModal = LEGACY_ONBOARDING_TUTORIALS_ENABLED && (
+    isTutorialOpen || (!profile.onboarding.countryIntroSeen && !profile.onboarding.introCompleted)
+  );
   const unlockedSections = new Set(getUnlockedSectionIds(profile));
 
   return (
@@ -1100,8 +1107,6 @@ export default function App() {
         pendingCommandCount={pendingCommandCount}
         onDaysElapsed={handleDaysElapsed}
         onOpenWardrobe={() => setIsAvatarWardrobeOpen(true)}
-        onOpenWalkthrough={handleRestartWalkthrough}
-        onOpenTutorial={() => setIsTutorialOpen(true)}
         unreadNotificationsCount={unreadNotificationsCount}
         onOpenNotifications={() => setIsNotificationModalOpen(true)}
         forceBellVibrate={forceBellVibrate}
@@ -1152,7 +1157,6 @@ export default function App() {
               onCommand={handleGameCommand}
               focusSection={cityFocusSection}
               onOpenLuckyWheel={() => setIsLuckyWheelOpen(true)}
-              onOpenTutorial={() => setIsTutorialOpen(true)}
               onOpenMorningReport={() => {
                 triggerHaptic('light');
                 const rep = offlineReport || calculateOfflineIdleProgress(profile);
@@ -1287,7 +1291,9 @@ export default function App() {
               onLogout={handleLogout}
               onResetWorld={handleResetToCountrySelection}
               onAccountDeleted={handleAccountDeleted}
-              onRestartWalkthrough={handleRestartWalkthrough}
+              onRestartWalkthrough={
+                LEGACY_ONBOARDING_TUTORIALS_ENABLED ? handleRestartWalkthrough : undefined
+              }
               onOpenWardrobe={() => setIsAvatarWardrobeOpen(true)}
               onSaveNow={() => Boolean(profile && saveGame(profile, account.id).ok)}
               onUpdateProfile={(updater) => {
@@ -1448,7 +1454,7 @@ export default function App() {
       /> */}
 
       {/* Interactive Multi-Step Spotlight Guided Walkthrough (Never grants rewards on skip or arrow click) */}
-      {!showStoryIntroModal && isWalkthroughActive && (
+      {LEGACY_ONBOARDING_TUTORIALS_ENABLED && !showStoryIntroModal && isWalkthroughActive && (
         <SpotlightWalkthrough
           currentStepIndex={walkthroughStepIndex}
           overrideStep={walkthroughOverrideStep}

@@ -54,7 +54,7 @@ export const CityHomeView: React.FC<CityHomeViewProps> = (props) => {
   const { profile, country, onNavigate, onCommand } = props;
   const [activeView, setActiveView] = useState<'3d_city' | 'dashboard'>('3d_city');
   const [selectedItem, setSelectedItem] = useState<SelectedItem | null>(null);
-  const [isNightMode, setIsNightMode] = useState(true);
+  const [isNightMode, setIsNightMode] = useState(false);
   const [cameraPreset, setCameraPreset] = useState<CityCameraPreset>(null);
   const [isBranchShopOpen, setIsBranchShopOpen] = useState(false);
   const [gridRefreshKey, setGridRefreshKey] = useState(0);

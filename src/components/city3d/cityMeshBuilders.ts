@@ -16,6 +16,8 @@ const sharedGeos = {
   sphereUnit: new THREE.SphereGeometry(0.5, 12, 10),
 };
 
+let bankNameplateMaterial: THREE.MeshBasicMaterial | null = null;
+
 /**
  * 1. Empty Plot Builder (أرض فضاء مجهزة للبيع أو غير مملوكة)
  */
@@ -962,80 +964,353 @@ export function buildHQMesh(
 export function buildBankMesh(palette: CityMaterialPalette, isSoftwareGl: boolean): THREE.Group {
   const bank = new THREE.Group();
 
-  // 1. Broad Marble Stepped Podium
-  const podium = new THREE.Mesh(new THREE.BoxGeometry(11.5, 0.9, 9.5), palette.whiteMarble);
-  podium.position.y = 0.45;
-  podium.receiveShadow = !isSoftwareGl;
-  bank.add(podium);
+  // Broad, layered podium and polished entrance approach.
+  const lowerPlinth = new THREE.Mesh(new THREE.BoxGeometry(25.8, 0.55, 18.2), palette.whiteMarble);
+  lowerPlinth.position.y = 0.28;
+  lowerPlinth.receiveShadow = !isSoftwareGl;
+  bank.add(lowerPlinth);
 
-  // Ceremonial Front Grand Stairs
-  for (let s = 0; s < 4; s++) {
-    const step = new THREE.Mesh(
-      new THREE.BoxGeometry(6.5 + s * 0.4, 0.18, 0.8),
+  const goldPlinthLine = new THREE.Mesh(new THREE.BoxGeometry(25.95, 0.09, 18.32), palette.brushedGold);
+  goldPlinthLine.position.y = 0.1;
+  bank.add(goldPlinthLine);
+
+  const upperPlinth = new THREE.Mesh(new THREE.BoxGeometry(24.9, 0.36, 17.4), palette.whiteMarble);
+  upperPlinth.position.y = 0.69;
+  bank.add(upperPlinth);
+
+  for (let step = 0; step < 5; step++) {
+    const stair = new THREE.Mesh(
+      new THREE.BoxGeometry(7.6 + step * 0.45, 0.16, 0.68),
       palette.whiteMarble
     );
-    step.position.set(0, 0.09 + s * 0.18, 4.8 + (3 - s) * 0.4);
-    bank.add(step);
+    stair.position.set(0, 0.16 + step * 0.16, 8.9 + (4 - step) * 0.48);
+    stair.receiveShadow = !isSoftwareGl;
+    bank.add(stair);
   }
 
-  // 2. Main Classical Banking Hall
-  const hall = new THREE.Mesh(new THREE.BoxGeometry(9.5, 5.2, 7.5), palette.whiteMarble);
-  hall.position.y = 3.4;
-  hall.castShadow = !isSoftwareGl;
-  bank.add(hall);
+  // 6. Two-storey navy-and-glass bank hall; its front is oriented toward +Z.
+  const bankBody = new THREE.Mesh(new THREE.BoxGeometry(24, 7.0, 15.0), palette.navyStructure);
+  bankBody.position.y = 4.15;
+  bankBody.castShadow = !isSoftwareGl;
+  bankBody.receiveShadow = !isSoftwareGl;
+  bank.add(bankBody);
 
-  // 3. Hexastyle Portico: 6 Fluted Classical Columns with Capitals & Bases
-  const colSpacing = 1.4;
-  for (let i = -2.5; i <= 2.5; i += 1.0) {
-    const cx = i * colSpacing;
+  const glassFacade = palette.curtainGlass;
+  const frontXs = [-9.6, -6.4, -3.2, 3.2, 6.4, 9.6];
+  const windowRows = [2.25, 5.05];
+  const frontWindowGeo = new THREE.BoxGeometry(2.55, 2.15, 0.1);
+  const frontWindowCount = frontXs.length * windowRows.length;
+  const frontWindows = new THREE.InstancedMesh(frontWindowGeo, glassFacade, frontWindowCount);
+  const instance = new THREE.Object3D();
+  let windowIndex = 0;
+  windowRows.forEach((y) => {
+    frontXs.forEach((x) => {
+      instance.position.set(x, y, 7.58);
+      instance.rotation.set(0, 0, 0);
+      instance.scale.set(1, 1, 1);
+      instance.updateMatrix();
+      frontWindows.setMatrixAt(windowIndex++, instance.matrix);
+    });
+  });
+  frontWindows.instanceMatrix.needsUpdate = true;
+  bank.add(frontWindows);
 
-    // Fluted shaft
-    const colShaft = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.36, 4.8, 12), palette.whiteMarble);
-    colShaft.position.set(cx, 3.3, 3.9);
-    colShaft.castShadow = !isSoftwareGl;
-    bank.add(colShaft);
+  const rearWindowGeo = new THREE.BoxGeometry(2.55, 2.15, 0.1);
+  const rearWindows = new THREE.InstancedMesh(rearWindowGeo, glassFacade, frontWindowCount);
+  windowIndex = 0;
+  windowRows.forEach((y) => {
+    frontXs.forEach((x) => {
+      instance.position.set(x, y, -7.58);
+      instance.rotation.set(0, Math.PI, 0);
+      instance.scale.set(1, 1, 1);
+      instance.updateMatrix();
+      rearWindows.setMatrixAt(windowIndex++, instance.matrix);
+    });
+  });
+  rearWindows.instanceMatrix.needsUpdate = true;
+  bank.add(rearWindows);
 
-    // Golden Corinthian Capital
-    const capital = new THREE.Mesh(new THREE.CylinderGeometry(0.44, 0.34, 0.35, 10), palette.imperialGold);
-    capital.position.set(cx, 5.75, 3.9);
-    bank.add(capital);
+  const sideWindowGeo = new THREE.BoxGeometry(2.2, 2.15, 0.1);
+  const sideWindowCount = 4 * windowRows.length;
+  [-1, 1].forEach((side) => {
+    const sideWindows = new THREE.InstancedMesh(sideWindowGeo, glassFacade, sideWindowCount);
+    let sideIndex = 0;
+    windowRows.forEach((y) => {
+      [-4.8, -1.6, 1.6, 4.8].forEach((z) => {
+        instance.position.set(side * 12.08, y, z);
+        instance.rotation.set(0, Math.PI / 2, 0);
+        instance.scale.set(1, 1, 1);
+        instance.updateMatrix();
+        sideWindows.setMatrixAt(sideIndex++, instance.matrix);
+      });
+    });
+    sideWindows.instanceMatrix.needsUpdate = true;
+    bank.add(sideWindows);
+  });
 
-    // Column Base Plinth
-    const base = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.22, 0.72), palette.whiteMarble);
-    base.position.set(cx, 0.95, 3.9);
-    bank.add(base);
+  // Fine gold horizontal belts and the continuous navy roof cornice.
+  [0.98, 3.62, 6.55].forEach((y) => {
+    const frontTrim = new THREE.Mesh(new THREE.BoxGeometry(24.7, 0.1, 0.14), palette.imperialGold);
+    frontTrim.position.set(0, y, 7.64);
+    bank.add(frontTrim);
+    const rearTrim = new THREE.Mesh(new THREE.BoxGeometry(24.7, 0.1, 0.14), palette.imperialGold);
+    rearTrim.position.set(0, y, -7.64);
+    bank.add(rearTrim);
+    [-1, 1].forEach((side) => {
+      const sideTrim = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.1, 15.0), palette.imperialGold);
+      sideTrim.position.set(side * 12.08, y, 0);
+      bank.add(sideTrim);
+    });
+  });
+
+  const roofCornice = new THREE.Mesh(new THREE.BoxGeometry(24.7, 0.24, 15.72), palette.whiteMarble);
+  roofCornice.position.y = 7.62;
+  bank.add(roofCornice);
+
+  const frontPilasterXs = [-11.2, -7.45, -3.72, 3.72, 7.45, 11.2];
+  const pilasterGeo = new THREE.BoxGeometry(0.72, 6.35, 0.78);
+  const pilasters = new THREE.InstancedMesh(pilasterGeo, palette.royalNavyMat, frontPilasterXs.length);
+  frontPilasterXs.forEach((x, index) => {
+    instance.position.set(x, 4.0, 7.82);
+    instance.rotation.set(0, 0, 0);
+    instance.scale.set(1, 1, 1);
+    instance.updateMatrix();
+    pilasters.setMatrixAt(index, instance.matrix);
+  });
+  pilasters.instanceMatrix.needsUpdate = true;
+  pilasters.castShadow = !isSoftwareGl;
+  bank.add(pilasters);
+
+  // Gold reveals frame the blue piers, matching the reference's repeated vertical rhythm.
+  const goldRevealGeo = new THREE.BoxGeometry(0.075, 5.95, 0.84);
+  const reveals = new THREE.InstancedMesh(goldRevealGeo, palette.brushedGold, frontPilasterXs.length * 2);
+  let revealIndex = 0;
+  frontPilasterXs.forEach((x) => {
+    [-0.34, 0.34].forEach((offset) => {
+      instance.position.set(x + offset, 4.0, 7.87);
+      instance.rotation.set(0, 0, 0);
+      instance.scale.set(1, 1, 1);
+      instance.updateMatrix();
+      reveals.setMatrixAt(revealIndex++, instance.matrix);
+    });
+  });
+  reveals.instanceMatrix.needsUpdate = true;
+  bank.add(reveals);
+
+  // Lotus-like capitals: a shared low-poly leaf shape instanced across the frontage.
+  const petalShape = new THREE.Shape();
+  petalShape.moveTo(0, 0);
+  petalShape.quadraticCurveTo(-0.18, 0.28, 0, 0.68);
+  petalShape.quadraticCurveTo(0.18, 0.28, 0, 0);
+  const petalGeo = new THREE.ShapeGeometry(petalShape, 6);
+  const capitalPetals = new THREE.InstancedMesh(
+    petalGeo,
+    palette.imperialGold,
+    frontPilasterXs.length * 5
+  );
+  let petalIndex = 0;
+  frontPilasterXs.forEach((x) => {
+    const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.38, 0.42, 8), palette.imperialGold);
+    cap.position.set(x, 6.88, 8.0);
+    bank.add(cap);
+    const capAbacus = new THREE.Mesh(new THREE.BoxGeometry(1.05, 0.16, 1.02), palette.brushedGold);
+    capAbacus.position.set(x, 7.14, 8.0);
+    bank.add(capAbacus);
+
+    [-0.86, -0.43, 0, 0.43, 0.86].forEach((angle) => {
+      instance.position.set(x + Math.sin(angle) * 0.24, 6.78, 8.43);
+      instance.rotation.set(0, 0, angle);
+      instance.scale.set(0.9, 0.82, 1);
+      instance.updateMatrix();
+      capitalPetals.setMatrixAt(petalIndex++, instance.matrix);
+    });
+
+    const baseRing = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.22, 1.0), palette.brushedGold);
+    baseRing.position.set(x, 1.0, 8.0);
+    bank.add(baseRing);
+  });
+  capitalPetals.instanceMatrix.needsUpdate = true;
+  bank.add(capitalPetals);
+
+  // Repeating crown/rosette reliefs in the upper fascia.
+  const rosetteGeo = new THREE.OctahedronGeometry(0.22, 0);
+  const rosettes = new THREE.InstancedMesh(rosetteGeo, palette.imperialGold, 11);
+  for (let index = 0; index < 11; index++) {
+    const x = -10 + index * 2;
+    instance.position.set(x, 7.42, 8.12);
+    instance.rotation.set(0, Math.PI / 4, 0);
+    instance.scale.set(1.15, 1.2, 0.5);
+    instance.updateMatrix();
+    rosettes.setMatrixAt(index, instance.matrix);
+  }
+  rosettes.instanceMatrix.needsUpdate = true;
+  bank.add(rosettes);
+
+  // Central glazed entrance with gold mullions and a bilingual Suly nameplate.
+  const entryFrame = new THREE.Mesh(new THREE.BoxGeometry(4.1, 3.55, 0.32), palette.brushedGold);
+  entryFrame.position.set(0, 2.3, 7.98);
+  bank.add(entryFrame);
+  const entryGlass = new THREE.Mesh(new THREE.BoxGeometry(3.72, 3.25, 0.12), palette.curtainGlass);
+  entryGlass.position.set(0, 2.3, 8.18);
+  bank.add(entryGlass);
+  const doorSplit = new THREE.Mesh(new THREE.BoxGeometry(0.075, 3.18, 0.08), palette.imperialGold);
+  doorSplit.position.set(0, 2.3, 8.27);
+  bank.add(doorSplit);
+  [-0.35, 0.35].forEach((x) => {
+    const handle = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.58, 0.08), palette.imperialGold);
+    handle.position.set(x, 2.18, 8.29);
+    bank.add(handle);
+  });
+
+  const signFrame = new THREE.Mesh(new THREE.BoxGeometry(8.5, 1.66, 0.32), palette.brushedGold);
+  signFrame.position.set(0, 5.2, 8.08);
+  bank.add(signFrame);
+  const signBacking = new THREE.Mesh(new THREE.BoxGeometry(8.24, 1.42, 0.16), palette.royalNavyMat);
+  signBacking.position.set(0, 5.2, 8.29);
+  bank.add(signBacking);
+
+  if (!bankNameplateMaterial && typeof document !== 'undefined') {
+    const canvas = document.createElement('canvas');
+    canvas.width = 1024;
+    canvas.height = 240;
+    const context = canvas.getContext('2d');
+    if (context) {
+      context.fillStyle = '#102244';
+      context.fillRect(0, 0, canvas.width, canvas.height);
+      context.strokeStyle = '#c89b45';
+      context.lineWidth = 12;
+      context.strokeRect(12, 12, canvas.width - 24, canvas.height - 24);
+      context.fillStyle = '#f4d58a';
+      context.textAlign = 'center';
+      context.textBaseline = 'middle';
+      context.direction = 'ltr';
+      context.font = 'bold 68px Georgia, serif';
+      context.fillText('Suly Islamic Bank', 512, 82);
+      context.direction = 'rtl';
+      context.font = 'bold 42px Arial, sans-serif';
+      context.fillText('بنك Suly الإسلامي', 512, 166);
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      bankNameplateMaterial = new THREE.MeshBasicMaterial({ map: texture, toneMapped: false });
+    }
+  }
+  if (bankNameplateMaterial) {
+    const sign = new THREE.Mesh(new THREE.PlaneGeometry(7.95, 1.28), bankNameplateMaterial);
+    sign.position.set(0, 5.2, 8.39);
+    bank.add(sign);
   }
 
-  // 4. Triangular Classical Pediment with Imperial Gold Relief
-  const pediment = new THREE.Mesh(new THREE.ConeGeometry(5.8, 2.6, 4), palette.whiteMarble);
-  pediment.rotation.y = Math.PI / 4;
-  pediment.position.set(0, 7.1, 2.2);
-  bank.add(pediment);
+  // Rear elevation echoes the blue central panel and balanced glass wings in the reference.
+  const rearPanel = new THREE.Mesh(new THREE.BoxGeometry(8.0, 5.5, 0.34), palette.royalNavyMat);
+  rearPanel.position.set(0, 4.2, -7.72);
+  bank.add(rearPanel);
+  [0.95, 3.55, 6.55].forEach((y) => {
+    const rearTrim = new THREE.Mesh(new THREE.BoxGeometry(24.4, 0.1, 0.2), palette.imperialGold);
+    rearTrim.position.set(0, y, -7.91);
+    bank.add(rearTrim);
+  });
 
-  // Golden Relief Medallion in Pediment Tympanum
-  const medallion = new THREE.Mesh(new THREE.CylinderGeometry(0.75, 0.75, 0.15, 16), palette.imperialGold);
-  medallion.rotation.x = Math.PI / 2;
-  medallion.position.set(0, 6.7, 4.15);
-  bank.add(medallion);
+  // 7. Roof terraces, parapets and raised service wings visible from above and from the sides.
+  const roofDeck = new THREE.Mesh(new THREE.BoxGeometry(25.0, 0.36, 16.0), palette.whiteMarble);
+  roofDeck.position.set(0, 7.83, 0);
+  bank.add(roofDeck);
+  [-8.0, 8.0].forEach((x) => {
+    const rooftopWing = new THREE.Mesh(new THREE.BoxGeometry(4.4, 1.5, 8.8), palette.whiteMarble);
+    rooftopWing.position.set(x, 8.72, -1.15);
+    bank.add(rooftopWing);
+    const wingCoping = new THREE.Mesh(new THREE.BoxGeometry(4.55, 0.16, 8.95), palette.brushedGold);
+    wingCoping.position.set(x, 9.52, -1.15);
+    bank.add(wingCoping);
+  });
 
-  // 5. Majestic Golden Ribbed Dome with Balustrade Lantern
-  const domeBase = new THREE.Mesh(new THREE.CylinderGeometry(2.8, 2.9, 0.8, 16), palette.whiteMarble);
-  domeBase.position.set(0, 6.3, 0);
+  const domeDrum = new THREE.Mesh(new THREE.BoxGeometry(12.5, 2.35, 10.4), palette.royalNavyMat);
+  domeDrum.position.set(0, 9.12, -0.15);
+  domeDrum.castShadow = !isSoftwareGl;
+  bank.add(domeDrum);
+  [8.0, 10.2].forEach((y) => {
+    const drumBelt = new THREE.Mesh(new THREE.BoxGeometry(12.9, 0.12, 10.8), palette.imperialGold);
+    drumBelt.position.set(0, y, -0.15);
+    bank.add(drumBelt);
+  });
+
+  const drumWindows = new THREE.InstancedMesh(new THREE.BoxGeometry(1.08, 1.2, 0.12), palette.curtainGlass, 12);
+  for (let index = 0; index < 6; index++) {
+    [-1, 1].forEach((side) => {
+      instance.position.set(-5 + index * 2, 9.05, side * 5.43 - 0.15);
+      instance.rotation.set(0, side < 0 ? Math.PI : 0, 0);
+      instance.scale.set(1, 1, 1);
+      instance.updateMatrix();
+      drumWindows.setMatrixAt(index * 2 + (side < 0 ? 1 : 0), instance.matrix);
+    });
+  }
+  drumWindows.instanceMatrix.needsUpdate = true;
+  bank.add(drumWindows);
+
+  const domeBase = new THREE.Mesh(new THREE.CylinderGeometry(5.75, 5.9, 0.48, 32), palette.imperialGold);
+  domeBase.position.set(0, 10.37, -0.15);
   bank.add(domeBase);
+  const domeRing = new THREE.Mesh(new THREE.TorusGeometry(5.66, 0.12, 6, 40), palette.brushedGold);
+  domeRing.rotation.x = Math.PI / 2;
+  domeRing.position.set(0, 10.62, -0.15);
+  bank.add(domeRing);
 
-  const dome = new THREE.Mesh(new THREE.SphereGeometry(2.6, 16, 12, 0, Math.PI * 2, 0, Math.PI / 2), palette.imperialGold);
-  dome.position.set(0, 6.7, 0);
+  const domeRadius = 5.55;
+  const dome = new THREE.Mesh(
+    new THREE.SphereGeometry(domeRadius, 32, 20, 0, Math.PI * 2, 0, Math.PI / 2),
+    palette.imperialGold
+  );
+  dome.position.set(0, 10.62, -0.15);
+  dome.castShadow = !isSoftwareGl;
   bank.add(dome);
 
-  // Dome Lantern Finial
-  const lantern = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 1.2, 8), palette.imperialGold);
-  lantern.position.set(0, 9.6, 0);
-  bank.add(lantern);
+  for (let rib = 0; rib < 16; rib++) {
+    const phi = (rib * Math.PI * 2) / 16;
+    const points: THREE.Vector3[] = [];
+    for (let segment = 0; segment <= 12; segment++) {
+      const theta = Math.PI / 2 - (segment / 12) * (Math.PI / 2 - 0.035);
+      points.push(
+        new THREE.Vector3(
+          Math.sin(theta) * domeRadius * Math.cos(phi),
+          10.62 + Math.cos(theta) * domeRadius,
+          -0.15 + Math.sin(theta) * domeRadius * Math.sin(phi)
+        )
+      );
+    }
+    const ribCurve = new THREE.CatmullRomCurve3(points);
+    const ribMesh = new THREE.Mesh(
+      new THREE.TubeGeometry(ribCurve, 20, 0.045, 5, false),
+      palette.brushedGold
+    );
+    bank.add(ribMesh);
+  }
 
-  // 6. Armored Security Vault Wing & Live Financial LED Ticker
-  const tickerScreen = new THREE.Mesh(new THREE.BoxGeometry(8.2, 0.38, 0.15), palette.neonCyan);
-  tickerScreen.position.set(0, 1.6, 4.75);
-  bank.add(tickerScreen);
+  [Math.PI / 3, Math.PI / 6].forEach((theta) => {
+    const horizontalRadius = domeRadius * Math.sin(theta);
+    const ring = new THREE.Mesh(
+      new THREE.TorusGeometry(horizontalRadius, 0.055, 5, 40),
+      palette.brushedGold
+    );
+    ring.rotation.x = Math.PI / 2;
+    ring.position.set(0, 10.62 + domeRadius * Math.cos(theta), -0.15);
+    bank.add(ring);
+  });
+
+  // Three-tiered golden finial and pointed crescent-shaped spire.
+  const finialBase = new THREE.Mesh(new THREE.CylinderGeometry(0.86, 0.86, 0.18, 16), palette.brushedGold);
+  finialBase.position.set(0, 16.2, -0.15);
+  bank.add(finialBase);
+  const lantern = new THREE.Mesh(new THREE.CylinderGeometry(0.48, 0.62, 0.92, 12), palette.imperialGold);
+  lantern.position.set(0, 16.72, -0.15);
+  bank.add(lantern);
+  const lanternCap = new THREE.Mesh(new THREE.ConeGeometry(0.58, 0.82, 12), palette.imperialGold);
+  lanternCap.position.set(0, 17.55, -0.15);
+  bank.add(lanternCap);
+  const spire = new THREE.Mesh(new THREE.ConeGeometry(0.25, 1.35, 10), palette.brushedGold);
+  spire.position.set(0, 18.58, -0.15);
+  bank.add(spire);
+  const spireTip = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.72, 8), palette.imperialGold);
+  spireTip.position.set(0, 19.58, -0.15);
+  bank.add(spireTip);
 
   return bank;
 }
@@ -1632,109 +1907,240 @@ export function buildStartupIncubatorMesh(palette: CityMaterialPalette, isSoftwa
  */
 export function buildMaritimePortMesh(palette: CityMaterialPalette, isSoftwareGl: boolean): THREE.Group {
   const group = new THREE.Group();
+  group.name = 'suly_container_port_terminal';
 
-  // Concrete Harbor Quayside Pier
-  const pier = new THREE.Mesh(new THREE.BoxGeometry(16, 0.6, 12), palette.slateStructure);
-  pier.position.set(-2, 0.3, 0);
-  pier.receiveShadow = !isSoftwareGl;
-  group.add(pier);
+  // The land yard is deliberately kept west of the x=65 service road so it
+  // does not overlap the existing factory or logistics warehouse.
+  const yardSlab = new THREE.Mesh(new THREE.BoxGeometry(8.1, 0.42, 54), palette.slateStructure);
+  yardSlab.position.set(-17.05, 0.21, 3);
+  yardSlab.receiveShadow = !isSoftwareGl;
+  group.add(yardSlab);
+  const yardApron = new THREE.Mesh(new THREE.BoxGeometry(7.85, 0.04, 53.7), palette.plazaPaver);
+  yardApron.position.set(-17.05, 0.44, 3);
+  yardApron.receiveShadow = !isSoftwareGl;
+  group.add(yardApron);
 
-  // Deep Water Basin alongside Pier
-  const waterBasin = new THREE.Mesh(new THREE.BoxGeometry(14, 0.2, 14), palette.harborWater);
-  waterBasin.position.set(6, 0.1, 0);
-  group.add(waterBasin);
+  // Quay sits east of the seawall; its deck forms a continuous berth for ships.
+  const quay = new THREE.Mesh(new THREE.BoxGeometry(14, 0.4, 56), palette.slateStructure);
+  quay.position.set(3.5, 0.2, 3);
+  quay.receiveShadow = !isSoftwareGl;
+  group.add(quay);
+  const quayTop = new THREE.Mesh(new THREE.BoxGeometry(13.7, 0.05, 55.7), palette.plazaPaver);
+  quayTop.position.set(3.5, 0.425, 3);
+  group.add(quayTop);
 
-  // Moored Cargo Container Ship
-  const shipGroup = new THREE.Group();
-  shipGroup.position.set(7, 0.5, 0);
+  // Port access apron continues the existing east-west road through the seawall opening.
+  const accessRamp = new THREE.Mesh(new THREE.BoxGeometry(10, 0.16, 7.6), palette.asphalt);
+  accessRamp.position.set(-8, 0.25, 3);
+  accessRamp.rotation.z = Math.atan2(0.28, 10);
+  accessRamp.name = 'port_access_ramp';
+  group.add(accessRamp);
+  const accessRoad = new THREE.Mesh(new THREE.BoxGeometry(13, 0.12, 7.6), palette.asphalt);
+  accessRoad.position.set(3.5, 0.51, 3);
+  accessRoad.name = 'port_access_road';
+  accessRoad.receiveShadow = !isSoftwareGl;
+  group.add(accessRoad);
+  const accessCenterLine = new THREE.Mesh(new THREE.BoxGeometry(12, 0.025, 0.14), palette.roadLine);
+  accessCenterLine.position.set(3.5, 0.58, 3);
+  group.add(accessCenterLine);
 
-  // Ship Hull
-  const hull = new THREE.Mesh(new THREE.BoxGeometry(4.2, 1.4, 11), palette.navyStructure);
-  hull.position.y = 0.7;
-  shipGroup.add(hull);
+  // Shipping containers use four InstancedMeshes instead of dozens of draw calls.
+  const yardContainerGeometry = new THREE.BoxGeometry(3.6, 2, 5.2);
+  const containerMaterials = [palette.containerBlue, palette.containerRed, palette.containerYellow, palette.containerGreen];
+  const containerPositions: THREE.Vector3[][] = containerMaterials.map(() => []);
+  const containerRows = [-20, -12, -4, 12, 20, 26];
+  const containerColumns = [-18.5, -14.5];
+  containerRows.forEach((z, row) => {
+    containerColumns.forEach((x, column) => {
+      const levels = 1 + ((row + column) % 3 === 0 ? 1 : 0) + ((row * 2 + column) % 7 === 0 ? 1 : 0);
+      for (let level = 0; level < levels; level++) {
+        const materialIndex = (row + column + level) % containerMaterials.length;
+        containerPositions[materialIndex].push(new THREE.Vector3(x, 0.46 + 1 + level * 2.03, z));
+      }
+    });
+  });
+  const containerTransform = new THREE.Object3D();
+  containerPositions.forEach((positions, materialIndex) => {
+    if (positions.length === 0) return;
+    const stacks = new THREE.InstancedMesh(yardContainerGeometry, containerMaterials[materialIndex], positions.length);
+    stacks.name = `port_yard_containers_${materialIndex}`;
+    stacks.castShadow = !isSoftwareGl;
+    stacks.receiveShadow = true;
+    positions.forEach((position, index) => {
+      containerTransform.position.copy(position);
+      containerTransform.rotation.set(0, 0, 0);
+      containerTransform.scale.set(1, 1, 1);
+      containerTransform.updateMatrix();
+      stacks.setMatrixAt(index, containerTransform.matrix);
+    });
+    stacks.instanceMatrix.needsUpdate = true;
+    group.add(stacks);
+  });
 
-  // Ship Bow taper
-  const bow = new THREE.Mesh(new THREE.ConeGeometry(2.1, 2.6, 4), palette.navyStructure);
-  bow.rotation.x = Math.PI / 2;
-  bow.rotation.y = Math.PI / 4;
-  bow.position.set(0, 0.7, 6.2);
-  shipGroup.add(bow);
-
-  // Ship Bridge / Deckhouse
-  const bridge = new THREE.Mesh(new THREE.BoxGeometry(3.2, 2.2, 2.2), palette.whiteMarble);
-  bridge.position.set(0, 2.2, -3.2);
-  shipGroup.add(bridge);
-
-  const exhaustFunnel = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.45, 1.6, 8), palette.containerRed);
-  exhaustFunnel.position.set(0, 3.8, -3.2);
-  shipGroup.add(exhaustFunnel);
-
-  // Containers stacked on the freighter
-  const shipContainerColors = [palette.containerRed, palette.containerBlue, palette.containerYellow, palette.containerGreen];
-  for (let r = 0; r < 3; r++) {
-    for (let c = 0; c < 2; c++) {
-      const cont = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.9, 2.4), shipContainerColors[(r + c) % 4]);
-      cont.position.set((c - 0.5) * 1.5, 1.85, (r - 0.5) * 2.5);
-      shipGroup.add(cont);
-    }
+  // Safety-striped quay edge bollards leave the access lane open.
+  const bollardGeometry = new THREE.CylinderGeometry(0.18, 0.24, 0.75, 8);
+  for (let z = -22; z <= 28; z += 6) {
+    if (Math.abs(z - 3) < 6) continue;
+    const bollard = new THREE.Mesh(bollardGeometry, palette.craneSteel);
+    bollard.position.set(10, 0.76, z);
+    bollard.castShadow = !isSoftwareGl;
+    group.add(bollard);
   }
-  group.add(shipGroup);
 
-  // Giant Container Gantry Crane on Pier
-  const craneGroup = new THREE.Group();
-  craneGroup.position.set(-2, 0.6, -1);
+  // Four ship-to-shore gantry cranes with A-frame legs, long booms, cabins and hooks.
+  const addBrace = (parent: THREE.Group, x1: number, y1: number, x2: number, y2: number, z: number) => {
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+    const brace = new THREE.Mesh(
+      new THREE.BoxGeometry(Math.hypot(dx, dy), 0.28, 0.28),
+      palette.craneSteel,
+    );
+    brace.position.set((x1 + x2) / 2, (y1 + y2) / 2, z);
+    brace.rotation.z = Math.atan2(dy, dx);
+    parent.add(brace);
+  };
 
-  // Four Crane Legs
-  [[-1.8, -1.8], [1.8, -1.8], [-1.8, 1.8], [1.8, 1.8]].forEach(([lx, lz]) => {
-    const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.16, 7.5, 6), palette.constructionYellow);
-    leg.position.set(lx, 3.75, lz);
-    craneGroup.add(leg);
+  const cranePositions = [-17, -8, 12, 22];
+  cranePositions.forEach((z, craneIndex) => {
+    const crane = new THREE.Group();
+    crane.name = `port_gantry_crane_${craneIndex + 1}`;
+    crane.position.set(5, 0, z);
+
+    const legGeometry = new THREE.BoxGeometry(0.72, 10.4, 0.78);
+    [[-4, -1.8], [-4, 1.8], [4, -1.8], [4, 1.8]].forEach(([x, legZ]) => {
+      const leg = new THREE.Mesh(legGeometry, palette.constructionYellow);
+      leg.position.set(x, 5.35, legZ);
+      leg.castShadow = !isSoftwareGl;
+      crane.add(leg);
+    });
+
+    const portalBeam = new THREE.Mesh(new THREE.BoxGeometry(9, 0.85, 0.95), palette.constructionYellow);
+    portalBeam.position.set(0, 10.5, 0);
+    crane.add(portalBeam);
+    [-4, 4].forEach((x) => {
+      const crossTie = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.58, 4.4), palette.craneSteel);
+      crossTie.position.set(x, 9.7, 0);
+      crane.add(crossTie);
+    });
+
+    // Main boom reaches from the berth out above the ship lane.
+    const boom = new THREE.Mesh(new THREE.BoxGeometry(28, 0.58, 0.88), palette.constructionYellow);
+    boom.position.set(9, 11.25, 0);
+    boom.castShadow = !isSoftwareGl;
+    crane.add(boom);
+    const counterJib = new THREE.Mesh(new THREE.BoxGeometry(7, 0.65, 0.9), palette.constructionYellow);
+    counterJib.position.set(-4.8, 11.2, 0);
+    crane.add(counterJib);
+    [-1.8, 1.8].forEach((braceZ) => {
+      addBrace(crane, -4, 1, 0, 9.8, braceZ);
+      addBrace(crane, 4, 1, 0, 9.8, braceZ);
+    });
+
+    const cabin = new THREE.Mesh(new THREE.BoxGeometry(2.4, 1.8, 2.2), palette.whiteMarble);
+    cabin.position.set(2, 8.9, 0);
+    crane.add(cabin);
+    const cabinGlass = new THREE.Mesh(new THREE.BoxGeometry(2.42, 0.82, 0.08), palette.curtainGlass);
+    cabinGlass.position.set(2, 9.05, 1.14);
+    crane.add(cabinGlass);
+
+    const trolley = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.6, 1.35), palette.craneSteel);
+    trolley.position.set(16, 10.85, 0);
+    crane.add(trolley);
+    const hoistCable = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.055, 4.8, 6), palette.navyStructure);
+    hoistCable.position.set(16, 8.1, 0);
+    crane.add(hoistCable);
+    if (craneIndex === 1) {
+      const suspendedContainer = new THREE.Mesh(new THREE.BoxGeometry(3.1, 1.45, 4.4), palette.containerYellow);
+      suspendedContainer.position.set(16, 5.1, 0);
+      crane.add(suspendedContainer);
+    }
+
+    group.add(crane);
   });
 
-  // Crane Horizontal Beam spanning to water
-  const beam = new THREE.Mesh(new THREE.BoxGeometry(10, 0.8, 1.2), palette.constructionYellow);
-  beam.position.set(2.8, 7.8, 0);
-  craneGroup.add(beam);
+  // Two low-profile container vessels sit outside the quay with clear water between them.
+  const addCargoShip = (name: string, x: number, z: number, width: number, length: number, colorIndex: number) => {
+    const ship = new THREE.Group();
+    ship.name = name;
+    ship.position.set(x, 0, z);
 
-  // Crane Operator Cabin
-  const cabin = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.1, 1.2), palette.whiteMarble);
-  cabin.position.set(1.5, 6.8, 0);
-  craneGroup.add(cabin);
+    const hull = new THREE.Mesh(new THREE.BoxGeometry(width, 1.8, length), palette.navyStructure);
+    hull.position.y = 0.95;
+    hull.castShadow = !isSoftwareGl;
+    ship.add(hull);
+    const waterline = new THREE.Mesh(new THREE.BoxGeometry(width + 0.1, 0.24, length - 1), palette.safetyOrange);
+    waterline.position.y = 0.42;
+    ship.add(waterline);
+    const bow = new THREE.Mesh(new THREE.ConeGeometry(width * 0.58, 3.4, 4), palette.navyStructure);
+    bow.rotation.x = Math.PI / 2;
+    bow.rotation.y = Math.PI / 4;
+    bow.position.set(0, 0.95, length / 2 + 1.45);
+    ship.add(bow);
 
-  group.add(craneGroup);
+    const bridgeZ = -length * 0.3;
+    const bridge = new THREE.Mesh(new THREE.BoxGeometry(width * 0.72, 3.7, 4.4), palette.whiteMarble);
+    bridge.position.set(0, 3.45, bridgeZ);
+    ship.add(bridge);
+    const bridgeWindows = new THREE.Mesh(new THREE.BoxGeometry(width * 0.7, 0.8, 0.08), palette.curtainGlass);
+    bridgeWindows.position.set(0, 4.05, bridgeZ + 2.25);
+    ship.add(bridgeWindows);
+    const funnel = new THREE.Mesh(new THREE.CylinderGeometry(0.48, 0.6, 1.8, 8), palette.containerRed);
+    funnel.position.set(width * 0.2, 5.35, bridgeZ - 0.4);
+    ship.add(funnel);
 
-  // Stacked Containers on Land
-  const landStacks = [
-    [-6, 0.6, -3, palette.containerBlue],
-    [-6, 1.5, -3, palette.containerRed],
-    [-4, 0.6, -3, palette.containerYellow],
-    [-6, 0.6, 2, palette.containerGreen],
-    [-4, 0.6, 2, palette.containerBlue],
-    [-4, 1.5, 2, palette.containerRed],
-  ];
-  landStacks.forEach(([cx, cy, cz, mat]) => {
-    const cMesh = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.9, 2.8), mat as THREE.Material);
-    cMesh.position.set(cx as number, (cy as number) + 0.45, cz as number);
-    cMesh.castShadow = !isSoftwareGl;
-    group.add(cMesh);
+    const shipContainerMaterials = [palette.containerRed, palette.containerBlue, palette.containerYellow, palette.containerGreen];
+    const rows = length > 21 ? [-2, 3.5, 9] : [-1, 5, 10];
+    rows.forEach((rowZ, row) => {
+      [-1, 1].forEach((side, column) => {
+        const container = new THREE.Mesh(
+          new THREE.BoxGeometry(width * 0.34, 1.65, 4.8),
+          shipContainerMaterials[(row + column + colorIndex) % shipContainerMaterials.length],
+        );
+        container.position.set(side * width * 0.2, 2.7, rowZ);
+        ship.add(container);
+      });
+    });
+    group.add(ship);
+  };
+
+  addCargoShip('port_cargo_ship_main', 23, -8, 8.4, 24, 0);
+  addCargoShip('port_cargo_ship_outer', 43, 10, 7.2, 20, 2);
+
+  // A striped harbor lighthouse anchors the southern tip of the quay.
+  const lighthouseX = 9;
+  const lighthouseZ = -24;
+  const lighthouseBase = new THREE.Mesh(new THREE.CylinderGeometry(0.95, 1.45, 8.5, 14), palette.whiteMarble);
+  lighthouseBase.position.set(lighthouseX, 4.65, lighthouseZ);
+  lighthouseBase.castShadow = !isSoftwareGl;
+  group.add(lighthouseBase);
+  [3.1, 6.3].forEach((y) => {
+    const band = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.27, 0.52, 14), palette.safetyOrange);
+    band.position.set(lighthouseX, y, lighthouseZ);
+    group.add(band);
   });
-
-  // Coastal Lighthouse on corner with beacon
-  const lighthouse = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 1.4, 9, 14), palette.whiteMarble);
-  lighthouse.position.set(-7.5, 4.8, 4.5);
-  group.add(lighthouse);
-
-  const lightLantern = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 0.9, 1.2, 12), palette.curtainGlass);
-  lightLantern.position.set(-7.5, 9.8, 4.5);
+  const lightLantern = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 1.2, 12), palette.curtainGlass);
+  lightLantern.position.set(lighthouseX, 9.5, lighthouseZ);
   group.add(lightLantern);
-
-  const lightDome = new THREE.Mesh(new THREE.ConeGeometry(1.1, 0.8, 12), palette.copperAccent);
-  lightDome.position.set(-7.5, 10.7, 4.5);
+  const lightDome = new THREE.Mesh(new THREE.ConeGeometry(1.2, 0.9, 12), palette.copperAccent);
+  lightDome.position.set(lighthouseX, 10.55, lighthouseZ);
   group.add(lightDome);
-
-  const beaconLight = new THREE.Mesh(new THREE.SphereGeometry(0.4, 8, 8), palette.beaconGlow);
-  beaconLight.position.set(-7.5, 9.8, 4.5);
+  const beaconLight = new THREE.Mesh(new THREE.SphereGeometry(0.38, 8, 8), palette.beaconGlow);
+  beaconLight.position.set(lighthouseX, 9.5, lighthouseZ);
   group.add(beaconLight);
+
+  // Buoys mark the open channel without filling the water around the vessels.
+  [-12, 8, 28].forEach((z, index) => {
+    const buoy = new THREE.Group();
+    buoy.name = `harbor_channel_buoy_${index + 1}`;
+    buoy.position.set(31, 0, z);
+    const float = new THREE.Mesh(new THREE.SphereGeometry(0.62, 8, 6), index % 2 ? palette.constructionYellow : palette.safetyOrange);
+    float.position.y = 0.48;
+    buoy.add(float);
+    const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.12, 1.1, 6), palette.whiteMarble);
+    mast.position.y = 1.24;
+    buoy.add(mast);
+    group.add(buoy);
+  });
 
   return group;
 }

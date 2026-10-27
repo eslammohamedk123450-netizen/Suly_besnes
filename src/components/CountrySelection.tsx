@@ -347,7 +347,7 @@ export function CountrySelection({
                   تعديل الدولة
                 </button>
                 <button className="button button-primary button-start flex-1" type="button" onClick={handleFinalStart}>
-                  <span>مشاهدة مقدمة {selectedCountry.name} واستلام الأصول</span>
+                  <span>استلام الأصول وبدء اللعب</span>
                   <Icon name="arrow" size={19} />
                 </button>
               </div>

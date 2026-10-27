@@ -8,7 +8,7 @@ import * as THREE from 'three';
 import {
   classifyIndustryToFacility,
   resolvePlotVisualStage,
-  CITY_WORLD_REGISTRY,
+  CITY_WORLD_CONFIG,
   DISTRICT_VISUAL_THEMES,
 } from './cityWorldData';
 import {
@@ -22,6 +22,7 @@ import {
   buildActiveConstructionMesh,
   buildHQMesh,
   buildBankMesh,
+  buildMaritimePortMesh,
   buildFactoryMesh,
   buildStoreMesh,
   buildWarehouseMesh,
@@ -70,15 +71,16 @@ describe('City 3D World & Architecture Data Model', () => {
     expect(resolvePlotVisualStage('completed')).toBe('completed');
   });
 
-  it('provides extensible multi-city and district metadata', () => {
-    const cairo = CITY_WORLD_REGISTRY['cairo_central'];
-    expect(cairo).toBeDefined();
-    expect(cairo.districts.length).toBeGreaterThanOrEqual(4);
-    expect(cairo.districts.some((d) => d.id === 'district_downtown')).toBe(true);
-    expect(cairo.districts.some((d) => d.id === 'district_industrial')).toBe(true);
-    expect(cairo.districts.some((d) => d.id === 'district_logistics')).toBe(true);
-    expect(cairo.districts.some((d) => d.id === 'district_innovation')).toBe(true);
-
+  it('provides consistent world, harbor, and district metadata', () => {
+    expect(CITY_WORLD_CONFIG.worldRadius).toBeGreaterThan(130);
+    expect(CITY_WORLD_CONFIG.coastlineX).toBeGreaterThanOrEqual(70);
+    expect(CITY_WORLD_CONFIG.harborWaterSize.width).toBeGreaterThan(100);
+    expect(CITY_WORLD_CONFIG.harborWaterSize.depth).toBeGreaterThan(180);
+    expect(CITY_WORLD_CONFIG.districts.length).toBeGreaterThanOrEqual(6);
+    expect(CITY_WORLD_CONFIG.districts.some((d) => d.id === 'district_downtown')).toBe(true);
+    expect(CITY_WORLD_CONFIG.districts.some((d) => d.id === 'district_maritime_industrial')).toBe(true);
+    expect(CITY_WORLD_CONFIG.districts.some((d) => d.id === 'district_tech_valley')).toBe(true);
+    expect(CITY_WORLD_CONFIG.districts.some((d) => d.id === 'district_luxury_coast')).toBe(true);
     expect(DISTRICT_VISUAL_THEMES['district_downtown'].accentColor).toBe('#f59e0b');
   });
 });
@@ -118,10 +120,31 @@ describe('City 3D Procedural Mesh Builders', () => {
     }
   });
 
-  it('builds central bank with classical columns and pediment', () => {
+  it('builds the Suly Islamic Bank with its glass facade, gold dome, and multi-view footprint', () => {
     const bank = buildBankMesh(palette, true);
     expect(bank).toBeInstanceOf(THREE.Group);
-    expect(bank.children.length).toBeGreaterThanOrEqual(6);
+    expect(bank.children.length).toBeGreaterThan(40);
+    bank.updateMatrixWorld(true);
+    const size = new THREE.Box3().setFromObject(bank).getSize(new THREE.Vector3());
+    expect(size.x).toBeGreaterThan(25);
+    expect(size.y).toBeGreaterThan(19);
+    expect(size.z).toBeGreaterThan(20);
+  });
+
+  it('builds a widened container terminal with cranes, ships, and instanced yard cargo', () => {
+    const port = buildMaritimePortMesh(palette, true);
+    expect(port).toBeInstanceOf(THREE.Group);
+    expect(port.getObjectByName('port_gantry_crane_4')).toBeDefined();
+    expect(port.getObjectByName('port_cargo_ship_main')).toBeDefined();
+    expect(port.getObjectByName('port_cargo_ship_outer')).toBeDefined();
+    expect(port.getObjectByName('port_access_road')).toBeDefined();
+    expect(port.getObjectByName('port_yard_containers_0')).toBeInstanceOf(THREE.InstancedMesh);
+
+    port.updateMatrixWorld(true);
+    const size = new THREE.Box3().setFromObject(port).getSize(new THREE.Vector3());
+    expect(size.x).toBeGreaterThan(60);
+    expect(size.y).toBeGreaterThan(11);
+    expect(size.z).toBeGreaterThan(50);
   });
 
   it('builds factory with dual smokestacks and smoke emitter positions', () => {
@@ -160,10 +183,18 @@ describe('City 3D Procedural Mesh Builders', () => {
       expect(v.speed).toBeGreaterThan(0);
       expect(v.mesh).toBeInstanceOf(THREE.Group);
     });
+
+    const water = roadNetwork.group.getObjectByName('expanded_harbor_water') as THREE.Mesh<THREE.PlaneGeometry>;
+    const seawall = roadNetwork.group.getObjectByName('harbor_seawall_sections') as THREE.InstancedMesh;
+    expect(water.geometry.parameters.width).toBe(CITY_WORLD_CONFIG.harborWaterSize.width);
+    expect(water.position.x - CITY_WORLD_CONFIG.harborWaterSize.width / 2).toBe(CITY_WORLD_CONFIG.coastlineX);
+    expect(seawall.count).toBeLessThan(seawall.instanceMatrix.count);
+    expect(roadNetwork.vehicles.filter((v) => v.axis === 'x').every((v) =>
+      v.min === -CITY_WORLD_CONFIG.coastlineX && v.max === CITY_WORLD_CONFIG.coastlineX
+    )).toBe(true);
   });
 
   it('disposes materials palette cleanly without throwing', () => {
     expect(() => disposeCityMaterialPalette(palette)).not.toThrow();
   });
 });
-

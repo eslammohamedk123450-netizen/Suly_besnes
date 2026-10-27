@@ -5,6 +5,7 @@
 
 import * as THREE from 'three';
 import type { CityMaterialPalette } from './cityMaterials';
+import { CITY_WORLD_CONFIG } from './cityWorldData';
 
 export interface TrafficVehicle {
   mesh: THREE.Group;
@@ -393,6 +394,8 @@ export function buildCityRoadNetwork(
 ): CityRoadNetworkResult {
   const roadGroup = new THREE.Group();
   const vehicles: TrafficVehicle[] = [];
+  const coastlineX = CITY_WORLD_CONFIG.coastlineX;
+  const eastWestRoadLength = coastlineX * 2;
 
   // 1. Central Grand Avenue (Z axis: North-South) - Expanded to 260 units
   const mainAvenueGeo = new THREE.BoxGeometry(9.6, 0.12, 260);
@@ -417,8 +420,8 @@ export function buildCityRoadNetwork(
     roadGroup.add(curb);
   });
 
-  // 2. Cross Boulevard (X axis: East-West) - Expanded to 260 units
-  const crossBoulevardGeo = new THREE.BoxGeometry(260, 0.12, 9.6);
+  // 2. Cross Boulevard (X axis: East-West) ends at the waterfront.
+  const crossBoulevardGeo = new THREE.BoxGeometry(eastWestRoadLength, 0.12, 9.6);
   const crossBoulevard = new THREE.Mesh(crossBoulevardGeo, palette.asphalt);
   crossBoulevard.position.set(0, 0.06, 0);
   crossBoulevard.receiveShadow = !isSoftwareGl;
@@ -426,20 +429,20 @@ export function buildCityRoadNetwork(
 
   [-5.4, 5.4].forEach((sz) => {
     const sidewalk = new THREE.Mesh(
-      new THREE.BoxGeometry(260, 0.22, 1.6),
+      new THREE.BoxGeometry(eastWestRoadLength, 0.22, 1.6),
       palette.plazaPaver
     );
     sidewalk.position.set(0, 0.11, sz);
     roadGroup.add(sidewalk);
 
-    const curb = new THREE.Mesh(new THREE.BoxGeometry(260, 0.26, 0.24), palette.curbGold);
+    const curb = new THREE.Mesh(new THREE.BoxGeometry(eastWestRoadLength, 0.26, 0.24), palette.curbGold);
     curb.position.set(0, 0.13, sz + (sz > 0 ? -0.8 : 0.8));
     roadGroup.add(curb);
   });
 
   // 3. Secondary Ring Roads (North & South avenues connecting all districts)
   [-65, -35, 35, 65].forEach((rz) => {
-    const ringRoad = new THREE.Mesh(new THREE.BoxGeometry(240, 0.12, 7.2), palette.asphalt);
+    const ringRoad = new THREE.Mesh(new THREE.BoxGeometry(eastWestRoadLength, 0.12, 7.2), palette.asphalt);
     ringRoad.position.set(0, 0.06, rz);
     roadGroup.add(ringRoad);
   });
@@ -451,17 +454,59 @@ export function buildCityRoadNetwork(
     roadGroup.add(crossSt);
   });
 
-  // 4. Eastern Deep Water Harbor Basin & Maritime Coastline
-  const harborWaterGeo = new THREE.PlaneGeometry(60, 180);
+  // 4. Expanded eastern sea with a segmented seawall and a deliberate port-road opening.
+  const harborWaterGeo = new THREE.PlaneGeometry(
+    CITY_WORLD_CONFIG.harborWaterSize.width,
+    CITY_WORLD_CONFIG.harborWaterSize.depth,
+  );
   const harborWater = new THREE.Mesh(harborWaterGeo, palette.harborWater);
+  harborWater.name = 'expanded_harbor_water';
   harborWater.rotation.x = -Math.PI / 2;
-  harborWater.position.set(100, 0.05, 0);
+  harborWater.position.set(coastlineX + CITY_WORLD_CONFIG.harborWaterSize.width / 2, 0.04, 0);
   roadGroup.add(harborWater);
 
-  // Concrete Quayside Embankment Border
-  const harborEmbankment = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.5, 180), palette.slateStructure);
-  harborEmbankment.position.set(70, 0.25, 0);
-  roadGroup.add(harborEmbankment);
+  // Instanced concrete wall sections leave a clear opening at the z=35 truck gate.
+  const seawallSectionDepth = 10;
+  const seawallSections = new THREE.InstancedMesh(
+    new THREE.BoxGeometry(2.4, 0.6, seawallSectionDepth),
+    palette.slateStructure,
+    Math.ceil(CITY_WORLD_CONFIG.groundSize / seawallSectionDepth),
+  );
+  seawallSections.name = 'harbor_seawall_sections';
+  const seawallTransform = new THREE.Object3D();
+  let seawallCount = 0;
+  const coastHalfDepth = CITY_WORLD_CONFIG.groundSize / 2;
+  for (let z = -coastHalfDepth; z < coastHalfDepth; z += seawallSectionDepth) {
+    const centerZ = z + seawallSectionDepth / 2;
+    if (Math.abs(centerZ - CITY_WORLD_CONFIG.harborAccessZ) <= seawallSectionDepth / 2) continue;
+    seawallTransform.position.set(coastlineX, 0.3, centerZ);
+    seawallTransform.updateMatrix();
+    seawallSections.setMatrixAt(seawallCount++, seawallTransform.matrix);
+  }
+  seawallSections.count = seawallCount;
+  seawallSections.instanceMatrix.needsUpdate = true;
+  roadGroup.add(seawallSections);
+
+  // Low-profile breakwater boulders soften the hard coastline without adding draw calls.
+  const breakwater = new THREE.InstancedMesh(
+    new THREE.IcosahedronGeometry(0.8, 0),
+    palette.slateStructure,
+    Math.ceil(CITY_WORLD_CONFIG.groundSize / 10),
+  );
+  breakwater.name = 'harbor_breakwater_rocks';
+  const rockTransform = new THREE.Object3D();
+  let rockCount = 0;
+  for (let z = -coastHalfDepth + 5; z < coastHalfDepth; z += 10) {
+    if (Math.abs(z - CITY_WORLD_CONFIG.harborAccessZ) <= 7) continue;
+    rockTransform.position.set(coastlineX + 1.8, 0.1, z);
+    rockTransform.rotation.set(0, (z * 0.07) % Math.PI, 0);
+    rockTransform.scale.set(1.5, 0.55, 2.8);
+    rockTransform.updateMatrix();
+    breakwater.setMatrixAt(rockCount++, rockTransform.matrix);
+  }
+  breakwater.count = rockCount;
+  breakwater.instanceMatrix.needsUpdate = true;
+  roadGroup.add(breakwater);
 
   // 4. Pedestrian Crosswalks (Zebra crossings at intersections)
   const zebraWidth = 0.5;
@@ -666,8 +711,8 @@ export function buildCityRoadNetwork(
         axis: 'x',
         dir: v.dir,
         speed: v.speed,
-        min: -120,
-        max: 120,
+        min: -coastlineX,
+        max: coastlineX,
         laneOffset: v.lane,
       });
     }

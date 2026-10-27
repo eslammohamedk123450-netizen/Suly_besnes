@@ -58,6 +58,7 @@ import {
   classifyIndustryToFacility,
   resolvePlotVisualStage,
   ALL_CITY_LANDMARKS,
+  CITY_WORLD_CONFIG,
   type LandmarkId,
   type LandmarkSystemDefinition,
 } from './cityWorldData';
@@ -209,8 +210,8 @@ export const CityCanvas: React.FC<CityCanvasProps> = ({
     // 6. Materials Palette
     const palette: CityMaterialPalette = createCityMaterialPalette(isNightMode, isLowPowerDevice);
 
-    // 7. Ground Plane (Expanded to 320 x 320)
-    const groundGeo = new THREE.PlaneGeometry(320, 320);
+    // 7. Mainland footprint; the eastern harbor water extends beyond this plane.
+    const groundGeo = new THREE.PlaneGeometry(CITY_WORLD_CONFIG.groundSize, CITY_WORLD_CONFIG.groundSize);
     const ground = new THREE.Mesh(groundGeo, palette.ground);
     ground.rotation.x = -Math.PI / 2;
     ground.receiveShadow = !isLowPowerDevice;
@@ -709,8 +710,8 @@ export const CityCanvas: React.FC<CityCanvasProps> = ({
         cameraLookAtPos.current.set(-45, 6, -45);
         break;
       case 'maritime':
-        cameraTargetPos.current.set(74, 24, 52);
-        cameraLookAtPos.current.set(74, 4, 32);
+        cameraTargetPos.current.set(65, 42, 83);
+        cameraLookAtPos.current.set(80, 4, 32);
         break;
       case 'gov':
         cameraTargetPos.current.set(45, 28, -25);
