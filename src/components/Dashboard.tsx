@@ -7,9 +7,7 @@ import { type GameCommand, type GameResult } from '../game/engine';
 import { playSound } from '../game/soundEffects';
 import { LeaderboardModal } from './LeaderboardModal';
 import { FinanceReportModal } from './FinanceReportModal';
-import { SmartOnboardingQuests } from './SmartOnboardingQuests';
 import { getLuckySpinState } from '../game/luckyWheelService';
-import { getCountryScenario, type CountryStoryQuest } from '../game/countryScenarios';
 import {
   isSectionUnlocked,
   getSectionRequiredLevel,
@@ -59,13 +57,10 @@ interface DashboardProps {
   onUpdateProfile?: (updater: (prev: PlayerProfile) => PlayerProfile) => void;
   onOpenLuckyWheel?: () => void;
   onOpenTutorial?: () => void;
-  onOpenCampaignHub?: () => void;
   onOpenMorningReport?: () => void;
   onOpenCentralBank?: () => void;
   onOpenPrestige?: () => void;
   onOpenStrategicPillars?: () => void;
-  onMarkBriefingSeen?: (questId: string) => void;
-  onStartGuidedWalkthrough?: (quest: CountryStoryQuest) => void;
 }
 
 interface CommandItem {
@@ -88,13 +83,10 @@ export function Dashboard({
   onClaimReward,
   onOpenLuckyWheel,
   onOpenTutorial,
-  onOpenCampaignHub,
   onOpenMorningReport,
   onOpenCentralBank,
   onOpenPrestige,
   onOpenStrategicPillars,
-  onMarkBriefingSeen,
-  onStartGuidedWalkthrough,
 }: DashboardProps) {
   const [isLeaderboardOpen, setIsLeaderboardOpen] = useState(false);
   const [isFinanceModalOpen, setIsFinanceModalOpen] = useState(false);
@@ -107,8 +99,6 @@ export function Dashboard({
     requiredLevel: number;
     hint: string;
   } | null>(null);
-
-  const scenario = getCountryScenario(country.id);
 
   // Keep countdown updated
   useEffect(() => {
@@ -441,10 +431,10 @@ export function Dashboard({
         <div className="flex items-center gap-2 overflow-hidden text-xs sm:text-sm min-w-0">
           <span className="px-2 py-0.5 rounded-lg bg-amber-500 text-slate-950 font-black text-[11px] shrink-0 flex items-center gap-1">
             <Flame className="w-3.5 h-3.5 fill-slate-950" />
-            {scenario.scenarioTitle}
+            نبض الإمبراطورية
           </span>
           <span className="text-slate-200 truncate">
-            {scenario.economicProfile.headline} · دورة اليوم {profile.day} في أسواق {country.name}
+            دورة اليوم {profile.day} في أسواق {country.name} · تابع مهامك التنفيذية وتوسعك المستمر
           </span>
         </div>
         <div className="flex items-center gap-2 shrink-0">
@@ -526,15 +516,6 @@ export function Dashboard({
         </div>
       </div>
 
-      {/* 2.1. Country-Specific Story Quests & Practical Guidance */}
-      <SmartOnboardingQuests
-        profile={profile}
-        onNavigate={handleNav}
-        onClaimReward={(cash, diamonds, questId) => onClaimReward?.(cash, diamonds, questId)}
-        onMarkBriefingSeen={onMarkBriefingSeen}
-        onStartGuidedWalkthrough={onStartGuidedWalkthrough}
-      />
-
       <button
         type="button"
         onClick={() => {
@@ -564,7 +545,7 @@ export function Dashboard({
               غرفة العمليات المركزية
             </h3>
             <span className="text-xs text-slate-400 hidden sm:inline">
-              · تفتح الأقسام تدريجياً وفق تقدمك في القصة والمستوى
+              · تفتح الأقسام تدريجياً وفق تقدمك ومستوى إمبراطوريتك
             </span>
           </div>
 
@@ -632,9 +613,6 @@ export function Dashboard({
                   } else if (item.id === 'lucky_wheel') {
                     playSound('click');
                     onOpenLuckyWheel?.();
-                  } else if (item.id === 'story_campaign') {
-                    playSound('click');
-                    onOpenCampaignHub?.();
                   } else if (item.id === 'strategic_pillars') {
                     playSound('click');
                     if (onOpenStrategicPillars) {
@@ -960,7 +938,7 @@ export function Dashboard({
               </span>
             </div>
             <p className="text-xs text-slate-300 leading-relaxed bg-slate-950/80 p-3.5 rounded-xl border border-slate-800 text-right">
-              📖 <strong>شرط سيناريو القصة:</strong>
+              📖 <strong>متطلب التقدم:</strong>
               <br />
               <span className="text-slate-400 mt-1 block">
                 {lockedGateModal.hint}

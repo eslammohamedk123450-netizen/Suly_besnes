@@ -1138,7 +1138,6 @@ export default function App() {
               onCommand={handleGameCommand}
               onOpenLuckyWheel={() => setIsLuckyWheelOpen(true)}
               onOpenTutorial={() => setIsTutorialOpen(true)}
-              onOpenCampaignHub={() => setIsCampaignHubOpen(true)}
               onOpenMorningReport={() => {
                 triggerHaptic('light');
                 const rep = offlineReport || calculateOfflineIdleProgress(profile);
@@ -1180,32 +1179,6 @@ export default function App() {
                   saveGame(next, account?.id);
                   return next;
                 });
-              }}
-              onMarkBriefingSeen={(questId) => {
-                setProfile((prev) => {
-                  if (!prev) return prev;
-                  if (prev.onboarding.seenQuestBriefings?.includes(questId)) return prev;
-                  const next: PlayerProfile = {
-                    ...prev,
-                    onboarding: {
-                      ...prev.onboarding,
-                      seenQuestBriefings: [...(prev.onboarding.seenQuestBriefings ?? []), questId],
-                    },
-                  };
-                  saveGame(next, account?.id);
-                  return next;
-                });
-              }}
-              onStartGuidedWalkthrough={(quest: CountryStoryQuest) => {
-                const resolved = resolveQuestWalkthroughTarget(quest, profile);
-                if (resolved.mode === 'core') {
-                  setWalkthroughOverrideStep(null);
-                  setWalkthroughStepIndex(resolved.stepIndex);
-                  setIsWalkthroughActive(true);
-                } else {
-                  setWalkthroughOverrideStep(resolved.step);
-                  setIsWalkthroughActive(true);
-                }
               }}
               onClaimReward={(cash, diamonds, questId) => {
                 let claimedOk = false;
@@ -1344,10 +1317,6 @@ export default function App() {
           );
         }}
         onAdvanceDay={() => void handleDaysElapsed(1)}
-        onOpenStoryCampaign={() => {
-          triggerHaptic('light');
-          navigate('tasks');
-        }}
         onOpenStrategicPillars={() => {
           triggerHaptic('light');
           setIsStrategicPillarsOpen(true);

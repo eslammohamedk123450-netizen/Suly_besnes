@@ -20,7 +20,6 @@ interface RightActionHubProps {
   onSellProduct: (productId: string, quantity: number) => void;
   onAdvanceDay: () => void;
   onOpenLuckyWheel?: () => void;
-  onOpenStoryCampaign?: () => void;
   onOpenStrategicPillars?: () => void;
   onAcceptBotOffer?: (offerId: string) => void;
   onProfileUpdate?: (profile: PlayerProfile) => void;
@@ -34,7 +33,6 @@ export function RightActionHub({
   onSellProduct,
   onAdvanceDay,
   onOpenLuckyWheel,
-  onOpenStoryCampaign,
   onOpenStrategicPillars,
   onAcceptBotOffer,
   onProfileUpdate,
@@ -179,21 +177,19 @@ export function RightActionHub({
             </button>
           )}
 
-          {onOpenStoryCampaign && (
-            <button
-              type="button"
-              className="right-story-handle"
-              onClick={() => {
-                playSound('click');
-                onOpenStoryCampaign();
-              }}
-                aria-label="المهام التنفيذية التعليمية"
-                title="المهام التنفيذية التعليمية - أهداف مستمرة ومكافآت قابلة للتحصيل"
-            >
-              <span className="right-story-handle-icon">📜</span>
-              <span className="right-story-badge">المهام التنفيذية</span>
-            </button>
-          )}
+          <button
+            type="button"
+            className="right-story-handle"
+            onClick={() => {
+              playSound('click');
+              onNavigate('tasks');
+            }}
+            aria-label="المهام التنفيذية"
+            title="المهام التنفيذية - مهام طويلة الأمد مرتبطة بتقدم الإمبراطورية"
+          >
+            <span className="right-story-handle-icon">📋</span>
+            <span className="right-story-badge">المهام التنفيذية</span>
+          </button>
 
           <button
             type="button"
@@ -556,19 +552,13 @@ export function RightActionHub({
                 </div>
 
                 <div className="right-hub-shortcuts-grid">
-                  {onOpenStoryCampaign && (
-                    <div
-                      className="right-hub-shortcut-card"
-                      onClick={() => {
-                        setOpen(false);
-                        playSound('click');
-                        onOpenStoryCampaign();
-                      }}
-                    >
-                      <span className="right-hub-shortcut-icon">📜</span>
-                      <span>المهام التنفيذية</span>
-                    </div>
-                  )}
+                  <div
+                    className="right-hub-shortcut-card"
+                    onClick={() => handleNavigate('tasks')}
+                  >
+                    <span className="right-hub-shortcut-icon">📋</span>
+                    <span>المهام التنفيذية</span>
+                  </div>
 
                   {onOpenStrategicPillars && (
                     <div

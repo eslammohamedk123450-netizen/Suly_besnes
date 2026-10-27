@@ -6,6 +6,7 @@ import { AUCTION_CATALOG, findIndustry, findMaterial, findInvestment, PRODUCT_CA
 import { getAuctionListings, isAuctionOpen } from './auctions';
 import { getOperatingCostProgression } from './economyBalance';
 import { getSynergyOperatingMultiplier } from './synergy';
+import { isSectionUnlocked } from './onboarding';
 
 export interface InventorySummaryRow {
   id: string;
@@ -296,7 +297,7 @@ function taskProgressCurrent(profile: PlayerProfile, condition: (typeof TASK_CAT
 }
 
 export function selectTaskBoard(profile: PlayerProfile): Array<(typeof TASK_CATALOG)[number] & { claimed: boolean; available: boolean; progressCurrent: number; progressPercent: number; status: 'available' | 'ready' | 'claimed' | 'progress' }> {
-  return TASK_CATALOG.map((task) => {
+  return TASK_CATALOG.filter((task) => isSectionUnlocked(profile, task.actionSection as SectionId)).map((task) => {
     const progress = profile.tasks.find((item) => item.taskId === task.id);
     const available = (() => {
       switch (task.condition) {

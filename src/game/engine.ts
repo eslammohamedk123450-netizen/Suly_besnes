@@ -38,7 +38,8 @@ import {
   cancelPlayerAssetAuction,
   instantSellPlayerAsset,
 } from './dynamicAuctions';
-import { claimStarterMission } from './onboarding';
+import { claimStarterMission, isSectionUnlocked } from './onboarding';
+import type { SectionId } from '../domain/navigation';
 import { acceptBotMarketOffer } from './economyBots';
 import { claimMissionReward } from './missionsEngine';
 
@@ -2563,6 +2564,7 @@ export function claimTask(profile: PlayerProfile, taskId: string): GameResult<Ta
   if (!task) return failure(profile, 'not-found', 'المهمة غير موجودة.');
   const current = (profile.tasks ?? []).find((item) => item.taskId === taskId);
   if (current?.claimed || profile.completedTaskIds.includes(taskId)) return failure(profile, 'already-claimed', 'تم تحصيل مكافأة هذه المهمة من قبل.');
+  if (!isSectionUnlocked(profile, task.actionSection as SectionId)) return failure(profile, 'condition-not-met', 'هذا النظام غير مفتوح في حسابك بعد.');
   if (!conditionMet(profile, task.condition)) return failure(profile, 'condition-not-met', 'لم يتحقق شرط المهمة بعد.');
   const tasks = [...(profile.tasks ?? []).filter((item) => item.taskId !== taskId), { taskId, claimed: true, claimedAt: timestampFor(profile) }];
   const nextProfile = addLedger(
@@ -2575,7 +2577,7 @@ export function claimTask(profile: PlayerProfile, taskId: string): GameResult<Ta
 
 export function claimAllTasks(profile: PlayerProfile): GameResult<TaskOutcome> {
   const claimedIds = new Set(profile.completedTaskIds);
-  const claimable = TASK_CATALOG.filter((task) => !claimedIds.has(task.id) && !(profile.tasks ?? []).some((item) => item.taskId === task.id && item.claimed) && conditionMet(profile, task.condition));
+  const claimable = TASK_CATALOG.filter((task) => isSectionUnlocked(profile, task.actionSection as SectionId) && !claimedIds.has(task.id) && !(profile.tasks ?? []).some((item) => item.taskId === task.id && item.claimed) && conditionMet(profile, task.condition));
   if (!claimable.length) return failure(profile, 'condition-not-met', 'لا توجد مكافآت جاهزة للتحصيل الآن.');
   const reward = claimable.reduce((sum, task) => sum + task.reward, 0);
   const tasks = [...(profile.tasks ??[])].map((item) => claimable.some((task) => task.id === item.taskId) ? { ...item, claimed: true, claimedAt: timestampFor(profile) } : item);
