@@ -214,7 +214,7 @@ export const CityCanvas: React.FC<CityCanvasProps> = ({
     const crownRingGeo = new THREE.RingGeometry(2.4, 2.7, 24);
     const crownRing = new THREE.Mesh(crownRingGeo, palette.plotHoloRing);
     crownRing.rotation.x = Math.PI / 2;
-    crownRing.position.y = 12 + hqLevel * 3.5;
+    crownRing.position.y = 10 + hqLevel * 5.6;
     hqMesh.add(crownRing);
 
     // B. CENTRAL SOVEREIGN BANK
@@ -422,10 +422,10 @@ export const CityCanvas: React.FC<CityCanvasProps> = ({
 
       // Animate smoke particles rising from stacks
       smokeParticles.forEach((smoke, idx) => {
-        smoke.position.y += dt * 0.55;
-        smoke.scale.multiplyScalar(1 + dt * 0.09);
-        if (smoke.position.y > 13.8) {
-          smoke.position.y = 9.2 + idx * 0.7;
+        smoke.position.y += dt * 0.65;
+        smoke.scale.multiplyScalar(1 + dt * 0.12);
+        if (smoke.position.y > 15.2) {
+          smoke.position.y = 9.8 + (idx % 4) * 0.6;
           smoke.scale.set(1, 1, 1);
         }
       });

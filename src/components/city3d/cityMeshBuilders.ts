@@ -5,7 +5,6 @@
 
 import * as THREE from 'three';
 import type { CityMaterialPalette } from './cityMaterials';
-import type { VisualConstructionStage, CityFacilityCategory } from './cityWorldData';
 
 /**
  * Shared reusable geometries to minimize GC and memory footprint on mobile devices
@@ -18,7 +17,7 @@ const sharedGeos = {
 };
 
 /**
- * Empty Plot Builder (أرض فضاء مجهزة للبيع أو غير مملوكة)
+ * 1. Empty Plot Builder (أرض فضاء مجهزة للبيع أو غير مملوكة)
  */
 export function buildEmptyPlotMesh(
   width: number,
@@ -30,14 +29,20 @@ export function buildEmptyPlotMesh(
 ): THREE.Group {
   const group = new THREE.Group();
 
-  // 1. Foundation slab with subtle bevel
-  const slabGeo = new THREE.BoxGeometry(width - 0.4, 0.25, depth - 0.4);
-  const slab = new THREE.Mesh(slabGeo, palette.sidewalk);
-  slab.position.y = 0.125;
+  // 1. Foundation slab with plaza pavers and gold curb border
+  const slabGeo = new THREE.BoxGeometry(width - 0.4, 0.28, depth - 0.4);
+  const slab = new THREE.Mesh(slabGeo, palette.plazaPaver);
+  slab.position.y = 0.14;
   slab.receiveShadow = !isSoftwareGl;
   group.add(slab);
 
-  // 2. Corner boundary markers
+  // Outer gold curb border
+  const curbGeo = new THREE.BoxGeometry(width - 0.2, 0.08, depth - 0.2);
+  const curb = new THREE.Mesh(curbGeo, palette.curbGold);
+  curb.position.y = 0.04;
+  group.add(curb);
+
+  // 2. Corner boundary markers with glowing beacons
   const halfW = (width - 0.8) / 2;
   const halfD = (depth - 0.8) / 2;
   const cornerPositions = [
@@ -48,51 +53,60 @@ export function buildEmptyPlotMesh(
   ];
 
   cornerPositions.forEach(([cx, cz]) => {
-    // Marker post
-    const postGeo = new THREE.BoxGeometry(0.2, 0.8, 0.2);
-    const post = new THREE.Mesh(postGeo, palette.curbGold);
-    post.position.set(cx, 0.5, cz);
+    // Marble bollard post
+    const postGeo = new THREE.BoxGeometry(0.24, 0.9, 0.24);
+    const post = new THREE.Mesh(postGeo, palette.whiteMarble);
+    post.position.set(cx, 0.55, cz);
     group.add(post);
 
     // Glowing corner beacon
-    const beaconGeo = new THREE.SphereGeometry(0.12, 8, 8);
+    const beaconGeo = new THREE.SphereGeometry(0.14, 8, 8);
     const beacon = new THREE.Mesh(
       beaconGeo,
       status === 'locked' ? palette.plotSignLocked : palette.plotHoloRing
     );
-    beacon.position.set(cx, 0.95, cz);
+    beacon.position.set(cx, 1.05, cz);
     group.add(beacon);
   });
 
-  // 3. Central For Sale / Status Stand
+  // 3. Central For Sale / Status Board
   const standGroup = new THREE.Group();
-  standGroup.position.set(0, 0.25, 0);
+  standGroup.position.set(0, 0.28, 0);
 
-  const post = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 2.0, 8), palette.industrialSteel);
-  post.position.y = 1.0;
-  standGroup.add(post);
+  // Steel supporting twin poles
+  [-0.8, 0.8].forEach((px) => {
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 2.2, 8), palette.industrialSteel);
+    pole.position.set(px, 1.1, 0);
+    standGroup.add(pole);
+  });
 
-  // Status board
+  // Main board body
   const board = new THREE.Mesh(
-    new THREE.BoxGeometry(2.4, 1.2, 0.12),
+    new THREE.BoxGeometry(2.6, 1.3, 0.12),
     status === 'locked' ? palette.plotSignLocked : palette.plotSignBoard
   );
-  board.position.y = 2.0;
+  board.position.y = 2.1;
+  board.castShadow = !isSoftwareGl;
   standGroup.add(board);
 
-  // Gold frame around board
-  const frame = new THREE.Mesh(new THREE.BoxGeometry(2.5, 1.3, 0.08), palette.imperialGold);
-  frame.position.y = 2.0;
+  // Golden architectural frame & header crown
+  const frame = new THREE.Mesh(new THREE.BoxGeometry(2.72, 1.42, 0.08), palette.imperialGold);
+  frame.position.y = 2.1;
   standGroup.add(frame);
 
-  // Rotating ground halo
-  const haloGeo = new THREE.RingGeometry(1.6, 1.9, 16);
+  const crownHeader = new THREE.Mesh(new THREE.ConeGeometry(0.5, 0.4, 4), palette.imperialGold);
+  crownHeader.rotation.y = Math.PI / 4;
+  crownHeader.position.set(0, 2.95, 0);
+  standGroup.add(crownHeader);
+
+  // Rotating holographic ground halo
+  const haloGeo = new THREE.RingGeometry(1.8, 2.1, 24);
   const halo = new THREE.Mesh(
     haloGeo,
     status === 'locked' ? palette.plotSignLocked : palette.plotHoloRing
   );
   halo.rotation.x = -Math.PI / 2;
-  halo.position.y = 0.28;
+  halo.position.y = 0.3;
   group.add(halo);
 
   group.add(standGroup);
@@ -100,7 +114,7 @@ export function buildEmptyPlotMesh(
 }
 
 /**
- * Paperwork & Land Survey Stage (مرحلة التخطيط والمسح الهندسي)
+ * 2. Paperwork & Land Survey Stage (مرحلة التخطيط والمسح الهندسي)
  */
 export function buildPaperworkSurveyMesh(
   width: number,
@@ -110,78 +124,94 @@ export function buildPaperworkSurveyMesh(
 ): THREE.Group {
   const group = new THREE.Group();
 
-  // 1. Plot ground
-  const slab = new THREE.Mesh(
-    new THREE.BoxGeometry(width - 0.4, 0.25, depth - 0.4),
-    palette.sidewalk
-  );
+  // Plot ground slab
+  const slab = new THREE.Mesh(new THREE.BoxGeometry(width - 0.4, 0.25, depth - 0.4), palette.plazaPaver);
   slab.position.y = 0.125;
   group.add(slab);
 
-  // 2. Surveyor Tripod & Theodolite
+  // Central Surveying Tripod & High-Tech Theodolite
   const tripodGroup = new THREE.Group();
   tripodGroup.position.set(0, 0.25, 0);
 
   for (let i = 0; i < 3; i++) {
     const angle = (i * Math.PI * 2) / 3;
     const leg = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.04, 0.04, 1.6, 6),
+      new THREE.CylinderGeometry(0.04, 0.05, 1.8, 6),
       palette.constructionYellow
     );
-    leg.position.set(Math.cos(angle) * 0.4, 0.8, Math.sin(angle) * 0.4);
-    leg.rotation.z = Math.cos(angle) * 0.25;
-    leg.rotation.x = -Math.sin(angle) * 0.25;
+    leg.position.set(Math.cos(angle) * 0.45, 0.9, Math.sin(angle) * 0.45);
+    leg.rotation.z = Math.cos(angle) * 0.28;
+    leg.rotation.x = -Math.sin(angle) * 0.28;
     tripodGroup.add(leg);
   }
 
-  // Theodolite head
-  const head = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.25, 0.3), palette.safetyOrange);
-  head.position.y = 1.65;
+  // Theodolite body
+  const head = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.3, 0.35), palette.safetyOrange);
+  head.position.y = 1.85;
   tripodGroup.add(head);
 
-  const scope = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.45, 8), palette.imperialGold);
+  // Optical telescope lens with glowing cyan crosshair
+  const scope = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.55, 8), palette.industrialSteel);
   scope.rotation.x = Math.PI / 2;
-  scope.position.set(0, 1.75, 0);
+  scope.position.set(0, 1.95, 0);
   tripodGroup.add(scope);
+
+  const lensGlass = new THREE.Mesh(new THREE.CircleGeometry(0.08, 8), palette.neonCyan);
+  lensGlass.position.set(0, 1.95, 0.28);
+  tripodGroup.add(lensGlass);
+
   group.add(tripodGroup);
 
-  // 3. Blueprint Planning Table
-  const deskGroup = new THREE.Group();
-  deskGroup.position.set(2.2, 0.25, 1.5);
-  const tableTop = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.1, 1.0), palette.slateStructure);
-  tableTop.position.y = 1.0;
-  deskGroup.add(tableTop);
+  // Field Blueprint Table
+  const tableGroup = new THREE.Group();
+  tableGroup.position.set(2.4, 0.25, -2.0);
 
-  const blueprint = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.02, 0.8), palette.plotSignPaperwork);
-  blueprint.position.y = 1.06;
-  deskGroup.add(blueprint);
+  const tableTop = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.08, 1.1), palette.whiteMarble);
+  tableTop.position.y = 0.9;
+  tableGroup.add(tableTop);
 
-  const legGeo = new THREE.BoxGeometry(0.08, 1.0, 0.08);
-  [-0.65, 0.65].forEach((lx) => {
-    [-0.35, 0.35].forEach((lz) => {
-      const leg = new THREE.Mesh(legGeo, palette.industrialSteel);
-      leg.position.set(lx, 0.5, lz);
-      deskGroup.add(leg);
-    });
+  // Blueprint sheet rolled out
+  const blueprint = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.02, 0.8), palette.curtainGlass);
+  blueprint.position.set(0, 0.95, 0);
+  tableGroup.add(blueprint);
+
+  // 4 Table legs
+  [
+    [-0.8, -0.45],
+    [0.8, -0.45],
+    [-0.8, 0.45],
+    [0.8, 0.45],
+  ].forEach(([lx, lz]) => {
+    const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.9, 6), palette.industrialSteel);
+    leg.position.set(lx, 0.45, lz);
+    tableGroup.add(leg);
   });
-  group.add(deskGroup);
 
-  // 4. Perimeter Caution Tape Posts
+  group.add(tableGroup);
+
+  // Survey flags at perimeter corners
   const halfW = (width - 1.2) / 2;
   const halfD = (depth - 1.2) / 2;
-  [-halfW, halfW].forEach((px) => {
-    [-halfD, halfD].forEach((pz) => {
-      const post = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 1.2, 6), palette.safetyOrange);
-      post.position.set(px, 0.7, pz);
-      group.add(post);
-    });
+  [
+    [-halfW, -halfD],
+    [halfW, -halfD],
+    [-halfW, halfD],
+    [halfW, halfD],
+  ].forEach(([fx, fz]) => {
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 1.6, 6), palette.industrialSteel);
+    pole.position.set(fx, 0.8, fz);
+    group.add(pole);
+
+    const flag = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.25, 0.02), palette.safetyOrange);
+    flag.position.set(fx + 0.2, 1.45, fz);
+    group.add(flag);
   });
 
   return group;
 }
 
 /**
- * Site Clearing & Earth Excavation Stage (مرحلة تمهيد الأرض والحفر)
+ * 3. Site Clearing & Excavation Stage (مرحلة تمهيد الموقع والحفر)
  */
 export function buildSiteClearingMesh(
   width: number,
@@ -191,74 +221,107 @@ export function buildSiteClearingMesh(
 ): THREE.Group {
   const group = new THREE.Group();
 
-  // 1. Excavated Earth base
-  const earthSlab = new THREE.Mesh(
-    new THREE.BoxGeometry(width - 0.4, 0.35, depth - 0.4),
-    palette.dirtExcavation
-  );
-  earthSlab.position.y = 0.175;
-  group.add(earthSlab);
+  // Excavated dirt ground
+  const pit = new THREE.Mesh(new THREE.BoxGeometry(width - 0.6, 0.35, depth - 0.6), palette.dirtExcavation);
+  pit.position.y = 0.175;
+  pit.receiveShadow = !isSoftwareGl;
+  group.add(pit);
 
-  // 2. Dirt Mounds
-  const mound1 = new THREE.Mesh(new THREE.ConeGeometry(2.0, 1.2, 8), palette.dirtExcavation);
-  mound1.position.set(-2.2, 0.8, 1.8);
-  group.add(mound1);
-
-  const mound2 = new THREE.Mesh(new THREE.ConeGeometry(1.6, 0.9, 7), palette.dirtExcavation);
-  mound2.position.set(2.4, 0.65, -1.8);
-  group.add(mound2);
-
-  // 3. Compact Bulldozer / Earthmover Vehicle
-  const dozerGroup = new THREE.Group();
-  dozerGroup.position.set(0.5, 0.35, 0);
-
-  // Treads
-  const treadMat = palette.slateStructure;
-  [-0.6, 0.6].forEach((tz) => {
-    const tread = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.4, 0.35), treadMat);
-    tread.position.set(0, 0.2, tz);
-    dozerGroup.add(tread);
-  });
-
-  // Body chassis
-  const chassis = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.6, 1.1), palette.constructionYellow);
-  chassis.position.set(0, 0.5, 0);
-  dozerGroup.add(chassis);
-
-  // Operator Cabin
-  const cab = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.7, 0.8), palette.navyStructure);
-  cab.position.set(-0.2, 1.05, 0);
-  dozerGroup.add(cab);
-
-  // Front Blade
-  const blade = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.65, 1.6), palette.craneSteel);
-  blade.position.set(1.15, 0.35, 0);
-  dozerGroup.add(blade);
-
-  group.add(dozerGroup);
-
-  // 4. Perimeter Safety Barrels
-  const barrelPositions = [
-    [-width / 2.5, depth / 2.6],
-    [width / 2.5, depth / 2.6],
-    [-width / 2.5, -depth / 2.6],
-    [width / 2.5, -depth / 2.6],
+  // Piles of excavated earth and gravel
+  const mounds = [
+    [-2.8, -2.4, 2.2, 1.1],
+    [2.8, -2.2, 1.8, 0.9],
+    [-1.2, 2.6, 2.4, 1.2],
+    [2.6, 2.4, 1.9, 0.95],
   ];
 
-  barrelPositions.forEach(([bx, bz]) => {
-    const barrel = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.3, 0.3, 0.85, 8),
-      palette.constructionCaution
-    );
-    barrel.position.set(bx, 0.6, bz);
-    group.add(barrel);
+  mounds.forEach(([mx, mz, rad, h]) => {
+    const mound = new THREE.Mesh(new THREE.ConeGeometry(rad, h, 8), palette.dirtExcavation);
+    mound.position.set(mx, 0.35 + h / 2, mz);
+    mound.castShadow = !isSoftwareGl;
+    group.add(mound);
+  });
+
+  // Heavy Tracked Crawler Excavator (10+ distinct parts)
+  const excavator = new THREE.Group();
+  excavator.position.set(0, 0.35, 0);
+
+  // Twin rubber crawler tracks
+  [-0.65, 0.65].forEach((tx) => {
+    const track = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.42, 2.0), palette.tireRubber);
+    track.position.set(tx, 0.21, 0);
+    excavator.add(track);
+
+    const trackSprocket = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.34, 8), palette.industrialSteel);
+    trackSprocket.rotation.z = Math.PI / 2;
+    trackSprocket.position.set(tx, 0.21, 0.85);
+    excavator.add(trackSprocket);
+  });
+
+  // Track carriage frame
+  const carriage = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.2, 1.5), palette.industrialSteel);
+  carriage.position.y = 0.35;
+  excavator.add(carriage);
+
+  // Rotating upper superstructure
+  const cabBody = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.85, 1.6), palette.constructionYellow);
+  cabBody.position.set(0, 0.85, 0);
+  cabBody.castShadow = !isSoftwareGl;
+  excavator.add(cabBody);
+
+  // Operator glass cabin
+  const cabGlass = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.65, 0.75), palette.carGlass);
+  cabGlass.position.set(0.3, 1.1, 0.35);
+  excavator.add(cabGlass);
+
+  // Counterweight block
+  const counterweight = new THREE.Mesh(new THREE.BoxGeometry(1.15, 0.7, 0.45), palette.slateStructure);
+  counterweight.position.set(0, 0.85, -0.65);
+  excavator.add(counterweight);
+
+  // Articulated boom, stick arm, and digging bucket
+  const boom = new THREE.Mesh(new THREE.BoxGeometry(0.18, 1.8, 0.25), palette.constructionYellow);
+  boom.position.set(-0.25, 1.7, 0.8);
+  boom.rotation.x = -0.55;
+  excavator.add(boom);
+
+  const stick = new THREE.Mesh(new THREE.BoxGeometry(0.16, 1.4, 0.2), palette.constructionYellow);
+  stick.position.set(-0.25, 2.2, 1.8);
+  stick.rotation.x = 0.75;
+  excavator.add(stick);
+
+  const bucket = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.4, 0.45), palette.industrialSteel);
+  bucket.position.set(-0.25, 1.4, 2.2);
+  bucket.rotation.x = 0.4;
+  excavator.add(bucket);
+
+  group.add(excavator);
+
+  // Perimeter Safety Cones with reflective stripes
+  const halfPerimW = (width - 1.4) / 2;
+  const halfPerimD = (depth - 1.4) / 2;
+  const coneLocations = [
+    [-halfPerimW, 0],
+    [halfPerimW, 0],
+    [0, -halfPerimD],
+    [0, halfPerimD],
+  ];
+
+  coneLocations.forEach(([cx, cz]) => {
+    const cone = new THREE.Mesh(new THREE.ConeGeometry(0.18, 0.55, 8), palette.safetyOrange);
+    cone.position.set(cx, 0.62, cz);
+    group.add(cone);
+
+    const base = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.05, 0.32), palette.slateStructure);
+    base.position.set(cx, 0.37, cz);
+    group.add(base);
   });
 
   return group;
 }
 
 /**
- * Active Structural Construction Stage (مرحلة الهيكل والرافعة البرجية والسقالات)
+ * 4. Active Construction Stage (مرحلة التشييد مع رافعة برجية وسقالات)
  */
 export function buildActiveConstructionMesh(
   width: number,
@@ -268,107 +331,114 @@ export function buildActiveConstructionMesh(
 ): THREE.Group {
   const group = new THREE.Group();
 
-  // 1. Concrete foundation slab
-  const slab = new THREE.Mesh(
-    new THREE.BoxGeometry(width - 0.4, 0.35, depth - 0.4),
-    palette.slateStructure
-  );
-  slab.position.y = 0.175;
+  // Cast Concrete Foundation Slab
+  const slab = new THREE.Mesh(new THREE.BoxGeometry(width - 1.2, 0.6, depth - 1.2), palette.facadeConcrete);
+  slab.position.y = 0.3;
+  slab.receiveShadow = !isSoftwareGl;
   group.add(slab);
 
-  // 2. Concrete core rising in the center
-  const core = new THREE.Mesh(
-    new THREE.BoxGeometry(width * 0.45, 4.2, depth * 0.45),
-    palette.slateStructure
-  );
-  core.position.set(-0.5, 2.3, 0);
-  core.castShadow = !isSoftwareGl;
-  group.add(core);
+  // Protruding Steel Rebars & Reinforced Concrete Columns
+  const rebarPositions = [
+    [-3.2, -3.2],
+    [3.2, -3.2],
+    [-3.2, 3.2],
+    [3.2, 3.2],
+    [0, -3.2],
+    [0, 3.2],
+    [-3.2, 0],
+    [3.2, 0],
+  ];
 
-  // Rebar columns protruding from top of core
-  [-1.2, 0, 1.2].forEach((rx) => {
-    [-1.2, 1.2].forEach((rz) => {
-      const rebar = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.05, 0.05, 1.2, 4),
-        palette.craneSteel
-      );
-      rebar.position.set(-0.5 + rx, 4.8, rz);
+  rebarPositions.forEach(([rx, rz]) => {
+    // Concrete Column
+    const col = new THREE.Mesh(new THREE.BoxGeometry(0.65, 3.8, 0.65), palette.facadeConcrete);
+    col.position.set(rx, 2.5, rz);
+    col.castShadow = !isSoftwareGl;
+    group.add(col);
+
+    // Rebars sticking out of top
+    for (let i = 0; i < 4; i++) {
+      const angle = (i * Math.PI) / 2;
+      const rebar = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.8, 4), palette.industrialSteel);
+      rebar.position.set(rx + Math.cos(angle) * 0.18, 4.6, rz + Math.sin(angle) * 0.18);
       group.add(rebar);
-    });
+    }
   });
 
-  // 3. Scaffolding wireframe structure around the core
-  const scaffold = new THREE.Mesh(
-    new THREE.BoxGeometry(width * 0.65, 5.2, depth * 0.65),
-    palette.scaffoldingWire
-  );
-  scaffold.position.set(-0.5, 2.8, 0);
-  group.add(scaffold);
+  // Scaffolding Wireframe Cube enclosing core
+  const scaf = new THREE.Mesh(new THREE.BoxGeometry(5.2, 5.0, 5.2), palette.scaffoldingWire);
+  scaf.position.set(0, 3.1, 0);
+  group.add(scaf);
 
-  // 4. Yellow Tower Crane with warning light
+  // Liebherr-Style Yellow Tower Crane (12+ distinct parts)
   const craneGroup = new THREE.Group();
-  craneGroup.position.set(width * 0.32, 0.35, -depth * 0.32);
+  craneGroup.position.set(3.4, 0.6, -3.4);
 
-  // Mast (tower)
-  const mast = new THREE.Mesh(
-    new THREE.BoxGeometry(0.7, 9.5, 0.7),
-    palette.constructionYellow
-  );
-  mast.position.y = 4.75;
-  mast.castShadow = !isSoftwareGl;
+  // Lattice Mast Tower
+  const mast = new THREE.Mesh(new THREE.BoxGeometry(0.7, 12.0, 0.7), palette.constructionYellow);
+  mast.position.y = 6.0;
   craneGroup.add(mast);
 
-  // Cabin
-  const cab = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.9, 0.9), palette.safetyOrange);
-  cab.position.set(0.1, 9.6, 0);
-  craneGroup.add(cab);
+  // Slewing Unit & Operator Cab
+  const slewUnit = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.55, 0.6, 8), palette.craneSteel);
+  slewUnit.position.y = 12.3;
+  craneGroup.add(slewUnit);
 
-  // Horizontal Boom (Jib)
-  const boom = new THREE.Mesh(
-    new THREE.BoxGeometry(7.5, 0.45, 0.45),
-    palette.constructionYellow
-  );
-  boom.position.set(2.0, 10.2, 0);
+  const operCab = new THREE.Mesh(new THREE.BoxGeometry(0.65, 0.75, 0.85), palette.carGlass);
+  operCab.position.set(0.65, 12.4, 0.35);
+  craneGroup.add(operCab);
+
+  // Apex A-Frame Peak
+  const apex = new THREE.Mesh(new THREE.ConeGeometry(0.5, 1.8, 4), palette.constructionYellow);
+  apex.rotation.y = Math.PI / 4;
+  apex.position.set(0, 13.5, 0);
+  craneGroup.add(apex);
+
+  // Main Jib Boom (stretching over construction site)
+  const boom = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.4, 11.0), palette.constructionYellow);
+  boom.position.set(0, 12.7, 3.0);
   craneGroup.add(boom);
 
-  // Counterweight
-  const counterweight = new THREE.Mesh(
-    new THREE.BoxGeometry(1.4, 0.7, 0.6),
-    palette.slateStructure
-  );
-  counterweight.position.set(-1.8, 10.2, 0);
-  craneGroup.add(counterweight);
+  // Counter-Jib with heavy concrete counterweights
+  const counterJib = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.4, 3.6), palette.constructionYellow);
+  counterJib.position.set(0, 12.7, -2.8);
+  craneGroup.add(counterJib);
 
-  // Red aviation warning strobe at crane apex
-  const beacon = new THREE.Mesh(
-    new THREE.SphereGeometry(0.15, 8, 8),
-    palette.carTaillight
-  );
-  beacon.position.set(0, 10.7, 0);
-  craneGroup.add(beacon);
+  const counterWeights = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.8, 1.4), palette.facadeConcrete);
+  counterWeights.position.set(0, 12.9, -3.8);
+  craneGroup.add(counterWeights);
+
+  // Hoist Trolley, Cable, and Heavy Steel Hook
+  const trolley = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.25, 0.55), palette.craneSteel);
+  trolley.position.set(0, 12.4, 4.8);
+  craneGroup.add(trolley);
+
+  const cable = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 4.5, 4), palette.industrialSteel);
+  cable.position.set(0, 10.15, 4.8);
+  craneGroup.add(cable);
+
+  const hook = new THREE.Mesh(new THREE.TorusGeometry(0.18, 0.05, 8, 12), palette.imperialGold);
+  hook.position.set(0, 7.8, 4.8);
+  craneGroup.add(hook);
 
   group.add(craneGroup);
 
-  // 5. Pallets of construction supplies
-  const pallet1 = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.7, 1.2), palette.craneSteel);
-  pallet1.position.set(-2.5, 0.7, 2.8);
-  group.add(pallet1);
+  // Site Construction Office Portakabin
+  const cabin = new THREE.Mesh(new THREE.BoxGeometry(2.4, 1.3, 1.5), palette.whiteMarble);
+  cabin.position.set(-3.2, 1.25, 3.2);
+  cabin.castShadow = !isSoftwareGl;
+  group.add(cabin);
 
-  const pallet2 = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.5, 1.4), palette.brushedGold);
-  pallet2.position.set(-0.8, 0.6, 3.2);
-  group.add(pallet2);
+  // Cabin door and window
+  const cabinDoor = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.9, 0.02), palette.navyStructure);
+  cabinDoor.position.set(-3.2, 1.05, 3.96);
+  group.add(cabinDoor);
 
   return group;
 }
 
 /**
- * -------------------------------------------------------------
- * COMPLETED FACILITIES PROCEDURAL MODELS (3-12 parts)
- * -------------------------------------------------------------
- */
-
-/**
- * IMPERIAL HEADQUARTERS (المقر الإمبراطوري) - Scales with HQ Level (1 to 5)
+ * 5. IMPERIAL HEADQUARTERS TOWER (5 Levels of Grandeur)
  */
 export function buildHQMesh(
   level: number,
@@ -377,241 +447,272 @@ export function buildHQMesh(
 ): THREE.Group {
   const hq = new THREE.Group();
 
-  // Part 1: Wide podium with grand plaza
-  const podium = new THREE.Mesh(
-    new THREE.BoxGeometry(11, 1.4, 11),
-    palette.navyStructure
-  );
-  podium.position.y = 0.7;
-  podium.castShadow = !isSoftwareGl;
-  podium.receiveShadow = !isSoftwareGl;
-  hq.add(podium);
+  // Tier 0: Grand Marble Plaza with Gold Curbs & Fountain Basin
+  const plazaBase = new THREE.Mesh(new THREE.BoxGeometry(16, 0.45, 16), palette.plazaPaver);
+  plazaBase.position.y = 0.225;
+  plazaBase.receiveShadow = !isSoftwareGl;
+  hq.add(plazaBase);
 
-  // Part 2: Gold perimeter trim
-  const trim = new THREE.Mesh(
-    new THREE.BoxGeometry(11.6, 0.25, 11.6),
-    palette.imperialGold
-  );
-  trim.position.y = 1.45;
-  hq.add(trim);
+  const plazaCurb = new THREE.Mesh(new THREE.BoxGeometry(16.4, 0.15, 16.4), palette.curbGold);
+  plazaCurb.position.y = 0.075;
+  hq.add(plazaCurb);
 
-  // Part 3: Grand gold entryway portico
-  const entrance = new THREE.Mesh(
-    new THREE.BoxGeometry(4.2, 2.2, 1.2),
-    palette.imperialGold
-  );
-  entrance.position.set(0, 1.6, 5.6);
-  hq.add(entrance);
+  // Front Water Fountain with cascading basin
+  const fountainRing = new THREE.Mesh(new THREE.CylinderGeometry(2.4, 2.6, 0.5, 16), palette.whiteMarble);
+  fountainRing.position.set(0, 0.6, 5.8);
+  hq.add(fountainRing);
 
-  // Level-specific skyscraper structure
-  if (level <= 1) {
-    // Level 1: Founding Pavilion (3 tiers)
-    const tower1 = new THREE.Mesh(
-      new THREE.BoxGeometry(7.5, 7.5, 7.5),
-      palette.curtainGlass
-    );
-    tower1.position.y = 5.2;
-    tower1.castShadow = !isSoftwareGl;
-    hq.add(tower1);
+  const fountainWater = new THREE.Mesh(new THREE.CylinderGeometry(2.2, 2.2, 0.4, 16), palette.waterSurface);
+  fountainWater.position.set(0, 0.65, 5.8);
+  hq.add(fountainWater);
 
-    const roofDeck = new THREE.Mesh(
-      new THREE.BoxGeometry(8.0, 0.4, 8.0),
-      palette.imperialGold
-    );
-    roofDeck.position.y = 9.1;
-    hq.add(roofDeck);
+  const jetSpire = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.18, 1.2, 8), palette.imperialGold);
+  jetSpire.position.set(0, 1.2, 5.8);
+  hq.add(jetSpire);
 
-    const spire = new THREE.Mesh(
-      new THREE.ConeGeometry(0.35, 3.0, 8),
-      palette.imperialGold
-    );
-    spire.position.y = 10.7;
-    hq.add(spire);
-  } else if (level === 2) {
-    // Level 2: Executive Operations Tower (4 tiers)
-    const tier1 = new THREE.Mesh(new THREE.BoxGeometry(7.8, 8, 7.8), palette.curtainGlass);
-    tier1.position.y = 5.4;
-    hq.add(tier1);
+  // Symmetrical Topiary Planters on Plaza
+  [-5.8, 5.8].forEach((px) => {
+    const planter = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.6, 1.4), palette.whiteMarble);
+    planter.position.set(px, 0.6, 5.8);
+    hq.add(planter);
 
-    const band1 = new THREE.Mesh(new THREE.BoxGeometry(8.2, 0.4, 8.2), palette.imperialGold);
-    band1.position.y = 9.5;
-    hq.add(band1);
+    const bush = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.2, 1.2), palette.foliageGreen);
+    bush.position.set(px, 1.4, 5.8);
+    bush.castShadow = !isSoftwareGl;
+    hq.add(bush);
+  });
 
-    const tier2 = new THREE.Mesh(new THREE.BoxGeometry(6.0, 6, 6.0), palette.curtainGlass);
-    tier2.position.y = 12.6;
-    hq.add(tier2);
+  // Level 1: Grand 2-Story Atrium Lobby
+  const lobbyH = 3.6;
+  const lobbyW = 10.0;
+  const lobbyD = 10.0;
 
-    const spire = new THREE.Mesh(new THREE.ConeGeometry(0.4, 4.0, 8), palette.imperialGold);
-    spire.position.y = 17.6;
-    hq.add(spire);
-  } else if (level === 3) {
-    // Level 3: Stepped Corporate Megatower
-    const tier1 = new THREE.Mesh(new THREE.BoxGeometry(8, 9, 8), palette.curtainGlass);
-    tier1.position.y = 6.0;
-    hq.add(tier1);
+  const lobby = new THREE.Mesh(new THREE.BoxGeometry(lobbyW, lobbyH, lobbyD), palette.navyStructure);
+  lobby.position.y = 0.45 + lobbyH / 2;
+  lobby.castShadow = !isSoftwareGl;
+  hq.add(lobby);
 
-    const skybridge = new THREE.Mesh(new THREE.BoxGeometry(8.6, 0.6, 8.6), palette.imperialGold);
-    skybridge.position.y = 10.7;
-    hq.add(skybridge);
+  // Lobby Glass Facade with Illuminated Warm Interior
+  const lobbyGlass = new THREE.Mesh(new THREE.BoxGeometry(lobbyW + 0.1, lobbyH - 0.6, lobbyD - 1.2), palette.curtainGlass);
+  lobbyGlass.position.y = 0.45 + lobbyH / 2;
+  hq.add(lobbyGlass);
 
-    const tier2 = new THREE.Mesh(new THREE.BoxGeometry(6.2, 8, 6.2), palette.litGlassNight);
-    tier2.position.y = 14.8;
-    hq.add(tier2);
+  // Cantilevered Grand Entrance Canopy
+  const canopy = new THREE.Mesh(new THREE.BoxGeometry(5.2, 0.25, 2.4), palette.imperialGold);
+  canopy.position.set(0, 2.6, 5.8);
+  hq.add(canopy);
 
-    const tier3 = new THREE.Mesh(new THREE.BoxGeometry(4.4, 5, 4.4), palette.curtainGlass);
-    tier3.position.y = 21.4;
-    hq.add(tier3);
+  // Revolving Gold Doors
+  const doorCylinder = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.1, 1.8, 12), palette.imperialGold);
+  doorCylinder.position.set(0, 1.35, 5.05);
+  hq.add(doorCylinder);
 
-    const crown = new THREE.Mesh(new THREE.CylinderGeometry(1.4, 1.8, 1.5, 8), palette.imperialGold);
-    crown.position.y = 24.6;
+  // TIER 1 TOWER SHAFT (Base Tower for all levels)
+  const t1Height = 8.5;
+  const t1Width = 8.4;
+  const t1Depth = 8.4;
+
+  const shaft1 = new THREE.Mesh(new THREE.BoxGeometry(t1Width, t1Height, t1Depth), palette.officeWindowsLit);
+  shaft1.position.y = 4.05 + t1Height / 2;
+  shaft1.castShadow = !isSoftwareGl;
+  hq.add(shaft1);
+
+  // Gold Vertical Architectural Mullions (Pillars)
+  [-3.8, -1.3, 1.3, 3.8].forEach((mx) => {
+    const mullion = new THREE.Mesh(new THREE.BoxGeometry(0.25, t1Height + 0.4, 0.25), palette.imperialGold);
+    mullion.position.set(mx, 4.05 + t1Height / 2, 4.25);
+    hq.add(mullion);
+
+    const mullionRear = new THREE.Mesh(new THREE.BoxGeometry(0.25, t1Height + 0.4, 0.25), palette.imperialGold);
+    mullionRear.position.set(mx, 4.05 + t1Height / 2, -4.25);
+    hq.add(mullionRear);
+  });
+
+  let currentY = 4.05 + t1Height;
+
+  // TIER 2: Executive Expansion (Levels 2-5)
+  if (level >= 2) {
+    const t2Height = 7.0;
+    const t2Width = 6.8;
+    const t2Depth = 6.8;
+
+    // Setback terrace balcony
+    const terrace = new THREE.Mesh(new THREE.BoxGeometry(t1Width, 0.4, t1Depth), palette.imperialGold);
+    terrace.position.y = currentY + 0.2;
+    hq.add(terrace);
+
+    const shaft2 = new THREE.Mesh(new THREE.BoxGeometry(t2Width, t2Height, t2Depth), palette.officeWindowsLit);
+    shaft2.position.y = currentY + 0.4 + t2Height / 2;
+    shaft2.castShadow = !isSoftwareGl;
+    hq.add(shaft2);
+
+    currentY += 0.4 + t2Height;
+  }
+
+  // TIER 3: Integrated Sovereign Complex (Levels 3-5)
+  if (level >= 3) {
+    const t3Height = 6.5;
+    const t3Width = 5.4;
+    const t3Depth = 5.4;
+
+    const terrace2 = new THREE.Mesh(new THREE.BoxGeometry(6.6, 0.35, 6.6), palette.brushedGold);
+    terrace2.position.y = currentY + 0.175;
+    hq.add(terrace2);
+
+    const shaft3 = new THREE.Mesh(new THREE.BoxGeometry(t3Width, t3Height, t3Depth), palette.officeWindowsLit);
+    shaft3.position.y = currentY + 0.35 + t3Height / 2;
+    shaft3.castShadow = !isSoftwareGl;
+    hq.add(shaft3);
+
+    currentY += 0.35 + t3Height;
+  }
+
+  // TIER 4: Continental Financial Spire (Levels 4-5)
+  if (level >= 4) {
+    const t4Height = 6.0;
+    const t4Width = 4.2;
+    const t4Depth = 4.2;
+
+    const shaft4 = new THREE.Mesh(new THREE.BoxGeometry(t4Width, t4Height, t4Depth), palette.curtainGlass);
+    shaft4.position.y = currentY + t4Height / 2;
+    shaft4.castShadow = !isSoftwareGl;
+    hq.add(shaft4);
+
+    // Cantilevered Executive Boardroom Skybay
+    const skybay = new THREE.Mesh(new THREE.BoxGeometry(4.8, 1.8, 4.8), palette.imperialGold);
+    skybay.position.y = currentY + 3.8;
+    hq.add(skybay);
+
+    currentY += t4Height;
+  }
+
+  // TIER 5: World-Class Skyscraper Pinnacle & Helipad (Level 5)
+  if (level >= 5) {
+    // Rooftop Helipad with "H" Mark
+    const helipad = new THREE.Mesh(new THREE.CylinderGeometry(2.4, 2.6, 0.4, 18), palette.slateStructure);
+    helipad.position.y = currentY + 0.2;
+    hq.add(helipad);
+
+    const helipadBorder = new THREE.Mesh(new THREE.RingGeometry(2.1, 2.3, 18), palette.imperialGold);
+    helipadBorder.rotation.x = -Math.PI / 2;
+    helipadBorder.position.y = currentY + 0.42;
+    hq.add(helipadBorder);
+
+    // Cantilevered Gold Crown Arch Spire
+    const crown = new THREE.Mesh(new THREE.ConeGeometry(1.6, 4.8, 4), palette.imperialGold);
+    crown.rotation.y = Math.PI / 4;
+    crown.position.y = currentY + 2.8;
     hq.add(crown);
 
-    const needle = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.25, 5, 8), palette.imperialGold);
-    needle.position.y = 27.6;
+    // Soaring Communications Needle Antenna with Aviation Beacon
+    const needle = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.14, 5.5, 8), palette.chromeMetal);
+    needle.position.y = currentY + 6.5;
     hq.add(needle);
-  } else if (level === 4) {
-    // Level 4: Global Financial Skyscraper
-    const tier1 = new THREE.Mesh(new THREE.BoxGeometry(8.2, 10, 8.2), palette.curtainGlass);
-    tier1.position.y = 6.5;
-    hq.add(tier1);
 
-    const tier2 = new THREE.Mesh(new THREE.BoxGeometry(6.6, 9, 6.6), palette.litGlassNight);
-    tier2.position.y = 16.1;
-    hq.add(tier2);
-
-    const tier3 = new THREE.Mesh(new THREE.BoxGeometry(4.8, 8, 4.8), palette.curtainGlass);
-    tier3.position.y = 24.7;
-    hq.add(tier3);
-
-    // Helipad
-    const helipad = new THREE.Mesh(new THREE.CylinderGeometry(2.4, 2.4, 0.3, 16), palette.slateStructure);
-    helipad.position.y = 28.9;
-    hq.add(helipad);
-
-    const helipadRing = new THREE.Mesh(new THREE.RingGeometry(1.6, 1.9, 16), palette.imperialGold);
-    helipadRing.rotation.x = -Math.PI / 2;
-    helipadRing.position.y = 29.06;
-    hq.add(helipadRing);
-
-    const needle = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.25, 7, 8), palette.imperialGold);
-    needle.position.y = 32.8;
-    hq.add(needle);
+    const aviationLight = new THREE.Mesh(new THREE.SphereGeometry(0.18, 8, 8), palette.carTaillight);
+    aviationLight.position.y = currentY + 9.25;
+    hq.add(aviationLight);
   } else {
-    // Level 5: Sovereign Imperial Monolith (Apex)
-    const tier1 = new THREE.Mesh(new THREE.BoxGeometry(8.6, 12, 8.6), palette.curtainGlass);
-    tier1.position.y = 7.5;
-    hq.add(tier1);
+    // Base Roof Parapet & Spire for Levels 1-4
+    const roofCap = new THREE.Mesh(new THREE.ConeGeometry(1.4, 3.2, 4), palette.imperialGold);
+    roofCap.rotation.y = Math.PI / 4;
+    roofCap.position.y = currentY + 1.6;
+    hq.add(roofCap);
 
-    const goldRibbon1 = new THREE.Mesh(new THREE.BoxGeometry(9.2, 0.6, 9.2), palette.imperialGold);
-    goldRibbon1.position.y = 13.7;
-    hq.add(goldRibbon1);
-
-    const tier2 = new THREE.Mesh(new THREE.BoxGeometry(7.0, 11, 7.0), palette.litGlassNight);
-    tier2.position.y = 19.3;
-    hq.add(tier2);
-
-    const goldRibbon2 = new THREE.Mesh(new THREE.BoxGeometry(7.6, 0.6, 7.6), palette.imperialGold);
-    goldRibbon2.position.y = 25.0;
-    hq.add(goldRibbon2);
-
-    const tier3 = new THREE.Mesh(new THREE.BoxGeometry(5.2, 9, 5.2), palette.curtainGlass);
-    tier3.position.y = 29.7;
-    hq.add(tier3);
-
-    // Sovereign Crown & Helipad
-    const helipad = new THREE.Mesh(new THREE.CylinderGeometry(2.8, 2.8, 0.35, 16), palette.navyStructure);
-    helipad.position.y = 34.4;
-    hq.add(helipad);
-
-    const helipadHolo = new THREE.Mesh(new THREE.RingGeometry(1.8, 2.2, 16), palette.imperialGold);
-    helipadHolo.rotation.x = -Math.PI / 2;
-    helipadHolo.position.y = 34.6;
-    hq.add(helipadHolo);
-
-    // Floating Sovereign Ring
-    const sovereignRing = new THREE.Mesh(
-      new THREE.TorusGeometry(3.6, 0.25, 12, 24),
-      palette.imperialGold
-    );
-    sovereignRing.rotation.x = Math.PI / 2;
-    sovereignRing.position.y = 36.2;
-    hq.add(sovereignRing);
-
-    const supremeSpire = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.1, 0.35, 9, 8),
-      palette.imperialGold
-    );
-    supremeSpire.position.y = 39.5;
-    hq.add(supremeSpire);
+    const antenna = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.1, 3.2, 8), palette.chromeMetal);
+    antenna.position.y = currentY + 4.2;
+    hq.add(antenna);
   }
 
   return hq;
 }
 
 /**
- * CENTRAL SOVEREIGN BANK (البنك المركزي والمؤسسة المالية)
- * Classical Neoclassical architecture: grand stairs, columns, pediment, dome
+ * 6. CENTRAL SOVEREIGN INVESTMENT BANK
  */
-export function buildBankMesh(
-  palette: CityMaterialPalette,
-  isSoftwareGl: boolean
-): THREE.Group {
+export function buildBankMesh(palette: CityMaterialPalette, isSoftwareGl: boolean): THREE.Group {
   const bank = new THREE.Group();
 
-  // Part 1: Stepped marble podium
-  const step1 = new THREE.Mesh(new THREE.BoxGeometry(11, 0.6, 9), palette.whiteMarble);
-  step1.position.y = 0.3;
-  bank.add(step1);
+  // 1. Broad Marble Stepped Podium
+  const podium = new THREE.Mesh(new THREE.BoxGeometry(11.5, 0.9, 9.5), palette.whiteMarble);
+  podium.position.y = 0.45;
+  podium.receiveShadow = !isSoftwareGl;
+  bank.add(podium);
 
-  const step2 = new THREE.Mesh(new THREE.BoxGeometry(10.2, 0.5, 8.2), palette.whiteMarble);
-  step2.position.y = 0.8;
-  bank.add(step2);
+  // Ceremonial Front Grand Stairs
+  for (let s = 0; s < 4; s++) {
+    const step = new THREE.Mesh(
+      new THREE.BoxGeometry(6.5 + s * 0.4, 0.18, 0.8),
+      palette.whiteMarble
+    );
+    step.position.set(0, 0.09 + s * 0.18, 4.8 + (3 - s) * 0.4);
+    bank.add(step);
+  }
 
-  // Part 2: Main Bank Treasury Hall
-  const hall = new THREE.Mesh(new THREE.BoxGeometry(9.2, 4.2, 7.2), palette.navyStructure);
-  hall.position.y = 3.1;
+  // 2. Main Classical Banking Hall
+  const hall = new THREE.Mesh(new THREE.BoxGeometry(9.5, 5.2, 7.5), palette.whiteMarble);
+  hall.position.y = 3.4;
   hall.castShadow = !isSoftwareGl;
   bank.add(hall);
 
-  // Part 3: Classical Corinthian/Ionic Columns (6 gold columns along front)
-  const colGeo = new THREE.CylinderGeometry(0.24, 0.28, 4.0, 10);
-  const colPositions = [-3.6, -2.2, -0.8, 0.8, 2.2, 3.6];
-  colPositions.forEach((cx) => {
-    const col = new THREE.Mesh(colGeo, palette.imperialGold);
-    col.position.set(cx, 3.0, 3.75);
-    col.castShadow = !isSoftwareGl;
-    bank.add(col);
-  });
+  // 3. Hexastyle Portico: 6 Fluted Classical Columns with Capitals & Bases
+  const colSpacing = 1.4;
+  for (let i = -2.5; i <= 2.5; i += 1.0) {
+    const cx = i * colSpacing;
 
-  // Part 4: Classical Entablature beam over columns
-  const beam = new THREE.Mesh(new THREE.BoxGeometry(9.6, 0.5, 1.4), palette.whiteMarble);
-  beam.position.set(0, 5.25, 3.75);
-  bank.add(beam);
+    // Fluted shaft
+    const colShaft = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.36, 4.8, 12), palette.whiteMarble);
+    colShaft.position.set(cx, 3.3, 3.9);
+    colShaft.castShadow = !isSoftwareGl;
+    bank.add(colShaft);
 
-  // Part 5: Triangular Gold Pediment
-  const pediment = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 5.0, 1.8, 3), palette.imperialGold);
-  pediment.rotation.z = Math.PI;
-  pediment.rotation.y = Math.PI / 2;
-  pediment.position.set(0, 6.2, 3.75);
+    // Golden Corinthian Capital
+    const capital = new THREE.Mesh(new THREE.CylinderGeometry(0.44, 0.34, 0.35, 10), palette.imperialGold);
+    capital.position.set(cx, 5.75, 3.9);
+    bank.add(capital);
+
+    // Column Base Plinth
+    const base = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.22, 0.72), palette.whiteMarble);
+    base.position.set(cx, 0.95, 3.9);
+    bank.add(base);
+  }
+
+  // 4. Triangular Classical Pediment with Imperial Gold Relief
+  const pediment = new THREE.Mesh(new THREE.ConeGeometry(5.8, 2.6, 4), palette.whiteMarble);
+  pediment.rotation.y = Math.PI / 4;
+  pediment.position.set(0, 7.1, 2.2);
   bank.add(pediment);
 
-  // Part 6: Classical Neoclassical Dome with gold finial
-  const dome = new THREE.Mesh(
-    new THREE.SphereGeometry(2.4, 16, 12, 0, Math.PI * 2, 0, Math.PI / 2),
-    palette.copperAccent
-  );
-  dome.position.set(0, 5.2, 0);
+  // Golden Relief Medallion in Pediment Tympanum
+  const medallion = new THREE.Mesh(new THREE.CylinderGeometry(0.75, 0.75, 0.15, 16), palette.imperialGold);
+  medallion.rotation.x = Math.PI / 2;
+  medallion.position.set(0, 6.7, 4.15);
+  bank.add(medallion);
+
+  // 5. Majestic Golden Ribbed Dome with Balustrade Lantern
+  const domeBase = new THREE.Mesh(new THREE.CylinderGeometry(2.8, 2.9, 0.8, 16), palette.whiteMarble);
+  domeBase.position.set(0, 6.3, 0);
+  bank.add(domeBase);
+
+  const dome = new THREE.Mesh(new THREE.SphereGeometry(2.6, 16, 12, 0, Math.PI * 2, 0, Math.PI / 2), palette.imperialGold);
+  dome.position.set(0, 6.7, 0);
   bank.add(dome);
 
-  const finial = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 1.4, 8), palette.imperialGold);
-  finial.position.set(0, 7.8, 0);
-  bank.add(finial);
+  // Dome Lantern Finial
+  const lantern = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 1.2, 8), palette.imperialGold);
+  lantern.position.set(0, 9.6, 0);
+  bank.add(lantern);
+
+  // 6. Armored Security Vault Wing & Live Financial LED Ticker
+  const tickerScreen = new THREE.Mesh(new THREE.BoxGeometry(8.2, 0.38, 0.15), palette.neonCyan);
+  tickerScreen.position.set(0, 1.6, 4.75);
+  bank.add(tickerScreen);
 
   return bank;
 }
 
 /**
- * FACTORY & INDUSTRIAL COMPLEX (المجمع الصناعي ومحطات الإنتاج)
+ * 7. FLAGSHIP MANUFACTURING & INDUSTRIAL COMPLEX
  */
 export function buildFactoryMesh(
   palette: CityMaterialPalette,
@@ -620,268 +721,405 @@ export function buildFactoryMesh(
   const factory = new THREE.Group();
   const smokePositions: THREE.Vector3[] = [];
 
-  // Part 1: Concrete industrial foundation
-  const base = new THREE.Mesh(new THREE.BoxGeometry(11, 0.6, 9.5), palette.slateStructure);
-  base.position.y = 0.3;
-  factory.add(base);
+  // 1. Heavy Industrial Floor Plinth
+  const plinth = new THREE.Mesh(new THREE.BoxGeometry(13.0, 0.5, 11.0), palette.slateStructure);
+  plinth.position.y = 0.25;
+  plinth.receiveShadow = !isSoftwareGl;
+  factory.add(plinth);
 
-  // Part 2: Main Heavy Production Hall with sawtooth roof
-  const hall = new THREE.Mesh(new THREE.BoxGeometry(6.5, 4.2, 8.2), palette.industrialSteel);
-  hall.position.set(-1.8, 2.5, 0);
-  hall.castShadow = !isSoftwareGl;
-  factory.add(hall);
+  // Yellow Safety Perimeter Edge
+  const safetyBorder = new THREE.Mesh(new THREE.BoxGeometry(13.3, 0.1, 11.3), palette.constructionCaution);
+  safetyBorder.position.y = 0.05;
+  factory.add(safetyBorder);
 
-  // Sawtooth roof wedges
-  [-2.5, 0, 2.5].forEach((rz) => {
-    const roofSection = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.01, 1.3, 6.4, 3),
-      palette.corrugatedMetal
+  // 2. Main Fabrication Hangar with Saw-Tooth Clerestory Roof
+  const hangarW = 8.5;
+  const hangarH = 4.8;
+  const hangarD = 7.0;
+
+  const hangar = new THREE.Mesh(new THREE.BoxGeometry(hangarW, hangarH, hangarD), palette.corrugatedMetal);
+  hangar.position.set(-1.8, 0.5 + hangarH / 2, 0);
+  hangar.castShadow = !isSoftwareGl;
+  factory.add(hangar);
+
+  // 3 Saw-Tooth Roof Ridges with North-Facing Glazing
+  for (let r = 0; r < 3; r++) {
+    const ridge = new THREE.Mesh(new THREE.ConeGeometry(1.6, 1.8, 3), palette.navyStructure);
+    ridge.rotation.y = Math.PI / 2;
+    ridge.rotation.z = 0.3;
+    ridge.position.set(-4.2 + r * 2.5, 5.8, 0);
+    factory.add(ridge);
+  }
+
+  // 3. Dual Industrial Smokestacks with Red & White Aviation Bands
+  const stackPositions = [
+    new THREE.Vector3(3.8, 0, -2.6),
+    new THREE.Vector3(5.2, 0, -2.6),
+  ];
+
+  stackPositions.forEach((sp, idx) => {
+    // Tapered tall chimney
+    const chimneyH = 8.8;
+    const chimney = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.5, 0.75, chimneyH, 12),
+      palette.industrialBrick
     );
-    roofSection.rotation.z = Math.PI / 2;
-    roofSection.position.set(-1.8, 5.1, rz);
-    factory.add(roofSection);
+    chimney.position.set(sp.x, 0.5 + chimneyH / 2, sp.z);
+    chimney.castShadow = !isSoftwareGl;
+    factory.add(chimney);
+
+    // Warning Bands near top
+    const band1 = new THREE.Mesh(new THREE.CylinderGeometry(0.54, 0.56, 0.8, 12), palette.whiteMarble);
+    band1.position.set(sp.x, 7.8, sp.z);
+    factory.add(band1);
+
+    const band2 = new THREE.Mesh(new THREE.CylinderGeometry(0.51, 0.53, 0.8, 12), palette.carTaillight);
+    band2.position.set(sp.x, 8.8, sp.z);
+    factory.add(band2);
+
+    // Smoke emission coordinate
+    smokePositions.push(new THREE.Vector3(sp.x, 9.4, sp.z));
   });
 
-  // Part 3: Dual Exhaust Smokestacks
-  const stackGeo = new THREE.CylinderGeometry(0.45, 0.65, 7.0, 12);
-  [-1.2, 1.2].forEach((sx) => {
-    const stack = new THREE.Mesh(stackGeo, palette.industrialBrick);
-    stack.position.set(-3.2 + sx, 5.5, -2.8);
-    stack.castShadow = !isSoftwareGl;
-    factory.add(stack);
+  // 4. Cylindrical Bulk Storage Silos with External Piping
+  [-0.6, 1.6].forEach((sx) => {
+    const silo = new THREE.Mesh(new THREE.CylinderGeometry(1.0, 1.0, 5.8, 14), palette.chromeMetal);
+    silo.position.set(sx, 3.4, 3.5);
+    silo.castShadow = !isSoftwareGl;
+    factory.add(silo);
 
-    const rim = new THREE.Mesh(new THREE.TorusGeometry(0.5, 0.1, 8, 12), palette.imperialGold);
-    rim.rotation.x = Math.PI / 2;
-    rim.position.set(-3.2 + sx, 9.0, -2.8);
-    factory.add(rim);
-
-    // Save smoke emitter position in world coords relative to factory
-    smokePositions.push(new THREE.Vector3(-3.2 + sx, 9.2, -2.8));
+    const siloCap = new THREE.Mesh(new THREE.ConeGeometry(1.05, 0.6, 14), palette.brushedGold);
+    siloCap.position.set(sx, 6.5, 3.5);
+    factory.add(siloCap);
   });
 
-  // Part 4: Spherical Petrochemical Pressure Tank with support legs
-  const sphereTank = new THREE.Mesh(
-    new THREE.SphereGeometry(1.6, 12, 10),
-    palette.curbGold
-  );
-  sphereTank.position.set(3.2, 2.8, 1.6);
-  sphereTank.castShadow = !isSoftwareGl;
-  factory.add(sphereTank);
+  // Industrial Pipeline Conduits
+  const pipe = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 5.4, 8), palette.copperAccent);
+  pipe.rotation.z = Math.PI / 2;
+  pipe.position.set(0.5, 4.2, 3.5);
+  factory.add(pipe);
 
-  // Tank support ring
-  const tankLegs = new THREE.Mesh(
-    new THREE.CylinderGeometry(1.5, 1.6, 2.2, 6, 1, true),
-    palette.industrialSteel
-  );
-  tankLegs.position.set(3.2, 1.3, 1.6);
-  factory.add(tankLegs);
+  // 5. Electrical Substation & High-Voltage Transformer
+  const subStation = new THREE.Mesh(new THREE.BoxGeometry(2.0, 1.8, 2.0), palette.slateStructure);
+  subStation.position.set(4.2, 1.4, 2.6);
+  factory.add(subStation);
 
-  // Part 5: Secondary Warehouse bay with roll-up dock
-  const bay = new THREE.Mesh(new THREE.BoxGeometry(3.5, 3.2, 4.0), palette.slateStructure);
-  bay.position.set(3.2, 2.0, -2.2);
-  factory.add(bay);
+  for (let b = 0; b < 3; b++) {
+    const bushing = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.1, 0.7, 6), palette.copperAccent);
+    bushing.position.set(3.6 + b * 0.6, 2.5, 2.6);
+    factory.add(bushing);
+  }
 
-  const rollUpDoor = new THREE.Mesh(new THREE.BoxGeometry(0.1, 2.2, 2.4), palette.corrugatedMetal);
-  rollUpDoor.position.set(4.96, 1.5, -2.2);
-  factory.add(rollUpDoor);
+  // Roll-Up Overhead Truck Cargo Door
+  const cargoDoor = new THREE.Mesh(new THREE.BoxGeometry(0.1, 2.6, 2.4), palette.industrialSteel);
+  cargoDoor.position.set(2.46, 1.8, 0);
+  factory.add(cargoDoor);
 
   return { group: factory, smokePositions };
 }
 
 /**
- * RETAIL MEGAMALL & COMMERCIAL STORES (المتاجر والمولات التجارية)
+ * 8. COMMERCIAL RETAIL MALL & MEGA STORE
  */
-export function buildStoreMesh(
-  palette: CityMaterialPalette,
-  isSoftwareGl: boolean
-): THREE.Group {
+export function buildStoreMesh(palette: CityMaterialPalette, isSoftwareGl: boolean): THREE.Group {
   const store = new THREE.Group();
 
-  // Part 1: Wide shopping plaza foundation
-  const base = new THREE.Mesh(new THREE.BoxGeometry(10.5, 0.4, 9), palette.sidewalk);
+  // 1. Paved Plaza Base
+  const base = new THREE.Mesh(new THREE.BoxGeometry(10.5, 0.4, 9.5), palette.plazaPaver);
   base.position.y = 0.2;
+  base.receiveShadow = !isSoftwareGl;
   store.add(base);
 
-  // Part 2: Main curved / modern shopping pavilion
-  const main = new THREE.Mesh(new THREE.BoxGeometry(8.5, 4.0, 6.5), palette.navyStructure);
-  main.position.set(0, 2.3, -0.6);
-  main.castShadow = !isSoftwareGl;
-  store.add(main);
+  // 2. Multistory Curved Glass Atrium Mall Structure
+  const body = new THREE.Mesh(new THREE.BoxGeometry(8.5, 4.6, 7.2), palette.navyStructure);
+  body.position.y = 2.5;
+  body.castShadow = !isSoftwareGl;
+  store.add(body);
 
-  // Part 3: Illuminated glass front show window
-  const windowFront = new THREE.Mesh(new THREE.BoxGeometry(7.8, 2.4, 0.2), palette.litGlassNight);
-  windowFront.position.set(0, 1.7, 2.66);
-  store.add(windowFront);
+  // Front Double-Height Glass Curtain Wall
+  const glassFacade = new THREE.Mesh(new THREE.BoxGeometry(8.6, 3.6, 0.2), palette.curtainGlass);
+  glassFacade.position.set(0, 2.2, 3.62);
+  store.add(glassFacade);
 
-  // Part 4: Cantilevered Gold Marquee Canopy
-  const canopy = new THREE.Mesh(new THREE.BoxGeometry(8.8, 0.35, 2.2), palette.imperialGold);
-  canopy.position.set(0, 3.2, 3.4);
+  // 3. Cantilevered Gold Entrance Canopy & Revolving Doors
+  const canopy = new THREE.Mesh(new THREE.BoxGeometry(4.4, 0.22, 1.8), palette.imperialGold);
+  canopy.position.set(0, 2.4, 4.5);
   store.add(canopy);
 
-  // Part 5: Commercial marquee billboard on roof
-  const billboard = new THREE.Mesh(new THREE.BoxGeometry(4.8, 1.6, 0.2), palette.imperialGold);
-  billboard.position.set(0, 5.2, -0.6);
+  // 4. Massive Illuminated Digital Billboard Display Screen
+  const billboard = new THREE.Mesh(new THREE.BoxGeometry(5.8, 1.4, 0.18), palette.neonCyan);
+  billboard.position.set(0, 4.1, 3.65);
   store.add(billboard);
+
+  // Billboard Gold Frame
+  const bFrame = new THREE.Mesh(new THREE.BoxGeometry(6.0, 1.55, 0.12), palette.imperialGold);
+  bFrame.position.set(0, 4.1, 3.64);
+  store.add(bFrame);
+
+  // 5. Rooftop HVAC Chiller Units and Ductwork
+  [-1.8, 1.8].forEach((hx) => {
+    const hvac = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.9, 1.4), palette.industrialSteel);
+    hvac.position.set(hx, 5.2, -1.0);
+    store.add(hvac);
+
+    const fan = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 0.15, 8), palette.slateStructure);
+    fan.position.set(hx, 5.72, -1.0);
+    store.add(fan);
+  });
+
+  // 6. Sidewalk Promenade with Outdoor Café Parasols
+  [-3.2, 3.2].forEach((cx) => {
+    // Parasol Umbrella
+    const umbrella = new THREE.Mesh(new THREE.ConeGeometry(0.9, 0.45, 8), palette.imperialGold);
+    umbrella.position.set(cx, 1.8, 3.8);
+    store.add(umbrella);
+
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 1.4, 6), palette.industrialSteel);
+    pole.position.set(cx, 1.1, 3.8);
+    store.add(pole);
+
+    // Café Table
+    const table = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, 0.05, 8), palette.whiteMarble);
+    table.position.set(cx, 0.75, 3.8);
+    store.add(table);
+  });
 
   return store;
 }
 
 /**
- * WAREHOUSE & LOGISTICS HUB (المستودعات ومراكز الشحن وسلاسل الإمداد)
+ * 9. LOGISTICS CENTER & MULTI-BAY DISTRIBUTION HUB
  */
-export function buildWarehouseMesh(
-  palette: CityMaterialPalette,
-  isSoftwareGl: boolean
-): THREE.Group {
-  const wh = new THREE.Group();
+export function buildWarehouseMesh(palette: CityMaterialPalette, isSoftwareGl: boolean): THREE.Group {
+  const warehouse = new THREE.Group();
 
-  // Part 1: Concrete apron
-  const base = new THREE.Mesh(new THREE.BoxGeometry(11, 0.4, 9), palette.slateStructure);
-  base.position.y = 0.2;
-  wh.add(base);
+  // 1. Concrete Truck Apron Foundation
+  const foundation = new THREE.Mesh(new THREE.BoxGeometry(11.5, 0.45, 10.5), palette.facadeConcrete);
+  foundation.position.y = 0.225;
+  foundation.receiveShadow = !isSoftwareGl;
+  warehouse.add(foundation);
 
-  // Part 2: High-bay warehouse shed
-  const shed = new THREE.Mesh(new THREE.BoxGeometry(9.2, 4.4, 6.8), palette.corrugatedMetal);
-  shed.position.set(0, 2.5, -0.6);
-  shed.castShadow = !isSoftwareGl;
-  wh.add(shed);
+  // 2. Main Distribution Hangar with Skylights
+  const main = new THREE.Mesh(new THREE.BoxGeometry(9.6, 4.4, 6.8), palette.corrugatedMetal);
+  main.position.set(0, 2.45, -1.2);
+  main.castShadow = !isSoftwareGl;
+  warehouse.add(main);
 
-  // Part 3: Roof monitor vents
-  const vent = new THREE.Mesh(new THREE.BoxGeometry(8.0, 0.6, 1.8), palette.industrialSteel);
-  vent.position.set(0, 4.9, -0.6);
-  wh.add(vent);
+  // 3. 4 Raised Loading Dock Bays with Roll-Up Doors & Rubber Bumpers
+  for (let b = -3; b <= 3; b += 2.0) {
+    // Roll-up door
+    const door = new THREE.Mesh(new THREE.BoxGeometry(1.4, 2.4, 0.15), palette.industrialSteel);
+    door.position.set(b, 1.65, 2.22);
+    warehouse.add(door);
 
-  // Part 4: Dual Loading Docks
-  [-2.2, 2.2].forEach((dx) => {
-    const dockDoor = new THREE.Mesh(new THREE.BoxGeometry(2.0, 2.5, 0.15), palette.slateStructure);
-    dockDoor.position.set(dx, 1.6, 2.8);
-    wh.add(dockDoor);
+    // Dock rubber bumper pad
+    const bumper = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.22, 0.25), palette.tireRubber);
+    bumper.position.set(b, 0.35, 2.3);
+    warehouse.add(bumper);
 
-    const bumper = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.3, 0.4), palette.curbGold);
-    bumper.position.set(dx, 0.45, 2.95);
-    wh.add(bumper);
+    // Dock Bay Number Plate
+    const numPlate = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.3, 0.05), palette.amberIndicator);
+    numPlate.position.set(b, 3.05, 2.22);
+    warehouse.add(numPlate);
+  }
+
+  // 4. Stacked Intermodal Shipping Containers in Yard (Maersk Blue, Evergreen Green, Gold)
+  const containerColors = [palette.curtainGlass, palette.foliageGreen, palette.imperialGold];
+
+  const containerStacks = [
+    { x: -3.8, y: 0.6, z: 3.4, rot: 0, col: 0 },
+    { x: -3.8, y: 1.5, z: 3.4, rot: 0, col: 1 },
+    { x: 3.8, y: 0.6, z: 3.4, rot: 0.08, col: 2 },
+  ];
+
+  containerStacks.forEach((c) => {
+    const box = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.9, 2.6), containerColors[c.col]);
+    box.position.set(c.x, c.y + 0.45, c.z);
+    box.rotation.y = c.rot;
+    box.castShadow = !isSoftwareGl;
+    warehouse.add(box);
   });
 
-  // Part 5: Stacked ISO Cargo Containers (Blue, Red, Gold)
-  const c1 = new THREE.Mesh(new THREE.BoxGeometry(3.0, 1.2, 1.2), palette.curtainGlass);
-  c1.position.set(-3.2, 0.8, 3.6);
-  wh.add(c1);
+  // 5. Heavy Floodlight Mast
+  const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.12, 6.2, 8), palette.industrialSteel);
+  mast.position.set(4.8, 3.1, -4.0);
+  warehouse.add(mast);
 
-  const c2 = new THREE.Mesh(new THREE.BoxGeometry(3.0, 1.2, 1.2), palette.imperialGold);
-  c2.position.set(-3.2, 2.0, 3.6);
-  wh.add(c2);
+  const floodlight = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.3, 0.3), palette.carHeadlight);
+  floodlight.position.set(4.8, 6.1, -3.9);
+  warehouse.add(floodlight);
 
-  return wh;
+  return warehouse;
 }
 
 /**
- * REGIONAL BRANCH OFFICE (الفروع والمكاتب الإقليمية)
+ * 10. PRESTIGE REGIONAL CORPORATE BRANCH
  */
-export function buildBranchMesh(
-  palette: CityMaterialPalette,
-  isSoftwareGl: boolean
-): THREE.Group {
+export function buildBranchMesh(palette: CityMaterialPalette, isSoftwareGl: boolean): THREE.Group {
   const branch = new THREE.Group();
 
-  // Part 1: Base plinth
-  const base = new THREE.Mesh(new THREE.BoxGeometry(9, 0.4, 8), palette.slateStructure);
-  base.position.y = 0.2;
+  // 1. Paved Plaza Base with Gold Trim
+  const base = new THREE.Mesh(new THREE.BoxGeometry(8.5, 0.35, 8.5), palette.plazaPaver);
+  base.position.y = 0.175;
+  base.receiveShadow = !isSoftwareGl;
   branch.add(base);
 
-  // Part 2: 4-story contemporary glass & steel office building
-  const office = new THREE.Mesh(new THREE.BoxGeometry(7.2, 6.5, 6.2), palette.navyStructure);
-  office.position.set(0, 3.6, 0);
-  office.castShadow = !isSoftwareGl;
-  branch.add(office);
+  // 2. 5-Story Corporate Glass Cube with Vertical Bronze Sun Louvers
+  const towerH = 5.8;
+  const tower = new THREE.Mesh(new THREE.BoxGeometry(6.4, towerH, 6.4), palette.curtainGlass);
+  tower.position.y = 0.35 + towerH / 2;
+  tower.castShadow = !isSoftwareGl;
+  branch.add(tower);
 
-  // Part 3: Exterior glass facade ribbons
-  [2.2, 3.8, 5.4].forEach((fy) => {
-    const glassRibbon = new THREE.Mesh(new THREE.BoxGeometry(7.35, 0.8, 6.35), palette.litGlassNight);
-    glassRibbon.position.set(0, fy, 0);
-    branch.add(glassRibbon);
+  // Vertical Architectural Louvers on Facade
+  for (let l = -2.6; l <= 2.6; l += 0.85) {
+    const louver = new THREE.Mesh(new THREE.BoxGeometry(0.12, towerH, 0.35), palette.imperialGold);
+    louver.position.set(l, 0.35 + towerH / 2, 3.3);
+    branch.add(louver);
+  }
+
+  // 3. Executive Rooftop Terrace Garden with Timber Pergola
+  const roofTerrace = new THREE.Mesh(new THREE.BoxGeometry(6.6, 0.35, 6.6), palette.navyStructure);
+  roofTerrace.position.y = 6.25;
+  branch.add(roofTerrace);
+
+  const pergola = new THREE.Mesh(new THREE.BoxGeometry(3.6, 1.4, 2.6), palette.copperAccent);
+  pergola.position.set(0, 7.1, 0);
+  branch.add(pergola);
+
+  // Rooftop Shrub Planters
+  [-2.2, 2.2].forEach((rx) => {
+    const shrub = new THREE.Mesh(new THREE.SphereGeometry(0.45, 8, 8), palette.foliageGreen);
+    shrub.position.set(rx, 6.7, -2.2);
+    branch.add(shrub);
   });
 
-  // Part 4: Gold entrance canopy
-  const canopy = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.25, 1.8), palette.imperialGold);
-  canopy.position.set(0, 1.6, 3.8);
-  branch.add(canopy);
+  // 4. Illuminated Corporate Brand Totem Pylon
+  const pylon = new THREE.Mesh(new THREE.BoxGeometry(0.7, 2.8, 0.25), palette.imperialGold);
+  pylon.position.set(-3.2, 1.4, 3.4);
+  branch.add(pylon);
 
-  // Part 5: Rooftop communications antenna
-  const antenna = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.08, 3.0, 6), palette.imperialGold);
-  antenna.position.set(2.2, 8.2, -1.8);
-  branch.add(antenna);
+  const pylonLogo = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.24, 0.08, 12), palette.neonCyan);
+  pylonLogo.rotation.x = Math.PI / 2;
+  pylonLogo.position.set(-3.2, 2.3, 3.54);
+  branch.add(pylonLogo);
 
   return branch;
 }
 
 /**
- * TECH & INNOVATION HUB (وادي التكنولوجيا والذكاء الاصطناعي)
+ * 11. SILICON OASIS TECH INNOVATION HUB
  */
-export function buildTechHubMesh(
-  palette: CityMaterialPalette,
-  isSoftwareGl: boolean
-): THREE.Group {
-  const tech = new THREE.Group();
+export function buildTechHubMesh(palette: CityMaterialPalette, isSoftwareGl: boolean): THREE.Group {
+  const hub = new THREE.Group();
 
-  // Foundation
-  const base = new THREE.Mesh(new THREE.BoxGeometry(10, 0.4, 9), palette.navyStructure);
-  base.position.y = 0.2;
-  tech.add(base);
+  // 1. Cybernetic Ground Base with Cyan LED Grid Lines
+  const base = new THREE.Mesh(new THREE.BoxGeometry(9.5, 0.35, 9.5), palette.navyStructure);
+  base.position.y = 0.175;
+  hub.add(base);
 
-  // Angular crystalline main hub
-  const hub = new THREE.Mesh(new THREE.BoxGeometry(7.0, 5.5, 6.5), palette.curtainGlass);
-  hub.position.set(0, 3.0, 0);
-  hub.castShadow = !isSoftwareGl;
-  tech.add(hub);
+  const neonPerimeter = new THREE.Mesh(new THREE.BoxGeometry(9.7, 0.08, 9.7), palette.neonCyan);
+  neonPerimeter.position.y = 0.08;
+  hub.add(neonPerimeter);
 
-  // Glowing neon cyber-gold trim bands
-  const band = new THREE.Mesh(new THREE.BoxGeometry(7.3, 0.3, 6.8), palette.imperialGold);
-  band.position.set(0, 5.8, 0);
-  tech.add(band);
+  // 2. Asymmetric Twin Tech Towers connected by Aerial Skybridge
+  const tower1 = new THREE.Mesh(new THREE.BoxGeometry(4.2, 6.8, 4.2), palette.curtainGlass);
+  tower1.position.set(-2.0, 3.75, 0);
+  tower1.castShadow = !isSoftwareGl;
+  hub.add(tower1);
 
-  // Parabolic Satellite Dish
+  const tower2 = new THREE.Mesh(new THREE.BoxGeometry(3.6, 5.4, 3.6), palette.curtainGlass);
+  tower2.position.set(2.4, 3.05, 0);
+  tower2.castShadow = !isSoftwareGl;
+  hub.add(tower2);
+
+  // Connecting Aerial Glass Skybridge
+  const bridge = new THREE.Mesh(new THREE.BoxGeometry(2.6, 1.2, 1.6), palette.neonCyan);
+  bridge.position.set(0.2, 4.4, 0);
+  hub.add(bridge);
+
+  // 3. Rooftop Parabolic Satellite Communications Array
   const dish = new THREE.Mesh(
-    new THREE.SphereGeometry(1.2, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2),
-    palette.industrialSteel
+    new THREE.SphereGeometry(1.1, 14, 8, 0, Math.PI * 2, 0, Math.PI / 3),
+    palette.whiteMarble
   );
   dish.rotation.x = -Math.PI / 3;
-  dish.position.set(-1.8, 6.8, -1.4);
-  tech.add(dish);
+  dish.position.set(-2.0, 7.8, 0);
+  hub.add(dish);
 
-  return tech;
+  const dishAntenna = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.9, 6), palette.chromeMetal);
+  dishAntenna.position.set(-2.0, 8.4, 0.3);
+  hub.add(dishAntenna);
+
+  // 4. Glowing Holographic Disc hovering between towers
+  const holoRing = new THREE.Mesh(new THREE.TorusGeometry(1.2, 0.1, 12, 24), palette.neonPurple);
+  holoRing.rotation.x = Math.PI / 2;
+  holoRing.position.set(0.2, 6.2, 0);
+  hub.add(holoRing);
+
+  return hub;
 }
 
 /**
- * AGRICULTURAL & GREENHOUSE COMPLEX (الدفيئات والمجمعات الزراعية)
+ * 12. HIGH-TECH BIO-AGRO & FOOD PRODUCTION FACILITY
  */
-export function buildAgroFarmMesh(
-  palette: CityMaterialPalette,
-  isSoftwareGl: boolean
-): THREE.Group {
+export function buildAgroFarmMesh(palette: CityMaterialPalette, isSoftwareGl: boolean): THREE.Group {
   const farm = new THREE.Group();
 
-  // Base grass soil
-  const base = new THREE.Mesh(new THREE.BoxGeometry(10, 0.35, 9), palette.foliageDarkGreen);
+  // 1. Manicured Soil & Crop Base
+  const base = new THREE.Mesh(new THREE.BoxGeometry(10.5, 0.35, 9.5), palette.grassLawn);
   base.position.y = 0.175;
+  base.receiveShadow = !isSoftwareGl;
   farm.add(base);
 
-  // Translucent Arched Greenhouse
-  const gh = new THREE.Mesh(
-    new THREE.CylinderGeometry(2.4, 2.4, 5.5, 16, 1, false, 0, Math.PI),
-    palette.curtainGlass
-  );
-  gh.rotation.z = Math.PI / 2;
-  gh.position.set(-1.2, 1.8, 0);
-  farm.add(gh);
+  // 2. Triple Barrel-Vaulted Hydroponic Greenhouses with Translucent Glass
+  [-2.6, 0, 2.6].forEach((gx) => {
+    const greenhouse = new THREE.Mesh(
+      new THREE.CylinderGeometry(1.2, 1.2, 5.8, 16, 1, false, 0, Math.PI),
+      palette.curtainGlass
+    );
+    greenhouse.rotation.z = Math.PI / 2;
+    greenhouse.rotation.y = Math.PI / 2;
+    greenhouse.position.set(gx, 1.2, 0.8);
+    greenhouse.castShadow = !isSoftwareGl;
+    farm.add(greenhouse);
 
-  // Grain Storage Silo
-  const silo = new THREE.Mesh(new THREE.CylinderGeometry(1.3, 1.3, 5.8, 16), palette.whiteMarble);
-  silo.position.set(2.8, 3.1, 1.2);
+    // Interior Crop Rows visible through glass
+    const crop = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.45, 5.2), palette.foliageGreen);
+    crop.position.set(gx, 0.55, 0.8);
+    farm.add(crop);
+  });
+
+  // 3. Fermentation Silos
+  const silo = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.1, 4.6, 14), palette.chromeMetal);
+  silo.position.set(3.4, 2.6, -2.8);
+  silo.castShadow = !isSoftwareGl;
   farm.add(silo);
 
-  const dome = new THREE.Mesh(new THREE.SphereGeometry(1.3, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2), palette.copperAccent);
-  dome.position.set(2.8, 6.0, 1.2);
-  farm.add(dome);
+  const siloCone = new THREE.Mesh(new THREE.ConeGeometry(1.15, 0.7, 14), palette.copperAccent);
+  siloCone.position.set(3.4, 5.2, -2.8);
+  farm.add(siloCone);
+
+  // 4. Clean Energy Micro Wind Turbine with 3 Aerodynamic Blades
+  const turbineTower = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.16, 6.4, 8), palette.whiteMarble);
+  turbineTower.position.set(-3.6, 3.5, -2.8);
+  farm.add(turbineTower);
+
+  const nacelle = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.35, 0.8), palette.whiteMarble);
+  nacelle.position.set(-3.6, 6.7, -2.8);
+  farm.add(nacelle);
+
+  for (let b = 0; b < 3; b++) {
+    const bladeAngle = (b * Math.PI * 2) / 3;
+    const blade = new THREE.Mesh(new THREE.BoxGeometry(0.12, 1.8, 0.04), palette.whiteMarble);
+    blade.position.set(
+      -3.6 + Math.cos(bladeAngle) * 0.9,
+      6.7 + Math.sin(bladeAngle) * 0.9,
+      -2.35
+    );
+    blade.rotation.z = bladeAngle;
+    farm.add(blade);
+  }
 
   return farm;
 }
