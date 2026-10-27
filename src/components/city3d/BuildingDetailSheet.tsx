@@ -185,13 +185,13 @@ export const BuildingDetailSheet: React.FC<BuildingDetailSheetProps> = ({
             <div className="p-3 bg-slate-950/70 border border-slate-800 rounded-xl">
               <span className="text-slate-400 block mb-1">الودائع النشطة:</span>
               <span className="font-bold text-amber-400 text-sm">
-                {formatMoney(profile.deposits.reduce((acc, d) => acc + d.amount, 0))}
+                {formatMoney((profile.banking?.deposits ?? []).reduce((acc: number, d) => acc + (d.principal || 0), 0))}
               </span>
             </div>
             <div className="p-3 bg-slate-950/70 border border-slate-800 rounded-xl col-span-2 md:col-span-1">
               <span className="text-slate-400 block mb-1">إجمالي القروض القائمة:</span>
               <span className="font-bold text-rose-400 text-sm">
-                {formatMoney(profile.loans.reduce((acc, l) => acc + l.amount, 0))}
+                {formatMoney((profile.banking?.loans ?? []).reduce((acc: number, l) => acc + (l.remainingBalance || l.principal || 0), 0))}
               </span>
             </div>
           </div>
@@ -240,7 +240,7 @@ export const BuildingDetailSheet: React.FC<BuildingDetailSheetProps> = ({
             <div className="p-3 bg-slate-950/70 border border-slate-800 rounded-xl">
               <span className="text-slate-400 block mb-1">طاقة التشغيل:</span>
               <span className="font-bold text-amber-400 text-sm">
-                {profile.companies.reduce((acc, c) => acc + c.energyUnits, 0)} وحدة
+                {profile.companies.reduce((acc, c) => acc + (c.energyUnits || 0), 0)} وحدة
               </span>
             </div>
             <div className="p-3 bg-slate-950/70 border border-slate-800 rounded-xl col-span-2 md:col-span-1">
@@ -277,6 +277,7 @@ export const BuildingDetailSheet: React.FC<BuildingDetailSheetProps> = ({
   }
 
   // 2. PLOT INTERACTION SHEETS
+  if (selectedItem.type !== 'plot') return null;
   const { plot } = selectedItem;
 
   // Handle direct land purchase
@@ -298,7 +299,7 @@ export const BuildingDetailSheet: React.FC<BuildingDetailSheetProps> = ({
         (current) => buyDirectLand(current, plot.id, paymentMethod)
       );
 
-      playSound('coins');
+      playSound('cash');
       setActionNotice('تمت معالجة شراء الأرض بنجاح!');
       setTimeout(() => {
         setIsSubmitting(false);
@@ -362,7 +363,7 @@ export const BuildingDetailSheet: React.FC<BuildingDetailSheetProps> = ({
       };
       saveCityConstructions(activeConstructions);
 
-      playSound('build');
+      playSound('success');
       setActionNotice('بدأت أعمال التمهيد والإنشاء في الموقع!');
       setTimeout(() => {
         setIsSubmitting(false);
@@ -609,7 +610,7 @@ export const BuildingDetailSheet: React.FC<BuildingDetailSheetProps> = ({
             <div className="p-3 bg-slate-950/70 border border-slate-800 rounded-xl">
               <span className="text-slate-400 block mb-1">تكلفة التشغيل اليومي:</span>
               <span className="font-bold text-rose-400">
-                {formatMoney(plot.company.operatingCostPerDay)}
+                {formatMoney(plot.company.operatingCostPerDay ?? 0)}
               </span>
             </div>
             <div className="p-3 bg-slate-950/70 border border-slate-800 rounded-xl col-span-2 md:col-span-1">
@@ -628,7 +629,7 @@ export const BuildingDetailSheet: React.FC<BuildingDetailSheetProps> = ({
                   },
                   (current) => runProduction(current, plot.company!.id, 1)
                 );
-                playSound('build');
+                playSound('success');
                 setActionNotice('تم إرسال أمر تشغيل دفعة إنتاج بنجاح!');
               }}
               className="flex-1 min-w-[140px] py-2.5 px-4 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-lg shadow-amber-500/20"
@@ -645,7 +646,7 @@ export const BuildingDetailSheet: React.FC<BuildingDetailSheetProps> = ({
                   },
                   (current) => serviceCompany(current, plot.company!.id)
                 );
-                playSound('coins');
+                playSound('cash');
                 setActionNotice('تمت صيانة وفحص الماكينات بنجاح!');
               }}
               className="flex-1 min-w-[140px] py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs flex items-center justify-center gap-2 transition-colors border border-slate-700"
