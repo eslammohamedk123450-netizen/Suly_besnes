@@ -131,6 +131,9 @@ export const CityCanvas: React.FC<CityCanvasProps> = ({
         return false;
       }
     })();
+    const isMobileDevice = window.matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0;
+    const isLowPowerDevice = isSoftwareGl || isMobileDevice;
+    const devicePixelRatio = Math.min(window.devicePixelRatio || 1, isLowPowerDevice ? 1.25 : 1.75);
 
     // 1. Scene setup with expanded atmospheric horizon fog
     const scene = new THREE.Scene();
@@ -145,16 +148,16 @@ export const CityCanvas: React.FC<CityCanvasProps> = ({
 
     // 3. WebGL Renderer
     const renderer = new THREE.WebGLRenderer({
-      antialias: !isSoftwareGl,
+      antialias: !isLowPowerDevice,
       powerPreference: 'high-performance',
       alpha: false,
     });
     renderer.setSize(width, height);
-    renderer.setPixelRatio(isSoftwareGl ? 1 : Math.min(window.devicePixelRatio, 2));
+    renderer.setPixelRatio(devicePixelRatio);
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.15;
-    renderer.shadowMap.enabled = !isSoftwareGl;
+    renderer.shadowMap.enabled = !isLowPowerDevice;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     container.appendChild(renderer.domElement);
 
@@ -173,9 +176,9 @@ export const CityCanvas: React.FC<CityCanvasProps> = ({
 
     const dirLight = new THREE.DirectionalLight('#fef08a', isNightMode ? 1.6 : 2.4);
     dirLight.position.set(50, 80, 50);
-    dirLight.castShadow = !isSoftwareGl;
-    dirLight.shadow.mapSize.width = 1024;
-    dirLight.shadow.mapSize.height = 1024;
+    dirLight.castShadow = !isLowPowerDevice;
+    dirLight.shadow.mapSize.width = isLowPowerDevice ? 512 : 1024;
+    dirLight.shadow.mapSize.height = isLowPowerDevice ? 512 : 1024;
     dirLight.shadow.camera.near = 10;
     dirLight.shadow.camera.far = 250;
     const shadowD = 90;
@@ -204,17 +207,17 @@ export const CityCanvas: React.FC<CityCanvasProps> = ({
     scene.add(tradePointLight);
 
     // 6. Materials Palette
-    const palette: CityMaterialPalette = createCityMaterialPalette(isNightMode, isSoftwareGl);
+    const palette: CityMaterialPalette = createCityMaterialPalette(isNightMode, isLowPowerDevice);
 
     // 7. Ground Plane (Expanded to 320 x 320)
     const groundGeo = new THREE.PlaneGeometry(320, 320);
     const ground = new THREE.Mesh(groundGeo, palette.ground);
     ground.rotation.x = -Math.PI / 2;
-    ground.receiveShadow = !isSoftwareGl;
+    ground.receiveShadow = !isLowPowerDevice;
     scene.add(ground);
 
     // 8. Modular Road Grid & Traffic
-    const roadNetwork = buildCityRoadNetwork(palette, isSoftwareGl, isNightMode);
+    const roadNetwork = buildCityRoadNetwork(palette, isLowPowerDevice, isNightMode);
     scene.add(roadNetwork.group);
     const trafficVehicles: TrafficVehicle[] = roadNetwork.vehicles;
 
@@ -254,7 +257,7 @@ export const CityCanvas: React.FC<CityCanvasProps> = ({
 
       switch (def.id) {
         case 'hq': {
-          landmarkMesh = buildHQMesh(hqLevel, palette, isSoftwareGl);
+          landmarkMesh = buildHQMesh(hqLevel, palette, isLowPowerDevice);
           // Rotating Crown Halo on HQ (aligned above the Egyptian Sun Corona)
           const hqActualH = getHQHeight(hqLevel);
           const crownRingGeo = new THREE.RingGeometry(3.6, 4.0, 32);
@@ -266,25 +269,25 @@ export const CityCanvas: React.FC<CityCanvasProps> = ({
           break;
         }
         case 'bank':
-          landmarkMesh = buildBankMesh(palette, isSoftwareGl);
+          landmarkMesh = buildBankMesh(palette, isLowPowerDevice);
           break;
         case 'stock_exchange':
-          landmarkMesh = buildStockExchangeMesh(palette, isSoftwareGl);
+          landmarkMesh = buildStockExchangeMesh(palette, isLowPowerDevice);
           break;
         case 'audit_tower':
-          landmarkMesh = buildAuditTowerMesh(palette, isSoftwareGl);
+          landmarkMesh = buildAuditTowerMesh(palette, isLowPowerDevice);
           break;
         case 'staff_academy':
-          landmarkMesh = buildHRAcademyMesh(palette, isSoftwareGl);
+          landmarkMesh = buildHRAcademyMesh(palette, isLowPowerDevice);
           break;
         case 'tech_tree':
-          landmarkMesh = buildTechTreeMesh(palette, isSoftwareGl);
+          landmarkMesh = buildTechTreeMesh(palette, isLowPowerDevice);
           break;
         case 'incubator':
-          landmarkMesh = buildStartupIncubatorMesh(palette, isSoftwareGl);
+          landmarkMesh = buildStartupIncubatorMesh(palette, isLowPowerDevice);
           break;
         case 'diamond_store':
-          landmarkMesh = buildDiamondVaultMesh(palette, isSoftwareGl);
+          landmarkMesh = buildDiamondVaultMesh(palette, isLowPowerDevice);
           // Grab diamond crystal for rotating
           landmarkMesh.traverse((c) => {
             if (c instanceof THREE.Mesh && c.geometry instanceof THREE.OctahedronGeometry) {
@@ -293,19 +296,19 @@ export const CityCanvas: React.FC<CityCanvasProps> = ({
           });
           break;
         case 'megaprojects':
-          landmarkMesh = buildMegaprojectsMinistryMesh(palette, isSoftwareGl);
+          landmarkMesh = buildMegaprojectsMinistryMesh(palette, isLowPowerDevice);
           break;
         case 'territory':
-          landmarkMesh = buildTerritoryCitadelMesh(palette, isSoftwareGl);
+          landmarkMesh = buildTerritoryCitadelMesh(palette, isLowPowerDevice);
           break;
         case 'cartel':
-          landmarkMesh = buildCartelBastionMesh(palette, isSoftwareGl);
+          landmarkMesh = buildCartelBastionMesh(palette, isLowPowerDevice);
           break;
         case 'maritime':
-          landmarkMesh = buildMaritimePortMesh(palette, isSoftwareGl);
+          landmarkMesh = buildMaritimePortMesh(palette, isLowPowerDevice);
           break;
         case 'factory': {
-          const factoryResult = buildFactoryMesh(palette, isSoftwareGl);
+          const factoryResult = buildFactoryMesh(palette, isLowPowerDevice);
           landmarkMesh = factoryResult.group;
           factoryResult.smokePositions.forEach((pos) => {
             for (let s = 0; s < 4; s++) {
@@ -318,16 +321,16 @@ export const CityCanvas: React.FC<CityCanvasProps> = ({
           break;
         }
         case 'warehouse_hub':
-          landmarkMesh = buildLogisticsHubMesh(palette, isSoftwareGl);
+          landmarkMesh = buildLogisticsHubMesh(palette, isLowPowerDevice);
           break;
         case 'auctions':
-          landmarkMesh = buildAuctionArenaMesh(palette, isSoftwareGl);
+          landmarkMesh = buildAuctionArenaMesh(palette, isLowPowerDevice);
           break;
         case 'contracts_pavilion':
-          landmarkMesh = buildContractsPavilionMesh(palette, isSoftwareGl);
+          landmarkMesh = buildContractsPavilionMesh(palette, isLowPowerDevice);
           break;
         case 'lucky_wheel':
-          landmarkMesh = buildLuckyWheelRotundaMesh(palette, isSoftwareGl);
+          landmarkMesh = buildLuckyWheelRotundaMesh(palette, isLowPowerDevice);
           landmarkMesh.traverse((c) => {
             if (c instanceof THREE.Mesh && c.geometry instanceof THREE.CylinderGeometry && c.position.z > 4) {
               luckyWheelDiscMesh = c;
@@ -335,13 +338,13 @@ export const CityCanvas: React.FC<CityCanvasProps> = ({
           });
           break;
         case 'tasks_monument':
-          landmarkMesh = buildTasksMonumentMesh(palette, isSoftwareGl);
+          landmarkMesh = buildTasksMonumentMesh(palette, isLowPowerDevice);
           break;
         case 'luxury_club':
-          landmarkMesh = buildLuxuryClubMesh(palette, isSoftwareGl);
+          landmarkMesh = buildLuxuryClubMesh(palette, isLowPowerDevice);
           break;
         case 'prestige_consulate':
-          landmarkMesh = buildPrestigeConsulateMesh(palette, isSoftwareGl);
+          landmarkMesh = buildPrestigeConsulateMesh(palette, isLowPowerDevice);
           break;
         default:
           break;
@@ -390,21 +393,21 @@ export const CityCanvas: React.FC<CityCanvasProps> = ({
           visualStage,
           plot.defaultPrice,
           palette,
-          isSoftwareGl
+          isLowPowerDevice
         );
         plotGroup.add(emptyMesh);
       } else if (visualStage === 'paperwork_survey') {
-        const surveyMesh = buildPaperworkSurveyMesh(plot.width, plot.depth, palette, isSoftwareGl);
+        const surveyMesh = buildPaperworkSurveyMesh(plot.width, plot.depth, palette, isLowPowerDevice);
         plotGroup.add(surveyMesh);
       } else if (visualStage === 'site_clearing') {
-        const clearingMesh = buildSiteClearingMesh(plot.width, plot.depth, palette, isSoftwareGl);
+        const clearingMesh = buildSiteClearingMesh(plot.width, plot.depth, palette, isLowPowerDevice);
         plotGroup.add(clearingMesh);
       } else if (visualStage === 'active_construction') {
         const constructionMesh = buildActiveConstructionMesh(
           plot.width,
           plot.depth,
           palette,
-          isSoftwareGl
+          isLowPowerDevice
         );
         plotGroup.add(constructionMesh);
       } else {
@@ -412,49 +415,49 @@ export const CityCanvas: React.FC<CityCanvasProps> = ({
         let completedFacilityMesh: THREE.Group;
 
         if (plot.branch) {
-          completedFacilityMesh = buildBranchMesh(palette, isSoftwareGl);
+          completedFacilityMesh = buildBranchMesh(palette, isLowPowerDevice);
           completedFacilityMesh.scale.set(0.9, 0.9, 0.9);
         } else if (plot.shop) {
-          completedFacilityMesh = buildStoreMesh(palette, isSoftwareGl);
+          completedFacilityMesh = buildStoreMesh(palette, isLowPowerDevice);
           completedFacilityMesh.scale.set(0.9, 0.9, 0.9);
         } else {
           const category = classifyIndustryToFacility(plot.company?.industryId);
 
           switch (category) {
             case 'factory': {
-              const res = buildFactoryMesh(palette, isSoftwareGl);
+              const res = buildFactoryMesh(palette, isLowPowerDevice);
               res.group.scale.set(0.75, 0.75, 0.75);
               completedFacilityMesh = res.group;
               break;
             }
             case 'store': {
-              completedFacilityMesh = buildStoreMesh(palette, isSoftwareGl);
+              completedFacilityMesh = buildStoreMesh(palette, isLowPowerDevice);
               completedFacilityMesh.scale.set(0.85, 0.85, 0.85);
               break;
             }
             case 'warehouse': {
-              completedFacilityMesh = buildWarehouseMesh(palette, isSoftwareGl);
+              completedFacilityMesh = buildWarehouseMesh(palette, isLowPowerDevice);
               completedFacilityMesh.scale.set(0.8, 0.8, 0.8);
               break;
             }
             case 'tech_hub': {
-              completedFacilityMesh = buildTechHubMesh(palette, isSoftwareGl);
+              completedFacilityMesh = buildTechHubMesh(palette, isLowPowerDevice);
               completedFacilityMesh.scale.set(0.8, 0.8, 0.8);
               break;
             }
             case 'central_bank': {
-              completedFacilityMesh = buildBankMesh(palette, isSoftwareGl);
+              completedFacilityMesh = buildBankMesh(palette, isLowPowerDevice);
               completedFacilityMesh.scale.set(0.75, 0.75, 0.75);
               break;
             }
             case 'agricultural_farm': {
-              completedFacilityMesh = buildAgroFarmMesh(palette, isSoftwareGl);
+              completedFacilityMesh = buildAgroFarmMesh(palette, isLowPowerDevice);
               completedFacilityMesh.scale.set(0.8, 0.8, 0.8);
               break;
             }
             case 'regional_branch':
             default: {
-              completedFacilityMesh = buildBranchMesh(palette, isSoftwareGl);
+              completedFacilityMesh = buildBranchMesh(palette, isLowPowerDevice);
               completedFacilityMesh.scale.set(0.85, 0.85, 0.85);
               break;
             }
@@ -517,7 +520,8 @@ export const CityCanvas: React.FC<CityCanvasProps> = ({
     });
     touchControllerRef.current = touchCtrl;
 
-    // Window Resize Handler
+    // ResizeObserver handles mobile browser chrome/orientation changes more
+    // reliably than window.resize alone.
     const onResize = () => {
       if (!container) return;
       const w = container.clientWidth;
@@ -527,14 +531,40 @@ export const CityCanvas: React.FC<CityCanvasProps> = ({
       renderer.setSize(w, h);
     };
     window.addEventListener('resize', onResize);
+    const resizeObserver = typeof ResizeObserver !== 'undefined'
+      ? new ResizeObserver(onResize)
+      : null;
+    resizeObserver?.observe(container);
 
     // -------------------------------------------------------------
     // RENDER LOOP with frame-rate independent exponential damping
     // -------------------------------------------------------------
     let animationFrameId = 0;
+    let frameQueued = false;
+    let isPaused = document.hidden;
     const clock = new THREE.Clock();
+    let scheduleFrame: () => void;
+
+    const onVisibilityChange = () => {
+      isPaused = document.hidden;
+      if (!isPaused) {
+        clock.getDelta();
+        scheduleFrame();
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
+
+    const intersectionObserver = typeof IntersectionObserver !== 'undefined'
+      ? new IntersectionObserver(([entry]) => {
+        isPaused = !entry.isIntersecting || document.hidden;
+        if (!isPaused) scheduleFrame();
+      }, { threshold: 0.01 })
+      : null;
+    intersectionObserver?.observe(container);
 
     const animate = () => {
+      frameQueued = false;
+      if (isPaused) return;
       const dt = Math.min(clock.getDelta(), 0.1);
       const elapsedTime = clock.getElapsedTime();
 
@@ -614,19 +644,33 @@ export const CityCanvas: React.FC<CityCanvasProps> = ({
       }
 
       renderer.render(scene, camera);
-      animationFrameId = requestAnimationFrame(animate);
+      scheduleFrame();
     };
 
-    animationFrameId = requestAnimationFrame(animate);
+    scheduleFrame = () => {
+      if (!isPaused && !frameQueued) {
+        frameQueued = true;
+        animationFrameId = requestAnimationFrame(animate);
+      }
+    };
+    scheduleFrame();
 
     // Clean unmount
     return () => {
       cancelAnimationFrame(animationFrameId);
       window.removeEventListener('resize', onResize);
+      resizeObserver?.disconnect();
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+      intersectionObserver?.disconnect();
       touchCtrl.dispose();
       touchControllerRef.current = null;
 
       renderer.dispose();
+      scene.traverse((object) => {
+        const mesh = object as THREE.Mesh;
+        if (mesh.geometry) mesh.geometry.dispose();
+      });
+      if (scene.environment) scene.environment.dispose();
       disposeCityMaterialPalette(palette);
       groundGeo.dispose();
       smokeGeo.dispose();
@@ -713,7 +757,7 @@ export const CityCanvas: React.FC<CityCanvasProps> = ({
 
   return (
     <div className="relative w-full h-[520px] md:h-[620px] rounded-2xl overflow-hidden shadow-2xl border border-amber-500/30 bg-slate-950 select-none">
-      <div ref={mountRef} className="w-full h-full cursor-grab active:cursor-grabbing" />
+      <div ref={mountRef} className="w-full h-full cursor-grab active:cursor-grabbing touch-none" />
 
       {/* Minimal Touch Navigation Helpers (Bottom-Right, non-intrusive) */}
       <div className="absolute bottom-3 right-3 flex items-center gap-1.5 z-10">
