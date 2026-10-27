@@ -147,7 +147,23 @@ describe('City 3D Procedural Mesh Builders', () => {
     expect(agroFarm).toBeInstanceOf(THREE.Group);
   });
 
+  it('builds city road network with multi-lane grid and animated traffic', async () => {
+    const { buildCityRoadNetwork } = await import('./cityRoadNetwork');
+    const roadNetwork = buildCityRoadNetwork(palette, true, true);
+    expect(roadNetwork.group).toBeInstanceOf(THREE.Group);
+    expect(roadNetwork.group.children.length).toBeGreaterThan(10);
+    expect(roadNetwork.vehicles.length).toBeGreaterThanOrEqual(4);
+
+    roadNetwork.vehicles.forEach((v) => {
+      expect(['x', 'z']).toContain(v.axis);
+      expect([1, -1]).toContain(v.dir);
+      expect(v.speed).toBeGreaterThan(0);
+      expect(v.mesh).toBeInstanceOf(THREE.Group);
+    });
+  });
+
   it('disposes materials palette cleanly without throwing', () => {
     expect(() => disposeCityMaterialPalette(palette)).not.toThrow();
   });
 });
+
