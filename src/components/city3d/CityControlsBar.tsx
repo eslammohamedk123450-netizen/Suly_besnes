@@ -11,7 +11,6 @@ import {
   Compass,
   Moon,
   Sun,
-  LayoutDashboard,
   Maximize2,
   ChevronDown,
   ChevronUp,
@@ -72,7 +71,7 @@ export const CityControlsBar: React.FC<CityControlsBarProps> = ({
       {/* Main Bottom Control Dock */}
       {!isCollapsed && (
         <div className="w-full bg-slate-900/95 border border-amber-500/30 rounded-2xl p-2.5 shadow-2xl backdrop-blur-md flex flex-wrap items-center justify-between gap-2 text-xs">
-          {/* View Switcher: 3D City vs Executive Dashboard */}
+          {/* The city is the only gameplay view; legacy dashboard navigation is retired. */}
           <div className="flex items-center bg-slate-950 p-1 rounded-xl border border-slate-800">
             <button
               onClick={() => onToggleView('3d_city')}
@@ -84,17 +83,6 @@ export const CityControlsBar: React.FC<CityControlsBarProps> = ({
             >
               <Building2 className="w-3.5 h-3.5" />
               <span>المدينة 3D</span>
-            </button>
-            <button
-              onClick={() => onToggleView('dashboard')}
-              className={`px-3 py-1.5 rounded-lg font-bold transition-all flex items-center gap-1.5 ${
-                activeView === 'dashboard'
-                  ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              <LayoutDashboard className="w-3.5 h-3.5" />
-              <span>اللوحة التنفيذية</span>
             </button>
           </div>
 

@@ -282,6 +282,16 @@ export const BuildingDetailSheet: React.FC<BuildingDetailSheetProps> = ({
             <button
               onClick={() => {
                 onClose();
+                onNavigate('companies');
+              }}
+              className="flex-1 min-w-[130px] py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-colors border border-slate-700"
+            >
+              <Briefcase className="w-3.5 h-3.5 text-emerald-400" />
+              <span>إدارة الشركات</span>
+            </button>
+            <button
+              onClick={() => {
+                onClose();
                 onNavigate('tech_tree');
               }}
               className="flex-1 min-w-[130px] py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-colors border border-slate-700"

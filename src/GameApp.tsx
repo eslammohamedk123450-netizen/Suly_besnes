@@ -88,6 +88,7 @@ export default function App() {
   const [playerName, setPlayerName] = useState(() => profile?.name ?? '');
   const [activeSection, setActiveSection] = useState<SectionId>('home');
   const [sectionFocus, setSectionFocus] = useState<string | undefined>();
+  const [cityFocusSection, setCityFocusSection] = useState<SectionId>('home');
   const [, setMobileMenuOpen] = useState(false);
   const [notificationTheme, setNotificationTheme] = useState(loadNotificationTheme);
   const [notice, setNotice] = useState('');
@@ -1003,13 +1004,15 @@ export default function App() {
       setNoticeTone('error');
       return;
     }
+    const isProfile = section === 'profile';
     const isDifferentSection = activeSection !== section;
-    setActiveSection(section);
+    // 3D-first shell: gameplay systems are opened from their city buildings.
+    // Legacy section modules remain available to the building feature work,
+    // but are no longer the primary navigation surface.
+    setActiveSection(isProfile ? 'profile' : 'home');
+    if (!isProfile) setCityFocusSection(section);
     setSectionFocus(focus);
-    if (!isWalkthroughActive && section !== 'home' && section !== 'profile' && !profile.onboarding.seenGuides.includes(section)) {
-      setPendingGuide(section);
-      playSound('unlock');
-    }
+    if (!isWalkthroughActive && section !== 'home' && section !== 'profile' && !profile.onboarding.seenGuides.includes(section)) playSound('unlock');
     setMobileMenuOpen(false);
     if (isDifferentSection && !focus) {
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -1106,8 +1109,8 @@ export default function App() {
       />
 
       <div className="app-layout w-full max-w-7xl mx-auto px-2 sm:px-4 lg:px-6">
-        <aside className="side-nav hidden lg:flex" aria-label="أقسام اللعبة">
-          <div className="side-nav-caption">إدارة الإمبراطورية</div>
+        {/* The city is now the sole gameplay navigation surface. */}
+        {/*
           {SECTION_GROUPS.map((group) => (
             <div className="nav-group" key={group.id}>
               <div className="nav-group-label">{group.label}</div>
@@ -1138,7 +1141,7 @@ export default function App() {
             </div>
           ))}
           <div className="side-nav-note"><Icon name="shield" size={16} /><span>{!account || account.isGuest ? <>حفظ<br />على هذا الجهاز</> : syncState === 'offline' ? <>اللعب مستمر<br />بانتظار الاتصال</> : syncState === 'blocked' ? <>حماية التقدم<br />مراجعة الحفظ</> : syncState === 'syncing' ? <>جارٍ حفظ<br />خطواتك</> : <>حفظ آمن<br />ومحدّث</>}</span></div>
-        </aside>
+        </aside>*/}
 
         <main className="main-content flex-1 w-full min-w-0 pb-24 md:pb-8">
           {activeSection === 'home' ? (
@@ -1147,6 +1150,7 @@ export default function App() {
               country={country}
               onNavigate={navigate}
               onCommand={handleGameCommand}
+              focusSection={cityFocusSection}
               onOpenLuckyWheel={() => setIsLuckyWheelOpen(true)}
               onOpenTutorial={() => setIsTutorialOpen(true)}
               onOpenMorningReport={() => {
@@ -1286,7 +1290,8 @@ export default function App() {
         </main>
       </div>
 
-      <RightActionHub
+      {/* Legacy quick-action hub is intentionally hidden; buildings own system entry points. */}
+      {/* <RightActionHub
         profile={profile}
         country={country}
         onNavigate={navigate}
@@ -1343,7 +1348,7 @@ export default function App() {
           setProfile(updated);
           saveGame(updated, account?.id);
         }}
-      />
+      /> */}
 
       <FlyingToast
         alert={activeToastAlert}
@@ -1415,7 +1420,8 @@ export default function App() {
         onClose={() => setCelebrationData(null)}
       />
 
-      <MobileBottomNav
+      {/* The 3D city and its building sheets replace the legacy mobile section nav. */}
+      {/* <MobileBottomNav
         activeSection={activeSection}
         onNavigate={navigate}
         onOpenCentralOperations={() => {
@@ -1426,7 +1432,7 @@ export default function App() {
           });
         }}
         profile={profile}
-      />
+      /> */}
 
       {/* Interactive Multi-Step Spotlight Guided Walkthrough (Never grants rewards on skip or arrow click) */}
       {!showStoryIntroModal && isWalkthroughActive && (

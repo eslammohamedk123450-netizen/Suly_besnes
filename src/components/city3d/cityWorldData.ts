@@ -434,6 +434,39 @@ export const ALL_CITY_LANDMARKS: LandmarkSystemDefinition[] = [
   },
 ];
 
+/**
+ * Canonical routing for the 3D-first game shell.
+ * Every legacy section is represented by a landmark, so navigation opens a
+ * building in the city instead of rendering the old full-page section UI.
+ */
+export const SECTION_LANDMARK_MAP: Partial<Record<SectionId, LandmarkId>> = {
+  home: 'hq',
+  store: 'diamond_store',
+  auctions: 'auctions',
+  companies: 'hq',
+  investments: 'stock_exchange',
+  bank: 'bank',
+  staff: 'staff_academy',
+  obligations: 'audit_tower',
+  lands: 'territory',
+  production: 'factory',
+  inventory: 'warehouse_hub',
+  reports: 'audit_tower',
+  contracts: 'contracts_pavilion',
+  tasks: 'tasks_monument',
+  territory: 'territory',
+  tech_tree: 'tech_tree',
+  luxury: 'luxury_club',
+  cartel: 'cartel',
+  maritime: 'maritime',
+  megaprojects: 'megaprojects',
+  incubator: 'incubator',
+};
+
+export function landmarkForSection(sectionId: SectionId): LandmarkId {
+  return SECTION_LANDMARK_MAP[sectionId] ?? 'hq';
+}
+
 export const CITY_WORLD_CONFIG = {
   worldRadius: 130,
   groundSize: 320,

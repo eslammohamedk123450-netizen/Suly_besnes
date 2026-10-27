@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import type { CountryDefinition } from '../domain/countries';
 import type { PlayerProfile } from '../domain/player';
 import type { SectionId } from '../domain/navigation';
@@ -12,6 +12,7 @@ import { CityCanvas, type SelectedItem, type CityCameraPreset } from './city3d/C
 import { BuildingDetailSheet } from './city3d/BuildingDetailSheet';
 import { BranchAndShopSheet } from './city3d/BranchAndShopSheet';
 import { CityControlsBar } from './city3d/CityControlsBar';
+import { ALL_CITY_LANDMARKS, landmarkForSection } from './city3d/cityWorldData';
 import { Dashboard } from './Dashboard';
 import { formatMoney } from '../domain/formatters';
 import {
@@ -46,6 +47,7 @@ interface CityHomeViewProps {
   onOpenCentralBank?: () => void;
   onOpenPrestige?: () => void;
   onOpenStrategicPillars?: () => void;
+  focusSection?: SectionId;
 }
 
 export const CityHomeView: React.FC<CityHomeViewProps> = (props) => {
@@ -56,6 +58,21 @@ export const CityHomeView: React.FC<CityHomeViewProps> = (props) => {
   const [cameraPreset, setCameraPreset] = useState<CityCameraPreset>(null);
   const [isBranchShopOpen, setIsBranchShopOpen] = useState(false);
   const [gridRefreshKey, setGridRefreshKey] = useState(0);
+
+  useEffect(() => {
+    if (!props.focusSection) return;
+    if (props.focusSection === 'home') {
+      setSelectedItem(null);
+      setCameraPreset('center');
+      return;
+    }
+    const landmarkId = landmarkForSection(props.focusSection);
+    const landmark = ALL_CITY_LANDMARKS.find((item) => item.id === landmarkId);
+    if (!landmark) return;
+    setActiveView('3d_city');
+    setCameraPreset(landmarkId === 'hq' ? 'hq' : null);
+    setSelectedItem({ type: 'landmark', id: landmark.id });
+  }, [props.focusSection]);
 
   const handleRefreshGrid = () => {
     setGridRefreshKey((k) => k + 1);
