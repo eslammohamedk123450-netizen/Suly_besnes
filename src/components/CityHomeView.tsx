@@ -10,6 +10,7 @@ import type { SectionId } from '../domain/navigation';
 import type { GameCommand, GameResult } from '../game/engine';
 import { CityCanvas, type SelectedItem } from './city3d/CityCanvas';
 import { BuildingDetailSheet } from './city3d/BuildingDetailSheet';
+import { BranchAndShopSheet } from './city3d/BranchAndShopSheet';
 import { CityControlsBar } from './city3d/CityControlsBar';
 import { Dashboard } from './Dashboard';
 import { formatMoney } from '../domain/formatters';
@@ -17,6 +18,7 @@ import {
   Building2,
   Landmark,
   Factory,
+  Store,
   MapPin,
   TrendingUp,
   Sparkles,

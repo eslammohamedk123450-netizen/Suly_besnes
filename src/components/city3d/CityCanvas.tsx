@@ -548,47 +548,158 @@ export const CityCanvas: React.FC<CityCanvasProps> = ({
         scaf.position.set(-0.5, 2.1, -0.5);
         plotGroup.add(scaf);
       } else if (plot.status === 'developed') {
-        // Finished company building according to industry type
         const bGroup = new THREE.Group();
-        const ind = plot.company?.industryId;
 
-        if (ind === 'petroleum' || ind === 'gas') {
-          // Refinery columns & tanks
-          const t1 = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 1.6, 4.5, 16), new THREE.MeshStandardMaterial({ color: '#64748b', metalness: 0.8 }));
-          t1.position.set(-2, 2.45, 0);
-          bGroup.add(t1);
+        if (plot.branch) {
+          // --- COMPANY BRANCH OFFICE BUILDING ---
+          // 1. Lower Corporate Lobby
+          const lobbyGeo = new THREE.BoxGeometry(6, 2.4, 6);
+          const lobbyMat = new THREE.MeshStandardMaterial({
+            color: '#0f172a',
+            roughness: 0.2,
+            metalness: 0.8,
+          });
+          const lobby = new THREE.Mesh(lobbyGeo, lobbyMat);
+          lobby.position.y = 1.4;
+          bGroup.add(lobby);
 
-          const t2 = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 0.9, 7, 12), new THREE.MeshStandardMaterial({ color: '#d97706', metalness: 0.6 }));
-          t2.position.set(2, 3.7, 0);
-          bGroup.add(t2);
-        } else if (ind === 'food') {
-          // Modern agricultural glass greenhouse & silo
-          const gh = new THREE.Mesh(new THREE.CylinderGeometry(2.5, 2.5, 2.8, 16, 1, false, 0, Math.PI), new THREE.MeshStandardMaterial({ color: '#10b981', roughness: 0.2, metalness: 0.3, transparent: true, opacity: 0.85 }));
-          gh.rotation.z = Math.PI / 2;
-          gh.position.set(-1, 2.0, 0);
-          bGroup.add(gh);
+          // 2. Mid Tower Glass Floors
+          const towerGeo = new THREE.BoxGeometry(4.8, 4.2, 4.8);
+          const towerMat = new THREE.MeshStandardMaterial({
+            color: '#1e293b',
+            roughness: 0.1,
+            metalness: 0.9,
+          });
+          const tower = new THREE.Mesh(towerGeo, towerMat);
+          tower.position.y = 4.7;
+          bGroup.add(tower);
 
-          const silo = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.2, 5.5, 16), new THREE.MeshStandardMaterial({ color: '#e2e8f0', metalness: 0.8 }));
-          silo.position.set(2.5, 2.95, 1);
-          bGroup.add(silo);
-        } else if (ind === 'electronics') {
-          // Futuristic tech hub with glowing windows
-          const main = new THREE.Mesh(new THREE.BoxGeometry(5.5, 5, 5), new THREE.MeshStandardMaterial({ color: '#0f172a', roughness: 0.3, metalness: 0.8 }));
-          main.position.y = 2.7;
-          bGroup.add(main);
+          // 3. Golden Crown Parapet & Brand Pylon
+          const crownGeo = new THREE.BoxGeometry(5.2, 0.4, 5.2);
+          const crownMat = new THREE.MeshStandardMaterial({
+            color: '#f59e0b',
+            metalness: 0.85,
+            roughness: 0.2,
+          });
+          const crown = new THREE.Mesh(crownGeo, crownMat);
+          crown.position.y = 6.9;
+          bGroup.add(crown);
 
-          const neonTrim = new THREE.Mesh(new THREE.BoxGeometry(5.7, 0.3, 5.2), new THREE.MeshBasicMaterial({ color: '#38bdf8' }));
-          neonTrim.position.y = 5.3;
-          bGroup.add(neonTrim);
+          // 4. Glowing Brand Beacon / Emblem
+          const beaconGeo = new THREE.CylinderGeometry(0.5, 0.5, 1.2, 12);
+          const beaconMat = new THREE.MeshBasicMaterial({ color: '#fbbf24' });
+          const beacon = new THREE.Mesh(beaconGeo, beaconMat);
+          beacon.position.y = 7.7;
+          bGroup.add(beacon);
+
+          // 5. Entrance Gold Canopy
+          const canopyGeo = new THREE.BoxGeometry(2.6, 0.2, 1.4);
+          const canopyMat = new THREE.MeshStandardMaterial({ color: '#f59e0b', metalness: 0.8 });
+          const canopy = new THREE.Mesh(canopyGeo, canopyMat);
+          canopy.position.set(0, 1.8, 3.2);
+          bGroup.add(canopy);
+        } else if (plot.shop) {
+          // --- RETAIL STORE / COMMERCIAL SHOP ---
+          const shopType = plot.shop.shopType;
+          let themeColor = '#10b981'; // groceries default
+          if (shopType === 'detergents') themeColor = '#06b6d4';
+          else if (shopType === 'electronics') themeColor = '#8b5cf6';
+          else if (shopType === 'building_materials') themeColor = '#f59e0b';
+
+          // 1. Storefront Main Body
+          const shopBodyGeo = new THREE.BoxGeometry(5.6, 3.2, 5);
+          const shopBodyMat = new THREE.MeshStandardMaterial({
+            color: '#1e293b',
+            roughness: 0.4,
+            metalness: 0.4,
+          });
+          const shopBody = new THREE.Mesh(shopBodyGeo, shopBodyMat);
+          shopBody.position.y = 1.8;
+          bGroup.add(shopBody);
+
+          // 2. Front Large Glass Display Windows
+          const glassGeo = new THREE.BoxGeometry(4.6, 1.8, 0.2);
+          const glassMat = new THREE.MeshStandardMaterial({
+            color: '#38bdf8',
+            roughness: 0.1,
+            metalness: 0.7,
+            transparent: true,
+            opacity: 0.85,
+          });
+          const glass = new THREE.Mesh(glassGeo, glassMat);
+          glass.position.set(0, 1.4, 2.52);
+          bGroup.add(glass);
+
+          // 3. Thematic Colored Store Awning / Canopy
+          const awningGeo = new THREE.BoxGeometry(4.8, 0.35, 1.5);
+          const awningMat = new THREE.MeshStandardMaterial({
+            color: themeColor,
+            roughness: 0.3,
+            metalness: 0.3,
+          });
+          const awning = new THREE.Mesh(awningGeo, awningMat);
+          awning.rotation.x = 0.2;
+          awning.position.set(0, 2.5, 3.0);
+          bGroup.add(awning);
+
+          // 4. Shop Signage Billboard Header
+          const signGeo = new THREE.BoxGeometry(4.2, 0.7, 0.25);
+          const signMat = new THREE.MeshStandardMaterial({
+            color: '#0f172a',
+            roughness: 0.3,
+          });
+          const sign = new THREE.Mesh(signGeo, signMat);
+          sign.position.set(0, 3.1, 2.55);
+          bGroup.add(sign);
+
+          // Sign glowing trim matching shop theme
+          const signTrimGeo = new THREE.BoxGeometry(4.3, 0.1, 0.3);
+          const signTrimMat = new THREE.MeshBasicMaterial({ color: themeColor });
+          const signTrim = new THREE.Mesh(signTrimGeo, signTrimMat);
+          signTrim.position.set(0, 3.48, 2.55);
+          bGroup.add(signTrim);
         } else {
-          // Modern Commercial / Manufacturing building
-          const body = new THREE.Mesh(new THREE.BoxGeometry(5, 4.2, 5), new THREE.MeshStandardMaterial({ color: '#334155', roughness: 0.5, metalness: 0.5 }));
-          body.position.y = 2.3;
-          bGroup.add(body);
+          // --- FACTORY / INDUSTRIAL / COMMERCIAL PREMISES ---
+          const ind = plot.company?.industryId;
 
-          const roof = new THREE.Mesh(new THREE.BoxGeometry(5.4, 0.4, 5.4), new THREE.MeshStandardMaterial({ color: '#f59e0b', metalness: 0.8 }));
-          roof.position.y = 4.6;
-          bGroup.add(roof);
+          if (ind === 'petroleum' || ind === 'gas') {
+            // Refinery columns & tanks
+            const t1 = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 1.6, 4.5, 16), new THREE.MeshStandardMaterial({ color: '#64748b', metalness: 0.8 }));
+            t1.position.set(-2, 2.45, 0);
+            bGroup.add(t1);
+
+            const t2 = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 0.9, 7, 12), new THREE.MeshStandardMaterial({ color: '#d97706', metalness: 0.6 }));
+            t2.position.set(2, 3.7, 0);
+            bGroup.add(t2);
+          } else if (ind === 'food') {
+            // Modern agricultural glass greenhouse & silo
+            const gh = new THREE.Mesh(new THREE.CylinderGeometry(2.5, 2.5, 2.8, 16, 1, false, 0, Math.PI), new THREE.MeshStandardMaterial({ color: '#10b981', roughness: 0.2, metalness: 0.3, transparent: true, opacity: 0.85 }));
+            gh.rotation.z = Math.PI / 2;
+            gh.position.set(-1, 2.0, 0);
+            bGroup.add(gh);
+
+            const silo = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.2, 5.5, 16), new THREE.MeshStandardMaterial({ color: '#e2e8f0', metalness: 0.8 }));
+            silo.position.set(2.5, 2.95, 1);
+            bGroup.add(silo);
+          } else if (ind === 'electronics') {
+            // Futuristic tech hub with glowing windows
+            const main = new THREE.Mesh(new THREE.BoxGeometry(5.5, 5, 5), new THREE.MeshStandardMaterial({ color: '#0f172a', roughness: 0.3, metalness: 0.8 }));
+            main.position.y = 2.7;
+            bGroup.add(main);
+
+            const neonTrim = new THREE.Mesh(new THREE.BoxGeometry(5.7, 0.3, 5.2), new THREE.MeshBasicMaterial({ color: '#38bdf8' }));
+            neonTrim.position.y = 5.3;
+            bGroup.add(neonTrim);
+          } else {
+            // Modern Commercial / Manufacturing building
+            const body = new THREE.Mesh(new THREE.BoxGeometry(5, 4.2, 5), new THREE.MeshStandardMaterial({ color: '#334155', roughness: 0.5, metalness: 0.5 }));
+            body.position.y = 2.3;
+            bGroup.add(body);
+
+            const roof = new THREE.Mesh(new THREE.BoxGeometry(5.4, 0.4, 5.4), new THREE.MeshStandardMaterial({ color: '#f59e0b', metalness: 0.8 }));
+            roof.position.y = 4.6;
+            bGroup.add(roof);
+          }
         }
 
         plotGroup.add(bGroup);
