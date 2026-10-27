@@ -6,6 +6,7 @@
 import type { PlayerProfile } from '../domain/player';
 import { calculateTotalAssets } from '../domain/player';
 import type { CountryId, IndustryId } from '../domain/countries';
+import type { CompanyBranch, RetailShop } from '../domain/branchAndShop';
 import { getDirectLandsForCountry, findIndustry, INDUSTRY_CATALOG, type DirectLandListing } from './catalog';
 import type { PurchasePaymentMethod } from './purchasePricing';
 import {
@@ -39,6 +40,8 @@ export interface CityPlotDefinition {
   catalogListingId?: string; // Real catalog ID (e.g. 'real-land-egypt-1') for authentic buyDirectLand
   associatedLandId?: string;
   associatedCompanyId?: string;
+  branch?: CompanyBranch;
+  shop?: RetailShop;
 }
 
 export interface CityConstructionState {
@@ -691,6 +694,12 @@ export function resolveCityGrid(
     let status: PlotStatus = 'empty_for_sale';
     let company: PlayerProfile['companies'][number] | undefined;
     let construction = constructions[basePlot.id];
+    const branch = (profile.branches ?? []).find(
+      (b) => b.plotId === basePlot.id || (matchedLand && b.landId === matchedLand.id)
+    );
+    const shop = (profile.shops ?? []).find(
+      (s) => s.plotId === basePlot.id || (matchedLand && s.landId === matchedLand.id)
+    );
 
     if (matchedLand) {
       company = playerCompanies.find((c) => c.landId === matchedLand!.id);
@@ -699,13 +708,17 @@ export function resolveCityGrid(
         const elapsed = now - construction.startedAt;
         if (elapsed >= construction.durationMs) {
           status = 'developed';
+          if (branch && branch.status === 'constructing') branch.status = 'active';
+          if (shop && shop.status === 'constructing') shop.status = 'active';
         } else if (elapsed < construction.durationMs * 0.3) {
           status = 'clearing';
         } else {
           status = 'constructing';
         }
-      } else if (company) {
+      } else if (company || branch || shop) {
         status = 'developed';
+        if (branch && branch.status === 'constructing') branch.status = 'active';
+        if (shop && shop.status === 'constructing') shop.status = 'active';
       } else {
         // Check if land is still in paperwork
         const readyDay = matchedLand.availableForCompanyOnDay ?? matchedLand.acquiredOnDay ?? profile.day;
@@ -734,6 +747,8 @@ export function resolveCityGrid(
       status,
       land: matchedLand,
       company,
+      branch,
+      shop,
       construction,
     };
   });

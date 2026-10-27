@@ -487,6 +487,8 @@ function migrateProfile(value: unknown): PlayerProfile | null {
     ...(Array.isArray(value.processedBotOfferIds) ? { processedBotOfferIds: Array.from(new Set(value.processedBotOfferIds.filter(isNonEmptyString))) } : {}),
     ...(typeof value.hqLevel === 'number' && Number.isInteger(value.hqLevel) && value.hqLevel >= 1 && value.hqLevel <= 5 ? { hqLevel: value.hqLevel } : {}),
     ...(isRecord(value.cityConstructions) ? { cityConstructions: value.cityConstructions as any } : {}),
+    branches: Array.isArray(value.branches) ? (value.branches as any) : [],
+    shops: Array.isArray(value.shops) ? (value.shops as any) : [],
   }, typeof value.accountCode === 'string' ? value.accountCode : value.id as string);
 }
 
