@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import type { PlayerProfile } from '../../domain/player';
@@ -32,24 +32,59 @@ import {
   buildBranchMesh,
   buildTechHubMesh,
   buildAgroFarmMesh,
+  buildStockExchangeMesh,
+  buildTechTreeMesh,
+  buildStartupIncubatorMesh,
+  buildMaritimePortMesh,
+  buildMegaprojectsMinistryMesh,
+  buildTerritoryCitadelMesh,
+  buildCartelBastionMesh,
+  buildAuctionArenaMesh,
+  buildLogisticsHubMesh,
+  buildHRAcademyMesh,
+  buildAuditTowerMesh,
+  buildContractsPavilionMesh,
+  buildTasksMonumentMesh,
+  buildLuxuryClubMesh,
+  buildDiamondVaultMesh,
+  buildLuckyWheelRotundaMesh,
+  buildPrestigeConsulateMesh,
 } from './cityMeshBuilders';
 import { buildCityRoadNetwork, type TrafficVehicle } from './cityRoadNetwork';
 import { CityTouchController } from './cityTouchControls';
 import {
   classifyIndustryToFacility,
   resolvePlotVisualStage,
+  ALL_CITY_LANDMARKS,
+  type LandmarkId,
+  type LandmarkSystemDefinition,
 } from './cityWorldData';
+import { createBuildingLabelSprite } from './cityLabels';
 
 export type SelectedItem =
-  | { type: 'landmark'; id: 'hq' | 'bank' | 'factory' }
+  | { type: 'landmark'; id: LandmarkId }
   | { type: 'plot'; plot: ReturnType<typeof resolveCityGrid>['plots'][number] };
+
+export type CityCameraPreset =
+  | 'center'
+  | 'hq'
+  | 'bank'
+  | 'stock_exchange'
+  | 'factory'
+  | 'tech'
+  | 'maritime'
+  | 'gov'
+  | 'trade'
+  | 'luxury'
+  | 'plots'
+  | null;
 
 interface CityCanvasProps {
   profile: PlayerProfile;
   selectedItem: SelectedItem | null;
   onSelectItem: (item: SelectedItem | null) => void;
   isNightMode?: boolean;
-  cameraPreset?: 'center' | 'hq' | 'bank' | 'factory' | 'plots' | null;
+  cameraPreset?: CityCameraPreset;
   onResetPreset?: () => void;
 }
 
@@ -68,8 +103,8 @@ export const CityCanvas: React.FC<CityCanvasProps> = ({
   onSelectItemRef.current = onSelectItem;
 
   // Camera targets for smooth frame-rate independent exponential damping
-  const cameraTargetPos = useRef(new THREE.Vector3(0, 34, 45));
-  const cameraLookAtPos = useRef(new THREE.Vector3(0, 0, 4));
+  const cameraTargetPos = useRef(new THREE.Vector3(0, 42, 60));
+  const cameraLookAtPos = useRef(new THREE.Vector3(0, 0, 5));
 
   // Touch controller instance ref
   const touchControllerRef = useRef<CityTouchController | null>(null);
@@ -78,9 +113,9 @@ export const CityCanvas: React.FC<CityCanvasProps> = ({
     if (!mountRef.current) return;
     const container = mountRef.current;
     const width = container.clientWidth || window.innerWidth;
-    const height = container.clientHeight || 540;
+    const height = container.clientHeight || 560;
 
-    // Detect software GL to optimize rendering budget on low-end / headless devices
+    // Detect software GL to optimize rendering budget
     const isSoftwareGl = (() => {
       try {
         const gl = document.createElement('canvas').getContext('webgl2');
@@ -95,17 +130,17 @@ export const CityCanvas: React.FC<CityCanvasProps> = ({
       }
     })();
 
-    // 1. Scene setup with horizon fog matching night/day atmosphere
+    // 1. Scene setup with expanded atmospheric horizon fog
     const scene = new THREE.Scene();
     const skyColor = isNightMode ? '#070b14' : '#0f172a';
     const fogColor = isNightMode ? '#090d18' : '#1e293b';
     scene.background = new THREE.Color(skyColor);
-    scene.fog = new THREE.FogExp2(fogColor, 0.008);
+    scene.fog = new THREE.FogExp2(fogColor, 0.0035);
 
-    // 2. Camera
-    const camera = new THREE.PerspectiveCamera(45, width / height, 0.5, 320);
-    camera.position.set(0, 36, 48);
-    camera.lookAt(0, 0, 4);
+    // 2. Camera with expanded view frustum for enlarged city
+    const camera = new THREE.PerspectiveCamera(45, width / height, 0.5, 600);
+    camera.position.set(0, 48, 70);
+    camera.lookAt(0, 0, 5);
 
     // 3. WebGL Renderer
     const renderer = new THREE.WebGLRenderer({
@@ -131,18 +166,18 @@ export const CityCanvas: React.FC<CityCanvasProps> = ({
     const hemiLight = new THREE.HemisphereLight(
       isNightMode ? '#38bdf8' : '#e0f2fe',
       isNightMode ? '#090d18' : '#1e293b',
-      isNightMode ? 0.75 : 1.15
+      isNightMode ? 0.8 : 1.2
     );
     scene.add(hemiLight);
 
-    const dirLight = new THREE.DirectionalLight('#fef08a', isNightMode ? 1.5 : 2.2);
-    dirLight.position.set(35, 55, 35);
+    const dirLight = new THREE.DirectionalLight('#fef08a', isNightMode ? 1.6 : 2.4);
+    dirLight.position.set(50, 80, 50);
     dirLight.castShadow = !isSoftwareGl;
     dirLight.shadow.mapSize.width = 1024;
     dirLight.shadow.mapSize.height = 1024;
     dirLight.shadow.camera.near = 10;
-    dirLight.shadow.camera.far = 140;
-    const shadowD = 55;
+    dirLight.shadow.camera.far = 250;
+    const shadowD = 90;
     dirLight.shadow.camera.left = -shadowD;
     dirLight.shadow.camera.right = shadowD;
     dirLight.shadow.camera.top = shadowD;
@@ -150,24 +185,28 @@ export const CityCanvas: React.FC<CityCanvasProps> = ({
     dirLight.shadow.bias = -0.0005;
     scene.add(dirLight);
 
-    // Accent atmospheric point lights
-    const hqPointLight = new THREE.PointLight('#f59e0b', 2.8, 50);
-    hqPointLight.position.set(0, 18, 0);
+    // District accent point lights
+    const hqPointLight = new THREE.PointLight('#f59e0b', 2.8, 60);
+    hqPointLight.position.set(0, 20, 0);
     scene.add(hqPointLight);
 
-    const bankPointLight = new THREE.PointLight('#38bdf8', 1.9, 32);
-    bankPointLight.position.set(-18, 10, 8);
-    scene.add(bankPointLight);
+    const techPointLight = new THREE.PointLight('#c084fc', 2.4, 50);
+    techPointLight.position.set(-45, 16, -45);
+    scene.add(techPointLight);
 
-    const factoryPointLight = new THREE.PointLight('#fb923c', 2.1, 35);
-    factoryPointLight.position.set(18, 10, 8);
-    scene.add(factoryPointLight);
+    const maritimePointLight = new THREE.PointLight('#0284c7', 2.4, 55);
+    maritimePointLight.position.set(70, 16, 32);
+    scene.add(maritimePointLight);
+
+    const tradePointLight = new THREE.PointLight('#10b981', 2.2, 50);
+    tradePointLight.position.set(-45, 16, 35);
+    scene.add(tradePointLight);
 
     // 6. Materials Palette
     const palette: CityMaterialPalette = createCityMaterialPalette(isNightMode, isSoftwareGl);
 
-    // 7. Ground Plane
-    const groundGeo = new THREE.PlaneGeometry(180, 180);
+    // 7. Ground Plane (Expanded to 320 x 320)
+    const groundGeo = new THREE.PlaneGeometry(320, 320);
     const ground = new THREE.Mesh(groundGeo, palette.ground);
     ground.rotation.x = -Math.PI / 2;
     ground.receiveShadow = !isSoftwareGl;
@@ -183,7 +222,7 @@ export const CityCanvas: React.FC<CityCanvasProps> = ({
     const registerClickable = (meshOrGroup: THREE.Object3D, item: SelectedItem) => {
       clickableObjects.set(meshOrGroup, item);
       meshOrGroup.traverse((child) => {
-        if (child instanceof THREE.Mesh) {
+        if (child instanceof THREE.Mesh || child instanceof THREE.Sprite) {
           clickableObjects.set(child, item);
         }
       });
@@ -199,43 +238,129 @@ export const CityCanvas: React.FC<CityCanvasProps> = ({
     });
 
     // -------------------------------------------------------------
-    // BUILD CENTRAL IMPERIAL LANDMARKS
+    // BUILD ALL 20 SYSTEM LANDMARKS & 3D LABELS
     // -------------------------------------------------------------
     const gridData = resolveCityGrid(profile, loadCityConstructions(profile));
     const hqLevel = gridData.hqLevel;
 
-    // A. IMPERIAL HEADQUARTERS
-    const hqMesh = buildHQMesh(hqLevel, palette, isSoftwareGl);
-    hqMesh.position.set(0, 0, 0);
-    scene.add(hqMesh);
-    registerClickable(hqMesh, { type: 'landmark', id: 'hq' });
+    // References for dynamic animated objects in the render loop
+    let crownRingMesh: THREE.Mesh | null = null;
+    let luckyWheelDiscMesh: THREE.Object3D | null = null;
+    let diamondCrystalMesh: THREE.Object3D | null = null;
 
-    // Rotating Crown Halo on HQ
-    const crownRingGeo = new THREE.RingGeometry(2.4, 2.7, 24);
-    const crownRing = new THREE.Mesh(crownRingGeo, palette.plotHoloRing);
-    crownRing.rotation.x = Math.PI / 2;
-    crownRing.position.y = 10 + hqLevel * 5.6;
-    hqMesh.add(crownRing);
+    ALL_CITY_LANDMARKS.forEach((def) => {
+      let landmarkMesh: THREE.Group | null = null;
 
-    // B. CENTRAL SOVEREIGN BANK
-    const bankMesh = buildBankMesh(palette, isSoftwareGl);
-    bankMesh.position.set(-18, 0, 8);
-    scene.add(bankMesh);
-    registerClickable(bankMesh, { type: 'landmark', id: 'bank' });
+      switch (def.id) {
+        case 'hq': {
+          landmarkMesh = buildHQMesh(hqLevel, palette, isSoftwareGl);
+          // Rotating Crown Halo on HQ
+          const crownRingGeo = new THREE.RingGeometry(2.4, 2.7, 24);
+          const crownRing = new THREE.Mesh(crownRingGeo, palette.plotHoloRing);
+          crownRing.rotation.x = Math.PI / 2;
+          crownRing.position.y = 10 + hqLevel * 5.6;
+          landmarkMesh.add(crownRing);
+          crownRingMesh = crownRing;
+          break;
+        }
+        case 'bank':
+          landmarkMesh = buildBankMesh(palette, isSoftwareGl);
+          break;
+        case 'stock_exchange':
+          landmarkMesh = buildStockExchangeMesh(palette, isSoftwareGl);
+          break;
+        case 'audit_tower':
+          landmarkMesh = buildAuditTowerMesh(palette, isSoftwareGl);
+          break;
+        case 'staff_academy':
+          landmarkMesh = buildHRAcademyMesh(palette, isSoftwareGl);
+          break;
+        case 'tech_tree':
+          landmarkMesh = buildTechTreeMesh(palette, isSoftwareGl);
+          break;
+        case 'incubator':
+          landmarkMesh = buildStartupIncubatorMesh(palette, isSoftwareGl);
+          break;
+        case 'diamond_store':
+          landmarkMesh = buildDiamondVaultMesh(palette, isSoftwareGl);
+          // Grab diamond crystal for rotating
+          landmarkMesh.traverse((c) => {
+            if (c instanceof THREE.Mesh && c.geometry instanceof THREE.OctahedronGeometry) {
+              diamondCrystalMesh = c;
+            }
+          });
+          break;
+        case 'megaprojects':
+          landmarkMesh = buildMegaprojectsMinistryMesh(palette, isSoftwareGl);
+          break;
+        case 'territory':
+          landmarkMesh = buildTerritoryCitadelMesh(palette, isSoftwareGl);
+          break;
+        case 'cartel':
+          landmarkMesh = buildCartelBastionMesh(palette, isSoftwareGl);
+          break;
+        case 'maritime':
+          landmarkMesh = buildMaritimePortMesh(palette, isSoftwareGl);
+          break;
+        case 'factory': {
+          const factoryResult = buildFactoryMesh(palette, isSoftwareGl);
+          landmarkMesh = factoryResult.group;
+          factoryResult.smokePositions.forEach((pos) => {
+            for (let s = 0; s < 4; s++) {
+              const sm = new THREE.Mesh(smokeGeo, smokeMat);
+              sm.position.set(def.coordinates.x + pos.x, pos.y + s * 0.8, def.coordinates.z + pos.z);
+              scene.add(sm);
+              smokeParticles.push(sm);
+            }
+          });
+          break;
+        }
+        case 'warehouse_hub':
+          landmarkMesh = buildLogisticsHubMesh(palette, isSoftwareGl);
+          break;
+        case 'auctions':
+          landmarkMesh = buildAuctionArenaMesh(palette, isSoftwareGl);
+          break;
+        case 'contracts_pavilion':
+          landmarkMesh = buildContractsPavilionMesh(palette, isSoftwareGl);
+          break;
+        case 'lucky_wheel':
+          landmarkMesh = buildLuckyWheelRotundaMesh(palette, isSoftwareGl);
+          landmarkMesh.traverse((c) => {
+            if (c instanceof THREE.Mesh && c.geometry instanceof THREE.CylinderGeometry && c.position.z > 4) {
+              luckyWheelDiscMesh = c;
+            }
+          });
+          break;
+        case 'tasks_monument':
+          landmarkMesh = buildTasksMonumentMesh(palette, isSoftwareGl);
+          break;
+        case 'luxury_club':
+          landmarkMesh = buildLuxuryClubMesh(palette, isSoftwareGl);
+          break;
+        case 'prestige_consulate':
+          landmarkMesh = buildPrestigeConsulateMesh(palette, isSoftwareGl);
+          break;
+        default:
+          break;
+      }
 
-    // C. FLAGSHIP MANUFACTURING COMPLEX
-    const factoryResult = buildFactoryMesh(palette, isSoftwareGl);
-    factoryResult.group.position.set(18, 0, 8);
-    scene.add(factoryResult.group);
-    registerClickable(factoryResult.group, { type: 'landmark', id: 'factory' });
+      if (landmarkMesh) {
+        landmarkMesh.position.set(def.coordinates.x, 0, def.coordinates.z);
+        scene.add(landmarkMesh);
+        registerClickable(landmarkMesh, { type: 'landmark', id: def.id });
 
-    // Spawn smoke particles above factory stacks
-    factoryResult.smokePositions.forEach((pos) => {
-      for (let s = 0; s < 4; s++) {
-        const sm = new THREE.Mesh(smokeGeo, smokeMat);
-        sm.position.set(18 + pos.x, pos.y + s * 0.8, 8 + pos.z);
-        scene.add(sm);
-        smokeParticles.push(sm);
+        // Build & attach 3D camera-facing Arabic Nameplate Sprite above building
+        const labelSprite = createBuildingLabelSprite({
+          titleAr: def.titleAr,
+          badgeAr: def.badgeAr,
+          icon: def.icon,
+          accentColor: def.accentColor,
+          badgeBgColor: def.badgeBgColor,
+        });
+        labelSprite.position.set(def.coordinates.x, def.labelHeight, def.coordinates.z);
+        scene.add(labelSprite);
+        registerClickable(labelSprite, { type: 'landmark', id: def.id });
       }
     });
 
@@ -341,7 +466,7 @@ export const CityCanvas: React.FC<CityCanvasProps> = ({
     });
 
     // 11. Selection Indicator Halo
-    const selectionHaloGeo = new THREE.RingGeometry(3.2, 3.6, 32);
+    const selectionHaloGeo = new THREE.RingGeometry(3.6, 4.1, 32);
     const selectionHalo = new THREE.Mesh(selectionHaloGeo, palette.plotHoloRing);
     selectionHalo.rotation.x = -Math.PI / 2;
     selectionHalo.position.y = 0.35;
@@ -408,6 +533,7 @@ export const CityCanvas: React.FC<CityCanvasProps> = ({
 
     const animate = () => {
       const dt = Math.min(clock.getDelta(), 0.1);
+      const elapsedTime = clock.getElapsedTime();
 
       // Smooth camera position damping (frame-rate independent)
       camera.position.x = THREE.MathUtils.damp(camera.position.x, cameraTargetPos.current.x, 7.5, dt);
@@ -448,16 +574,30 @@ export const CityCanvas: React.FC<CityCanvasProps> = ({
       });
 
       // Subtle rotation on HQ beacon ring
-      crownRing.rotation.z += dt * 0.45;
+      if (crownRingMesh) {
+        crownRingMesh.rotation.z += dt * 0.45;
+      }
+
+      // Animate lucky prize wheel
+      if (luckyWheelDiscMesh) {
+        luckyWheelDiscMesh.rotation.z += dt * 0.6;
+      }
+
+      // Animate floating rotating diamond
+      if (diamondCrystalMesh) {
+        diamondCrystalMesh.rotation.y += dt * 0.8;
+        diamondCrystalMesh.position.y = 4.2 + Math.sin(elapsedTime * 2) * 0.25;
+      }
 
       // Update Selection Indicator position
       const currentSelected = selectedItemRef.current;
       if (currentSelected) {
         selectionHalo.visible = true;
         if (currentSelected.type === 'landmark') {
-          if (currentSelected.id === 'hq') selectionHalo.position.set(0, 0.35, 0);
-          else if (currentSelected.id === 'bank') selectionHalo.position.set(-18, 0.35, 8);
-          else if (currentSelected.id === 'factory') selectionHalo.position.set(18, 0.35, 8);
+          const foundDef = ALL_CITY_LANDMARKS.find((l) => l.id === currentSelected.id);
+          if (foundDef) {
+            selectionHalo.position.set(foundDef.coordinates.x, 0.35, foundDef.coordinates.z);
+          }
         } else if (currentSelected.type === 'plot') {
           selectionHalo.position.set(
             currentSelected.plot.gridX,
@@ -489,7 +629,6 @@ export const CityCanvas: React.FC<CityCanvasProps> = ({
       smokeGeo.dispose();
       smokeMat.dispose();
       selectionHaloGeo.dispose();
-      crownRingGeo.dispose();
 
       if (renderer.domElement && renderer.domElement.parentNode) {
         renderer.domElement.parentNode.removeChild(renderer.domElement);
@@ -500,24 +639,67 @@ export const CityCanvas: React.FC<CityCanvasProps> = ({
   // Handle camera presets changes smoothly
   useEffect(() => {
     if (!cameraPreset) return;
-    if (cameraPreset === 'center') {
-      cameraTargetPos.current.set(0, 34, 45);
-      cameraLookAtPos.current.set(0, 0, 4);
-    } else if (cameraPreset === 'hq') {
-      cameraTargetPos.current.set(0, 18, 22);
-      cameraLookAtPos.current.set(0, 8, 0);
-    } else if (cameraPreset === 'bank') {
-      cameraTargetPos.current.set(-18, 14, 25);
-      cameraLookAtPos.current.set(-18, 3, 8);
-    } else if (cameraPreset === 'factory') {
-      cameraTargetPos.current.set(18, 14, 25);
-      cameraLookAtPos.current.set(18, 3, 8);
-    } else if (cameraPreset === 'plots') {
-      cameraTargetPos.current.set(24, 26, -5);
-      cameraLookAtPos.current.set(25, 0, -18);
+    switch (cameraPreset) {
+      case 'center':
+      case 'hq':
+        cameraTargetPos.current.set(0, 36, 44);
+        cameraLookAtPos.current.set(0, 4, 0);
+        break;
+      case 'bank':
+        cameraTargetPos.current.set(-24, 20, 32);
+        cameraLookAtPos.current.set(-24, 4, 12);
+        break;
+      case 'stock_exchange':
+        cameraTargetPos.current.set(24, 20, 32);
+        cameraLookAtPos.current.set(24, 4, 12);
+        break;
+      case 'factory':
+        cameraTargetPos.current.set(45, 22, 70);
+        cameraLookAtPos.current.set(45, 4, 52);
+        break;
+      case 'tech':
+        cameraTargetPos.current.set(-45, 28, -25);
+        cameraLookAtPos.current.set(-45, 6, -45);
+        break;
+      case 'maritime':
+        cameraTargetPos.current.set(74, 24, 52);
+        cameraLookAtPos.current.set(74, 4, 32);
+        break;
+      case 'gov':
+        cameraTargetPos.current.set(45, 28, -25);
+        cameraLookAtPos.current.set(45, 6, -45);
+        break;
+      case 'trade':
+        cameraTargetPos.current.set(-45, 26, 42);
+        cameraLookAtPos.current.set(-45, 4, 32);
+        break;
+      case 'luxury':
+        cameraTargetPos.current.set(-74, 24, 52);
+        cameraLookAtPos.current.set(-74, 4, 32);
+        break;
+      case 'plots':
+        cameraTargetPos.current.set(16, 26, -5);
+        cameraLookAtPos.current.set(16, 0, -18);
+        break;
+      default:
+        break;
     }
     if (onResetPreset) onResetPreset();
   }, [cameraPreset, onResetPreset]);
+
+  // Pan to clicked landmark automatically
+  useEffect(() => {
+    if (selectedItem?.type === 'landmark') {
+      const def = ALL_CITY_LANDMARKS.find((l) => l.id === selectedItem.id);
+      if (def) {
+        cameraTargetPos.current.set(def.coordinates.x, 22, def.coordinates.z + 24);
+        cameraLookAtPos.current.set(def.coordinates.x, 3, def.coordinates.z);
+      }
+    } else if (selectedItem?.type === 'plot') {
+      cameraTargetPos.current.set(selectedItem.plot.gridX, 18, selectedItem.plot.gridZ + 18);
+      cameraLookAtPos.current.set(selectedItem.plot.gridX, 1, selectedItem.plot.gridZ);
+    }
+  }, [selectedItem]);
 
   // Expose quick zoom & rotation helpers for mobile overlay buttons
   const handleZoomIn = () => touchControllerRef.current?.zoomStep('in');
@@ -575,3 +757,5 @@ export const CityCanvas: React.FC<CityCanvasProps> = ({
     </div>
   );
 };
+
+export default CityCanvas;

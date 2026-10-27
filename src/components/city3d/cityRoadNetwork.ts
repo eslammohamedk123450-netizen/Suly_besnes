@@ -394,17 +394,17 @@ export function buildCityRoadNetwork(
   const roadGroup = new THREE.Group();
   const vehicles: TrafficVehicle[] = [];
 
-  // 1. Central Grand Avenue (Z axis: North-South)
-  const mainAvenueGeo = new THREE.BoxGeometry(9.0, 0.12, 160);
+  // 1. Central Grand Avenue (Z axis: North-South) - Expanded to 260 units
+  const mainAvenueGeo = new THREE.BoxGeometry(9.6, 0.12, 260);
   const mainAvenue = new THREE.Mesh(mainAvenueGeo, palette.asphalt);
   mainAvenue.position.set(0, 0.06, 0);
   mainAvenue.receiveShadow = !isSoftwareGl;
   roadGroup.add(mainAvenue);
 
   // Sidewalks along Central Grand Avenue
-  [-5.2, 5.2].forEach((sx) => {
+  [-5.4, 5.4].forEach((sx) => {
     const sidewalk = new THREE.Mesh(
-      new THREE.BoxGeometry(1.6, 0.22, 160),
+      new THREE.BoxGeometry(1.6, 0.22, 260),
       palette.plazaPaver
     );
     sidewalk.position.set(sx, 0.11, 0);
@@ -412,44 +412,56 @@ export function buildCityRoadNetwork(
     roadGroup.add(sidewalk);
 
     // Gold curb trim
-    const curb = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.26, 160), palette.curbGold);
+    const curb = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.26, 260), palette.curbGold);
     curb.position.set(sx + (sx > 0 ? -0.8 : 0.8), 0.13, 0);
     roadGroup.add(curb);
   });
 
-  // 2. Cross Boulevard (X axis: East-West)
-  const crossBoulevardGeo = new THREE.BoxGeometry(160, 0.12, 9.0);
+  // 2. Cross Boulevard (X axis: East-West) - Expanded to 260 units
+  const crossBoulevardGeo = new THREE.BoxGeometry(260, 0.12, 9.6);
   const crossBoulevard = new THREE.Mesh(crossBoulevardGeo, palette.asphalt);
   crossBoulevard.position.set(0, 0.06, 0);
   crossBoulevard.receiveShadow = !isSoftwareGl;
   roadGroup.add(crossBoulevard);
 
-  [-5.2, 5.2].forEach((sz) => {
+  [-5.4, 5.4].forEach((sz) => {
     const sidewalk = new THREE.Mesh(
-      new THREE.BoxGeometry(160, 0.22, 1.6),
+      new THREE.BoxGeometry(260, 0.22, 1.6),
       palette.plazaPaver
     );
     sidewalk.position.set(0, 0.11, sz);
     roadGroup.add(sidewalk);
 
-    const curb = new THREE.Mesh(new THREE.BoxGeometry(160, 0.26, 0.24), palette.curbGold);
+    const curb = new THREE.Mesh(new THREE.BoxGeometry(260, 0.26, 0.24), palette.curbGold);
     curb.position.set(0, 0.13, sz + (sz > 0 ? -0.8 : 0.8));
     roadGroup.add(curb);
   });
 
-  // 3. Secondary Ring Roads (North & South avenues)
-  [-22, 18].forEach((rz) => {
-    const ringRoad = new THREE.Mesh(new THREE.BoxGeometry(160, 0.12, 7.2), palette.asphalt);
+  // 3. Secondary Ring Roads (North & South avenues connecting all districts)
+  [-65, -35, 35, 65].forEach((rz) => {
+    const ringRoad = new THREE.Mesh(new THREE.BoxGeometry(240, 0.12, 7.2), palette.asphalt);
     ringRoad.position.set(0, 0.06, rz);
     roadGroup.add(ringRoad);
   });
 
-  // Secondary Cross Streets (West & East avenues)
-  [-28, 28].forEach((rx) => {
-    const crossSt = new THREE.Mesh(new THREE.BoxGeometry(7.2, 0.12, 160), palette.asphalt);
+  // Secondary Cross Streets (West & East avenues connecting all districts)
+  [-65, -35, 35, 65].forEach((rx) => {
+    const crossSt = new THREE.Mesh(new THREE.BoxGeometry(7.2, 0.12, 240), palette.asphalt);
     crossSt.position.set(rx, 0.06, 0);
     roadGroup.add(crossSt);
   });
+
+  // 4. Eastern Deep Water Harbor Basin & Maritime Coastline
+  const harborWaterGeo = new THREE.PlaneGeometry(60, 180);
+  const harborWater = new THREE.Mesh(harborWaterGeo, palette.harborWater);
+  harborWater.rotation.x = -Math.PI / 2;
+  harborWater.position.set(100, 0.05, 0);
+  roadGroup.add(harborWater);
+
+  // Concrete Quayside Embankment Border
+  const harborEmbankment = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.5, 180), palette.slateStructure);
+  harborEmbankment.position.set(70, 0.25, 0);
+  roadGroup.add(harborEmbankment);
 
   // 4. Pedestrian Crosswalks (Zebra crossings at intersections)
   const zebraWidth = 0.5;
@@ -642,8 +654,8 @@ export function buildCityRoadNetwork(
         axis: 'z',
         dir: v.dir,
         speed: v.speed,
-        min: -70,
-        max: 70,
+        min: -120,
+        max: 120,
         laneOffset: v.lane,
       });
     } else {
@@ -654,8 +666,8 @@ export function buildCityRoadNetwork(
         axis: 'x',
         dir: v.dir,
         speed: v.speed,
-        min: -70,
-        max: 70,
+        min: -120,
+        max: 120,
         laneOffset: v.lane,
       });
     }

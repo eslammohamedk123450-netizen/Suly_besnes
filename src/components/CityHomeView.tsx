@@ -8,7 +8,7 @@ import type { CountryDefinition } from '../domain/countries';
 import type { PlayerProfile } from '../domain/player';
 import type { SectionId } from '../domain/navigation';
 import type { GameCommand, GameResult } from '../game/engine';
-import { CityCanvas, type SelectedItem } from './city3d/CityCanvas';
+import { CityCanvas, type SelectedItem, type CityCameraPreset } from './city3d/CityCanvas';
 import { BuildingDetailSheet } from './city3d/BuildingDetailSheet';
 import { BranchAndShopSheet } from './city3d/BranchAndShopSheet';
 import { CityControlsBar } from './city3d/CityControlsBar';
@@ -26,6 +26,8 @@ import {
   Shield,
   Layers,
   ChevronLeft,
+  Ship,
+  Gavel,
 } from 'lucide-react';
 
 interface CityHomeViewProps {
@@ -51,9 +53,7 @@ export const CityHomeView: React.FC<CityHomeViewProps> = (props) => {
   const [activeView, setActiveView] = useState<'3d_city' | 'dashboard'>('3d_city');
   const [selectedItem, setSelectedItem] = useState<SelectedItem | null>(null);
   const [isNightMode, setIsNightMode] = useState(true);
-  const [cameraPreset, setCameraPreset] = useState<
-    'center' | 'hq' | 'bank' | 'factory' | 'plots' | null
-  >(null);
+  const [cameraPreset, setCameraPreset] = useState<CityCameraPreset>(null);
   const [isBranchShopOpen, setIsBranchShopOpen] = useState(false);
   const [gridRefreshKey, setGridRefreshKey] = useState(0);
 
@@ -88,13 +88,13 @@ export const CityHomeView: React.FC<CityHomeViewProps> = (props) => {
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h2 className="font-black text-white text-base">مدينة الأعمال الإمبراطورية</h2>
+              <h2 className="font-black text-white text-base">مدينة الأعمال الإمبراطورية الكبرى</h2>
               <span className="text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/30 px-2 py-0.5 rounded-full font-bold">
-                خريطة 3D تفاعلية
+                خريطة 3D واقعية متكاملة
               </span>
             </div>
             <p className="text-xs text-slate-400">
-              المقر الرئيسي، البنك، مجمع المصانع، والأراضي الاستثمارية في عاصمة {country.name}
+              المقر الإمبراطوري، البورصة، البنك، الأسطول الملاحي، وادي التكنولوجيا، والمشاريع القومية في عاصمة {country.name}
             </p>
           </div>
         </div>
@@ -132,40 +132,82 @@ export const CityHomeView: React.FC<CityHomeViewProps> = (props) => {
             {/* Instruction badge over canvas for first-time / touch feedback */}
             <div className="absolute top-3 right-3 pointer-events-none bg-slate-950/80 border border-slate-800/80 backdrop-blur-md px-3 py-1.5 rounded-xl text-[11px] text-slate-300 flex items-center gap-2 shadow-lg">
               <span className="w-2 h-2 rounded-full bg-emerald-400" />
-              <span>المس وحرّك الكاميرا بحرية · اضغط على أي مبنى للتفاعل</span>
+              <span>خريطة 3D حية: اضغط على أي مبنى للتفاعل مع نظامه</span>
             </div>
 
             {/* Active Landmark Quick Floating Bar */}
-            <div className="absolute top-3 left-3 flex items-center gap-1.5">
+            <div className="absolute top-3 left-3 flex flex-wrap items-center gap-1.5 max-w-[80vw] overflow-x-auto no-scrollbar pb-1">
               <button
                 onClick={() => {
                   setCameraPreset('hq');
                   handleSelectItem({ type: 'landmark', id: 'hq' });
                 }}
-                className="px-2.5 py-1.5 rounded-xl bg-slate-950/85 hover:bg-slate-900 border border-amber-500/40 text-amber-300 text-xs font-bold flex items-center gap-1 shadow-lg backdrop-blur-md transition-all"
+                className="px-2.5 py-1.5 rounded-xl bg-slate-950/85 hover:bg-slate-900 border border-amber-500/40 text-amber-300 text-xs font-bold flex items-center gap-1 shadow-lg backdrop-blur-md transition-all shrink-0"
               >
-                <Building2 className="w-3.5 h-3.5 text-amber-400" />
                 <span>المقر 👑</span>
+              </button>
+              <button
+                onClick={() => {
+                  setCameraPreset('stock_exchange');
+                  handleSelectItem({ type: 'landmark', id: 'stock_exchange' });
+                }}
+                className="px-2.5 py-1.5 rounded-xl bg-slate-950/85 hover:bg-slate-900 border border-emerald-500/40 text-emerald-300 text-xs font-bold flex items-center gap-1 shadow-lg backdrop-blur-md transition-all shrink-0"
+              >
+                <span>البورصة 📈</span>
               </button>
               <button
                 onClick={() => {
                   setCameraPreset('bank');
                   handleSelectItem({ type: 'landmark', id: 'bank' });
                 }}
-                className="px-2.5 py-1.5 rounded-xl bg-slate-950/85 hover:bg-slate-900 border border-sky-500/40 text-sky-300 text-xs font-bold flex items-center gap-1 shadow-lg backdrop-blur-md transition-all"
+                className="px-2.5 py-1.5 rounded-xl bg-slate-950/85 hover:bg-slate-900 border border-sky-500/40 text-sky-300 text-xs font-bold flex items-center gap-1 shadow-lg backdrop-blur-md transition-all shrink-0"
               >
-                <Landmark className="w-3.5 h-3.5 text-sky-400" />
                 <span>البنك 🏦</span>
               </button>
               <button
                 onClick={() => {
-                  setCameraPreset('factory');
-                  handleSelectItem({ type: 'landmark', id: 'factory' });
+                  setCameraPreset('tech');
+                  handleSelectItem({ type: 'landmark', id: 'tech_tree' });
                 }}
-                className="px-2.5 py-1.5 rounded-xl bg-slate-950/85 hover:bg-slate-900 border border-orange-500/40 text-orange-300 text-xs font-bold flex items-center gap-1 shadow-lg backdrop-blur-md transition-all"
+                className="px-2.5 py-1.5 rounded-xl bg-slate-950/85 hover:bg-slate-900 border border-purple-500/40 text-purple-300 text-xs font-bold flex items-center gap-1 shadow-lg backdrop-blur-md transition-all shrink-0"
               >
-                <Factory className="w-3.5 h-3.5 text-orange-400" />
-                <span>المصانع 🏭</span>
+                <span>التكنولوجيا 🔬</span>
+              </button>
+              <button
+                onClick={() => {
+                  setCameraPreset('maritime');
+                  handleSelectItem({ type: 'landmark', id: 'maritime' });
+                }}
+                className="px-2.5 py-1.5 rounded-xl bg-slate-950/85 hover:bg-slate-900 border border-cyan-500/40 text-cyan-300 text-xs font-bold flex items-center gap-1 shadow-lg backdrop-blur-md transition-all shrink-0"
+              >
+                <span>الميناء 🚢</span>
+              </button>
+              <button
+                onClick={() => {
+                  setCameraPreset('gov');
+                  handleSelectItem({ type: 'landmark', id: 'megaprojects' });
+                }}
+                className="px-2.5 py-1.5 rounded-xl bg-slate-950/85 hover:bg-slate-900 border border-blue-500/40 text-blue-300 text-xs font-bold flex items-center gap-1 shadow-lg backdrop-blur-md transition-all shrink-0"
+              >
+                <span>المشاريع 🏛️</span>
+              </button>
+              <button
+                onClick={() => {
+                  setCameraPreset('trade');
+                  handleSelectItem({ type: 'landmark', id: 'auctions' });
+                }}
+                className="px-2.5 py-1.5 rounded-xl bg-slate-950/85 hover:bg-slate-900 border border-yellow-500/40 text-yellow-300 text-xs font-bold flex items-center gap-1 shadow-lg backdrop-blur-md transition-all shrink-0"
+              >
+                <span>المزادات ⚖️</span>
+              </button>
+              <button
+                onClick={() => {
+                  setCameraPreset('luxury');
+                  handleSelectItem({ type: 'landmark', id: 'luxury_club' });
+                }}
+                className="px-2.5 py-1.5 rounded-xl bg-slate-950/85 hover:bg-slate-900 border border-pink-500/40 text-pink-300 text-xs font-bold flex items-center gap-1 shadow-lg backdrop-blur-md transition-all shrink-0"
+              >
+                <span>الرفاهية 🛥️</span>
               </button>
             </div>
 
@@ -188,6 +230,8 @@ export const CityHomeView: React.FC<CityHomeViewProps> = (props) => {
                 onCommand={onCommand}
                 onRefreshGrid={handleRefreshGrid}
                 onOpenBranchShop={() => setIsBranchShopOpen(true)}
+                onOpenLuckyWheel={props.onOpenLuckyWheel}
+                onOpenPrestige={props.onOpenPrestige}
               />
             )}
           </div>

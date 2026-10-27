@@ -27,6 +27,7 @@ import {
   accelerateConstruction,
   HQ_TIERS,
 } from '../../game/cityGridSystem';
+import { ALL_CITY_LANDMARKS } from './cityWorldData';
 import {
   type GameCommand,
   type GameResult,
@@ -61,6 +62,15 @@ import {
   FileText,
   BadgeAlert,
   Store,
+  Users,
+  Briefcase,
+  Award,
+  Ship,
+  Anchor,
+  Rocket,
+  Globe,
+  BarChart3,
+  Gavel,
 } from 'lucide-react';
 import type { SelectedItem } from './CityCanvas';
 
@@ -75,6 +85,8 @@ interface BuildingDetailSheetProps {
   ) => void;
   onRefreshGrid: () => void;
   onOpenBranchShop?: () => void;
+  onOpenLuckyWheel?: () => void;
+  onOpenPrestige?: () => void;
 }
 
 export const BuildingDetailSheet: React.FC<BuildingDetailSheetProps> = ({
@@ -85,6 +97,8 @@ export const BuildingDetailSheet: React.FC<BuildingDetailSheetProps> = ({
   onCommand,
   onRefreshGrid,
   onOpenBranchShop,
+  onOpenLuckyWheel,
+  onOpenPrestige,
 }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedIndustryId, setSelectedIndustryId] = useState<string>('');
@@ -621,6 +635,205 @@ export const BuildingDetailSheet: React.FC<BuildingDetailSheetProps> = ({
             >
               <Coins className="w-5 h-5 text-amber-400" />
               <span>بورصة السلع وشراء الخامات</span>
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    // ALL OTHER SPECIALIZED SYSTEM LANDMARKS
+    const landmarkDef = ALL_CITY_LANDMARKS.find((l) => l.id === id);
+    if (landmarkDef) {
+      return (
+        <div className="absolute inset-x-0 bottom-0 z-40 bg-slate-900/95 border-t border-amber-500/40 rounded-t-3xl shadow-2xl p-5 backdrop-blur-md animate-slide-up text-white max-w-3xl mx-auto max-h-[85vh] overflow-y-auto" dir="rtl">
+          {/* Header */}
+          <div className="flex items-center justify-between border-b border-slate-800 pb-3 mb-4">
+            <div className="flex items-center gap-3">
+              <div
+                className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl border shadow-lg"
+                style={{
+                  backgroundColor: `${landmarkDef.accentColor}20`,
+                  borderColor: `${landmarkDef.accentColor}50`,
+                }}
+              >
+                <span>{landmarkDef.icon}</span>
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="font-bold text-lg text-white">{landmarkDef.titleAr}</h3>
+                  <span
+                    className="text-[10px] px-2.5 py-0.5 rounded-full font-bold border"
+                    style={{
+                      color: landmarkDef.accentColor,
+                      backgroundColor: `${landmarkDef.accentColor}20`,
+                      borderColor: `${landmarkDef.accentColor}40`,
+                    }}
+                  >
+                    {landmarkDef.badgeAr}
+                  </span>
+                </div>
+                <p className="text-xs text-slate-400 mt-0.5">{landmarkDef.descriptionAr}</p>
+              </div>
+            </div>
+            <button
+              onClick={onClose}
+              className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          {actionNotice && (
+            <div
+              className={`mb-4 p-3 rounded-xl border text-xs font-bold text-center ${
+                actionNotice.type === 'success'
+                  ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300'
+                  : 'bg-rose-500/20 border-rose-500/40 text-rose-300'
+              }`}
+            >
+              {actionNotice.text}
+            </div>
+          )}
+
+          {/* Quick Empire Real-time Metrics */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 mb-4 text-xs">
+            <div className="p-3 bg-slate-950/70 border border-slate-800 rounded-xl">
+              <span className="text-slate-400 block mb-1">الرصيد المتاح:</span>
+              <span className="font-bold text-emerald-400 text-sm">{formatMoney(profile.bankBalance)}</span>
+            </div>
+            <div className="p-3 bg-slate-950/70 border border-slate-800 rounded-xl">
+              <span className="text-slate-400 block mb-1">رصيد الماس:</span>
+              <span className="font-bold text-sky-400 text-sm flex items-center gap-1">
+                <span>{profile.diamonds}</span>
+                <Gem className="w-3.5 h-3.5 text-sky-400" />
+              </span>
+            </div>
+            <div className="p-3 bg-slate-950/70 border border-slate-800 rounded-xl">
+              <span className="text-slate-400 block mb-1">السمعة والجاه:</span>
+              <span className="font-bold text-amber-400 text-sm">{profile.reputation ?? 100} نقطة</span>
+            </div>
+            <div className="p-3 bg-slate-950/70 border border-slate-800 rounded-xl">
+              <span className="text-slate-400 block mb-1">المستوى القيادي:</span>
+              <span className="font-bold text-purple-400 text-sm">مستوى {profile.level}</span>
+            </div>
+          </div>
+
+          {/* System-Specific Highlights Card */}
+          <div
+            className="p-4 rounded-2xl bg-slate-950/80 border mb-4 space-y-3"
+            style={{ borderColor: `${landmarkDef.accentColor}40` }}
+          >
+            <div className="flex items-center justify-between text-xs">
+              <span className="font-bold text-white flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full" style={{ backgroundColor: landmarkDef.accentColor }} />
+                <span>حالة النظام والجاهزية التشغيلية</span>
+              </span>
+              <span className="text-[11px] text-emerald-400 font-bold bg-emerald-950/40 px-2 py-0.5 rounded-md border border-emerald-500/30">
+                ● متصل ومتاح للتفاعل
+              </span>
+            </div>
+
+            <div className="text-xs text-slate-300 leading-relaxed bg-slate-900/60 p-3 rounded-xl border border-slate-800">
+              {landmarkDef.id === 'stock_exchange' && (
+                <p>تم ربط بورصة الأوراق المالية بشبكة التداول الحية. يمكنك الآن الاكتتاب في الطروحات العامة (IPO)، والمضاربة على أسهم الشركات الاستثمارية المدرجة ومضاعفة رأس المال.</p>
+              )}
+              {landmarkDef.id === 'tech_tree' && (
+                <p>مختبرات الأبحاث تعمل بكامل طاقتها. استثمر في شجرة التكنولوجيا لتفعيل الأتمتة الذكية لخطوط الإنتاج، خفض تكاليف الصيانة، وزيادة جودة المنتجات.</p>
+              )}
+              {landmarkDef.id === 'incubator' && (
+                <p>حاضنة الشركات الناشئة ورأس المال الجريء (VC) تستقبل جولات التمويل الأولية (Seed / Series A). اختر الشركات الواعدة وحولها إلى يونيكورن (Unicorn) بعوائد مضاعفة.</p>
+              )}
+              {landmarkDef.id === 'maritime' && (
+                <p>أرصفة الميناء جاهزة لتسيير أساطيل الحاويات وفتح خطوط الملاحة البحرية الدولية لتصدير البضائع إلى الموانئ الإقليمية وتحقيق أرباح دولية بالعملات الصعبة.</p>
+              )}
+              {landmarkDef.id === 'megaprojects' && (
+                <p>ديوان المشاريع القومية والمناقصات الحكومية يتيح لك المنافسة على عقود البنية التحتية للدولة، مد شبكات الطاقة والموانئ، والحصول على إعفاءات ضريبية سيادية.</p>
+              )}
+              {landmarkDef.id === 'territory' && (
+                <p>قلعة النفوذ الإقليمي ترصد السيطرة التجارية والجغرافية في المحافظات والمدن. وسّع فروعك واحتل حصة السوق الإقليمية لتحصيل عوائد النفوذ اليومية.</p>
+              )}
+              {landmarkDef.id === 'cartel' && (
+                <p>تكتل الكارتيل والتحالفات التجارية يتيح لك تشكيل جبهات قوية مع كبار رجال الأعمال، شن حروب أسعار ضد المنافسين، وحماية الأسواق من التقلبات.</p>
+              )}
+              {landmarkDef.id === 'auctions' && (
+                <p>صالة المزادات الحية تعرض أراضي استثمارية مميزة، أصولاً نادرة، وماكينات صناعية بنظام المزايدة العلنية. زايد بذكاء واقتنص الصفقات الرابحة.</p>
+              )}
+              {landmarkDef.id === 'warehouse_hub' && (
+                <p>المستودعات المركزية وبورصة السلع تتيح لك تخزين وتوريد المواد الخام، ومراقبة تغير أسعار السلع والمنتجات الجاهزة لبيعها في ذروة السوق.</p>
+              )}
+              {landmarkDef.id === 'staff_academy' && (
+                <p>أكاديمية الكوادر والموارد البشرية تتيح لك استقطاب مديري التشغيل، خبراء التسويق، المحاسبين القانونيين، ومحامي الشركات لتعزيز الكفاءة والإنتاجية.</p>
+              )}
+              {landmarkDef.id === 'audit_tower' && (
+                <p>برج الرقابة والتقارير المالية يوفر تحليلاً بيانيًا شاملاً للأرباح والخسائر، التدفقات النقدية، تقييم الأصول، والميزانية العمومية لإمبراطوريتك.</p>
+              )}
+              {landmarkDef.id === 'contracts_pavilion' && (
+                <p>مقر العقود والاتفاقيات الدولية يوفر عقود توريد مجزية من كبرى الشركات العالمية. الالتزام بمواعيد التسليم يرفع تصنيفك الائتماني والسمعة الدولية.</p>
+              )}
+              {landmarkDef.id === 'tasks_monument' && (
+                <p>صرح المهام والشرف يسجل إنجازاتك اليومية والأسبوعية ويمنحك مكافآت فورية من النقد والماس وشارات المليارديرات المرموقة.</p>
+              )}
+              {landmarkDef.id === 'luxury_club' && (
+                <p>نادي المليارديرات والرفاهية الملكية يتيح لك اقتناء القصور، اليخوت الفارهة، والسيارات الرياضية الفاخرة لكسب نقاط الهيبة ومضاعفة أرباح إمبراطوريتك.</p>
+              )}
+              {landmarkDef.id === 'diamond_store' && (
+                <p>خزينة الماس الملكية تتيح لك الحصول على حزم الماس، بطاقات الإنتاج والتسريع الفوري، وامتيازات الـ VIP لتسريع وتيرة نمو إمبراطوريتك.</p>
+              )}
+              {landmarkDef.id === 'lucky_wheel' && (
+                <p>كازينو عجلة الحظ الدوارة اليومية يوفر فرصة مجانية لتدوير العجلة وربح مكافآت ضخمة من النقد، الماس، وبطاقات الحظ السحرية.</p>
+              )}
+              {landmarkDef.id === 'prestige_consulate' && (
+                <p>قنصلية التوسع الدولي وإعادة الهيكلة تمكنك من إعادة هيكلة إمبراطوريتك (Prestige) لفتح قارات عالمية ومضاعفة العوائد بنسبة هائلة ودائمة.</p>
+              )}
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex flex-wrap items-center gap-3">
+            {landmarkDef.id === 'lucky_wheel' ? (
+              <button
+                onClick={() => {
+                  onClose();
+                  if (onOpenLuckyWheel) onOpenLuckyWheel();
+                }}
+                className="flex-1 py-3 px-4 rounded-xl bg-gradient-to-r from-rose-500 to-amber-500 hover:from-rose-400 hover:to-amber-400 text-slate-950 font-bold text-sm flex items-center justify-center gap-2 transition-all shadow-lg shadow-rose-500/20"
+              >
+                <Coins className="w-5 h-5" />
+                <span>تدوير عجلة الحظ الآن 🎡</span>
+              </button>
+            ) : landmarkDef.id === 'prestige_consulate' ? (
+              <button
+                onClick={() => {
+                  onClose();
+                  if (onOpenPrestige) onOpenPrestige();
+                }}
+                className="flex-1 py-3 px-4 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-sm flex items-center justify-center gap-2 transition-all shadow-lg shadow-purple-500/20"
+              >
+                <TrendingUp className="w-5 h-5" />
+                <span>بدء التوسع الدولي وإعادة الهيكلة 🌐</span>
+              </button>
+            ) : landmarkDef.sectionId ? (
+              <button
+                onClick={() => {
+                  onClose();
+                  onNavigate(landmarkDef.sectionId!);
+                }}
+                className="flex-1 py-3 px-4 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all shadow-lg text-slate-950"
+                style={{
+                  backgroundColor: landmarkDef.accentColor,
+                  boxShadow: `0 10px 25px -5px ${landmarkDef.accentColor}40`,
+                }}
+              >
+                <ChevronLeft className="w-5 h-5" />
+                <span>دخول {landmarkDef.titleAr} بالكامل</span>
+              </button>
+            ) : null}
+
+            <button
+              onClick={onClose}
+              className="py-3 px-5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-bold text-sm transition-colors border border-slate-700"
+            >
+              إغلاق
             </button>
           </div>
         </div>

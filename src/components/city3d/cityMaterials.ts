@@ -244,6 +244,17 @@ export interface CityMaterialPalette {
   whiteMarble: THREE.MeshStandardMaterial;
   neonCyan: THREE.MeshBasicMaterial;
   neonPurple: THREE.MeshBasicMaterial;
+  neonGreen: THREE.MeshBasicMaterial;
+  neonGold: THREE.MeshBasicMaterial;
+  neonRed: THREE.MeshBasicMaterial;
+  obsidianFortress: THREE.MeshStandardMaterial;
+  harborWater: THREE.MeshStandardMaterial;
+  poolTurquoise: THREE.MeshStandardMaterial;
+  containerRed: THREE.MeshStandardMaterial;
+  containerBlue: THREE.MeshStandardMaterial;
+  containerGreen: THREE.MeshStandardMaterial;
+  containerYellow: THREE.MeshStandardMaterial;
+  beaconGlow: THREE.MeshBasicMaterial;
 
   // Construction Stages Materials
   constructionYellow: THREE.MeshStandardMaterial;
@@ -412,6 +423,57 @@ export function createCityMaterialPalette(
     }),
     neonPurple: new THREE.MeshBasicMaterial({
       color: '#a855f7',
+    }),
+    neonGreen: new THREE.MeshBasicMaterial({
+      color: '#10b981',
+    }),
+    neonGold: new THREE.MeshBasicMaterial({
+      color: '#f59e0b',
+    }),
+    neonRed: new THREE.MeshBasicMaterial({
+      color: '#ef4444',
+    }),
+    obsidianFortress: new THREE.MeshStandardMaterial({
+      color: '#0f172a',
+      roughness: 0.25,
+      metalness: 0.85,
+    }),
+    harborWater: new THREE.MeshStandardMaterial({
+      color: '#0369a1',
+      roughness: 0.1,
+      metalness: 0.6,
+      transparent: true,
+      opacity: 0.88,
+    }),
+    poolTurquoise: new THREE.MeshStandardMaterial({
+      color: '#06b6d4',
+      roughness: 0.05,
+      metalness: 0.4,
+      transparent: true,
+      opacity: 0.85,
+    }),
+    containerRed: new THREE.MeshStandardMaterial({
+      color: '#dc2626',
+      roughness: 0.45,
+      metalness: 0.6,
+    }),
+    containerBlue: new THREE.MeshStandardMaterial({
+      color: '#2563eb',
+      roughness: 0.45,
+      metalness: 0.6,
+    }),
+    containerGreen: new THREE.MeshStandardMaterial({
+      color: '#16a34a',
+      roughness: 0.45,
+      metalness: 0.6,
+    }),
+    containerYellow: new THREE.MeshStandardMaterial({
+      color: '#f59e0b',
+      roughness: 0.45,
+      metalness: 0.6,
+    }),
+    beaconGlow: new THREE.MeshBasicMaterial({
+      color: '#fef08a',
     }),
 
     // Construction stages

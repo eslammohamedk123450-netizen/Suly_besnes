@@ -20,7 +20,20 @@ import {
 } from 'lucide-react';
 
 interface CityControlsBarProps {
-  onSelectPreset: (preset: 'center' | 'hq' | 'bank' | 'factory' | 'plots') => void;
+  onSelectPreset: (
+    preset:
+      | 'center'
+      | 'hq'
+      | 'bank'
+      | 'stock_exchange'
+      | 'factory'
+      | 'tech'
+      | 'maritime'
+      | 'gov'
+      | 'trade'
+      | 'luxury'
+      | 'plots'
+  ) => void;
   isNightMode: boolean;
   onToggleNightMode: () => void;
   activeView: '3d_city' | 'dashboard';
@@ -46,7 +59,7 @@ export const CityControlsBar: React.FC<CityControlsBarProps> = ({
         {isCollapsed ? (
           <>
             <ChevronUp className="w-3.5 h-3.5" />
-            <span>إظهار أزرار التحكم بالكاميرا والمدينة</span>
+            <span>إظهار أزرار التحكم بالكاميرا وأحياء المدينة</span>
           </>
         ) : (
           <>
@@ -85,7 +98,7 @@ export const CityControlsBar: React.FC<CityControlsBarProps> = ({
             </button>
           </div>
 
-          {/* Camera Focus Presets */}
+          {/* Camera Focus Presets across All Districts */}
           <div className="flex flex-wrap items-center gap-1.5">
             <button
               onClick={() => onSelectPreset('center')}
@@ -97,31 +110,63 @@ export const CityControlsBar: React.FC<CityControlsBarProps> = ({
             </button>
             <button
               onClick={() => onSelectPreset('hq')}
-              className="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-medium flex items-center gap-1 transition-colors border border-slate-700"
+              className="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 hover:text-white font-bold flex items-center gap-1 transition-colors border border-amber-500/30"
               title="التركيز على البرج الإمبراطوري"
             >
-              <Building2 className="w-3.5 h-3.5 text-amber-400" />
-              <span>المقر</span>
+              <span>المقر 👑</span>
+            </button>
+            <button
+              onClick={() => onSelectPreset('stock_exchange')}
+              className="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-emerald-300 hover:text-white font-medium flex items-center gap-1 transition-colors border border-slate-700"
+              title="التركيز على البورصة"
+            >
+              <span>البورصة 📈</span>
             </button>
             <button
               onClick={() => onSelectPreset('bank')}
-              className="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-medium flex items-center gap-1 transition-colors border border-slate-700"
+              className="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-sky-300 hover:text-white font-medium flex items-center gap-1 transition-colors border border-slate-700"
               title="التركيز على البنك المركزي"
             >
-              <Landmark className="w-3.5 h-3.5 text-sky-400" />
-              <span>البنك</span>
+              <span>البنك 🏦</span>
             </button>
             <button
-              onClick={() => onSelectPreset('factory')}
-              className="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-medium flex items-center gap-1 transition-colors border border-slate-700"
-              title="التركيز على مجمع المصانع"
+              onClick={() => onSelectPreset('tech')}
+              className="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-purple-300 hover:text-white font-medium flex items-center gap-1 transition-colors border border-slate-700"
+              title="التركيز على وادي التكنولوجيا"
             >
-              <Factory className="w-3.5 h-3.5 text-orange-400" />
-              <span>المصانع</span>
+              <span>التكنولوجيا 🔬</span>
+            </button>
+            <button
+              onClick={() => onSelectPreset('maritime')}
+              className="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-cyan-300 hover:text-white font-medium flex items-center gap-1 transition-colors border border-slate-700"
+              title="التركيز على الميناء والأسطول"
+            >
+              <span>الميناء 🚢</span>
+            </button>
+            <button
+              onClick={() => onSelectPreset('gov')}
+              className="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-blue-300 hover:text-white font-medium flex items-center gap-1 transition-colors border border-slate-700"
+              title="التركيز على المنطقة الحكومية"
+            >
+              <span>الحكومة 🏛️</span>
+            </button>
+            <button
+              onClick={() => onSelectPreset('trade')}
+              className="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-yellow-300 hover:text-white font-medium flex items-center gap-1 transition-colors border border-slate-700"
+              title="التركيز على حي المزادات والتجارة"
+            >
+              <span>المزادات ⚖️</span>
+            </button>
+            <button
+              onClick={() => onSelectPreset('luxury')}
+              className="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-pink-300 hover:text-white font-medium flex items-center gap-1 transition-colors border border-slate-700"
+              title="التركيز على ساحل الرفاهية واليخوت"
+            >
+              <span>الرفاهية 🛥️</span>
             </button>
             <button
               onClick={() => onSelectPreset('plots')}
-              className="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-medium flex items-center gap-1 transition-colors border border-slate-700"
+              className="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-emerald-400 hover:text-white font-medium flex items-center gap-1 transition-colors border border-slate-700"
               title="التركيز على الأراضي الاستثمارية"
             >
               <MapPin className="w-3.5 h-3.5 text-emerald-400" />
