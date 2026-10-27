@@ -528,7 +528,7 @@ export function transferStockToShop(
     const remainingSpace = Math.max(0, shop.shelfCapacity - currentShelfLoad);
     return failure(
       profile,
-      'warehouse-full',
+      'storage-limit',
       `سعة أرفف المتجر لا تكفي. المساحة الشاغرة: ${remainingSpace} وحدة فقط (السعة الكلية: ${shop.shelfCapacity}).`
     );
   }
