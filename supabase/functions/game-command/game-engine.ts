@@ -29,7 +29,7 @@ var COUNTRIES = [
     startingBalance: 25e3,
     startingBalanceEgpEquivalent: 25e3,
     economy: {
-      exchangeRateToEgp: 1,
+      usdToLocalRate: 55.29801574267654,
       companySetupFee: 2e3,
       licenseFeesByIndustry: buildIndustryFees(),
       taxRate: 0.12,
@@ -53,7 +53,7 @@ var COUNTRIES = [
     startingBalance: 25e3,
     startingBalanceEgpEquivalent: 25e3,
     economy: {
-      exchangeRateToEgp: 1,
+      usdToLocalRate: 3.75,
       companySetupFee: 2e3,
       licenseFeesByIndustry: buildIndustryFees(),
       taxRate: 0.15,
@@ -77,7 +77,7 @@ var COUNTRIES = [
     startingBalance: 25e3,
     startingBalanceEgpEquivalent: 25e3,
     economy: {
-      exchangeRateToEgp: 1,
+      usdToLocalRate: 3.6725,
       companySetupFee: 2200,
       licenseFeesByIndustry: buildIndustryFees(),
       taxRate: 0.09,
@@ -101,7 +101,7 @@ var COUNTRIES = [
     startingBalance: 25e3,
     startingBalanceEgpEquivalent: 25e3,
     economy: {
-      exchangeRateToEgp: 1,
+      usdToLocalRate: 1.0,
       companySetupFee: 2500,
       licenseFeesByIndustry: buildIndustryFees(),
       taxRate: 0.21,
@@ -125,7 +125,7 @@ var COUNTRIES = [
     startingBalance: 25e3,
     startingBalanceEgpEquivalent: 25e3,
     economy: {
-      exchangeRateToEgp: 1,
+      usdToLocalRate: 3.220526962466595,
       companySetupFee: 2e3,
       licenseFeesByIndustry: buildIndustryFees(),
       taxRate: 0.15,
@@ -149,7 +149,7 @@ var COUNTRIES = [
     startingBalance: 25e3,
     startingBalanceEgpEquivalent: 25e3,
     economy: {
-      exchangeRateToEgp: 1,
+      usdToLocalRate: 3.64,
       companySetupFee: 2100,
       licenseFeesByIndustry: buildIndustryFees(),
       taxRate: 0.1,
@@ -173,7 +173,7 @@ var COUNTRIES = [
     startingBalance: 25e3,
     startingBalanceEgpEquivalent: 25e3,
     economy: {
-      exchangeRateToEgp: 1,
+      usdToLocalRate: 1.3380609512753974,
       companySetupFee: 2300,
       licenseFeesByIndustry: buildIndustryFees(),
       taxRate: 0.19,
@@ -197,7 +197,7 @@ var COUNTRIES = [
     startingBalance: 25e3,
     startingBalanceEgpEquivalent: 25e3,
     economy: {
-      exchangeRateToEgp: 1,
+      usdToLocalRate: 1.1212539997087916,
       companySetupFee: 2300,
       licenseFeesByIndustry: buildIndustryFees(),
       taxRate: 0.19,
@@ -221,7 +221,7 @@ var COUNTRIES = [
     startingBalance: 25e3,
     startingBalanceEgpEquivalent: 25e3,
     economy: {
-      exchangeRateToEgp: 1,
+      usdToLocalRate: 157.09917931618187,
       companySetupFee: 2200,
       licenseFeesByIndustry: buildIndustryFees(),
       taxRate: 0.15,
@@ -229,11 +229,11 @@ var COUNTRIES = [
       operatingCostMultiplier: 1.1
     }
   },
-  { id: "jordan", name: "المملكة الأردنية الهاشمية", flag: "🇯🇴", storyTitle: "نهضة الأعمال الأردنية", storySummary: "إدارة الأعمال في الأردن", storyFull: ["ابدأ مشروعك المحلي.", "طوّر الإنتاج والتجارة.", "وسّع إمبراطوريتك."], currency: { code: "JOD", symbol: "د.أ", name: "الدينار الأردني" }, startingBalance: 25e3, startingBalanceEgpEquivalent: 25e3, economy: { exchangeRateToEgp: 1, companySetupFee: 2100, licenseFeesByIndustry: buildIndustryFees(), taxRate: 0.16, customsRate: 0.03, operatingCostMultiplier: 1.05 } },
-  { id: "palestine", name: "فلسطين", flag: "🇵🇸", storyTitle: "نهضة الأعمال الفلسطينية", storySummary: "إدارة الأعمال في فلسطين", storyFull: ["ابدأ مشروعك المحلي.", "طوّر الإنتاج والتجارة.", "وسّع إمبراطوريتك."], currency: { code: "ILS", symbol: "₪", name: "الشيكل الإسرائيلي الجديد" }, startingBalance: 25e3, startingBalanceEgpEquivalent: 25e3, economy: { exchangeRateToEgp: 1, companySetupFee: 2000, licenseFeesByIndustry: buildIndustryFees(), taxRate: 0.16, customsRate: 0.03, operatingCostMultiplier: 1.05 } },
-  { id: "china", name: "جمهورية الصين الشعبية", flag: "🇨🇳", storyTitle: "بناء الأعمال في الصين", storySummary: "إدارة الأعمال في الصين", storyFull: ["ابدأ مشروعك المحلي.", "طوّر الإنتاج والتجارة.", "وسّع إمبراطوريتك."], currency: { code: "CNY", symbol: "¥", name: "اليوان الصيني" }, startingBalance: 25e3, startingBalanceEgpEquivalent: 25e3, economy: { exchangeRateToEgp: 1, companySetupFee: 2200, licenseFeesByIndustry: buildIndustryFees(), taxRate: 0.13, customsRate: 0.02, operatingCostMultiplier: 1.08 } },
-  { id: "spain", name: "مملكة إسبانيا", flag: "🇪🇸", storyTitle: "نهضة الأعمال الإسبانية", storySummary: "إدارة الأعمال في إسبانيا", storyFull: ["ابدأ مشروعك المحلي.", "طوّر الإنتاج والتجارة.", "وسّع إمبراطوريتك."], currency: { code: "EUR", symbol: "€", name: "اليورو" }, startingBalance: 25e3, startingBalanceEgpEquivalent: 25e3, economy: { exchangeRateToEgp: 1, companySetupFee: 2300, licenseFeesByIndustry: buildIndustryFees(), taxRate: 0.19, customsRate: 0.02, operatingCostMultiplier: 1.1 } },
-  { id: "russia", name: "الاتحاد الروسي", flag: "🇷🇺", storyTitle: "نهضة الأعمال الروسية", storySummary: "إدارة الأعمال في روسيا", storyFull: ["ابدأ مشروعك المحلي.", "طوّر الإنتاج والتجارة.", "وسّع إمبراطوريتك."], currency: { code: "RUB", symbol: "₽", name: "الروبل الروسي" }, startingBalance: 25e3, startingBalanceEgpEquivalent: 25e3, economy: { exchangeRateToEgp: 1, companySetupFee: 2200, licenseFeesByIndustry: buildIndustryFees(), taxRate: 0.18, customsRate: 0.03, operatingCostMultiplier: 1.08 } }
+  { id: "jordan", name: "المملكة الأردنية الهاشمية", flag: "🇯🇴", storyTitle: "نهضة الأعمال الأردنية", storySummary: "إدارة الأعمال في الأردن", storyFull: ["ابدأ مشروعك المحلي.", "طوّر الإنتاج والتجارة.", "وسّع إمبراطوريتك."], currency: { code: "JOD", symbol: "د.أ", name: "الدينار الأردني" }, startingBalance: 25e3, startingBalanceEgpEquivalent: 25e3, economy: { usdToLocalRate: 0.709, companySetupFee: 2100, licenseFeesByIndustry: buildIndustryFees(), taxRate: 0.16, customsRate: 0.03, operatingCostMultiplier: 1.05 } },
+  { id: "palestine", name: "فلسطين", flag: "🇵🇸", storyTitle: "نهضة الأعمال الفلسطينية", storySummary: "إدارة الأعمال في فلسطين", storyFull: ["ابدأ مشروعك المحلي.", "طوّر الإنتاج والتجارة.", "وسّع إمبراطوريتك."], currency: { code: "ILS", symbol: "₪", name: "الشيكل الإسرائيلي الجديد" }, startingBalance: 25e3, startingBalanceEgpEquivalent: 25e3, economy: { usdToLocalRate: 3.1102410492636143, companySetupFee: 2000, licenseFeesByIndustry: buildIndustryFees(), taxRate: 0.16, customsRate: 0.03, operatingCostMultiplier: 1.05 } },
+  { id: "china", name: "جمهورية الصين الشعبية", flag: "🇨🇳", storyTitle: "بناء الأعمال في الصين", storySummary: "إدارة الأعمال في الصين", storyFull: ["ابدأ مشروعك المحلي.", "طوّر الإنتاج والتجارة.", "وسّع إمبراطوريتك."], currency: { code: "CNY", symbol: "¥", name: "اليوان الصيني" }, startingBalance: 25e3, startingBalanceEgpEquivalent: 25e3, economy: { usdToLocalRate: 6.675608572444649, companySetupFee: 2200, licenseFeesByIndustry: buildIndustryFees(), taxRate: 0.13, customsRate: 0.02, operatingCostMultiplier: 1.08 } },
+  { id: "spain", name: "مملكة إسبانيا", flag: "🇪🇸", storyTitle: "نهضة الأعمال الإسبانية", storySummary: "إدارة الأعمال في إسبانيا", storyFull: ["ابدأ مشروعك المحلي.", "طوّر الإنتاج والتجارة.", "وسّع إمبراطوريتك."], currency: { code: "EUR", symbol: "€", name: "اليورو" }, startingBalance: 25e3, startingBalanceEgpEquivalent: 25e3, economy: { usdToLocalRate: 1.1212539997087916, companySetupFee: 2300, licenseFeesByIndustry: buildIndustryFees(), taxRate: 0.19, customsRate: 0.02, operatingCostMultiplier: 1.1 } },
+  { id: "russia", name: "الاتحاد الروسي", flag: "🇷🇺", storyTitle: "نهضة الأعمال الروسية", storySummary: "إدارة الأعمال في روسيا", storyFull: ["ابدأ مشروعك المحلي.", "طوّر الإنتاج والتجارة.", "وسّع إمبراطوريتك."], currency: { code: "RUB", symbol: "₽", name: "الروبل الروسي" }, startingBalance: 25e3, startingBalanceEgpEquivalent: 25e3, economy: { usdToLocalRate: 80.4909704, companySetupFee: 2200, licenseFeesByIndustry: buildIndustryFees(), taxRate: 0.18, customsRate: 0.03, operatingCostMultiplier: 1.08 } }
 ];
 function findCountry(countryId) {
   return COUNTRIES.find((country) => country.id === countryId);

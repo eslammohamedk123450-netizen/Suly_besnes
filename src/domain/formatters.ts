@@ -11,19 +11,23 @@ export function formatMoney(
   country?: CountryDefinition | CountryId | string
 ): string {
   let symbol = '$';
+  let usdToLocalRate = 1;
 
   if (country) {
     if (typeof country === 'object' && country.currency?.symbol) {
       symbol = country.currency.symbol;
+      usdToLocalRate = country.economy.usdToLocalRate;
     } else if (typeof country === 'string') {
       const found = findCountry(country as CountryId);
       if (found?.currency?.symbol) {
         symbol = found.currency.symbol;
+        usdToLocalRate = found.economy.usdToLocalRate;
       }
     }
   }
 
-  return `${symbol} ${formatNumber(value ?? 0)}`;
+  const localValue = (value ?? 0) * usdToLocalRate;
+  return `${symbol} ${formatNumber(localValue)}`;
 }
 
 export function formatGold(grams: number): string {

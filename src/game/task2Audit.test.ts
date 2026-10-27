@@ -31,6 +31,7 @@ import {
   calculateNetWorth,
 } from '../domain/player';
 import { COUNTRIES, findCountry } from '../domain/countries';
+import { formatMoney } from '../domain/formatters';
 import { getDirectLandsForCountry } from './catalog';
 import { verifyCountryAndLandIntegrity } from '../domain/countryAuditCatalog';
 import { enqueueGameCommand, loadQueuedGameCommands, acknowledgeGameCommand } from '../storage/commandOutbox';
@@ -293,6 +294,13 @@ describe('Task 2 — Comprehensive Internal Systems, Economy, and Persistence Au
 
   // 6. Supported Countries, Jordan Integration, and Unique Land IDs
   describe('6. Country and Land Catalog Integrity', () => {
+    it('converts the USD reference balance into each country currency for display', () => {
+      expect(formatMoney(25_000, findCountry('egypt'))).toBe('ج.م 1,382,450');
+      expect(formatMoney(25_000, findCountry('saudi'))).toBe('ر.س 93,750');
+      expect(formatMoney(25_000, findCountry('jordan'))).toBe('د.أ 17,725');
+      expect(formatMoney(25_000, findCountry('russia'))).toBe('₽ 2,012,274');
+    });
+
     it('defines a non-default currency for every supported country', () => {
       const expected = { egypt: 'EGP', saudi: 'SAR', uae: 'AED', usa: 'USD', kuwait: 'KWD', qatar: 'QAR', uk: 'GBP', germany: 'EUR', japan: 'JPY', jordan: 'JOD', palestine: 'ILS', china: 'CNY', spain: 'EUR', russia: 'RUB' };
       for (const country of COUNTRIES) expect(country.currency.code).toBe(expected[country.id]);

@@ -41,8 +41,8 @@ export interface CountryDefinition {
   startingBalance: number;
   startingBalanceEgpEquivalent: number;
   economy: {
-    /** Exchange rate normalized to USD (1.0 for all) */
-    exchangeRateToEgp: number;
+    /** Fixed conversion rate: 1 USD equals this many local currency units. */
+    usdToLocalRate: number;
     /** Simulation-only company formation fee in USD */
     companySetupFee: number;
     /** Simulation-only licence prices by industry in USD */
@@ -85,7 +85,7 @@ export const COUNTRIES: readonly CountryDefinition[] = [
     startingBalance: 25_000,
     startingBalanceEgpEquivalent: 25_000,
     economy: {
-      exchangeRateToEgp: 1.0,
+      usdToLocalRate: 55.29801574267654,
       companySetupFee: 2_000,
       licenseFeesByIndustry: buildIndustryFees(),
       taxRate: 0.12,
@@ -110,7 +110,7 @@ export const COUNTRIES: readonly CountryDefinition[] = [
     startingBalance: 25_000,
     startingBalanceEgpEquivalent: 25_000,
     economy: {
-      exchangeRateToEgp: 1.0,
+      usdToLocalRate: 3.75,
       companySetupFee: 2_000,
       licenseFeesByIndustry: buildIndustryFees(),
       taxRate: 0.15,
@@ -135,7 +135,7 @@ export const COUNTRIES: readonly CountryDefinition[] = [
     startingBalance: 25_000,
     startingBalanceEgpEquivalent: 25_000,
     economy: {
-      exchangeRateToEgp: 1.0,
+      usdToLocalRate: 3.6725,
       companySetupFee: 2_200,
       licenseFeesByIndustry: buildIndustryFees(),
       taxRate: 0.09,
@@ -160,7 +160,7 @@ export const COUNTRIES: readonly CountryDefinition[] = [
     startingBalance: 25_000,
     startingBalanceEgpEquivalent: 25_000,
     economy: {
-      exchangeRateToEgp: 1.0,
+      usdToLocalRate: 1.0,
       companySetupFee: 2_500,
       licenseFeesByIndustry: buildIndustryFees(),
       taxRate: 0.21,
@@ -185,7 +185,7 @@ export const COUNTRIES: readonly CountryDefinition[] = [
     startingBalance: 25_000,
     startingBalanceEgpEquivalent: 25_000,
     economy: {
-      exchangeRateToEgp: 1.0,
+      usdToLocalRate: 3.220526962466595,
       companySetupFee: 2_000,
       licenseFeesByIndustry: buildIndustryFees(),
       taxRate: 0.15,
@@ -210,7 +210,7 @@ export const COUNTRIES: readonly CountryDefinition[] = [
     startingBalance: 25_000,
     startingBalanceEgpEquivalent: 25_000,
     economy: {
-      exchangeRateToEgp: 1.0,
+      usdToLocalRate: 3.64,
       companySetupFee: 2_100,
       licenseFeesByIndustry: buildIndustryFees(),
       taxRate: 0.1,
@@ -235,7 +235,7 @@ export const COUNTRIES: readonly CountryDefinition[] = [
     startingBalance: 25_000,
     startingBalanceEgpEquivalent: 25_000,
     economy: {
-      exchangeRateToEgp: 1.0,
+      usdToLocalRate: 1.3380609512753974,
       companySetupFee: 2_300,
       licenseFeesByIndustry: buildIndustryFees(),
       taxRate: 0.19,
@@ -260,7 +260,7 @@ export const COUNTRIES: readonly CountryDefinition[] = [
     startingBalance: 25_000,
     startingBalanceEgpEquivalent: 25_000,
     economy: {
-      exchangeRateToEgp: 1.0,
+      usdToLocalRate: 1.1212539997087916,
       companySetupFee: 2_300,
       licenseFeesByIndustry: buildIndustryFees(),
       taxRate: 0.19,
@@ -285,7 +285,7 @@ export const COUNTRIES: readonly CountryDefinition[] = [
     startingBalance: 25_000,
     startingBalanceEgpEquivalent: 25_000,
     economy: {
-      exchangeRateToEgp: 1.0,
+      usdToLocalRate: 157.09917931618187,
       companySetupFee: 2_200,
       licenseFeesByIndustry: buildIndustryFees(),
       taxRate: 0.15,
@@ -310,7 +310,7 @@ export const COUNTRIES: readonly CountryDefinition[] = [
     startingBalance: 25_000,
     startingBalanceEgpEquivalent: 25_000,
     economy: {
-      exchangeRateToEgp: 1.0,
+      usdToLocalRate: 0.709,
       companySetupFee: 2_100,
       licenseFeesByIndustry: buildIndustryFees(),
       taxRate: 0.14,
@@ -334,7 +334,7 @@ export const COUNTRIES: readonly CountryDefinition[] = [
     startingBalance: 25_000,
     startingBalanceEgpEquivalent: 25_000,
     economy: {
-      exchangeRateToEgp: 1.0,
+      usdToLocalRate: 3.1102410492636143,
       companySetupFee: 1_900,
       licenseFeesByIndustry: buildIndustryFees(),
       taxRate: 0.16,
@@ -348,7 +348,7 @@ export const COUNTRIES: readonly CountryDefinition[] = [
     storyFull: ['ابدأ مشروعك بخطوة عملية في السوق المحلي.', 'استثمر في الإنتاج والتجارة والخدمات.', 'وسّع أعمالك عبر المدن والمراكز الصناعية.'],
     currency: { code: 'CNY', symbol: '¥', name: 'اليوان الصيني' },
     startingBalance: 25_000, startingBalanceEgpEquivalent: 25_000,
-    economy: { exchangeRateToEgp: 1.0, companySetupFee: 2_200, licenseFeesByIndustry: buildIndustryFees(), taxRate: 0.18, customsRate: 0.03, operatingCostMultiplier: 1.08 },
+    economy: { usdToLocalRate: 6.675608572444649, companySetupFee: 2_200, licenseFeesByIndustry: buildIndustryFees(), taxRate: 0.18, customsRate: 0.03, operatingCostMultiplier: 1.08 },
   },
   {
     id: 'spain', name: 'مملكة إسبانيا', flag: '🇪🇸', storyTitle: 'بناء الأعمال في مملكة إسبانيا',
@@ -356,7 +356,7 @@ export const COUNTRIES: readonly CountryDefinition[] = [
     storyFull: ['ابدأ مشروعك بخطوة عملية في السوق المحلي.', 'استثمر في الإنتاج والتجارة والخدمات.', 'وسّع أعمالك عبر المدن والمراكز الصناعية.'],
     currency: { code: 'EUR', symbol: '€', name: 'اليورو' },
     startingBalance: 25_000, startingBalanceEgpEquivalent: 25_000,
-    economy: { exchangeRateToEgp: 1.0, companySetupFee: 2_200, licenseFeesByIndustry: buildIndustryFees(), taxRate: 0.18, customsRate: 0.03, operatingCostMultiplier: 1.08 },
+    economy: { usdToLocalRate: 1.1212539997087916, companySetupFee: 2_200, licenseFeesByIndustry: buildIndustryFees(), taxRate: 0.18, customsRate: 0.03, operatingCostMultiplier: 1.08 },
   },
   {
     id: 'russia', name: 'الاتحاد الروسي', flag: '🇷🇺', storyTitle: 'بناء الأعمال في الاتحاد الروسي',
@@ -364,7 +364,7 @@ export const COUNTRIES: readonly CountryDefinition[] = [
     storyFull: ['ابدأ مشروعك بخطوة عملية في السوق المحلي.', 'استثمر في الإنتاج والتجارة والخدمات.', 'وسّع أعمالك عبر المدن والمراكز الصناعية.'],
     currency: { code: 'RUB', symbol: '₽', name: 'الروبل الروسي' },
     startingBalance: 25_000, startingBalanceEgpEquivalent: 25_000,
-    economy: { exchangeRateToEgp: 1.0, companySetupFee: 2_200, licenseFeesByIndustry: buildIndustryFees(), taxRate: 0.18, customsRate: 0.03, operatingCostMultiplier: 1.08 },
+    economy: { usdToLocalRate: 80.4909704, companySetupFee: 2_200, licenseFeesByIndustry: buildIndustryFees(), taxRate: 0.18, customsRate: 0.03, operatingCostMultiplier: 1.08 },
   },
 ];
 export function findCountry(countryId: CountryId): CountryDefinition | undefined {
