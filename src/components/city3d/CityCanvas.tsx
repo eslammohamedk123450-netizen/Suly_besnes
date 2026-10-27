@@ -17,6 +17,7 @@ import { playSound } from '../../game/soundEffects';
 import {
   createCityMaterialPalette,
   disposeCityMaterialPalette,
+  getOrCreateSkyTexture,
   type CityMaterialPalette,
 } from './cityMaterials';
 import {
@@ -133,10 +134,9 @@ export const CityCanvas: React.FC<CityCanvasProps> = ({
 
     // 1. Scene setup with expanded atmospheric horizon fog
     const scene = new THREE.Scene();
-    const skyColor = isNightMode ? '#070b14' : '#0f172a';
-    const fogColor = isNightMode ? '#090d18' : '#1e293b';
-    scene.background = new THREE.Color(skyColor);
-    scene.fog = new THREE.FogExp2(fogColor, 0.0035);
+    const fogColor = isNightMode ? '#0b1630' : '#64748b';
+    scene.background = getOrCreateSkyTexture(isNightMode);
+    scene.fog = new THREE.FogExp2(fogColor, isNightMode ? 0.003 : 0.0026);
 
     // 2. Camera with expanded view frustum for enlarged city
     const camera = new THREE.PerspectiveCamera(45, width / height, 0.5, 600);

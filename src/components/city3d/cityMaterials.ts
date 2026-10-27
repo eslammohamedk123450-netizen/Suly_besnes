@@ -11,15 +11,23 @@ import * as THREE from 'three';
 let asphaltTexture: THREE.CanvasTexture | null = null;
 let solarTexture: THREE.CanvasTexture | null = null;
 let cautionTexture: THREE.CanvasTexture | null = null;
-let officeWindowTexture: THREE.CanvasTexture | null = null;
+let officeWindowTextures: { day: THREE.CanvasTexture | null; night: THREE.CanvasTexture | null } = {
+  day: null,
+  night: null,
+};
 let paverTexture: THREE.CanvasTexture | null = null;
 let containerTexture: THREE.CanvasTexture | null = null;
+let skyTextures: { day: THREE.CanvasTexture | null; night: THREE.CanvasTexture | null } = {
+  day: null,
+  night: null,
+};
 
 /**
  * Creates procedural high-rise office window facade texture with illuminated offices
  */
 export function getOrCreateOfficeWindowTexture(isNightMode = true): THREE.Texture {
-  if (officeWindowTexture) return officeWindowTexture;
+  const mode = isNightMode ? 'night' : 'day';
+  if (officeWindowTextures[mode]) return officeWindowTextures[mode]!;
 
   if (typeof document === 'undefined') {
     const data = new Uint8Array([14, 165, 233, 255]);
@@ -49,7 +57,7 @@ export function getOrCreateOfficeWindowTexture(isNightMode = true): THREE.Textur
         const w = cellW - 6;
         const h = cellH - 6;
 
-        const isLit = (r + c * 3) % 3 !== 0;
+        const isLit = isNightMode && (r + c * 3) % 3 !== 0;
         if (isLit) {
           // Warm executive office glow or cool cyan LED glow
           const warm = (r * 7 + c) % 2 === 0;
@@ -79,12 +87,72 @@ export function getOrCreateOfficeWindowTexture(isNightMode = true): THREE.Textur
     }
   }
 
-  officeWindowTexture = new THREE.CanvasTexture(canvas);
-  officeWindowTexture.wrapS = THREE.RepeatWrapping;
-  officeWindowTexture.wrapT = THREE.RepeatWrapping;
-  officeWindowTexture.repeat.set(3, 4);
-  officeWindowTexture.colorSpace = THREE.SRGBColorSpace;
-  return officeWindowTexture;
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.RepeatWrapping;
+  texture.repeat.set(3, 4);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  officeWindowTextures[mode] = texture;
+  return texture;
+}
+
+/**
+ * Lightweight equirectangular sky backdrop. It gives the procedural city a
+ * cinematic horizon without adding an HDR download or another runtime asset.
+ */
+export function getOrCreateSkyTexture(isNightMode = true): THREE.Texture {
+  const mode = isNightMode ? 'night' : 'day';
+  if (skyTextures[mode]) return skyTextures[mode]!;
+
+  if (typeof document === 'undefined') {
+    const data = new Uint8Array([7, 11, 20, 255]);
+    const tex = new THREE.DataTexture(data, 1, 1);
+    tex.needsUpdate = true;
+    return tex;
+  }
+
+  const canvas = document.createElement('canvas');
+  canvas.width = 1024;
+  canvas.height = 512;
+  const ctx = canvas.getContext('2d');
+  if (ctx) {
+    const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+    if (isNightMode) {
+      gradient.addColorStop(0, '#020617');
+      gradient.addColorStop(0.48, '#0b1630');
+      gradient.addColorStop(0.76, '#172554');
+      gradient.addColorStop(1, '#0f172a');
+    } else {
+      gradient.addColorStop(0, '#7dd3fc');
+      gradient.addColorStop(0.52, '#bae6fd');
+      gradient.addColorStop(0.78, '#dbeafe');
+      gradient.addColorStop(1, '#64748b');
+    }
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    if (isNightMode) {
+      const stars = [
+        [0.12, 0.18], [0.24, 0.31], [0.38, 0.14], [0.51, 0.25],
+        [0.67, 0.12], [0.78, 0.29], [0.9, 0.17], [0.58, 0.38],
+      ];
+      ctx.fillStyle = 'rgba(255, 248, 210, 0.75)';
+      stars.forEach(([x, y], index) => {
+        ctx.beginPath();
+        ctx.arc(x * canvas.width, y * canvas.height, index % 3 === 0 ? 2 : 1, 0, Math.PI * 2);
+        ctx.fill();
+      });
+    } else {
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.28)';
+      ctx.fillRect(0, canvas.height * 0.62, canvas.width, canvas.height * 0.12);
+    }
+  }
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.mapping = THREE.EquirectangularReflectionMapping;
+  skyTextures[mode] = texture;
+  return texture;
 }
 
 /**
@@ -400,31 +468,31 @@ export function createCityMaterialPalette(
 
   return {
     ground: new THREE.MeshStandardMaterial({
-      color: isNightMode ? '#080d1a' : '#0f172a',
-      roughness: 0.95,
-      metalness: 0.05,
+      color: isNightMode ? '#080d1a' : '#273449',
+      roughness: 0.88,
+      metalness: 0.08,
     }),
     asphalt: new THREE.MeshStandardMaterial({
       map: asphaltTex,
-      color: isNightMode ? '#151d2e' : '#1e293b',
-      roughness: 0.82,
-      metalness: 0.15,
+      color: isNightMode ? '#121a2b' : '#263449',
+      roughness: 0.74,
+      metalness: 0.22,
     }),
     sidewalk: new THREE.MeshStandardMaterial({
-      color: isNightMode ? '#1e293b' : '#334155',
-      roughness: 0.75,
-      metalness: 0.15,
+      color: isNightMode ? '#202b3f' : '#64748b',
+      roughness: 0.68,
+      metalness: 0.18,
     }),
     plazaPaver: new THREE.MeshStandardMaterial({
       map: paverTex,
-      color: isNightMode ? '#1e293b' : '#475569',
-      roughness: 0.65,
-      metalness: 0.2,
+      color: isNightMode ? '#283449' : '#94a3b8',
+      roughness: 0.58,
+      metalness: 0.24,
     }),
     curbGold: new THREE.MeshStandardMaterial({
-      color: '#d97706',
-      roughness: 0.25,
-      metalness: 0.85,
+      color: '#a8792b',
+      roughness: 0.3,
+      metalness: 0.9,
     }),
     roadLine: new THREE.MeshBasicMaterial({
       color: '#f59e0b',
@@ -435,19 +503,19 @@ export function createCityMaterialPalette(
 
     // Luxury Empire theme
     imperialGold: new THREE.MeshStandardMaterial({
-      color: '#f59e0b',
-      roughness: 0.15,
-      metalness: 0.95,
+      color: '#c89b45',
+      roughness: 0.22,
+      metalness: 0.92,
     }),
     brushedGold: new THREE.MeshStandardMaterial({
-      color: '#d97706',
-      roughness: 0.28,
-      metalness: 0.85,
+      color: '#9d6f24',
+      roughness: 0.34,
+      metalness: 0.86,
     }),
     navyStructure: new THREE.MeshStandardMaterial({
-      color: isNightMode ? '#0a1020' : '#0f172a',
-      roughness: 0.35,
-      metalness: 0.65,
+      color: isNightMode ? '#091225' : '#1e293b',
+      roughness: 0.3,
+      metalness: 0.7,
     }),
     slateStructure: new THREE.MeshStandardMaterial({
       color: isNightMode ? '#1e293b' : '#334155',
@@ -455,18 +523,18 @@ export function createCityMaterialPalette(
       metalness: 0.5,
     }),
     curtainGlass: new THREE.MeshStandardMaterial({
-      color: isNightMode ? '#0284c7' : '#38bdf8',
-      roughness: 0.08,
-      metalness: 0.92,
+      color: isNightMode ? '#075985' : '#7dd3fc',
+      roughness: 0.12,
+      metalness: 0.86,
       transparent: true,
       opacity: 0.88,
     }),
     litGlassNight: new THREE.MeshStandardMaterial({
-      color: isNightMode ? '#38bdf8' : '#60a5fa',
-      emissive: isNightMode ? new THREE.Color('#0284c7') : new THREE.Color('#000000'),
-      emissiveIntensity: isNightMode ? 0.35 : 0,
-      roughness: 0.15,
-      metalness: 0.8,
+      color: isNightMode ? '#38bdf8' : '#bae6fd',
+      emissive: isNightMode ? new THREE.Color('#0369a1') : new THREE.Color('#000000'),
+      emissiveIntensity: isNightMode ? 0.28 : 0,
+      roughness: 0.18,
+      metalness: 0.72,
     }),
     officeWindowsLit: new THREE.MeshStandardMaterial({
       map: officeWindowTex,
