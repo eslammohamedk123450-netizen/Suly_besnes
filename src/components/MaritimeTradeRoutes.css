@@ -1,380 +1,269 @@
+:root {
+  --port-deep: #061525;
+  --port-navy: #0b2740;
+  --port-sea: #0c5a76;
+  --port-cyan: #38c8d8;
+  --port-gold: #f6c453;
+  --port-sand: #f4d9a0;
+  --port-ink: #eaf6fb;
+  --port-muted: #9bb7c5;
+  --port-line: rgba(125, 218, 232, 0.2);
+  --port-glass: rgba(7, 29, 49, 0.78);
+}
+
 .maritime-container {
   display: flex;
   flex-direction: column;
-  gap: 1.25rem;
-  padding: 1rem;
+  gap: 1.1rem;
+  padding: clamp(.65rem, 2vw, 1.25rem);
+  color: var(--port-ink);
+  background:
+    radial-gradient(circle at 82% 4%, rgba(246,196,83,.18), transparent 26rem),
+    linear-gradient(180deg, rgba(7,35,57,.98), rgba(4,18,34,.98));
+  border: 1px solid rgba(112, 211, 225, .16);
+  border-radius: 1.5rem;
+  box-shadow: 0 24px 70px rgba(0, 15, 30, .34), inset 0 1px rgba(255,255,255,.04);
 }
 
 .maritime-header {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 50%, #1d4ed8 100%);
-  border-radius: 16px;
-  padding: 1.5rem;
+  min-height: 220px;
+  padding: clamp(1.25rem, 4vw, 2.5rem);
   color: white;
-  border: 1px solid rgba(59, 130, 246, 0.3);
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(246,196,83,.38);
+  border-radius: 1.35rem;
+  background:
+    linear-gradient(180deg, rgba(117,190,215,.28) 0%, rgba(9,81,111,.23) 46%, rgba(2,25,47,.94) 47%, rgba(3,38,59,.98) 100%),
+    linear-gradient(135deg, #b9d8dc 0%, #4c9db2 28%, #0b5472 58%, #061827 100%);
+  box-shadow: 0 18px 38px rgba(0, 8, 20, .38), inset 0 1px rgba(255,255,255,.28);
+}
+
+/* Coastal skyline, road and water-light accents: decorative only. */
+.maritime-header::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  opacity: .72;
+  background:
+    linear-gradient(155deg, transparent 0 47%, rgba(221,238,232,.2) 47.3% 48%, transparent 48.3%),
+    linear-gradient(90deg, transparent 0 11%, rgba(8,41,61,.7) 11% 15%, transparent 15.5% 20%, rgba(8,41,61,.6) 20% 24%, transparent 24.5% 30%, rgba(8,41,61,.7) 30% 34%, transparent 34.5%),
+    repeating-linear-gradient(172deg, transparent 0 16px, rgba(84,213,222,.18) 17px 18px, transparent 19px 34px);
+  transform: perspective(500px) rotateX(2deg);
+}
+
+.maritime-header::after {
+  content: '⚓   ▦  ▦  ▦   ━━━━━━━   ▦  ▦  ▦   🚢';
+  position: absolute;
+  left: 4%;
+  right: 4%;
+  bottom: 10%;
+  color: rgba(246,196,83,.62);
+  letter-spacing: .65rem;
+  font-size: clamp(.75rem, 2vw, 1.25rem);
+  white-space: nowrap;
+  text-shadow: 0 0 14px rgba(246,196,83,.42);
+}
+
+.maritime-header-copy {
+  position: relative;
+  z-index: 1;
+  max-width: 700px;
+  text-shadow: 0 2px 10px rgba(0,0,0,.42);
 }
 
 .maritime-header-copy h2 {
-  font-size: 1.5rem;
-  font-weight: 800;
-  margin: 0.25rem 0;
+  font-size: clamp(1.35rem, 3vw, 2.25rem);
+  font-weight: 900;
+  letter-spacing: -.03em;
+  margin: .35rem 0;
+}
+
+.maritime-header-copy p {
+  max-width: 650px;
+  margin: .45rem 0 0;
+  color: #d9edf1;
+  font-size: .92rem;
+  line-height: 1.75;
 }
 
 .maritime-kicker {
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: #93c5fd;
+  display: inline-flex;
+  align-items: center;
+  gap: .4rem;
+  font-size: .78rem;
+  font-weight: 800;
+  color: var(--port-sand);
+  letter-spacing: .02em;
 }
 
 .maritime-header-badge {
-  font-size: 3rem;
-  background: rgba(255, 255, 255, 0.1);
-  width: 70px;
-  height: 70px;
-  border-radius: 50%;
+  position: relative;
+  z-index: 1;
+  flex: 0 0 auto;
+  font-size: clamp(2.5rem, 7vw, 4.5rem);
+  width: clamp(70px, 13vw, 108px);
+  height: clamp(70px, 13vw, 108px);
+  border-radius: 32% 68% 55% 45%;
   display: flex;
   align-items: center;
   justify-content: center;
-  backdrop-filter: blur(4px);
+  background: linear-gradient(145deg, rgba(246,196,83,.95), rgba(241,139,42,.7));
+  border: 2px solid rgba(255,235,170,.86);
+  box-shadow: 0 0 0 8px rgba(246,196,83,.12), 0 16px 28px rgba(0,0,0,.35), inset 0 2px rgba(255,255,255,.55);
+  transform: rotate(-5deg);
 }
 
 .maritime-tabs {
-  display: flex;
-  gap: 0.75rem;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: .6rem;
+  padding: .35rem;
+  background: rgba(3, 19, 34, .78);
+  border: 1px solid var(--port-line);
+  border-radius: 1rem;
 }
 
 .maritime-tab-btn {
-  padding: 0.75rem 1.25rem;
-  border-radius: 10px;
-  background: #1e293b;
-  color: #94a3b8;
-  border: 1px solid #334155;
-  font-weight: 700;
+  min-height: 46px;
+  padding: .65rem .8rem;
+  border-radius: .75rem;
+  background: transparent;
+  color: var(--port-muted);
+  border: 1px solid transparent;
+  font-weight: 800;
+  font-size: .78rem;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: transform .2s ease, background .2s ease, color .2s ease, border-color .2s ease;
 }
 
-.maritime-tab-btn.active {
-  background: #2563eb;
-  color: white;
-  border-color: #3b82f6;
-}
+.maritime-tab-btn:hover { color: white; background: rgba(55,200,216,.1); border-color: var(--port-line); transform: translateY(-1px); }
+.maritime-tab-btn.active { color: #071b2a; background: linear-gradient(135deg, #ffe18b, var(--port-gold)); border-color: #ffe6a3; box-shadow: 0 8px 18px rgba(246,196,83,.2); }
 
-.vessels-grid {
+.vessels-grid, .routes-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 1.25rem;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 275px), 1fr));
+  gap: .9rem;
 }
 
-.vessel-card {
-  background: #0f172a;
-  border: 1px solid #1e293b;
-  border-radius: 16px;
-  padding: 1.25rem;
+.vessel-card, .route-card, .voyage-card, .no-voyages {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(145deg, rgba(14,56,79,.94), rgba(5,25,43,.96));
+  border: 1px solid var(--port-line);
+  border-radius: 1.1rem;
+  box-shadow: 0 12px 26px rgba(0, 11, 24, .25), inset 0 1px rgba(255,255,255,.045);
+}
+
+.vessel-card::before, .route-card::before, .voyage-card::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  height: 3px;
+  background: linear-gradient(90deg, transparent, var(--port-cyan), var(--port-gold), transparent);
+  opacity: .8;
+}
+
+.vessel-card { padding: 1rem; display: flex; flex-direction: column; gap: .85rem; }
+.vessel-card:hover, .route-card:hover, .voyage-card:hover { border-color: rgba(246,196,83,.48); transform: translateY(-2px); transition: transform .2s ease, border-color .2s ease; }
+
+.vessel-card-head, .route-head, .voyage-info { display: flex; align-items: center; gap: .8rem; }
+.vessel-icon, .route-flag, .voyage-ship-icon {
+  display: inline-flex; align-items: center; justify-content: center;
+  flex: 0 0 auto;
+  width: 3rem; height: 3rem;
+  font-size: 1.8rem;
+  border-radius: .9rem;
+  background: linear-gradient(145deg, rgba(246,196,83,.22), rgba(47,186,207,.16));
+  border: 1px solid rgba(246,196,83,.3);
+  box-shadow: inset 0 1px rgba(255,255,255,.12);
+}
+
+.vessel-card-head h3, .route-head h5, .voyage-info h4 { margin: 0; color: var(--port-ink); font-size: 1rem; font-weight: 900; }
+.vessel-type-pill { display: inline-block; margin-top: .25rem; padding: .18rem .55rem; border-radius: 99px; background: rgba(56,200,216,.13); color: #8ee8ed; border: 1px solid rgba(56,200,216,.23); font-size: .68rem; }
+
+.vessel-stats, .route-info {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: .45rem;
+  padding: .7rem;
+  border-radius: .8rem;
+  background: rgba(2,18,32,.52);
+  border: 1px solid rgba(125,218,232,.1);
 }
+.vstat { display: flex; justify-content: space-between; gap: .7rem; font-size: .78rem; }
+.vstat span, .route-info, .route-dest, .voyage-profit span { color: var(--port-muted); }
+.vstat strong { color: #e9f7fa; }
+.profit-text, .voyage-profit strong { color: #5de0af !important; }
 
-.vessel-card-head {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-}
-
-.vessel-icon {
-  font-size: 2.25rem;
-  background: #1e293b;
-  padding: 0.5rem;
-  border-radius: 12px;
-}
-
-.vessel-card-head h3 {
-  margin: 0;
-  font-size: 1.1rem;
-  color: #f8fafc;
-}
-
-.vessel-type-pill {
-  font-size: 0.75rem;
-  background: #1e3a8a;
-  color: #93c5fd;
-  padding: 0.2rem 0.6rem;
-  border-radius: 999px;
-  display: inline-block;
-  margin-top: 0.2rem;
-}
-
-.vessel-stats {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  background: #1e293b;
-  padding: 0.75rem;
-  border-radius: 10px;
-}
-
-.vstat {
-  display: flex;
-  justify-content: space-between;
-  font-size: 0.85rem;
-}
-
-.vstat span {
-  color: #94a3b8;
-}
-
-.vstat strong {
-  color: #f1f5f9;
-}
-
-.profit-text {
-  color: #10b981 !important;
-}
-
-.vessel-card-foot {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-top: auto;
-  padding-top: 0.75rem;
-  border-top: 1px solid #1e293b;
-}
-
-.vessel-owned-count span {
-  font-size: 0.75rem;
-  color: #94a3b8;
-  display: block;
-}
-
-.vessel-owned-count strong {
-  font-size: 0.95rem;
-  color: #38bdf8;
-}
-
-.buy-vessel-btn {
-  background: #2563eb;
-  color: white;
-  border: none;
-  padding: 0.6rem 1rem;
-  border-radius: 8px;
-  font-weight: 700;
+.vessel-card-foot { display: flex; justify-content: space-between; align-items: center; gap: .75rem; margin-top: auto; padding-top: .75rem; border-top: 1px solid rgba(125,218,232,.13); }
+.vessel-owned-count span { font-size: .7rem; color: var(--port-muted); display: block; }
+.vessel-owned-count strong { font-size: .9rem; color: var(--port-cyan); }
+.buy-vessel-btn, .launch-btn, .claim-voyage-btn {
+  background: linear-gradient(135deg, #f6c453, #e99a31);
+  color: #092037;
+  border: 1px solid rgba(255,229,157,.6);
+  padding: .62rem .9rem;
+  border-radius: .7rem;
+  font-weight: 900;
   cursor: pointer;
+  box-shadow: 0 7px 16px rgba(246,196,83,.16);
 }
+.buy-vessel-btn:hover, .launch-btn:hover, .claim-voyage-btn:hover { filter: brightness(1.08); transform: translateY(-1px); }
+.buy-vessel-btn:disabled { background: #294157; color: #7891a0; border-color: transparent; box-shadow: none; cursor: not-allowed; }
 
-.buy-vessel-btn:disabled {
-  background: #334155;
-  color: #64748b;
-  cursor: not-allowed;
-}
-
-.routes-launch-section {
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
-}
-
+.routes-launch-section { display: flex; flex-direction: column; gap: 1.15rem; }
 .launch-box {
-  background: #1e293b;
-  border: 1px solid #3b82f6;
-  border-radius: 16px;
-  padding: 1.5rem;
+  position: relative; overflow: hidden;
+  background: linear-gradient(135deg, rgba(12,83,108,.9), rgba(6,32,54,.96));
+  border: 1px solid rgba(56,200,216,.38);
+  border-radius: 1.15rem;
+  padding: clamp(1rem, 3vw, 1.5rem);
   color: white;
+  box-shadow: 0 14px 30px rgba(0, 14, 28, .3);
 }
+.launch-box::after { content: '⚓ 〰 〰 〰 〰 〰 🚢'; position: absolute; right: 1rem; bottom: .5rem; color: rgba(125,232,234,.15); font-size: 2rem; letter-spacing: .4rem; pointer-events: none; }
+.launch-box h3 { margin: 0 0 .25rem; font-size: 1.2rem; color: #ffe29a; }
+.launch-box p { color: #b7d9e0; font-size: .85rem; margin-bottom: 1rem; }
+.launch-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .85rem; position: relative; z-index: 1; }
+.form-field { display: flex; flex-direction: column; gap: .35rem; }
+.form-field label { font-size: .78rem; color: #c6e2e8; font-weight: 700; }
+.form-field select { padding: .7rem; border-radius: .7rem; background: rgba(2,18,32,.78); color: white; border: 1px solid rgba(125,218,232,.28); font-weight: 700; }
+.launch-btn { grid-column: 1 / -1; min-height: 46px; background: linear-gradient(135deg, #38d5b0, #149b91); color: #031b2a; }
 
-.launch-box h3 {
-  margin: 0 0 0.25rem 0;
-  font-size: 1.25rem;
-}
+.routes-list h4 { color: #f7dda0; margin: .25rem 0 .8rem; }
+.route-card { padding: 1rem; }
+.route-head { margin-bottom: .75rem; }
+.route-flag { width: 2.7rem; height: 2.7rem; font-size: 1.55rem; }
+.route-head h5 { font-size: .95rem; }
+.route-dest { font-size: .72rem; }
+.risk-text { color: #ff9e91; }
+.mult-text { color: #78e5ef; }
 
-.launch-box p {
-  color: #94a3b8;
-  font-size: 0.9rem;
-  margin-bottom: 1.25rem;
-}
+.voyages-section { display: flex; flex-direction: column; gap: .9rem; }
+.no-voyages { text-align: center; padding: 3rem 1rem; color: var(--port-muted); border-style: dashed; }
+.no-voyages span { font-size: 4rem; display: block; margin-bottom: .75rem; filter: drop-shadow(0 0 13px rgba(56,200,216,.5)); }
+.voyages-list { display: flex; flex-direction: column; gap: .8rem; }
+.voyage-card { display: grid; grid-template-columns: 1.4fr .8fr auto; align-items: center; gap: 1rem; padding: 1rem 1.15rem; }
+.voyage-route-name { font-size: .76rem; color: var(--port-muted); }
+.voyage-profit strong { font-size: 1rem; }
+.claim-voyage-btn { background: linear-gradient(135deg, #44d9a7, #159d86); color: #062334; }
+.claimed-badge { color: #89a4b1; font-weight: 800; font-size: .8rem; }
 
-.launch-form {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-
-.form-field {
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-}
-
-.form-field label {
-  font-size: 0.85rem;
-  color: #cbd5e1;
-  font-weight: 600;
-}
-
-.form-field select {
-  padding: 0.75rem;
-  border-radius: 8px;
-  background: #0f172a;
-  color: white;
-  border: 1px solid #334155;
-  font-weight: bold;
-}
-
-.launch-btn {
-  background: #10b981;
-  color: white;
-  border: none;
-  padding: 0.85rem;
-  border-radius: 10px;
-  font-size: 1rem;
-  font-weight: 800;
-  cursor: pointer;
-  margin-top: 0.5rem;
-}
-
-.routes-list h4 {
-  color: #f8fafc;
-  margin-bottom: 1rem;
-}
-
-.routes-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: 1rem;
-}
-
-.route-card {
-  background: #0f172a;
-  border: 1px solid #1e293b;
-  border-radius: 12px;
-  padding: 1rem;
-}
-
-.route-head {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  margin-bottom: 0.75rem;
-}
-
-.route-flag {
-  font-size: 2rem;
-}
-
-.route-head h5 {
-  margin: 0;
-  font-size: 0.95rem;
-  color: #f8fafc;
-}
-
-.route-dest {
-  font-size: 0.75rem;
-  color: #94a3b8;
-}
-
-.route-info {
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-  font-size: 0.8rem;
-  color: #cbd5e1;
-}
-
-.risk-text {
-  color: #ef4444;
-}
-
-.mult-text {
-  color: #38bdf8;
-}
-
-.voyages-section {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-
-.no-voyages {
-  text-align: center;
-  padding: 3rem;
-  background: #0f172a;
-  border-radius: 16px;
-  border: 1px dashed #334155;
-  color: #94a3b8;
-}
-
-.no-voyages span {
-  font-size: 4rem;
-  display: block;
-  margin-bottom: 1rem;
-}
-
-.voyages-list {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-
-.voyage-card {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  background: #0f172a;
-  border: 1px solid #1e293b;
-  padding: 1rem 1.25rem;
-  border-radius: 12px;
-}
-
-.voyage-info {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-}
-
-.voyage-ship-icon {
-  font-size: 2rem;
-  background: #1e293b;
-  padding: 0.4rem;
-  border-radius: 10px;
-}
-
-.voyage-info h4 {
-  margin: 0;
-  color: #f8fafc;
-  font-size: 1rem;
-}
-
-.voyage-route-name {
-  font-size: 0.8rem;
-  color: #94a3b8;
-}
-
-.voyage-profit span {
-  font-size: 0.75rem;
-  color: #94a3b8;
-  display: block;
-}
-
-.voyage-profit strong {
-  font-size: 1.1rem;
-  color: #10b981;
-}
-
-.claim-voyage-btn {
-  background: #10b981;
-  color: white;
-  border: none;
-  padding: 0.6rem 1.2rem;
-  border-radius: 8px;
-  font-weight: 800;
-  cursor: pointer;
-}
-
-.claimed-badge {
-  color: #64748b;
-  font-weight: bold;
-  font-size: 0.85rem;
+@media (max-width: 700px) {
+  .maritime-header { min-height: 200px; align-items: flex-start; }
+  .maritime-header-badge { width: 64px; height: 64px; font-size: 2.4rem; }
+  .maritime-header-copy p { font-size: .8rem; max-width: 75%; }
+  .maritime-tabs { grid-template-columns: 1fr; }
+  .maritime-tab-btn { min-height: 42px; }
+  .launch-form { grid-template-columns: 1fr; }
+  .launch-btn { grid-column: auto; }
+  .voyage-card { grid-template-columns: 1fr; gap: .75rem; }
+  .voyage-action, .claim-voyage-btn { width: 100%; }
+  .claim-voyage-btn { min-height: 42px; }
 }
