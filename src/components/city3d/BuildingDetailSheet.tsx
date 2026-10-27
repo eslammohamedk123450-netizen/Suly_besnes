@@ -1,0 +1,682 @@
+/**
+ * @license
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import React, { useState } from 'react';
+import type { PlayerProfile } from '../../domain/player';
+import type { SectionId } from '../../domain/navigation';
+import { formatMoney } from '../../domain/formatters';
+import {
+  INDUSTRY_CATALOG,
+  findIndustry,
+  type IndustryCatalogEntry,
+} from '../../game/catalog';
+import {
+  type CityPlotDefinition,
+  type CityConstructionState,
+  acquireTransactionLock,
+  releaseTransactionLock,
+  saveCityConstructions,
+  loadCityConstructions,
+  getConstructionSpecs,
+} from '../../game/cityGridSystem';
+import {
+  type GameCommand,
+  type GameResult,
+  buyDirectLand,
+  foundCompany,
+  runProduction,
+  serviceCompany,
+} from '../../game/engine';
+import { playSound } from '../../game/soundEffects';
+import {
+  X,
+  Building2,
+  Factory,
+  Landmark,
+  Hammer,
+  Clock,
+  Sparkles,
+  Zap,
+  ArrowRight,
+  ShieldCheck,
+  Coins,
+  Gem,
+  CheckCircle2,
+  Lock,
+  ChevronLeft,
+} from 'lucide-react';
+import type { SelectedItem } from './CityCanvas';
+
+interface BuildingDetailSheetProps {
+  selectedItem: SelectedItem | null;
+  profile: PlayerProfile;
+  onClose: () => void;
+  onNavigate: (section: SectionId, target?: string) => void;
+  onCommand: (
+    command: GameCommand,
+    fallback: (current: PlayerProfile) => GameResult<unknown>
+  ) => void;
+  onRefreshGrid: () => void;
+}
+
+export const BuildingDetailSheet: React.FC<BuildingDetailSheetProps> = ({
+  selectedItem,
+  profile,
+  onClose,
+  onNavigate,
+  onCommand,
+  onRefreshGrid,
+}) => {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [selectedIndustryId, setSelectedIndustryId] = useState<string>('');
+  const [customCompanyName, setCustomCompanyName] = useState<string>('');
+  const [actionNotice, setActionNotice] = useState<string | null>(null);
+
+  if (!selectedItem) return null;
+
+  // 1. LANDMARK SHEETS
+  if (selectedItem.type === 'landmark') {
+    const { id } = selectedItem;
+
+    if (id === 'hq') {
+      return (
+        <div className="absolute inset-x-0 bottom-0 z-40 bg-slate-900/95 border-t border-amber-500/40 rounded-t-3xl shadow-2xl p-5 backdrop-blur-md animate-slide-up text-white max-w-3xl mx-auto">
+          <div className="flex items-center justify-between border-b border-slate-800 pb-3 mb-4">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400">
+                <Building2 className="w-7 h-7" />
+              </div>
+              <div>
+                <h3 className="font-bold text-lg text-amber-300">البرج الإمبراطوري · المقر الرئيسي</h3>
+                <p className="text-xs text-slate-400">مركز إدارة الإمبراطورية وتوجيه العمليات الاستراتيجية</p>
+              </div>
+            </div>
+            <button
+              onClick={onClose}
+              className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4 text-xs">
+            <div className="p-3 bg-slate-950/70 border border-slate-800 rounded-xl">
+              <span className="text-slate-400 block mb-1">المستوى الحالي:</span>
+              <span className="font-bold text-amber-400 text-sm">المستوى {profile.level}</span>
+            </div>
+            <div className="p-3 bg-slate-950/70 border border-slate-800 rounded-xl">
+              <span className="text-slate-400 block mb-1">الرصيد النقدي:</span>
+              <span className="font-bold text-emerald-400 text-sm">{formatMoney(profile.bankBalance)}</span>
+            </div>
+            <div className="p-3 bg-slate-950/70 border border-slate-800 rounded-xl">
+              <span className="text-slate-400 block mb-1">الشركات التابعة:</span>
+              <span className="font-bold text-blue-400 text-sm">{profile.companies.length} شركات</span>
+            </div>
+            <div className="p-3 bg-slate-950/70 border border-slate-800 rounded-xl">
+              <span className="text-slate-400 block mb-1">الأراضي المملوكة:</span>
+              <span className="font-bold text-purple-400 text-sm">{profile.lands.length} مواقع</span>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={() => {
+                onClose();
+                onNavigate('tech_tree');
+              }}
+              className="flex-1 min-w-[140px] py-2.5 px-4 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-lg shadow-amber-500/20"
+            >
+              <Sparkles className="w-4 h-4" />
+              <span>شجرة الأبحاث والأتمتة</span>
+            </button>
+            <button
+              onClick={() => {
+                onClose();
+                onNavigate('luxury');
+              }}
+              className="flex-1 min-w-[140px] py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs flex items-center justify-center gap-2 transition-colors border border-slate-700"
+            >
+              <ShieldCheck className="w-4 h-4 text-amber-400" />
+              <span>الهيبة والرفاهية</span>
+            </button>
+            <button
+              onClick={() => {
+                onClose();
+                onNavigate('tasks');
+              }}
+              className="flex-1 min-w-[140px] py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs flex items-center justify-center gap-2 transition-colors border border-slate-700"
+            >
+              <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+              <span>المهام اليومية والإنجازات</span>
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    if (id === 'bank') {
+      return (
+        <div className="absolute inset-x-0 bottom-0 z-40 bg-slate-900/95 border-t border-sky-500/40 rounded-t-3xl shadow-2xl p-5 backdrop-blur-md animate-slide-up text-white max-w-3xl mx-auto">
+          <div className="flex items-center justify-between border-b border-slate-800 pb-3 mb-4">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-xl bg-sky-500/20 border border-sky-500/40 flex items-center justify-center text-sky-400">
+                <Landmark className="w-7 h-7" />
+              </div>
+              <div>
+                <h3 className="font-bold text-lg text-sky-300">البنك المركزي والتمويل الاستثماري</h3>
+                <p className="text-xs text-slate-400">إدارة الودائع، التسهيلات الائتمانية، والقروض المصرفية</p>
+              </div>
+            </div>
+            <button
+              onClick={onClose}
+              className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4 text-xs">
+            <div className="p-3 bg-slate-950/70 border border-slate-800 rounded-xl">
+              <span className="text-slate-400 block mb-1">الرصيد المصرفي:</span>
+              <span className="font-bold text-emerald-400 text-sm">{formatMoney(profile.bankBalance)}</span>
+            </div>
+            <div className="p-3 bg-slate-950/70 border border-slate-800 rounded-xl">
+              <span className="text-slate-400 block mb-1">الودائع النشطة:</span>
+              <span className="font-bold text-amber-400 text-sm">
+                {formatMoney(profile.deposits.reduce((acc, d) => acc + d.amount, 0))}
+              </span>
+            </div>
+            <div className="p-3 bg-slate-950/70 border border-slate-800 rounded-xl col-span-2 md:col-span-1">
+              <span className="text-slate-400 block mb-1">إجمالي القروض القائمة:</span>
+              <span className="font-bold text-rose-400 text-sm">
+                {formatMoney(profile.loans.reduce((acc, l) => acc + l.amount, 0))}
+              </span>
+            </div>
+          </div>
+
+          <button
+            onClick={() => {
+              onClose();
+              onNavigate('bank');
+            }}
+            className="w-full py-3 px-4 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold text-sm flex items-center justify-center gap-2 transition-all shadow-lg shadow-sky-500/20"
+          >
+            <Coins className="w-5 h-5" />
+            <span>الدخول إلى نظام البنك والحسابات والقروض</span>
+            <ChevronLeft className="w-4 h-4 mr-auto" />
+          </button>
+        </div>
+      );
+    }
+
+    if (id === 'factory') {
+      return (
+        <div className="absolute inset-x-0 bottom-0 z-40 bg-slate-900/95 border-t border-amber-500/40 rounded-t-3xl shadow-2xl p-5 backdrop-blur-md animate-slide-up text-white max-w-3xl mx-auto">
+          <div className="flex items-center justify-between border-b border-slate-800 pb-3 mb-4">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-xl bg-orange-500/20 border border-orange-500/40 flex items-center justify-center text-orange-400">
+                <Factory className="w-7 h-7" />
+              </div>
+              <div>
+                <h3 className="font-bold text-lg text-orange-300">مجمع الصناعات والإنتاج المركزي</h3>
+                <p className="text-xs text-slate-400">تشغيل خطوط الإنتاج، إدارة سلاسل الإمداد، وتوريد الخامات</p>
+              </div>
+            </div>
+            <button
+              onClick={onClose}
+              className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4 text-xs">
+            <div className="p-3 bg-slate-950/70 border border-slate-800 rounded-xl">
+              <span className="text-slate-400 block mb-1">المصانع النشطة:</span>
+              <span className="font-bold text-orange-400 text-sm">{profile.companies.length} منشأة</span>
+            </div>
+            <div className="p-3 bg-slate-950/70 border border-slate-800 rounded-xl">
+              <span className="text-slate-400 block mb-1">طاقة التشغيل:</span>
+              <span className="font-bold text-amber-400 text-sm">
+                {profile.companies.reduce((acc, c) => acc + c.energyUnits, 0)} وحدة
+              </span>
+            </div>
+            <div className="p-3 bg-slate-950/70 border border-slate-800 rounded-xl col-span-2 md:col-span-1">
+              <span className="text-slate-400 block mb-1">المواد والمخزون:</span>
+              <span className="font-bold text-emerald-400 text-sm">{profile.inventory.length} صنف مسجل</span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => {
+                onClose();
+                onNavigate('production');
+              }}
+              className="flex-1 py-3 px-4 rounded-xl bg-orange-500 hover:bg-orange-400 text-slate-950 font-bold text-sm flex items-center justify-center gap-2 transition-all shadow-lg shadow-orange-500/20"
+            >
+              <Factory className="w-5 h-5" />
+              <span>إدارة المصانع ودفعات الإنتاج</span>
+            </button>
+            <button
+              onClick={() => {
+                onClose();
+                onNavigate('inventory');
+              }}
+              className="flex-1 py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-sm flex items-center justify-center gap-2 transition-colors border border-slate-700"
+            >
+              <Coins className="w-5 h-5 text-amber-400" />
+              <span>بورصة السلع وشراء الخامات</span>
+            </button>
+          </div>
+        </div>
+      );
+    }
+  }
+
+  // 2. PLOT INTERACTION SHEETS
+  const { plot } = selectedItem;
+
+  // Handle direct land purchase
+  const handleBuyLand = (paymentMethod: 'cash' | 'diamonds') => {
+    const lockKey = `buy-land-${plot.id}`;
+    if (!acquireTransactionLock(lockKey)) {
+      return; // Locked against double-charge
+    }
+
+    setIsSubmitting(true);
+    setActionNotice(null);
+
+    try {
+      onCommand(
+        {
+          name: 'buy_direct_land',
+          args: { listingId: plot.id, paymentMethod },
+        },
+        (current) => buyDirectLand(current, plot.id, paymentMethod)
+      );
+
+      playSound('coins');
+      setActionNotice('تمت معالجة شراء الأرض بنجاح!');
+      setTimeout(() => {
+        setIsSubmitting(false);
+        releaseTransactionLock(lockKey);
+        onRefreshGrid();
+      }, 500);
+    } catch {
+      setIsSubmitting(false);
+      releaseTransactionLock(lockKey);
+    }
+  };
+
+  // Handle starting construction
+  const handleStartConstruction = () => {
+    if (!selectedIndustryId) {
+      setActionNotice('يرجى اختيار نوع القطاع الصناعي أولاً');
+      return;
+    }
+
+    const landId = plot.land?.id || plot.id;
+    const lockKey = `construct-${plot.id}`;
+    if (!acquireTransactionLock(lockKey)) {
+      return;
+    }
+
+    setIsSubmitting(true);
+    setActionNotice(null);
+
+    const industry = findIndustry(selectedIndustryId as any);
+    const companyName = customCompanyName.trim() || `${industry?.name || 'منشأة'} الإمبراطورية`;
+
+    try {
+      // 1. Authoritative engine command
+      onCommand(
+        {
+          name: 'found_company',
+          args: {
+            industryId: selectedIndustryId as any,
+            landId,
+            name: companyName,
+            paymentMethod: 'cash',
+          },
+        },
+        (current) =>
+          foundCompany(current, selectedIndustryId as any, landId, companyName, 'cash')
+      );
+
+      // 2. Save active 3D construction job
+      const specs = getConstructionSpecs(selectedIndustryId as any, profile.level);
+      const activeConstructions = loadCityConstructions();
+      activeConstructions[plot.id] = {
+        plotId: plot.id,
+        landId,
+        industryId: selectedIndustryId as any,
+        companyName,
+        startedAt: Date.now(),
+        durationMs: specs.durationSeconds * 1000,
+        costCash: specs.cashCost,
+        costDiamonds: specs.diamondsCost,
+        status: 'constructing',
+      };
+      saveCityConstructions(activeConstructions);
+
+      playSound('build');
+      setActionNotice('بدأت أعمال التمهيد والإنشاء في الموقع!');
+      setTimeout(() => {
+        setIsSubmitting(false);
+        releaseTransactionLock(lockKey);
+        onRefreshGrid();
+      }, 500);
+    } catch {
+      setIsSubmitting(false);
+      releaseTransactionLock(lockKey);
+    }
+  };
+
+  // Allowed industries for this land zoning
+  const availableIndustries = INDUSTRY_CATALOG.filter(
+    (ind) => ind.requiredLandType === plot.zoning
+  );
+
+  return (
+    <div className="absolute inset-x-0 bottom-0 z-40 bg-slate-900/95 border-t border-amber-500/40 rounded-t-3xl shadow-2xl p-5 backdrop-blur-md animate-slide-up text-white max-w-3xl mx-auto max-h-[85vh] overflow-y-auto">
+      {/* Header */}
+      <div className="flex items-center justify-between border-b border-slate-800 pb-3 mb-4">
+        <div className="flex items-center gap-3">
+          <div className="w-12 h-12 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400">
+            {plot.status === 'developed' ? (
+              <Building2 className="w-7 h-7" />
+            ) : plot.status === 'constructing' || plot.status === 'clearing' ? (
+              <Hammer className="w-7 h-7 text-amber-400" />
+            ) : (
+              <Landmark className="w-7 h-7 text-sky-400" />
+            )}
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h3 className="font-bold text-lg text-amber-300">
+                {plot.company ? plot.company.name : plot.label}
+              </h3>
+              <span
+                className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+                  plot.status === 'developed'
+                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                    : plot.status === 'constructing' || plot.status === 'clearing'
+                    ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                    : plot.status === 'owned_empty'
+                    ? 'bg-sky-500/20 text-sky-400 border border-sky-500/30'
+                    : plot.status === 'locked'
+                    ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
+                    : 'bg-slate-800 text-slate-300 border border-slate-700'
+                }`}
+              >
+                {plot.status === 'developed'
+                  ? 'منشأة نشطة'
+                  : plot.status === 'constructing'
+                  ? 'قيد الإنشاء'
+                  : plot.status === 'clearing'
+                  ? 'تمهيد الأرض'
+                  : plot.status === 'owned_empty'
+                  ? 'أرض جاهزة للبناء'
+                  : plot.status === 'locked'
+                  ? 'منطقة مقفلة'
+                  : 'أرض معروضة للاستثمار'}
+              </span>
+            </div>
+            <p className="text-xs text-slate-400">{plot.districtName}</p>
+          </div>
+        </div>
+        <button
+          onClick={onClose}
+          className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"
+        >
+          <X className="w-5 h-5" />
+        </button>
+      </div>
+
+      {actionNotice && (
+        <div className="mb-4 p-3 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-xs font-bold text-center">
+          {actionNotice}
+        </div>
+      )}
+
+      {/* Plot Specs Grid */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4 text-xs">
+        <div className="p-3 bg-slate-950/70 border border-slate-800 rounded-xl">
+          <span className="text-slate-400 block mb-1">المساحة:</span>
+          <span className="font-bold text-slate-200">{plot.areaSquareMeters} م²</span>
+        </div>
+        <div className="p-3 bg-slate-950/70 border border-slate-800 rounded-xl">
+          <span className="text-slate-400 block mb-1">نوع الاستخدام:</span>
+          <span className="font-bold text-amber-400">
+            {plot.zoning === 'industrial'
+              ? 'صناعي'
+              : plot.zoning === 'commercial'
+              ? 'تجاري'
+              : 'زراعي'}
+          </span>
+        </div>
+        <div className="p-3 bg-slate-950/70 border border-slate-800 rounded-xl">
+          <span className="text-slate-400 block mb-1">القيمة السوقية:</span>
+          <span className="font-bold text-emerald-400">{formatMoney(plot.defaultPrice)}</span>
+        </div>
+        <div className="p-3 bg-slate-950/70 border border-slate-800 rounded-xl">
+          <span className="text-slate-400 block mb-1">المستوى المطلوب:</span>
+          <span className="font-bold text-sky-400">مستوى {plot.requiredLevel}</span>
+        </div>
+      </div>
+
+      {/* Action Sections based on Plot Status */}
+
+      {/* 1. EMPTY FOR SALE */}
+      {plot.status === 'empty_for_sale' && (
+        <div className="space-y-4">
+          <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-300">
+            أرض استثمارية مميزة في {plot.districtName}. الشراء يتيح لك تأسيس مصانع أو مقرات تجارية تابعة لإمبراطوريتك.
+          </div>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => handleBuyLand('cash')}
+              disabled={isSubmitting || profile.bankBalance < plot.defaultPrice}
+              className="flex-1 py-3 px-4 rounded-xl bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-slate-950 font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-lg shadow-amber-500/20"
+            >
+              <Coins className="w-4 h-4" />
+              <span>شراء نقدًا ({formatMoney(plot.defaultPrice)})</span>
+            </button>
+            <button
+              onClick={() => handleBuyLand('diamonds')}
+              disabled={isSubmitting || profile.diamonds < Math.ceil(plot.defaultPrice / 1500)}
+              className="flex-1 py-3 px-4 rounded-xl bg-sky-600 hover:bg-sky-500 disabled:opacity-50 text-white font-bold text-xs flex items-center justify-center gap-2 transition-colors border border-sky-400/30"
+            >
+              <Gem className="w-4 h-4" />
+              <span>شراء بالماس ({Math.ceil(plot.defaultPrice / 1500)} 💎)</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 2. OWNED EMPTY (Ready to Build) */}
+      {plot.status === 'owned_empty' && (
+        <div className="space-y-4">
+          <div className="p-3.5 rounded-xl bg-sky-950/40 border border-sky-500/30 text-xs text-sky-200">
+            أنت تمتلك هذه الأرض! اختر نوع المنشأة التي ترغب في بنائها وتأسيسها عليها:
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-xs text-slate-400 block font-bold">اسم الشركة أو المصنع الجديد:</label>
+            <input
+              type="text"
+              value={customCompanyName}
+              onChange={(e) => setCustomCompanyName(e.target.value)}
+              placeholder="مثال: مجمع النيل للصناعات المتقدمة"
+              className="w-full py-2.5 px-3 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs focus:outline-none focus:border-amber-500"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-xs text-slate-400 block font-bold">القطاع الصناعي المسموح به:</label>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+              {availableIndustries.map((ind) => {
+                const isSelected = selectedIndustryId === ind.id;
+                const cost = ind.setupFee + ind.licenseFee;
+                return (
+                  <button
+                    key={ind.id}
+                    type="button"
+                    onClick={() => setSelectedIndustryId(ind.id)}
+                    className={`p-3 rounded-xl border text-right transition-all flex flex-col justify-between ${
+                      isSelected
+                        ? 'bg-amber-500/20 border-amber-500 text-white shadow-md shadow-amber-500/10'
+                        : 'bg-slate-950 border-slate-800 text-slate-300 hover:border-slate-700'
+                    }`}
+                  >
+                    <div className="font-bold text-xs text-amber-300">{ind.name}</div>
+                    <div className="text-[11px] text-slate-400 mt-1">
+                      تكلفة التأسيس والترخيص: <span className="text-emerald-400 font-bold">{formatMoney(cost)}</span>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <button
+            onClick={handleStartConstruction}
+            disabled={isSubmitting || !selectedIndustryId}
+            className="w-full py-3 px-4 rounded-xl bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-slate-950 font-bold text-sm flex items-center justify-center gap-2 transition-all shadow-lg shadow-amber-500/20"
+          >
+            <Hammer className="w-5 h-5" />
+            <span>بدء التمهيد وتأسيس وبناء المنشأة</span>
+          </button>
+        </div>
+      )}
+
+      {/* 3. UNDER CONSTRUCTION */}
+      {(plot.status === 'constructing' || plot.status === 'clearing') && (
+        <div className="space-y-4">
+          <div className="p-4 rounded-xl bg-slate-950 border border-amber-500/40 space-y-3">
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-amber-400 font-bold flex items-center gap-2">
+                <Clock className="w-4 h-4 animate-spin text-amber-400" />
+                <span>
+                  {plot.status === 'clearing' ? 'جاري تمهيد وتسوية الموقع...' : 'جاري تشييد وبناء المنشأة...'}
+                </span>
+              </span>
+              <span className="text-slate-400 font-bold">
+                {plot.construction?.companyName || 'منشأة صناعية'}
+              </span>
+            </div>
+
+            {/* Progress bar */}
+            <div className="w-full bg-slate-800 rounded-full h-3 overflow-hidden border border-slate-700">
+              <div
+                className="bg-gradient-to-r from-amber-500 to-amber-300 h-full rounded-full transition-all duration-500 animate-pulse"
+                style={{ width: '70%' }}
+              />
+            </div>
+          </div>
+
+          <button
+            onClick={() => {
+              // Instant finish
+              const active = loadCityConstructions();
+              if (active[plot.id]) {
+                active[plot.id].startedAt = 0; // finished
+                saveCityConstructions(active);
+                onRefreshGrid();
+              }
+            }}
+            className="w-full py-2.5 px-4 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs flex items-center justify-center gap-2 transition-colors border border-sky-400/30"
+          >
+            <Zap className="w-4 h-4 text-amber-300" />
+            <span>تسريع البناء والإتمام فوراً</span>
+          </button>
+        </div>
+      )}
+
+      {/* 4. DEVELOPED (Finished Company) */}
+      {plot.status === 'developed' && plot.company && (
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-xs">
+            <div className="p-3 bg-slate-950/70 border border-slate-800 rounded-xl">
+              <span className="text-slate-400 block mb-1">القطاع:</span>
+              <span className="font-bold text-amber-300">
+                {findIndustry(plot.company.industryId)?.name || plot.company.industryId}
+              </span>
+            </div>
+            <div className="p-3 bg-slate-950/70 border border-slate-800 rounded-xl">
+              <span className="text-slate-400 block mb-1">تكلفة التشغيل اليومي:</span>
+              <span className="font-bold text-rose-400">
+                {formatMoney(plot.company.operatingCostPerDay)}
+              </span>
+            </div>
+            <div className="p-3 bg-slate-950/70 border border-slate-800 rounded-xl col-span-2 md:col-span-1">
+              <span className="text-slate-400 block mb-1">طاقة المنشأة:</span>
+              <span className="font-bold text-sky-400">{plot.company.energyUnits} وحدة</span>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={() => {
+                onCommand(
+                  {
+                    name: 'run_production',
+                    args: { companyId: plot.company!.id, batches: 1 },
+                  },
+                  (current) => runProduction(current, plot.company!.id, 1)
+                );
+                playSound('build');
+                setActionNotice('تم إرسال أمر تشغيل دفعة إنتاج بنجاح!');
+              }}
+              className="flex-1 min-w-[140px] py-2.5 px-4 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-lg shadow-amber-500/20"
+            >
+              <Zap className="w-4 h-4" />
+              <span>تشغيل دفعة إنتاج</span>
+            </button>
+            <button
+              onClick={() => {
+                onCommand(
+                  {
+                    name: 'service_company',
+                    args: { companyId: plot.company!.id },
+                  },
+                  (current) => serviceCompany(current, plot.company!.id)
+                );
+                playSound('coins');
+                setActionNotice('تمت صيانة وفحص الماكينات بنجاح!');
+              }}
+              className="flex-1 min-w-[140px] py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs flex items-center justify-center gap-2 transition-colors border border-slate-700"
+            >
+              <ShieldCheck className="w-4 h-4 text-emerald-400" />
+              <span>صيانة الماكينات</span>
+            </button>
+            <button
+              onClick={() => {
+                onClose();
+                onNavigate('production');
+              }}
+              className="flex-1 min-w-[140px] py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs flex items-center justify-center gap-2 transition-colors border border-slate-700"
+            >
+              <Factory className="w-4 h-4 text-sky-400" />
+              <span>لوحة المصانع الكاملة</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 5. LOCKED DISTRICT */}
+      {plot.status === 'locked' && (
+        <div className="p-4 rounded-xl bg-rose-950/30 border border-rose-500/30 text-center space-y-2">
+          <Lock className="w-8 h-8 text-rose-400 mx-auto" />
+          <h4 className="font-bold text-sm text-rose-300">هذه المنطقة مقفلة حالياً</h4>
+          <p className="text-xs text-slate-400">
+            يتطلب فتح هذه المنطقة وإتاحة أراضيها الاستثمارية وصول إمبراطوريتك إلى المستوى {plot.requiredLevel}.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+};
