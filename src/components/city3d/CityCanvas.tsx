@@ -24,6 +24,7 @@ import {
   buildPaperworkSurveyMesh,
   buildSiteClearingMesh,
   buildActiveConstructionMesh,
+  getHQHeight,
   buildHQMesh,
   buildBankMesh,
   buildFactoryMesh,
@@ -254,11 +255,12 @@ export const CityCanvas: React.FC<CityCanvasProps> = ({
       switch (def.id) {
         case 'hq': {
           landmarkMesh = buildHQMesh(hqLevel, palette, isSoftwareGl);
-          // Rotating Crown Halo on HQ
-          const crownRingGeo = new THREE.RingGeometry(2.4, 2.7, 24);
+          // Rotating Crown Halo on HQ (aligned above the Egyptian Sun Corona)
+          const hqActualH = getHQHeight(hqLevel);
+          const crownRingGeo = new THREE.RingGeometry(3.6, 4.0, 32);
           const crownRing = new THREE.Mesh(crownRingGeo, palette.plotHoloRing);
           crownRing.rotation.x = Math.PI / 2;
-          crownRing.position.y = 10 + hqLevel * 5.6;
+          crownRing.position.y = hqActualH + 0.8;
           landmarkMesh.add(crownRing);
           crownRingMesh = crownRing;
           break;
@@ -358,7 +360,8 @@ export const CityCanvas: React.FC<CityCanvasProps> = ({
           accentColor: def.accentColor,
           badgeBgColor: def.badgeBgColor,
         });
-        labelSprite.position.set(def.coordinates.x, def.labelHeight, def.coordinates.z);
+        const actualLabelY = def.id === 'hq' ? getHQHeight(hqLevel) + 3.2 : def.labelHeight;
+        labelSprite.position.set(def.coordinates.x, actualLabelY, def.coordinates.z);
         scene.add(labelSprite);
         registerClickable(labelSprite, { type: 'landmark', id: def.id });
       }

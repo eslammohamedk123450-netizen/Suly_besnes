@@ -211,6 +211,106 @@ export function getOrCreateCautionTexture(): THREE.Texture {
   return cautionTexture;
 }
 
+let sulyBrandTexture: THREE.CanvasTexture | null = null;
+export function getOrCreateSulyBrandTexture(): THREE.Texture {
+  if (sulyBrandTexture) return sulyBrandTexture;
+  if (typeof document === 'undefined') {
+    const data = new Uint8Array([18, 35, 71, 255]);
+    const tex = new THREE.DataTexture(data, 1, 1);
+    tex.needsUpdate = true;
+    return tex;
+  }
+  const canvas = document.createElement('canvas');
+  canvas.width = 512;
+  canvas.height = 256;
+  const ctx = canvas.getContext('2d');
+  if (ctx) {
+    ctx.fillStyle = '#0f1d38';
+    ctx.fillRect(0, 0, 512, 256);
+
+    ctx.strokeStyle = '#f59e0b';
+    ctx.lineWidth = 8;
+    ctx.strokeRect(12, 12, 488, 232);
+
+    ctx.strokeStyle = '#d97706';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(22, 22, 468, 212);
+
+    [[22, 22], [490, 22], [22, 234], [490, 234]].forEach(([cx, cy]) => {
+      ctx.fillStyle = '#fbbf24';
+      ctx.beginPath();
+      ctx.arc(cx, cy, 6, 0, Math.PI * 2);
+      ctx.fill();
+    });
+
+    ctx.font = 'bold 78px "Times New Roman", "Cinzel", "Cairo", serif';
+    ctx.fillStyle = '#fef08a';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('SULY', 256, 95);
+
+    ctx.font = 'bold 22px "Arial", "Cairo", sans-serif';
+    ctx.fillStyle = '#f59e0b';
+    ctx.fillText('TECHNOLOGIES', 256, 145);
+
+    ctx.fillStyle = '#fbbf24';
+    ctx.beginPath();
+    ctx.arc(256, 185, 16, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.moveTo(256 - 16, 185);
+    ctx.quadraticCurveTo(256 - 80, 175, 256 - 150, 180);
+    ctx.quadraticCurveTo(256 - 80, 195, 256 - 16, 192);
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.moveTo(256 + 16, 185);
+    ctx.quadraticCurveTo(256 + 80, 175, 256 + 150, 180);
+    ctx.quadraticCurveTo(256 + 80, 195, 256 + 16, 192);
+    ctx.fill();
+  }
+  sulyBrandTexture = new THREE.CanvasTexture(canvas);
+  sulyBrandTexture.colorSpace = THREE.SRGBColorSpace;
+  return sulyBrandTexture;
+}
+
+let ankhReliefTexture: THREE.CanvasTexture | null = null;
+export function getOrCreateAnkhReliefTexture(): THREE.Texture {
+  if (ankhReliefTexture) return ankhReliefTexture;
+  if (typeof document === 'undefined') {
+    const data = new Uint8Array([18, 35, 71, 255]);
+    const tex = new THREE.DataTexture(data, 1, 1);
+    tex.needsUpdate = true;
+    return tex;
+  }
+  const canvas = document.createElement('canvas');
+  canvas.width = 128;
+  canvas.height = 512;
+  const ctx = canvas.getContext('2d');
+  if (ctx) {
+    ctx.fillStyle = '#0f1d38';
+    ctx.fillRect(0, 0, 128, 512);
+
+    ctx.strokeStyle = '#f59e0b';
+    ctx.lineWidth = 4;
+    ctx.strokeRect(6, 6, 116, 500);
+
+    ctx.font = 'bold 54px serif';
+    ctx.fillStyle = '#fbbf24';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    for (let y = 60; y < 500; y += 100) {
+      ctx.fillText('☥', 64, y);
+    }
+  }
+  ankhReliefTexture = new THREE.CanvasTexture(canvas);
+  ankhReliefTexture.wrapS = THREE.RepeatWrapping;
+  ankhReliefTexture.wrapT = THREE.RepeatWrapping;
+  ankhReliefTexture.colorSpace = THREE.SRGBColorSpace;
+  return ankhReliefTexture;
+}
+
 /**
  * Reusable material registry to eliminate per-object allocations and GPU state churn
  */
@@ -235,6 +335,10 @@ export interface CityMaterialPalette {
   facadeConcrete: THREE.MeshStandardMaterial;
   chromeMetal: THREE.MeshStandardMaterial;
   waterSurface: THREE.MeshStandardMaterial;
+  sulyBrandMat: THREE.MeshStandardMaterial;
+  ankhReliefMat: THREE.MeshStandardMaterial;
+  royalNavyMat: THREE.MeshStandardMaterial;
+  warmAmberLitGlass: THREE.MeshStandardMaterial;
 
   // Commercial & Industrial Materials
   industrialSteel: THREE.MeshStandardMaterial;
@@ -381,6 +485,28 @@ export function createCityMaterialPalette(
       color: '#f1f5f9',
       roughness: 0.1,
       metalness: 0.95,
+    }),
+    sulyBrandMat: new THREE.MeshStandardMaterial({
+      map: getOrCreateSulyBrandTexture(),
+      roughness: 0.25,
+      metalness: 0.8,
+    }),
+    ankhReliefMat: new THREE.MeshStandardMaterial({
+      map: getOrCreateAnkhReliefTexture(),
+      roughness: 0.3,
+      metalness: 0.7,
+    }),
+    royalNavyMat: new THREE.MeshStandardMaterial({
+      color: '#102244',
+      roughness: 0.35,
+      metalness: 0.35,
+    }),
+    warmAmberLitGlass: new THREE.MeshStandardMaterial({
+      color: '#fef08a',
+      roughness: 0.1,
+      metalness: 0.2,
+      emissive: '#f59e0b',
+      emissiveIntensity: isNightMode ? 0.9 : 0.45,
     }),
     waterSurface: new THREE.MeshStandardMaterial({
       color: '#0284c7',

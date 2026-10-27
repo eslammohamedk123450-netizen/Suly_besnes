@@ -438,7 +438,160 @@ export function buildActiveConstructionMesh(
 }
 
 /**
+ * Creates the signature upward-curving golden horn/acroteria finial
+ * seen at the four roof corners of every level in the reference design.
+ */
+function createCornerHornFinial(palette: CityMaterialPalette, scale = 1.0): THREE.Group {
+  const finial = new THREE.Group();
+
+  // Base plinth
+  const base = new THREE.Mesh(new THREE.BoxGeometry(0.35 * scale, 0.25 * scale, 0.35 * scale), palette.imperialGold);
+  base.position.y = 0.125 * scale;
+  finial.add(base);
+
+  // Curved horn body curving up and out
+  const hornGeo = new THREE.ConeGeometry(0.2 * scale, 1.1 * scale, 8);
+  const horn = new THREE.Mesh(hornGeo, palette.imperialGold);
+  horn.position.set(0.12 * scale, 0.7 * scale, 0.12 * scale);
+  horn.rotation.z = -0.35;
+  horn.rotation.x = 0.35;
+  finial.add(horn);
+
+  // Tip golden sphere ball
+  const tip = new THREE.Mesh(new THREE.SphereGeometry(0.1 * scale, 8, 8), palette.imperialGold);
+  tip.position.set(0.28 * scale, 1.25 * scale, 0.28 * scale);
+  finial.add(tip);
+
+  return finial;
+}
+
+/**
+ * Creates the ornate Egyptian Sun-Disc Corona (قرص الشمس المجنح الذهبي)
+ * with radiant sunburst rays, flanking horns, and perimeter lotus cresting.
+ */
+function createEgyptianSunCorona(
+  roofW: number,
+  roofD: number,
+  palette: CityMaterialPalette,
+  tier: 3 | 4 | 5
+): THREE.Group {
+  const corona = new THREE.Group();
+
+  // 1. Perimeter golden crenellations / lotus acroteria balustrade around all 4 edges
+  const finialSpacing = 0.9;
+  const numX = Math.floor(roofW / finialSpacing);
+  const numZ = Math.floor(roofD / finialSpacing);
+
+  for (let ix = -numX / 2; ix <= numX / 2; ix++) {
+    [-roofD / 2, roofD / 2].forEach((pz) => {
+      const crenel = new THREE.Mesh(new THREE.ConeGeometry(0.16, 0.7, 4), palette.imperialGold);
+      crenel.rotation.y = Math.PI / 4;
+      crenel.position.set(ix * finialSpacing, 0.35, pz);
+      corona.add(crenel);
+    });
+  }
+
+  for (let iz = -numZ / 2; iz <= numZ / 2; iz++) {
+    [-roofW / 2, roofW / 2].forEach((px) => {
+      const crenel = new THREE.Mesh(new THREE.ConeGeometry(0.16, 0.7, 4), palette.imperialGold);
+      crenel.rotation.y = Math.PI / 4;
+      crenel.position.set(px, 0.35, iz * finialSpacing);
+      corona.add(crenel);
+    });
+  }
+
+  // 2. Corner Upward Horn Finials
+  const halfW = roofW / 2;
+  const halfD = roofD / 2;
+  [
+    [-halfW, -halfD, -1, -1],
+    [halfW, -halfD, 1, -1],
+    [-halfW, halfD, -1, 1],
+    [halfW, halfD, 1, 1],
+  ].forEach(([cx, cz, dirX, dirZ]) => {
+    const cornerHorn = createCornerHornFinial(palette, tier === 5 ? 1.4 : tier === 4 ? 1.2 : 1.0);
+    cornerHorn.position.set(cx, 0, cz);
+    cornerHorn.rotation.y = Math.atan2(dirX, dirZ);
+    corona.add(cornerHorn);
+  });
+
+  // 3. Central Golden Sun-Disc Monument with radiating sunburst rays
+  const sunGroup = new THREE.Group();
+  sunGroup.position.set(0, 0.4, 0);
+
+  // Central Sun Orb
+  const sunRadius = tier === 5 ? 1.3 : tier === 4 ? 1.1 : 0.9;
+  const sunOrb = new THREE.Mesh(
+    new THREE.SphereGeometry(sunRadius, 18, 18),
+    palette.imperialGold
+  );
+  sunOrb.position.y = sunRadius + 0.3;
+  sunGroup.add(sunOrb);
+
+  // Concentric Golden Halo Ring
+  const haloGeo = new THREE.RingGeometry(sunRadius * 1.3, sunRadius * 1.55, 32);
+  const halo = new THREE.Mesh(haloGeo, palette.imperialGold);
+  halo.position.y = sunRadius + 0.3;
+  sunGroup.add(halo);
+
+  // Radiant Golden Sunburst Rays
+  const rayCount = tier === 5 ? 16 : 12;
+  for (let r = 0; r < rayCount; r++) {
+    const angle = (r * Math.PI * 2) / rayCount;
+    const rayLength = (r % 2 === 0 ? 1.6 : 1.1) * (tier === 5 ? 1.3 : 1.0);
+    const ray = new THREE.Mesh(new THREE.ConeGeometry(0.15, rayLength, 6), palette.imperialGold);
+    ray.position.set(
+      Math.cos(angle) * (sunRadius + rayLength / 2),
+      sunRadius + 0.3 + Math.sin(angle) * (sunRadius + rayLength / 2),
+      0
+    );
+    ray.rotation.z = angle - Math.PI / 2;
+    sunGroup.add(ray);
+  }
+
+  // Flanking Royal Horns / Uraeus Wings
+  [-1, 1].forEach((dir) => {
+    const horn = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.35, 2.2, 8), palette.imperialGold);
+    horn.rotation.z = dir * 0.7;
+    horn.position.set(dir * (sunRadius + 1.2), sunRadius + 0.4, 0);
+    sunGroup.add(horn);
+
+    const tipBall = new THREE.Mesh(new THREE.SphereGeometry(0.22, 8, 8), palette.imperialGold);
+    tipBall.position.set(dir * (sunRadius + 2.0), sunRadius + 1.2, 0);
+    sunGroup.add(tipBall);
+  });
+
+  corona.add(sunGroup);
+  return corona;
+}
+
+/**
+ * Returns the exact structural height of the HQ building for any level
+ */
+export function getHQHeight(level: number): number {
+  switch (level) {
+    case 1:
+      return 6.5;
+    case 2:
+      return 19.5;
+    case 3:
+      return 30.5;
+    case 4:
+      return 40.5;
+    case 5:
+    default:
+      return 51.5;
+  }
+}
+
+/**
  * 5. IMPERIAL HEADQUARTERS TOWER (5 Levels of Grandeur)
+ * Meticulously modeled to mirror the exact architectural progression:
+ * Level 1: 2-story royal navy classical villa with columns, SULY sign, and corner horn finials.
+ * Level 2: 8-story navy skyscraper with colonnade, corner bay windows, and SULY logo plate.
+ * Level 3: 14-story grand skyscraper with Ankh relief piers and Egyptian sun-disc crown.
+ * Level 4: 20-story opulent golden skyscraper with rich golden fluted mullions and dual sun-disc corona.
+ * Level 5: 26+ story sovereign imperial skyscraper with supreme golden corona, uraeus horns, and illuminated ribbon glass.
  */
 export function buildHQMesh(
   level: number,
@@ -447,7 +600,7 @@ export function buildHQMesh(
 ): THREE.Group {
   const hq = new THREE.Group();
 
-  // Tier 0: Grand Marble Plaza with Gold Curbs & Fountain Basin
+  // Tier 0: Grand Marble Plaza with Gold Curbs
   const plazaBase = new THREE.Mesh(new THREE.BoxGeometry(16, 0.45, 16), palette.plazaPaver);
   plazaBase.position.y = 0.225;
   plazaBase.receiveShadow = !isSoftwareGl;
@@ -482,146 +635,322 @@ export function buildHQMesh(
     hq.add(bush);
   });
 
-  // Level 1: Grand 2-Story Atrium Lobby
-  const lobbyH = 3.6;
-  const lobbyW = 10.0;
-  const lobbyD = 10.0;
+  // =========================================================================
+  // LEVEL 1: Classical 2-Story Royal Navy Villa
+  // =========================================================================
+  if (level === 1) {
+    const bW = 7.6;
+    const bD = 7.6;
+    const bH = 5.6;
 
-  const lobby = new THREE.Mesh(new THREE.BoxGeometry(lobbyW, lobbyH, lobbyD), palette.navyStructure);
-  lobby.position.y = 0.45 + lobbyH / 2;
-  lobby.castShadow = !isSoftwareGl;
-  hq.add(lobby);
+    // Main Navy Stone Structure Body
+    const body = new THREE.Mesh(new THREE.BoxGeometry(bW, bH, bD), palette.royalNavyMat);
+    body.position.y = 0.45 + bH / 2;
+    body.castShadow = !isSoftwareGl;
+    hq.add(body);
 
-  // Lobby Glass Facade with Illuminated Warm Interior
-  const lobbyGlass = new THREE.Mesh(new THREE.BoxGeometry(lobbyW + 0.1, lobbyH - 0.6, lobbyD - 1.2), palette.curtainGlass);
-  lobbyGlass.position.y = 0.45 + lobbyH / 2;
-  hq.add(lobbyGlass);
+    // White marble foundation plinth
+    const plinth = new THREE.Mesh(new THREE.BoxGeometry(bW + 0.4, 0.4, bD + 0.4), palette.whiteMarble);
+    plinth.position.y = 0.65;
+    hq.add(plinth);
 
-  // Cantilevered Grand Entrance Canopy
-  const canopy = new THREE.Mesh(new THREE.BoxGeometry(5.2, 0.25, 2.4), palette.imperialGold);
-  canopy.position.set(0, 2.6, 5.8);
-  hq.add(canopy);
+    // Middle horizontal gold belt dividing 1st & 2nd floors
+    const belt = new THREE.Mesh(new THREE.BoxGeometry(bW + 0.25, 0.2, bD + 0.25), palette.imperialGold);
+    belt.position.y = 3.25;
+    hq.add(belt);
 
-  // Revolving Gold Doors
-  const doorCylinder = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.1, 1.8, 12), palette.imperialGold);
-  doorCylinder.position.set(0, 1.35, 5.05);
-  hq.add(doorCylinder);
+    // Front Entrance Portico with twin fluted columns
+    const portico = new THREE.Group();
+    portico.position.set(0, 0.45, bD / 2);
 
-  // TIER 1 TOWER SHAFT (Base Tower for all levels)
-  const t1Height = 8.5;
-  const t1Width = 8.4;
-  const t1Depth = 8.4;
+    // Twin Marble Columns with gold capitals
+    [-1.2, 1.2].forEach((cx) => {
+      const col = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.24, 2.6, 12), palette.whiteMarble);
+      col.position.set(cx, 1.3, 0.6);
+      portico.add(col);
 
-  const shaft1 = new THREE.Mesh(new THREE.BoxGeometry(t1Width, t1Height, t1Depth), palette.officeWindowsLit);
-  shaft1.position.y = 4.05 + t1Height / 2;
-  shaft1.castShadow = !isSoftwareGl;
-  hq.add(shaft1);
+      const cap = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.18, 0.55), palette.imperialGold);
+      cap.position.set(cx, 2.65, 0.6);
+      portico.add(cap);
+    });
 
-  // Gold Vertical Architectural Mullions (Pillars)
-  [-3.8, -1.3, 1.3, 3.8].forEach((mx) => {
-    const mullion = new THREE.Mesh(new THREE.BoxGeometry(0.25, t1Height + 0.4, 0.25), palette.imperialGold);
-    mullion.position.set(mx, 4.05 + t1Height / 2, 4.25);
-    hq.add(mullion);
+    // Golden "SULY" Entablature Lintel Sign
+    const signBoard = new THREE.Mesh(new THREE.BoxGeometry(3.2, 0.65, 0.4), palette.sulyBrandMat);
+    signBoard.position.set(0, 2.9, 0.6);
+    portico.add(signBoard);
 
-    const mullionRear = new THREE.Mesh(new THREE.BoxGeometry(0.25, t1Height + 0.4, 0.25), palette.imperialGold);
-    mullionRear.position.set(mx, 4.05 + t1Height / 2, -4.25);
-    hq.add(mullionRear);
+    // Double Glass Entrance Doors
+    const door = new THREE.Mesh(new THREE.BoxGeometry(2.0, 2.2, 0.15), palette.warmAmberLitGlass);
+    door.position.set(0, 1.1, 0.08);
+    portico.add(door);
+
+    hq.add(portico);
+
+    // Symmetrical Framed Windows on 2 Floors
+    const windowRows = [1.8, 4.4];
+    windowRows.forEach((wy) => {
+      // Front windows flanking entrance
+      [-2.4, 2.4].forEach((wx) => {
+        // Gold window frame
+        const frame = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.4, 0.15), palette.imperialGold);
+        frame.position.set(wx, wy, bD / 2 + 0.06);
+        hq.add(frame);
+
+        // Glowing glass
+        const glass = new THREE.Mesh(new THREE.BoxGeometry(0.9, 1.1, 0.16), palette.warmAmberLitGlass);
+        glass.position.set(wx, wy, bD / 2 + 0.07);
+        hq.add(glass);
+      });
+
+      // Side windows
+      [-2.2, 2.2].forEach((wz) => {
+        [-bW / 2 - 0.06, bW / 2 + 0.06].forEach((wx) => {
+          const frame = new THREE.Mesh(new THREE.BoxGeometry(0.15, 1.4, 1.2), palette.imperialGold);
+          frame.position.set(wx, wy, wz);
+          hq.add(frame);
+
+          const glass = new THREE.Mesh(new THREE.BoxGeometry(0.16, 1.1, 0.9), palette.warmAmberLitGlass);
+          glass.position.set(wx, wy, wz);
+          hq.add(glass);
+        });
+      });
+    });
+
+    // Rooftop Parapet with Golden Cornice
+    const roofY = 0.45 + bH;
+    const roofCornice = new THREE.Mesh(new THREE.BoxGeometry(bW + 0.35, 0.35, bD + 0.35), palette.imperialGold);
+    roofCornice.position.y = roofY + 0.175;
+    hq.add(roofCornice);
+
+    const roofParapet = new THREE.Mesh(new THREE.BoxGeometry(bW, 0.5, bD), palette.royalNavyMat);
+    roofParapet.position.y = roofY + 0.5;
+    hq.add(roofParapet);
+
+    // Flat Navy Roof Slab
+    const roofSlab = new THREE.Mesh(new THREE.BoxGeometry(bW - 0.6, 0.15, bD - 0.6), palette.royalNavyMat);
+    roofSlab.position.y = roofY + 0.35;
+    hq.add(roofSlab);
+
+    // 4 Upward Curving Golden Corner Horn Finials (Exact match to reference photo!)
+    const halfW = bW / 2;
+    const halfD = bD / 2;
+    [
+      [-halfW, -halfD, -1, -1],
+      [halfW, -halfD, 1, -1],
+      [-halfW, halfD, -1, 1],
+      [halfW, halfD, 1, 1],
+    ].forEach(([cx, cz, dirX, dirZ]) => {
+      const horn = createCornerHornFinial(palette, 1.0);
+      horn.position.set(cx, roofY + 0.5, cz);
+      horn.rotation.y = Math.atan2(dirX, dirZ);
+      hq.add(horn);
+    });
+
+    return hq;
+  }
+
+  // =========================================================================
+  // LEVELS 2 TO 5: Skyscraper Proportions with Distinct Upgrades
+  // =========================================================================
+  const tW = 8.2;
+  const tD = 8.2;
+
+  // Determine height and floor tiers by level
+  let shaftHeight = 11.0; // Level 2: 8 floors (~18m total)
+  if (level === 3) shaftHeight = 20.0; // Level 3: 14 floors (~28m total)
+  if (level === 4) shaftHeight = 30.0; // Level 4: 20 floors (~38m total)
+  if (level >= 5) shaftHeight = 40.0; // Level 5: 26+ floors (~49m total)
+
+  // 1. Double-Height Grand Colonnade Base (Ground Floor)
+  const baseH = 4.0;
+  const baseMesh = new THREE.Mesh(new THREE.BoxGeometry(tW + 0.8, baseH, tD + 0.8), palette.royalNavyMat);
+  baseMesh.position.y = 0.45 + baseH / 2;
+  baseMesh.castShadow = !isSoftwareGl;
+  hq.add(baseMesh);
+
+  // Corner Navy Piers with Golden Ankh Relief Panels
+  const pierW = 1.6;
+  [
+    [-(tW / 2 + 0.3), -(tD / 2 + 0.3)],
+    [(tW / 2 + 0.3), -(tD / 2 + 0.3)],
+    [-(tW / 2 + 0.3), (tD / 2 + 0.3)],
+    [(tW / 2 + 0.3), (tD / 2 + 0.3)],
+  ].forEach(([px, pz]) => {
+    const pier = new THREE.Mesh(new THREE.BoxGeometry(pierW, baseH + 0.1, pierW), palette.royalNavyMat);
+    pier.position.set(px, 0.45 + baseH / 2, pz);
+    hq.add(pier);
+
+    // Front/Side Golden Ankh Relief Plaque
+    const ankhPlaque = new THREE.Mesh(new THREE.BoxGeometry(0.8, baseH - 0.6, 0.1), palette.ankhReliefMat);
+    ankhPlaque.position.set(px, 0.45 + baseH / 2, pz + (pz > 0 ? pierW / 2 + 0.06 : -pierW / 2 - 0.06));
+    hq.add(ankhPlaque);
   });
 
-  let currentY = 4.05 + t1Height;
+  // Base Colonnade Columns (Fluted White Marble with Gold Capitals, or all Gold for Level 4)
+  const colMat = level === 4 ? palette.imperialGold : palette.whiteMarble;
+  const colPositions = [-2.0, 0, 2.0];
+  colPositions.forEach((cx) => {
+    // Front colonnade columns
+    const col = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.28, baseH - 0.4, 12), colMat);
+    col.position.set(cx, 0.45 + (baseH - 0.4) / 2, tD / 2 + 0.45);
+    hq.add(col);
 
-  // TIER 2: Executive Expansion (Levels 2-5)
-  if (level >= 2) {
-    const t2Height = 7.0;
-    const t2Width = 6.8;
-    const t2Depth = 6.8;
+    const cap = new THREE.Mesh(new THREE.BoxGeometry(0.65, 0.22, 0.65), palette.imperialGold);
+    cap.position.set(cx, 0.45 + baseH - 0.3, tD / 2 + 0.45);
+    hq.add(cap);
 
-    // Setback terrace balcony
-    const terrace = new THREE.Mesh(new THREE.BoxGeometry(t1Width, 0.4, t1Depth), palette.imperialGold);
-    terrace.position.y = currentY + 0.2;
-    hq.add(terrace);
+    // Rear colonnade columns
+    const colRear = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.28, baseH - 0.4, 12), colMat);
+    colRear.position.set(cx, 0.45 + (baseH - 0.4) / 2, -tD / 2 - 0.45);
+    hq.add(colRear);
+  });
 
-    const shaft2 = new THREE.Mesh(new THREE.BoxGeometry(t2Width, t2Height, t2Depth), palette.officeWindowsLit);
-    shaft2.position.y = currentY + 0.4 + t2Height / 2;
-    shaft2.castShadow = !isSoftwareGl;
-    hq.add(shaft2);
+  // Grand Golden Entrance Portal
+  const portalDoor = new THREE.Mesh(new THREE.BoxGeometry(3.6, 3.0, 0.25), palette.warmAmberLitGlass);
+  portalDoor.position.set(0, 0.45 + 1.5, tD / 2 + 0.4);
+  hq.add(portalDoor);
 
-    currentY += 0.4 + t2Height;
+  // Cantilevered Gilded Cornice dividing base from tower shaft
+  const baseCornice = new THREE.Mesh(new THREE.BoxGeometry(tW + 1.2, 0.4, tD + 1.2), palette.imperialGold);
+  baseCornice.position.y = 0.45 + baseH + 0.2;
+  hq.add(baseCornice);
+
+  // 2. Tower Shaft (Glass curtain walls with warm interior lighting)
+  const shaftY = 0.45 + baseH + 0.4;
+  const shaftMat = level === 4 ? palette.warmAmberLitGlass : palette.officeWindowsLit;
+  const shaft = new THREE.Mesh(new THREE.BoxGeometry(tW - 0.2, shaftHeight, tD - 0.2), shaftMat);
+  shaft.position.y = shaftY + shaftHeight / 2;
+  shaft.castShadow = !isSoftwareGl;
+  hq.add(shaft);
+
+  // Vertical Pier Columns (Royal Navy blue for 2, 3, 5; Brilliant Gold for Level 4)
+  const pierMat = level === 4 ? palette.imperialGold : palette.royalNavyMat;
+  const cornerCoords = [
+    [-tW / 2 + 0.4, -tD / 2 + 0.4],
+    [tW / 2 - 0.4, -tD / 2 + 0.4],
+    [-tW / 2 + 0.4, tD / 2 - 0.4],
+    [tW / 2 - 0.4, tD / 2 - 0.4],
+  ];
+
+  cornerCoords.forEach(([cx, cz]) => {
+    const vPier = new THREE.Mesh(new THREE.BoxGeometry(1.2, shaftHeight, 1.2), pierMat);
+    vPier.position.set(cx, shaftY + shaftHeight / 2, cz);
+    vPier.castShadow = !isSoftwareGl;
+    hq.add(vPier);
+
+    // Continuous vertical Ankh Relief Rib on corner piers for levels 3, 4, 5
+    if (level >= 3) {
+      const ankhRib = new THREE.Mesh(new THREE.BoxGeometry(0.55, shaftHeight, 0.1), palette.ankhReliefMat);
+      ankhRib.position.set(cx, shaftY + shaftHeight / 2, cz + (cz > 0 ? 0.65 : -0.65));
+      hq.add(ankhRib);
+    }
+  });
+
+  // Horizontal Floor Trims (Gilded spandrel beams across the facade)
+  const floorHeight = 1.8;
+  const numFloors = Math.floor(shaftHeight / floorHeight);
+  for (let f = 1; f < numFloors; f++) {
+    const fy = shaftY + f * floorHeight;
+    const floorSpandrel = new THREE.Mesh(
+      new THREE.BoxGeometry(tW + 0.05, 0.2, tD + 0.05),
+      palette.imperialGold
+    );
+    floorSpandrel.position.y = fy;
+    hq.add(floorSpandrel);
   }
 
-  // TIER 3: Integrated Sovereign Complex (Levels 3-5)
-  if (level >= 3) {
-    const t3Height = 6.5;
-    const t3Width = 5.4;
-    const t3Depth = 5.4;
-
-    const terrace2 = new THREE.Mesh(new THREE.BoxGeometry(6.6, 0.35, 6.6), palette.brushedGold);
-    terrace2.position.y = currentY + 0.175;
-    hq.add(terrace2);
-
-    const shaft3 = new THREE.Mesh(new THREE.BoxGeometry(t3Width, t3Height, t3Depth), palette.officeWindowsLit);
-    shaft3.position.y = currentY + 0.35 + t3Height / 2;
-    shaft3.castShadow = !isSoftwareGl;
-    hq.add(shaft3);
-
-    currentY += 0.35 + t3Height;
-  }
-
-  // TIER 4: Continental Financial Spire (Levels 4-5)
-  if (level >= 4) {
-    const t4Height = 6.0;
-    const t4Width = 4.2;
-    const t4Depth = 4.2;
-
-    const shaft4 = new THREE.Mesh(new THREE.BoxGeometry(t4Width, t4Height, t4Depth), palette.curtainGlass);
-    shaft4.position.y = currentY + t4Height / 2;
-    shaft4.castShadow = !isSoftwareGl;
-    hq.add(shaft4);
-
-    // Cantilevered Executive Boardroom Skybay
-    const skybay = new THREE.Mesh(new THREE.BoxGeometry(4.8, 1.8, 4.8), palette.imperialGold);
-    skybay.position.y = currentY + 3.8;
-    hq.add(skybay);
-
-    currentY += t4Height;
-  }
-
-  // TIER 5: World-Class Skyscraper Pinnacle & Helipad (Level 5)
-  if (level >= 5) {
-    // Rooftop Helipad with "H" Mark
-    const helipad = new THREE.Mesh(new THREE.CylinderGeometry(2.4, 2.6, 0.4, 18), palette.slateStructure);
-    helipad.position.y = currentY + 0.2;
-    hq.add(helipad);
-
-    const helipadBorder = new THREE.Mesh(new THREE.RingGeometry(2.1, 2.3, 18), palette.imperialGold);
-    helipadBorder.rotation.x = -Math.PI / 2;
-    helipadBorder.position.y = currentY + 0.42;
-    hq.add(helipadBorder);
-
-    // Cantilevered Gold Crown Arch Spire
-    const crown = new THREE.Mesh(new THREE.ConeGeometry(1.6, 4.8, 4), palette.imperialGold);
-    crown.rotation.y = Math.PI / 4;
-    crown.position.y = currentY + 2.8;
-    hq.add(crown);
-
-    // Soaring Communications Needle Antenna with Aviation Beacon
-    const needle = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.14, 5.5, 8), palette.chromeMetal);
-    needle.position.y = currentY + 6.5;
-    hq.add(needle);
-
-    const aviationLight = new THREE.Mesh(new THREE.SphereGeometry(0.18, 8, 8), palette.carTaillight);
-    aviationLight.position.y = currentY + 9.25;
-    hq.add(aviationLight);
+  // 3. Iconic "SULY TECHNOLOGIES" Gilded Signboards with Winged Solar Disk
+  const signHeights: number[] = [];
+  if (level === 2) {
+    signHeights.push(shaftY + shaftHeight - 2.2);
+  } else if (level === 3) {
+    signHeights.push(shaftY + shaftHeight * 0.45);
+    signHeights.push(shaftY + shaftHeight - 2.5);
+  } else if (level === 4) {
+    signHeights.push(shaftY + shaftHeight * 0.35);
+    signHeights.push(shaftY + shaftHeight * 0.7);
+    signHeights.push(shaftY + shaftHeight - 2.6);
   } else {
-    // Base Roof Parapet & Spire for Levels 1-4
-    const roofCap = new THREE.Mesh(new THREE.ConeGeometry(1.4, 3.2, 4), palette.imperialGold);
-    roofCap.rotation.y = Math.PI / 4;
-    roofCap.position.y = currentY + 1.6;
-    hq.add(roofCap);
+    // Level 5
+    signHeights.push(shaftY + shaftHeight * 0.3);
+    signHeights.push(shaftY + shaftHeight * 0.6);
+    signHeights.push(shaftY + shaftHeight - 2.8);
+  }
 
-    const antenna = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.1, 3.2, 8), palette.chromeMetal);
-    antenna.position.y = currentY + 4.2;
-    hq.add(antenna);
+  signHeights.forEach((sy) => {
+    // Front brand plaque
+    const signFront = new THREE.Mesh(new THREE.BoxGeometry(3.6, 1.8, 0.2), palette.sulyBrandMat);
+    signFront.position.set(0, sy, tD / 2 + 0.02);
+    hq.add(signFront);
+
+    // Side brand plaque
+    const signSide = new THREE.Mesh(new THREE.BoxGeometry(0.2, 1.8, 3.6), palette.sulyBrandMat);
+    signSide.position.set(tW / 2 + 0.02, sy, 0);
+    hq.add(signSide);
+  });
+
+  // Vertical Illuminated Edge Light Strips (Level 5 royal glow)
+  if (level >= 5) {
+    cornerCoords.forEach(([cx, cz]) => {
+      const neonStrip = new THREE.Mesh(new THREE.BoxGeometry(0.12, shaftHeight, 0.12), palette.neonGold);
+      neonStrip.position.set(cx + (cx > 0 ? 0.62 : -0.62), shaftY + shaftHeight / 2, cz + (cz > 0 ? 0.62 : -0.62));
+      hq.add(neonStrip);
+    });
+  }
+
+  // 4. Rooftop Structure & Iconic Crown
+  const roofStartY = shaftY + shaftHeight;
+
+  // Golden Main Roof Cornice
+  const roofCornice = new THREE.Mesh(new THREE.BoxGeometry(tW + 0.6, 0.4, tD + 0.6), palette.imperialGold);
+  roofCornice.position.y = roofStartY + 0.2;
+  hq.add(roofCornice);
+
+  // Setback Penthouse Deck
+  const deckW = tW - 0.8;
+  const deckD = tD - 0.8;
+  const deckH = 1.4;
+  const roofDeck = new THREE.Mesh(new THREE.BoxGeometry(deckW, deckH, deckD), palette.royalNavyMat);
+  roofDeck.position.y = roofStartY + 0.4 + deckH / 2;
+  hq.add(roofDeck);
+
+  // LEVEL 2 ROOFTOP: Setback deck with 4 upward curving corner horn finials & gold balustrade
+  if (level === 2) {
+    const rY = roofStartY + 0.4 + deckH;
+    const halfDW = deckW / 2;
+    const halfDD = deckD / 2;
+
+    // Golden perimeter balustrade
+    const balustrade = new THREE.Mesh(new THREE.BoxGeometry(deckW + 0.2, 0.4, deckD + 0.2), palette.imperialGold);
+    balustrade.position.y = rY + 0.2;
+    hq.add(balustrade);
+
+    // 4 Corner Horn Finials
+    [
+      [-halfDW, -halfDD, -1, -1],
+      [halfDW, -halfDD, 1, -1],
+      [-halfDW, halfDD, -1, 1],
+      [halfDW, halfDD, 1, 1],
+    ].forEach(([cx, cz, dirX, dirZ]) => {
+      const horn = createCornerHornFinial(palette, 1.1);
+      horn.position.set(cx, rY + 0.4, cz);
+      horn.rotation.y = Math.atan2(dirX, dirZ);
+      hq.add(horn);
+    });
+
+    // Central executive golden pyramid peak
+    const peak = new THREE.Mesh(new THREE.ConeGeometry(1.6, 2.2, 4), palette.imperialGold);
+    peak.rotation.y = Math.PI / 4;
+    peak.position.y = rY + 1.1;
+    hq.add(peak);
+  }
+
+  // LEVELS 3, 4, 5: Egyptian Sun-Disc Corona (Matching reference picture)
+  if (level >= 3) {
+    const coronaTier = (level === 5 ? 5 : level === 4 ? 4 : 3) as 3 | 4 | 5;
+    const corona = createEgyptianSunCorona(deckW, deckD, palette, coronaTier);
+    corona.position.y = roofStartY + 0.4 + deckH;
+    hq.add(corona);
   }
 
   return hq;
