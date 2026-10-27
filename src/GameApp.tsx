@@ -118,6 +118,16 @@ export default function App() {
   const [isStrategicPillarsOpen, setIsStrategicPillarsOpen] = useState(false);
   const syncLock = useRef(false);
   const remoteCommandAttempts = useRef(new Map<string, Promise<RemoteGameCommandAttempt>>());
+  const lastLocalSaveSignature = useRef('');
+
+  useEffect(() => {
+    if (!profile) return;
+    const accountId = account?.id;
+    const signature = `${accountId ?? 'guest'}:${JSON.stringify(profile)}`;
+    if (signature === lastLocalSaveSignature.current) return;
+    const saved = saveGame(profile, accountId);
+    if (saved.ok) lastLocalSaveSignature.current = signature;
+  }, [profile, account?.id]);
 
   const applyLoadedProfileState = (loadedProfile: PlayerProfile | null) => {
     setProfile(loadedProfile);
@@ -1238,6 +1248,7 @@ export default function App() {
               onAccountDeleted={handleAccountDeleted}
               onRestartWalkthrough={handleRestartWalkthrough}
               onOpenWardrobe={() => setIsAvatarWardrobeOpen(true)}
+              onSaveNow={() => Boolean(profile && saveGame(profile, account.id).ok)}
               onUpdateProfile={(updater) => {
                 setProfile((prev) => {
                   if (!prev) return prev;

@@ -68,6 +68,7 @@ interface ProfilePageProps {
   onRestartWalkthrough?: () => void;
   onOpenWardrobe?: () => void;
   onUpdateProfile?: (updater: (prev: PlayerProfile) => PlayerProfile) => void;
+  onSaveNow?: () => boolean;
 }
 
 async function copyTextWithFallback(text: string): Promise<boolean> {
@@ -114,10 +115,12 @@ export function ProfilePage({
   onAccountDeleted,
   onRestartWalkthrough,
   onOpenWardrobe,
-  onUpdateProfile
+  onUpdateProfile,
+  onSaveNow,
 }: ProfilePageProps) {
   // Modals state
   const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [saveNowNotice, setSaveNowNotice] = useState<string | null>(null);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
@@ -1056,6 +1059,20 @@ export function ProfilePage({
                   <span>البيئة المشغلة:</span>
                   <strong className="text-slate-200">AI Studio Web Edition</strong>
                 </div>
+              </div>
+
+              <div className="p-3.5 rounded-2xl bg-emerald-950/20 border border-emerald-500/25 space-y-2">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <strong className="text-xs sm:text-sm block text-white">حفظ التقدم الآن</strong>
+                    <span className="text-[10px] text-slate-400">يحفظ الموارد والمهام والأيام والأصول على هذا الجهاز فورًا.</span>
+                  </div>
+                  <button type="button" className="px-3 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs" onClick={() => {
+                    const ok = onSaveNow?.() ?? false;
+                    setSaveNowNotice(ok ? 'تم حفظ التقدم محليًا بنجاح ✓' : 'فشل الحفظ المحلي؛ لم يتم اعتماد التغيير.');
+                  }}>حفظ الآن</button>
+                </div>
+                {saveNowNotice && <span className={`text-[10px] ${saveNowNotice.startsWith('تم') ? 'text-emerald-300' : 'text-rose-300'}`}>{saveNowNotice}</span>}
               </div>
 
               {/* Restart Mandatory Walkthrough Button */}
