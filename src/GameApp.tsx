@@ -1006,10 +1006,9 @@ export default function App() {
     }
     const isProfile = section === 'profile';
     const isDifferentSection = activeSection !== section;
-    // 3D-first shell: gameplay systems are opened from their city buildings.
-    // Legacy section modules remain available to the building feature work,
-    // but are no longer the primary navigation surface.
-    setActiveSection(isProfile ? 'profile' : 'home');
+    // 3D-first shell: gameplay systems are opened from their city buildings,
+    // while the original working system UI is rendered inside the city shell.
+    setActiveSection(section);
     if (!isProfile) setCityFocusSection(section);
     setSectionFocus(focus);
     if (!isWalkthroughActive && section !== 'home' && section !== 'profile' && !profile.onboarding.seenGuides.includes(section)) playSound('unlock');
@@ -1144,7 +1143,8 @@ export default function App() {
         </aside>*/}
 
         <main className="main-content flex-1 w-full min-w-0 pb-24 md:pb-8">
-          {activeSection === 'home' ? (
+          {activeSection !== 'profile' ? (
+            <div className="relative space-y-4">
             <CityHomeView
               profile={profile}
               country={country}
@@ -1239,7 +1239,43 @@ export default function App() {
                 }
               }}
             />
-          ) : activeSection === 'profile' ? (
+            {activeSection !== 'home' && (
+              <div className="rounded-3xl border border-amber-500/30 bg-slate-950/95 shadow-2xl overflow-hidden">
+                <div className="px-4 py-3 border-b border-amber-500/20 bg-slate-900/90 flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-[10px] uppercase tracking-[0.18em] text-amber-400 font-black">نظام داخل مبنى 3D</p>
+                    <p className="text-sm text-white font-black">{getSection(activeSection).label}</p>
+                  </div>
+                  <button type="button" onClick={() => navigate('home')} className="px-3 py-1.5 rounded-xl bg-amber-500 text-slate-950 text-xs font-black">
+                    العودة للمدينة
+                  </button>
+                </div>
+                <SectionPage
+                  section={getSection(activeSection)}
+                  profile={profile}
+                  country={country}
+                  focus={sectionFocus}
+                  notificationTheme={notificationTheme}
+                  isGuest={Boolean(account.isGuest)}
+                  onNotificationThemeChange={setNotificationTheme}
+                  onHome={() => navigate('home')}
+                  onNavigate={(section) => navigate(section)}
+                  onAction={handleGameResult}
+                  onCommand={handleGameCommand}
+                  onRedeemed={handleRedeemed}
+                  onRefreshProfile={refreshAuthoritativeProfile}
+                  onLinkAccount={() => setLinkingAccount(true)}
+                  onLogout={handleLogout}
+                  onShowGuide={() => setPendingGuide(activeSection)}
+                  onProfileUpdate={(updated) => {
+                    setProfile(updated);
+                    saveGame(updated, account?.id);
+                  }}
+                />
+              </div>
+            )}
+            </div>
+          ) : (
             <ProfilePage
               profile={profile}
               country={country}
@@ -1261,29 +1297,6 @@ export default function App() {
                   saveGame(next, account?.id);
                   return next;
                 });
-              }}
-            />
-          ) : (
-            <SectionPage
-              section={getSection(activeSection)}
-              profile={profile}
-              country={country}
-              focus={sectionFocus}
-              notificationTheme={notificationTheme}
-              isGuest={Boolean(account.isGuest)}
-              onNotificationThemeChange={setNotificationTheme}
-              onHome={() => navigate('home')}
-              onNavigate={(section) => navigate(section)}
-              onAction={handleGameResult}
-              onCommand={handleGameCommand}
-              onRedeemed={handleRedeemed}
-              onRefreshProfile={refreshAuthoritativeProfile}
-              onLinkAccount={() => setLinkingAccount(true)}
-              onLogout={handleLogout}
-              onShowGuide={() => setPendingGuide(activeSection)}
-              onProfileUpdate={(updated) => {
-                setProfile(updated);
-                saveGame(updated, account?.id);
               }}
             />
           )}
