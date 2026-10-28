@@ -12,17 +12,29 @@ jobs:
         with:
           distribution: temurin
           java-version: 21
+      
       - run: npm install --legacy-peer-deps
-      - run: npm install @capacitor/assets --legacy-peer-deps
-      - run: npm install @capacitor/android @capacitor/core @capacitor/cli --legacy-peer-deps
+      - run: npm install @capacitor/android @capacitor/core @capacitor/assets --legacy-peer-deps
       - run: npm run build
-      - run: rm -rf android
-      - run: npx cap add android
-      - run: npx cap copy android
-      - run: cp public/icons/app-icon.png icon.png
-      - run: npx capacitor-assets generate --android --iconBackgroundColor "#0f172a"
-      - run: cd android && chmod +x gradlew && ./gradlew assembleDebug
+
+      # متسمسحش الاندرويد لو موجود، ضيفه بس لو مش موجود
+      - run: |
+          if [ ! -d "android" ]; then
+            npx cap add android
+          fi
+          npx cap copy android
+          npx cap sync android
+
+      # زود رقم الاصدار تلقائيا عشان يرضى يتثبت فوق القديم
+      - run: |
+          sed -i "s/versionCode .*/versionCode ${{ github.run_number }}/" android/app/build.gradle || sed -i "s/versionCode .*/versionCode ${{ github.run_number }}/" android/app/build.gradle.kts
+
+      - run: cp public/icons/app-icon.png icon.png || cp public/icon.png icon.png || echo "icon not found skip"
+      - run: npx capacitor-assets generate --android --iconBackgroundColor '#ffffff' || echo "skip assets"
+
+      - run: cd android && chmod +x gradlew && ./gradlew assembleDebug --no-daemon
+
       - uses: actions/upload-artifact@v4
         with:
-          name: Suly-Business-APK
+          name: Suly-Business-APK-v${{ github.run_number }}
           path: android/app/build/outputs/apk/debug/app-debug.apk
