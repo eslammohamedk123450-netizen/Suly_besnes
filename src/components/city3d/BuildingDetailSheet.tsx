@@ -74,6 +74,11 @@ import {
 } from 'lucide-react';
 import type { SelectedItem } from './CityCanvas';
 
+const RESEARCH_CENTER_LEVEL_IMAGES = Array.from({ length: 8 }, (_, index) => ({
+  level: index + 1,
+  src: `/images/research-center/level-${String(index + 1).padStart(2, '0')}.jpg`,
+}));
+
 interface BuildingDetailSheetProps {
   selectedItem: SelectedItem | null;
   profile: PlayerProfile;
@@ -702,6 +707,41 @@ export const BuildingDetailSheet: React.FC<BuildingDetailSheetProps> = ({
               }`}
             >
               {actionNotice.text}
+            </div>
+          )}
+
+          {landmarkDef.id === 'tech_tree' && (
+            <div className="mb-4 rounded-2xl border border-purple-400/30 bg-purple-950/20 p-3.5">
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs font-black text-purple-200">تطور مركز الأبحاث والتكنولوجيا</p>
+                  <p className="mt-1 text-[11px] text-slate-400">صور المستويات المضافة من مبنى مركز الأبحاث</p>
+                </div>
+                <span className="rounded-lg border border-purple-400/30 bg-purple-400/10 px-2 py-1 text-[10px] font-bold text-purple-200">
+                  المستوى الحالي {Math.min(8, Math.max(1, profile.level ?? 1))}
+                </span>
+              </div>
+              <div className="grid grid-cols-4 gap-2 sm:grid-cols-8">
+                {RESEARCH_CENTER_LEVEL_IMAGES.map(({ level, src }) => {
+                  const isCurrentLevel = level === Math.min(8, Math.max(1, profile.level ?? 1));
+                  return (
+                    <div
+                      key={src}
+                      className={`overflow-hidden rounded-lg border bg-slate-950/80 transition-all ${
+                        isCurrentLevel ? 'border-purple-300 ring-2 ring-purple-400/40' : 'border-slate-700/80'
+                      }`}
+                    >
+                      <img
+                        src={src}
+                        alt={`مركز الأبحاث والتكنولوجيا - المستوى ${level}`}
+                        className="aspect-square w-full object-cover"
+                        loading="lazy"
+                      />
+                      <span className="block py-1 text-center text-[9px] font-bold text-slate-300">م{level}</span>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           )}
 
