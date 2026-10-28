@@ -6,6 +6,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import type { PlayerProfile } from '../../domain/player';
 import {
   resolveCityGrid,
@@ -127,6 +128,7 @@ export const CityCanvas: React.FC<CityCanvasProps> = ({
 
   useEffect(() => {
     if (!mountRef.current) return;
+    let sceneIsActive = true;
     const container = mountRef.current;
     const width = container.clientWidth || window.innerWidth;
     const height = container.clientHeight || 560;
@@ -286,9 +288,46 @@ export const CityCanvas: React.FC<CityCanvasProps> = ({
         case 'bank':
           landmarkMesh = buildBankMesh(palette, isLowPowerDevice);
           break;
-        case 'stock_exchange':
+        case 'stock_exchange': {
           landmarkMesh = buildStockExchangeMesh(palette, isLowPowerDevice);
+          const proceduralFallback = landmarkMesh;
+          new GLTFLoader().load(
+            '/models/stock-exchange-level5.glb',
+            (gltf) => {
+              if (!sceneIsActive) return;
+              const generatedModel = gltf.scene;
+              const originalBounds = new THREE.Box3().setFromObject(generatedModel);
+              const originalSize = originalBounds.getSize(new THREE.Vector3());
+              if (originalSize.x <= 0 || originalSize.y <= 0 || originalSize.z <= 0) return;
+
+              // Fit the level-five building to the city's landmark footprint.
+              const scale = Math.min(15 / originalSize.x, 22 / originalSize.y, 14 / originalSize.z);
+              generatedModel.scale.multiplyScalar(scale);
+              const scaledBounds = new THREE.Box3().setFromObject(generatedModel);
+              const center = scaledBounds.getCenter(new THREE.Vector3());
+              generatedModel.position.set(
+                def.coordinates.x - center.x,
+                -scaledBounds.min.y,
+                def.coordinates.z - center.z
+              );
+              generatedModel.traverse((object) => {
+                if (object instanceof THREE.Mesh) {
+                  object.castShadow = !isLowPowerDevice;
+                  object.receiveShadow = !isLowPowerDevice;
+                }
+              });
+
+              proceduralFallback.visible = false;
+              scene.add(generatedModel);
+              registerClickable(generatedModel, { type: 'landmark', id: def.id });
+            },
+            undefined,
+            () => {
+              // Keep the procedural landmark visible if the optimized GLB is unavailable.
+            }
+          );
           break;
+        }
         case 'audit_tower':
           landmarkMesh = buildAuditTowerMesh(palette, isLowPowerDevice);
           break;
@@ -378,7 +417,11 @@ export const CityCanvas: React.FC<CityCanvasProps> = ({
           accentColor: def.accentColor,
           badgeBgColor: def.badgeBgColor,
         });
-        const actualLabelY = def.id === 'hq' ? getHQHeight(hqLevel) + 3.2 : def.labelHeight;
+        const actualLabelY = def.id === 'hq'
+          ? getHQHeight(hqLevel) + 3.2
+          : def.id === 'stock_exchange'
+            ? 25
+            : def.labelHeight;
         labelSprite.position.set(def.coordinates.x, actualLabelY, def.coordinates.z);
         scene.add(labelSprite);
         registerClickable(labelSprite, { type: 'landmark', id: def.id });
@@ -697,6 +740,7 @@ export const CityCanvas: React.FC<CityCanvasProps> = ({
 
     // Clean unmount
     return () => {
+      sceneIsActive = false;
       cancelAnimationFrame(animationFrameId);
       window.removeEventListener('resize', onResize);
       resizeObserver?.disconnect();
