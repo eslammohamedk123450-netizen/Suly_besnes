@@ -730,6 +730,9 @@ export const CityCanvas: React.FC<CityCanvasProps> = ({
   // Move between districts without changing the fixed camera heading or height.
   useEffect(() => {
     if (!cameraPreset) return;
+    // Clear momentum from the previous swipe before an explicit transition.
+    // Otherwise the camera can continue drifting and land on another building.
+    touchControllerRef.current?.cancelMotion();
     switch (cameraPreset) {
       case 'center':
       case 'hq':
@@ -770,6 +773,7 @@ export const CityCanvas: React.FC<CityCanvasProps> = ({
 
   // Pan to clicked landmark automatically
   useEffect(() => {
+    touchControllerRef.current?.cancelMotion();
     if (selectedItem?.type === 'landmark') {
       const def = ALL_CITY_LANDMARKS.find((l) => l.id === selectedItem.id);
       if (def) {

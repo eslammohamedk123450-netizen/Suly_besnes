@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import type { CountryDefinition } from '../domain/countries';
 import type { PlayerProfile } from '../domain/player';
 import { accountCodeFromSeed } from '../domain/accountFeatures';
@@ -137,6 +137,15 @@ export function ProfilePage({
   const [soundVol, setSoundVol] = useState(() => Math.round(getSoundVolume() * 100));
   const [musicOn, setMusicOn] = useState(() => isMusicPlaying());
   const [musicVol, setMusicVol] = useState(() => Math.round(getMusicVolume() * 100));
+
+  useEffect(() => {
+    if (!showSettingsModal) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setShowSettingsModal(false);
+    };
+    window.addEventListener('keydown', closeOnEscape);
+    return () => window.removeEventListener('keydown', closeOnEscape);
+  }, [showSettingsModal]);
 
   // Delete account form state
   const [typedEmail, setTypedEmail] = useState('');
@@ -884,7 +893,7 @@ export function ProfilePage({
           onClick={() => setShowSettingsModal(false)}
         >
           <div 
-            className="relative bg-slate-900 border border-amber-500/40 rounded-3xl max-w-lg w-full p-5 sm:p-7 text-slate-100 shadow-2xl overflow-hidden"
+            className="relative bg-slate-900 border border-amber-500/40 rounded-3xl max-w-lg w-full max-h-[90dvh] overflow-y-auto p-5 sm:p-7 text-slate-100 shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between pb-4 border-b border-slate-800">
@@ -1163,13 +1172,14 @@ export function ProfilePage({
               </div>
             </div>
 
-            <div className="pt-3 border-t border-slate-800 flex justify-end">
+            <div className="sticky bottom-0 pt-3 border-t border-slate-800 bg-slate-900/95 flex justify-end">
               <button
                 type="button"
                 onClick={() => setShowSettingsModal(false)}
-                className="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs transition cursor-pointer"
+                className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs transition cursor-pointer"
+                aria-label="إغلاق الإعدادات والعودة إلى اللعبة"
               >
-                تم الحفظ والإغلاق ✓
+                إغلاق الإعدادات والعودة إلى اللعبة ✓
               </button>
             </div>
           </div>

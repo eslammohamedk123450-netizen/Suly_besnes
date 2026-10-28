@@ -236,8 +236,15 @@ export class CityTouchController {
   public resetView() {
     focusCityCamera(this.targetPos.current, this.lookAtPos.current, 0, 0);
     this.targetFov.current = CITY_CAMERA_LIMITS.defaultFov;
+    this.cancelMotion();
+  }
+
+  /** Stop previous drag inertia before an explicit building transition. */
+  public cancelMotion() {
     this.velocityX = 0;
     this.velocityZ = 0;
+    this.isPointerDown = false;
+    this.isPinching = false;
   }
 
   public setSpeed(multiplier: number) {
