@@ -36,6 +36,7 @@ import {
   type GameCommandHandler,
 } from '../game/engine';
 import { formatMoney, formatNumber } from '../domain/formatters';
+import { StaffAcademyBuilding } from './StaffAcademyBuilding';
 
 interface StaffManagementViewProps {
   profile: PlayerProfile;
@@ -145,6 +146,7 @@ export const StaffManagementView: React.FC<StaffManagementViewProps> = ({
 
   const hrMember = activeStaff.find((m) => m.role === 'hr');
   const hrDiscountRate = hrMember ? Math.min(0.32, 0.20 + (staffLevel(hrMember) - 1) * 0.03) : 0;
+  const staffBuildingLevel = activeStaff.reduce((highest, member) => Math.max(highest, staffLevel(member)), 1);
 
   return (
     <div className="space-y-5 animate-fade-in text-slate-100" dir="rtl">
@@ -225,6 +227,8 @@ export const StaffManagementView: React.FC<StaffManagementViewProps> = ({
           </div>
         </div>
       </div>
+
+      <StaffAcademyBuilding level={staffBuildingLevel} activeStaffCount={activeStaff.length} />
 
       {/* 2. Automation Directives Panel (Executive Suite Control) */}
       <div className="rounded-3xl bg-slate-900 border border-slate-800 p-5 sm:p-6 shadow-xl relative overflow-hidden">
