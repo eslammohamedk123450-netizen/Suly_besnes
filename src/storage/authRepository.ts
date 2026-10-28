@@ -52,7 +52,11 @@ export function createGuestAccount(): LocalAccount {
 
 export async function loadCurrentAccount(): Promise<LocalAccount | null> {
   try {
-    const { data } = await supabase.auth.getSession();
+    const sessionRequest = supabase.auth.getSession();
+    const timeout = new Promise<never>((_, reject) => {
+      window.setTimeout(() => reject(new Error('auth_session_timeout')), 4500);
+    });
+    const { data } = await Promise.race([sessionRequest, timeout]);
     if (data.session?.user) return toAccount(data.session.user);
   } catch {
     // A local guest account remains usable when the authentication service is offline.
@@ -253,4 +257,3 @@ export async function deleteCurrentAccount(options?: DeleteAccountOptions): Prom
     return { ok: false, message: `تعذر حذف الحساب: ${msg}` };
   }
 }
-
