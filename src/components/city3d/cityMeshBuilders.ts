@@ -1798,8 +1798,13 @@ export function buildStockExchangeMesh(palette: CityMaterialPalette, isSoftwareG
 /**
  * 14. Tech Tree R&D Innovation Bio-Cyber Dome (مركز الأبحاث والتكنولوجيا)
  */
-export function buildTechTreeMesh(palette: CityMaterialPalette, isSoftwareGl: boolean): THREE.Group {
+export function buildTechTreeMesh(
+  palette: CityMaterialPalette,
+  isSoftwareGl: boolean,
+  level = 1
+): THREE.Group {
   const group = new THREE.Group();
+  const visualLevel = Math.max(1, Math.min(8, Math.round(level)));
 
   // Tech Base Platform
   const baseSlab = new THREE.Mesh(new THREE.CylinderGeometry(6.5, 7, 0.4, 24), palette.slateStructure);
@@ -1812,22 +1817,52 @@ export function buildTechTreeMesh(palette: CityMaterialPalette, isSoftwareGl: bo
   dataRing.position.y = 0.22;
   group.add(dataRing);
 
+  // Each research level adds another illuminated orbital ring to the campus.
+  for (let ringLevel = 2; ringLevel <= visualLevel; ringLevel += 1) {
+    const orbitalRing = new THREE.Mesh(
+      new THREE.RingGeometry(7.1 + ringLevel * 0.3, 7.16 + ringLevel * 0.3, 32),
+      ringLevel % 2 === 0 ? palette.neonPurple : palette.neonCyan
+    );
+    orbitalRing.rotation.x = -Math.PI / 2;
+    orbitalRing.position.y = 0.24 + ringLevel * 0.015;
+    group.add(orbitalRing);
+  }
+
   // Main Geodesic Glass Research Dome
-  const dome = new THREE.Mesh(new THREE.SphereGeometry(4.8, 20, 16, 0, Math.PI * 2, 0, Math.PI / 2), palette.curtainGlass);
+  const dome = new THREE.Mesh(
+    new THREE.SphereGeometry(4.35 + visualLevel * 0.12, 20, 16, 0, Math.PI * 2, 0, Math.PI / 2),
+    palette.curtainGlass
+  );
   dome.position.y = 0.4;
   dome.castShadow = !isSoftwareGl;
   group.add(dome);
 
+  // Glass greenhouse ribs make the upgrade silhouette visibly richer.
+  for (let rib = 0; rib < Math.min(8, 3 + visualLevel); rib += 1) {
+    const ribRing = new THREE.Mesh(
+      new THREE.TorusGeometry(4.42 + visualLevel * 0.12, 0.045, 6, 24),
+      palette.industrialSteel
+    );
+    ribRing.rotation.x = Math.PI / 2;
+    ribRing.rotation.y = (rib * Math.PI) / Math.min(8, 3 + visualLevel);
+    ribRing.position.y = 0.45 + rib * 0.05;
+    group.add(ribRing);
+  }
+
   // Central Quantum Supercomputing Core Cylinder inside Dome
-  const quantumCore = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.2, 5.2, 16), palette.neonPurple);
-  quantumCore.position.y = 2.8;
+  const quantumCore = new THREE.Mesh(
+    new THREE.CylinderGeometry(1.05 + visualLevel * 0.04, 1.2 + visualLevel * 0.05, 4.2 + visualLevel * 0.35, 16),
+    palette.neonPurple
+  );
+  quantumCore.position.y = 2.3 + visualLevel * 0.2;
   group.add(quantumCore);
 
   // Outer Cantilevered Research Pods
-  for (let p = 0; p < 3; p++) {
-    const angle = (p * Math.PI * 2) / 3;
-    const px = Math.cos(angle) * 4.6;
-    const pz = Math.sin(angle) * 4.6;
+  const podCount = Math.min(8, 2 + visualLevel);
+  for (let p = 0; p < podCount; p++) {
+    const angle = (p * Math.PI * 2) / podCount;
+    const px = Math.cos(angle) * (4.4 + visualLevel * 0.08);
+    const pz = Math.sin(angle) * (4.4 + visualLevel * 0.08);
 
     const pod = new THREE.Mesh(new THREE.BoxGeometry(1.8, 1.4, 2.2), palette.whiteMarble);
     pod.position.set(px, 1.1, pz);
@@ -2199,45 +2234,93 @@ export function buildMegaprojectsMinistryMesh(palette: CityMaterialPalette, isSo
 /**
  * 18. Territory Conquest & Regional Dominion Citadel (قلعة النفوذ والسيطرة)
  */
-export function buildTerritoryCitadelMesh(palette: CityMaterialPalette, isSoftwareGl: boolean): THREE.Group {
+export function buildTerritoryCitadelMesh(
+  palette: CityMaterialPalette,
+  isSoftwareGl: boolean,
+  level = 1
+): THREE.Group {
   const group = new THREE.Group();
+  const visualLevel = Math.max(1, Math.min(5, Math.round(level)));
 
   // Pentagonal Armored Fortress Base
-  const baseFort = new THREE.Mesh(new THREE.CylinderGeometry(5.8, 6.6, 3.2, 5), palette.navyStructure);
-  baseFort.position.y = 1.6;
+  const baseFort = new THREE.Mesh(
+    new THREE.CylinderGeometry(5.4 + visualLevel * 0.2, 6.1 + visualLevel * 0.25, 2.4 + visualLevel * 0.35, 5),
+    palette.navyStructure
+  );
+  baseFort.position.y = 1.2 + visualLevel * 0.18;
   baseFort.castShadow = !isSoftwareGl;
   group.add(baseFort);
 
+  // Higher levels add a glowing defensive moat around the citadel.
+  if (visualLevel >= 2) {
+    const moat = new THREE.Mesh(
+      new THREE.RingGeometry(6.35 + visualLevel * 0.2, 7.05 + visualLevel * 0.25, 5),
+      palette.neonCyan
+    );
+    moat.rotation.x = -Math.PI / 2;
+    moat.position.y = 0.18;
+    group.add(moat);
+  }
+
   // Fortified Upper Ramparts
-  const ramparts = new THREE.Mesh(new THREE.CylinderGeometry(4.4, 4.8, 2.4, 5), palette.slateStructure);
-  ramparts.position.y = 4.2;
+  const ramparts = new THREE.Mesh(
+    new THREE.CylinderGeometry(4.1 + visualLevel * 0.15, 4.5 + visualLevel * 0.18, 1.8 + visualLevel * 0.25, 5),
+    palette.slateStructure
+  );
+  ramparts.position.y = 3.3 + visualLevel * 0.55;
   group.add(ramparts);
 
-  // Corner Defense Turret Towers
-  for (let t = 0; t < 5; t++) {
-    const angle = (t * Math.PI * 2) / 5;
-    const tx = Math.cos(angle) * 5.2;
-    const tz = Math.sin(angle) * 5.2;
+  if (visualLevel >= 3) {
+    const innerWall = new THREE.Mesh(
+      new THREE.TorusGeometry(4.65 + visualLevel * 0.15, 0.22, 6, 5),
+      palette.imperialGold
+    );
+    innerWall.rotation.x = Math.PI / 2;
+    innerWall.position.y = 4.25 + visualLevel * 0.45;
+    group.add(innerWall);
+  }
 
-    const turret = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 0.9, 4.8, 8), palette.navyStructure);
-    turret.position.set(tx, 2.4, tz);
+  // Corner Defense Turret Towers
+  const turretCount = Math.min(9, 4 + visualLevel);
+  for (let t = 0; t < turretCount; t++) {
+    const angle = (t * Math.PI * 2) / turretCount;
+    const tx = Math.cos(angle) * (4.9 + visualLevel * 0.25);
+    const tz = Math.sin(angle) * (4.9 + visualLevel * 0.25);
+
+    const turret = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.72 + visualLevel * 0.04, 0.84 + visualLevel * 0.05, 3.8 + visualLevel * 0.55, 8),
+      palette.navyStructure
+    );
+    turret.position.set(tx, 1.9 + visualLevel * 0.35, tz);
     group.add(turret);
 
-    const turretCap = new THREE.Mesh(new THREE.ConeGeometry(0.95, 1.1, 8), palette.imperialGold);
-    turretCap.position.set(tx, 5.3, tz);
+    const turretCap = new THREE.Mesh(new THREE.ConeGeometry(0.88 + visualLevel * 0.06, 1.0 + visualLevel * 0.12, 8), palette.imperialGold);
+    turretCap.position.set(tx, 4.55 + visualLevel * 0.72, tz);
     group.add(turretCap);
   }
 
   // Central Radar Radome Dome
-  const radome = new THREE.Mesh(new THREE.SphereGeometry(1.6, 14, 14), palette.whiteMarble);
-  radome.position.set(0, 6.5, 0);
+  const radome = new THREE.Mesh(new THREE.SphereGeometry(1.25 + visualLevel * 0.15, 14, 14), palette.whiteMarble);
+  radome.position.set(0, 5.5 + visualLevel * 0.85, 0);
   group.add(radome);
 
   // Holographic Wireframe Globe Ring
-  const holoGlobe = new THREE.Mesh(new THREE.RingGeometry(2.4, 2.7, 24), palette.neonGold);
+  const holoGlobe = new THREE.Mesh(new THREE.RingGeometry(2.0 + visualLevel * 0.18, 2.25 + visualLevel * 0.18, 24), palette.neonGold);
   holoGlobe.rotation.x = Math.PI / 4;
-  holoGlobe.position.set(0, 7.5, 0);
+  holoGlobe.position.set(0, 6.35 + visualLevel * 0.85, 0);
   group.add(holoGlobe);
+
+  if (visualLevel >= 4) {
+    const commandSpire = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.18, 0.3, 3.2 + visualLevel * 0.4, 8),
+      palette.imperialGold
+    );
+    commandSpire.position.y = 8.0 + visualLevel * 0.55;
+    group.add(commandSpire);
+    const commandBeacon = new THREE.Mesh(new THREE.SphereGeometry(0.38, 10, 10), palette.neonGold);
+    commandBeacon.position.y = 9.8 + visualLevel * 0.55;
+    group.add(commandBeacon);
+  }
 
   return group;
 }

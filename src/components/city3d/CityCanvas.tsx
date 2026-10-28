@@ -296,7 +296,7 @@ export const CityCanvas: React.FC<CityCanvasProps> = ({
           landmarkMesh = buildHRAcademyMesh(palette, isLowPowerDevice);
           break;
         case 'tech_tree':
-          landmarkMesh = buildTechTreeMesh(palette, isLowPowerDevice);
+          landmarkMesh = buildTechTreeMesh(palette, isLowPowerDevice, profile.level ?? 1);
           break;
         case 'incubator':
           landmarkMesh = buildStartupIncubatorMesh(palette, isLowPowerDevice);
@@ -314,7 +314,7 @@ export const CityCanvas: React.FC<CityCanvasProps> = ({
           landmarkMesh = buildMegaprojectsMinistryMesh(palette, isLowPowerDevice);
           break;
         case 'territory':
-          landmarkMesh = buildTerritoryCitadelMesh(palette, isLowPowerDevice);
+          landmarkMesh = buildTerritoryCitadelMesh(palette, isLowPowerDevice, profile.level ?? 1);
           break;
         case 'cartel':
           landmarkMesh = buildCartelBastionMesh(palette, isLowPowerDevice);
