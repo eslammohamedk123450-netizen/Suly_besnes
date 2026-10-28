@@ -1,26 +1,33 @@
-const CACHE_NAME = 'business-empire-shell-v3';
-const APP_SHELL = ['/', '/manifest.webmanifest', '/icons/app-icon.svg', '/images/cairo-skyline-lite.webp'];
+const CACHE_NAME = 'business-empire-shell-v4';
+const BASE_URL = new URL('./', self.registration.scope).pathname;
+const APP_SHELL = [BASE_URL, `${BASE_URL}manifest.webmanifest`, `${BASE_URL}icons/app-icon.svg`, `${BASE_URL}images/cairo-skyline-lite.webp`];
 
 self.addEventListener('install', (event) => {
   event.waitUntil((async () => {
     const cache = await caches.open(CACHE_NAME);
     for (const path of APP_SHELL) {
-      const response = await fetch(path, { cache: 'reload' });
-      if (response.ok) await cache.put(path, response);
-    }
-
-    const html = await (await cache.match('/')).text();
-    const assetPaths = [...html.matchAll(/(?:src|href)="([^\"]+\.(?:js|css)(?:\?[^\"]*)?)"/g)]
-      .map((match) => match[1])
-      .filter((path) => path.startsWith('/'));
-    await Promise.all(assetPaths.map(async (path) => {
       try {
         const response = await fetch(path, { cache: 'reload' });
         if (response.ok) await cache.put(path, response);
       } catch {
-        // A failed optional asset fetch should not block installation.
+        // Optional shell assets must not prevent the application from opening.
       }
-    }));
+    }
+    const shell = await cache.match(BASE_URL);
+    if (shell) {
+      const html = await shell.text();
+      const assetPaths = [...html.matchAll(/(?:src|href)="([^\"]+\.(?:js|css)(?:\?[^\"]*)?)"/g)]
+        .map((match) => match[1])
+        .filter((path) => path.startsWith(BASE_URL));
+      await Promise.all(assetPaths.map(async (path) => {
+        try {
+          const response = await fetch(path, { cache: 'reload' });
+          if (response.ok) await cache.put(path, response);
+        } catch {
+          // A failed optional asset fetch should not block installation.
+        }
+      }));
+    }
     await self.skipWaiting();
   })());
 });
@@ -44,11 +51,11 @@ self.addEventListener('fetch', (event) => {
         .then((response) => {
           if (response.ok) {
             const copy = response.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put('/', copy));
+            caches.open(CACHE_NAME).then((cache) => cache.put(BASE_URL, copy));
           }
           return response;
         })
-        .catch(async () => (await caches.match('/')) ?? Response.error()),
+        .catch(async () => (await caches.match(BASE_URL)) ?? Response.error()),
     );
     return;
   }

@@ -1,39 +1,20 @@
 {
-  "id": "/",
+  "id": "./",
   "name": "إمبراطورية الأعمال سولي بيزنس | Suly Business Empire",
   "short_name": "سولي بيزنس",
   "description": "إمبراطورية الأعمال سولي بيزنس: محاكاة اقتصادية عربية شاملة للهواتف تعمل أوفلاين مع أرباح الغياب، صدمات البنك المركزي، وتوسع الشركات والإنتاج.",
   "lang": "ar",
   "dir": "rtl",
-  "start_url": "/",
-  "scope": "/",
+  "start_url": "./",
+  "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#07192a",
   "theme_color": "#07192a",
-  "categories": [
-    "games",
-    "simulation",
-    "finance"
-  ],
+  "categories": ["games", "simulation", "finance"],
   "icons": [
-    {
-      "src": "/icons/app-icon.png",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "/icons/app-icon.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "/icons/app-icon.svg",
-      "sizes": "any",
-      "type": "image/svg+xml",
-      "purpose": "any"
-    }
+    { "src": "./icons/app-icon.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "./icons/app-icon.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" },
+    { "src": "./icons/app-icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
   ]
 }

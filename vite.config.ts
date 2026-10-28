@@ -5,7 +5,9 @@ import {defineConfig, loadEnv} from 'vite';
 
 export default defineConfig(({mode}) => {
   const env = loadEnv(mode, process.cwd(), '');
+  const base = process.env.GITHUB_ACTIONS === 'true' ? '/Suly_besnes/' : '/';
   return {
+    base,
     plugins: [react(), tailwindcss()],
     resolve: {
       alias: {
