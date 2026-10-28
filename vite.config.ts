@@ -1,9 +1,10 @@
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
-import {defineConfig} from 'vite';
+import {defineConfig, loadEnv} from 'vite';
 
-export default defineConfig(() => {
+export default defineConfig(({mode}) => {
+  const env = loadEnv(mode, process.cwd(), '');
   return {
     plugins: [react(), tailwindcss()],
     resolve: {
@@ -20,6 +21,18 @@ export default defineConfig(() => {
       hmr: process.env.DISABLE_HMR !== 'true',
       // Disable file watching when DISABLE_HMR is true to save CPU during agent edits.
       watch: process.env.DISABLE_HMR === 'true' ? null : {},
+      // Keep the Ollama secret on the dev server and avoid browser CORS.
+      proxy: {
+        '/api/ollama': {
+          target: env.OLLAMA_API_BASE || 'https://ollama.com',
+          changeOrigin: true,
+          secure: true,
+          rewrite: (requestPath) => requestPath.replace(/^\/api\/ollama/, '/api'),
+          headers: env.OLLAMA_API_KEY
+            ? { Authorization: `Bearer ${env.OLLAMA_API_KEY}` }
+            : undefined,
+        },
+      },
     },
   };
 });

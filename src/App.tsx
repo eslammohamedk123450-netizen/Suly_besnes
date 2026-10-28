@@ -3,6 +3,11 @@ import { Capacitor } from '@capacitor/core';
 import { App as CapApp } from '@capacitor/app';
 import GameApp from './GameApp';
 import { Sparkles, X } from 'lucide-react';
+import AiDevConsole from './components/AiDevConsole.jsx';
+
+const projectFiles = Object.keys(import.meta.glob('./**/*', { eager: false }))
+  .map((file) => `src/${file.replace(/^\.\//, '')}`)
+  .filter((file) => !file.includes('/node_modules/'));
 
 export default function App() {
   const [isGuideOpen, setIsGuideOpen] = useState(false);
@@ -79,6 +84,8 @@ export default function App() {
           </div>
         </div>
       )}
+
+      <AiDevConsole projectFiles={projectFiles} />
     </div>
   );
 }
