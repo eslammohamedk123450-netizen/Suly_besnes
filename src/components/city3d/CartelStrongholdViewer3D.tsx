@@ -77,7 +77,9 @@ export const CartelStrongholdViewer3D: React.FC<CartelStrongholdViewer3DProps> =
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.15;
-    container.innerHTML = '';
+    while (container.firstChild) {
+      container.removeChild(container.firstChild);
+    }
     container.appendChild(renderer.domElement);
 
     // Lights
@@ -381,10 +383,12 @@ export const CartelStrongholdViewer3D: React.FC<CartelStrongholdViewer3DProps> =
 
       {/* 3D WebGL Canvas Area */}
       <div
-        ref={mountRef}
         style={{ height }}
-        className="w-full relative cursor-grab active:cursor-grabbing bg-slate-950"
+        className="w-full relative cursor-grab active:cursor-grabbing bg-slate-950 overflow-hidden"
       >
+        {/* Dedicated 3D Canvas Mount Point without React children */}
+        <div ref={mountRef} className="absolute inset-0 w-full h-full" />
+
         {/* Floating Zoom & Interaction Badge */}
         <div className="absolute bottom-3 left-3 z-10 flex flex-col gap-1.5 bg-slate-900/80 p-1.5 rounded-xl border border-slate-800 backdrop-blur-md">
           <button

@@ -177,6 +177,9 @@ export const CityCanvas: React.FC<CityCanvasProps> = ({
     renderer.toneMappingExposure = 1.15;
     renderer.shadowMap.enabled = !isLowPowerDevice;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    while (container.firstChild) {
+      container.removeChild(container.firstChild);
+    }
     container.appendChild(renderer.domElement);
 
     // 4. Procedural Studio Environment
@@ -775,7 +778,7 @@ export const CityCanvas: React.FC<CityCanvasProps> = ({
       smokeMat.dispose();
       selectionHaloGeo.dispose();
 
-      if (renderer.domElement && renderer.domElement.parentNode) {
+      if (renderer.domElement && renderer.domElement.parentNode && renderer.domElement.parentNode.contains(renderer.domElement)) {
         renderer.domElement.parentNode.removeChild(renderer.domElement);
       }
     };
