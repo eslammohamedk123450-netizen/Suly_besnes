@@ -154,9 +154,9 @@ export const CityCanvas: React.FC<CityCanvasProps> = ({
 
     // 1. Scene setup with expanded atmospheric horizon fog
     const scene = new THREE.Scene();
-    const fogColor = isNightMode ? '#0b1630' : '#64748b';
+    const fogColor = isNightMode ? '#0b1630' : '#bae6fd';
     scene.background = getOrCreateSkyTexture(isNightMode);
-    scene.fog = new THREE.FogExp2(fogColor, isNightMode ? 0.003 : 0.0026);
+    scene.fog = new THREE.FogExp2(fogColor, isNightMode ? 0.003 : 0.0016);
 
     // 2. Camera with expanded view frustum for enlarged city
     const camera = new THREE.PerspectiveCamera(cameraTargetFov.current, width / height, 0.5, 600);
@@ -174,7 +174,7 @@ export const CityCanvas: React.FC<CityCanvasProps> = ({
     renderer.setPixelRatio(devicePixelRatio);
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.15;
+    renderer.toneMappingExposure = 1.2;
     renderer.shadowMap.enabled = !isLowPowerDevice;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     container.appendChild(renderer.domElement);
@@ -186,13 +186,13 @@ export const CityCanvas: React.FC<CityCanvasProps> = ({
 
     // 5. Lighting Rig (Warm Key, Cool Sky Fill, Rim Lighting)
     const hemiLight = new THREE.HemisphereLight(
-      isNightMode ? '#38bdf8' : '#e0f2fe',
-      isNightMode ? '#090d18' : '#1e293b',
-      isNightMode ? 0.8 : 1.2
+      isNightMode ? '#38bdf8' : '#ffffff',
+      isNightMode ? '#090d18' : '#86efac',
+      isNightMode ? 0.85 : 1.35
     );
     scene.add(hemiLight);
 
-    const dirLight = new THREE.DirectionalLight('#fef08a', isNightMode ? 1.6 : 2.4);
+    const dirLight = new THREE.DirectionalLight('#fffbeb', isNightMode ? 1.6 : 2.6);
     dirLight.position.set(50, 80, 50);
     dirLight.castShadow = !isLowPowerDevice;
     dirLight.shadow.mapSize.width = isLowPowerDevice ? 512 : 1024;

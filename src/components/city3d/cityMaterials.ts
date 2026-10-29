@@ -17,6 +17,10 @@ let officeWindowTextures: { day: THREE.CanvasTexture | null; night: THREE.Canvas
 };
 let paverTexture: THREE.CanvasTexture | null = null;
 let containerTexture: THREE.CanvasTexture | null = null;
+let groundTextures: { day: THREE.CanvasTexture | null; night: THREE.CanvasTexture | null } = {
+  day: null,
+  night: null,
+};
 let skyTextures: { day: THREE.CanvasTexture | null; night: THREE.CanvasTexture | null } = {
   day: null,
   night: null,
@@ -25,6 +29,83 @@ let skyTextures: { day: THREE.CanvasTexture | null; night: THREE.CanvasTexture |
 /**
  * Creates procedural high-rise office window facade texture with illuminated offices
  */
+/**
+ * Creates high-detail procedural turf / parkland terrain texture
+ * Gives the entire tycoon city a vibrant, lush, inviting foundation
+ */
+export function getOrCreateGroundTexture(isNightMode = false): THREE.Texture {
+  const mode = isNightMode ? 'night' : 'day';
+  if (groundTextures[mode]) return groundTextures[mode]!;
+
+  if (typeof document === 'undefined') {
+    const data = isNightMode ? new Uint8Array([7, 21, 33, 255]) : new Uint8Array([34, 197, 94, 255]);
+    const tex = new THREE.DataTexture(data, 1, 1);
+    tex.needsUpdate = true;
+    return tex;
+  }
+
+  const canvas = document.createElement('canvas');
+  canvas.width = 512;
+  canvas.height = 512;
+  const ctx = canvas.getContext('2d');
+  if (ctx) {
+    if (isNightMode) {
+      ctx.fillStyle = '#071521';
+      ctx.fillRect(0, 0, 512, 512);
+      ctx.strokeStyle = '#0e2438';
+      ctx.lineWidth = 2;
+      for (let x = 0; x < 512; x += 64) {
+        for (let y = 0; y < 512; y += 64) {
+          ctx.strokeRect(x, y, 64, 64);
+        }
+      }
+    } else {
+      // Vibrant, cheerful tycoon lawn parkland with alternating mowed grass bands
+      ctx.fillStyle = '#22c55e'; // Vibrant fresh grass
+      ctx.fillRect(0, 0, 512, 512);
+
+      // Alternating lawn stripes (classic stadium/park manicured look)
+      ctx.fillStyle = '#16a34a';
+      for (let y = 0; y < 512; y += 64) {
+        ctx.fillRect(0, y, 512, 32);
+      }
+
+      // Subtle fine grass stipples for depth
+      for (let i = 0; i < 1500; i++) {
+        const x = Math.floor(Math.random() * 512);
+        const y = Math.floor(Math.random() * 512);
+        const isLight = Math.random() > 0.5;
+        ctx.fillStyle = isLight ? 'rgba(134, 239, 172, 0.45)' : 'rgba(21, 128, 61, 0.35)';
+        ctx.fillRect(x, y, 2, 2);
+      }
+
+      // Very soft grid border to give player sense of city scale
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+      ctx.lineWidth = 1;
+      for (let x = 0; x < 512; x += 64) {
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, 512);
+        ctx.stroke();
+      }
+      for (let y = 0; y < 512; y += 64) {
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(512, y);
+        ctx.stroke();
+      }
+    }
+  }
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.RepeatWrapping;
+  texture.repeat.set(24, 24);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  groundTextures[mode] = texture;
+  return texture;
+}
+
 export function getOrCreateOfficeWindowTexture(isNightMode = true): THREE.Texture {
   const mode = isNightMode ? 'night' : 'day';
   if (officeWindowTextures[mode]) return officeWindowTextures[mode]!;
@@ -123,28 +204,50 @@ export function getOrCreateSkyTexture(isNightMode = true): THREE.Texture {
       gradient.addColorStop(0.76, '#172554');
       gradient.addColorStop(1, '#0f172a');
     } else {
-      gradient.addColorStop(0, '#7dd3fc');
-      gradient.addColorStop(0.52, '#bae6fd');
-      gradient.addColorStop(0.78, '#dbeafe');
-      gradient.addColorStop(1, '#64748b');
+      // Radiant, sunny Mediterranean sky:
+      // Vibrant Azure -> Cerulean Blue -> Soft Sunny Blue -> Golden Horizon Glow
+      gradient.addColorStop(0, '#0284c7');     // Rich deep azure zenith
+      gradient.addColorStop(0.35, '#38bdf8');  // Cheerful sky blue
+      gradient.addColorStop(0.68, '#7dd3fc');  // Soft sunny blue
+      gradient.addColorStop(0.88, '#bae6fd');  // Bright horizon glow
+      gradient.addColorStop(1.0, '#f0f9ff');   // Luminous warm horizon light (Zero grey!)
     }
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     if (isNightMode) {
       const stars = [
-        [0.12, 0.18], [0.24, 0.31], [0.38, 0.14], [0.51, 0.25],
-        [0.67, 0.12], [0.78, 0.29], [0.9, 0.17], [0.58, 0.38],
+        [0.08, 0.12], [0.12, 0.18], [0.19, 0.08], [0.24, 0.31], [0.31, 0.22],
+        [0.38, 0.14], [0.45, 0.28], [0.51, 0.25], [0.58, 0.38], [0.63, 0.19],
+        [0.67, 0.12], [0.72, 0.33], [0.78, 0.29], [0.85, 0.11], [0.9, 0.17],
       ];
-      ctx.fillStyle = 'rgba(255, 248, 210, 0.75)';
+      ctx.fillStyle = 'rgba(255, 248, 210, 0.85)';
       stars.forEach(([x, y], index) => {
         ctx.beginPath();
-        ctx.arc(x * canvas.width, y * canvas.height, index % 3 === 0 ? 2 : 1, 0, Math.PI * 2);
+        ctx.arc(x * canvas.width, y * canvas.height, index % 4 === 0 ? 2.5 : 1.5, 0, Math.PI * 2);
         ctx.fill();
       });
     } else {
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.28)';
-      ctx.fillRect(0, canvas.height * 0.62, canvas.width, canvas.height * 0.12);
+      // Cheerful fluffy clouds across the upper horizon
+      const clouds = [
+        [0.08, 0.40, 70, 22], [0.12, 0.38, 55, 25],
+        [0.28, 0.45, 90, 26], [0.33, 0.42, 65, 28],
+        [0.55, 0.38, 110, 30], [0.60, 0.35, 75, 28],
+        [0.78, 0.44, 85, 24], [0.82, 0.42, 60, 22],
+        [0.94, 0.41, 70, 20],
+      ];
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.65)';
+      clouds.forEach(([cx, cy, rx, ry]) => {
+        ctx.beginPath();
+        ctx.ellipse(cx * canvas.width, cy * canvas.height, rx, ry, 0, 0, Math.PI * 2);
+        ctx.fill();
+      });
+      // Soft bright haze layer near the bottom
+      const haze = ctx.createLinearGradient(0, canvas.height * 0.75, 0, canvas.height);
+      haze.addColorStop(0, 'rgba(255, 255, 255, 0)');
+      haze.addColorStop(1, 'rgba(255, 255, 255, 0.45)');
+      ctx.fillStyle = haze;
+      ctx.fillRect(0, canvas.height * 0.75, canvas.width, canvas.height * 0.25);
     }
   }
 
@@ -173,19 +276,20 @@ export function getOrCreatePaverTexture(): THREE.Texture {
   canvas.height = 128;
   const ctx = canvas.getContext('2d');
   if (ctx) {
-    ctx.fillStyle = '#334155';
+    // Warm limestone travertine paver stones
+    ctx.fillStyle = '#f8fafc';
     ctx.fillRect(0, 0, 128, 128);
 
     const tileSize = 16;
-    ctx.strokeStyle = '#1e293b';
-    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = '#cbd5e1';
+    ctx.lineWidth = 1.2;
 
     for (let x = 0; x <= 128; x += tileSize) {
       for (let y = 0; y <= 128; y += tileSize) {
         ctx.strokeRect(x, y, tileSize, tileSize);
-        // Subtle color variance between stones
-        const variance = Math.floor((Math.sin(x * 12 + y * 7) + 1) * 12);
-        ctx.fillStyle = `rgba(255, 255, 255, ${0.03 + variance * 0.005})`;
+        // Subtle warm sun-baked limestone tint variance
+        const variance = Math.floor((Math.sin(x * 12 + y * 7) + 1) * 10);
+        ctx.fillStyle = `rgba(254, 243, 199, ${0.15 + variance * 0.015})`;
         ctx.fillRect(x + 1, y + 1, tileSize - 2, tileSize - 2);
       }
     }
@@ -468,31 +572,32 @@ export function createCityMaterialPalette(
 
   return {
     ground: new THREE.MeshStandardMaterial({
-      color: isNightMode ? '#080d1a' : '#273449',
-      roughness: 0.88,
-      metalness: 0.08,
+      map: getOrCreateGroundTexture(isNightMode),
+      color: isNightMode ? '#071521' : '#ffffff',
+      roughness: 0.85,
+      metalness: 0.04,
     }),
     asphalt: new THREE.MeshStandardMaterial({
       map: asphaltTex,
-      color: isNightMode ? '#121a2b' : '#263449',
-      roughness: 0.74,
-      metalness: 0.22,
+      color: isNightMode ? '#0f172a' : '#1e293b',
+      roughness: 0.72,
+      metalness: 0.16,
     }),
     sidewalk: new THREE.MeshStandardMaterial({
-      color: isNightMode ? '#202b3f' : '#64748b',
-      roughness: 0.68,
-      metalness: 0.18,
+      color: isNightMode ? '#1e293b' : '#f1f5f9',
+      roughness: 0.58,
+      metalness: 0.1,
     }),
     plazaPaver: new THREE.MeshStandardMaterial({
       map: paverTex,
-      color: isNightMode ? '#283449' : '#94a3b8',
-      roughness: 0.58,
-      metalness: 0.24,
+      color: isNightMode ? '#1e293b' : '#ffffff',
+      roughness: 0.55,
+      metalness: 0.12,
     }),
     curbGold: new THREE.MeshStandardMaterial({
-      color: '#a8792b',
-      roughness: 0.3,
-      metalness: 0.9,
+      color: '#f59e0b',
+      roughness: 0.25,
+      metalness: 0.88,
     }),
     roadLine: new THREE.MeshBasicMaterial({
       color: '#f59e0b',
@@ -503,13 +608,13 @@ export function createCityMaterialPalette(
 
     // Luxury Empire theme
     imperialGold: new THREE.MeshStandardMaterial({
-      color: '#c89b45',
+      color: '#f59e0b',
       roughness: 0.22,
       metalness: 0.92,
     }),
     brushedGold: new THREE.MeshStandardMaterial({
-      color: '#9d6f24',
-      roughness: 0.34,
+      color: '#d97706',
+      roughness: 0.32,
       metalness: 0.86,
     }),
     navyStructure: new THREE.MeshStandardMaterial({
@@ -545,8 +650,8 @@ export function createCityMaterialPalette(
       metalness: 0.75,
     }),
     facadeConcrete: new THREE.MeshStandardMaterial({
-      color: isNightMode ? '#334155' : '#64748b',
-      roughness: 0.85,
+      color: isNightMode ? '#334155' : '#e2e8f0',
+      roughness: 0.75,
       metalness: 0.1,
     }),
     chromeMetal: new THREE.MeshStandardMaterial({
@@ -577,13 +682,13 @@ export function createCityMaterialPalette(
       emissiveIntensity: isNightMode ? 0.9 : 0.45,
     }),
     waterSurface: new THREE.MeshStandardMaterial({
-      color: '#0284c7',
-      emissive: new THREE.Color('#0369a1'),
-      emissiveIntensity: isNightMode ? 0.4 : 0.1,
-      roughness: 0.1,
-      metalness: 0.8,
+      color: '#06b6d4',
+      emissive: new THREE.Color('#0284c7'),
+      emissiveIntensity: isNightMode ? 0.35 : 0.08,
+      roughness: 0.08,
+      metalness: 0.6,
       transparent: true,
-      opacity: 0.85,
+      opacity: 0.88,
     }),
 
     // Materials for industries
@@ -758,17 +863,17 @@ export function createCityMaterialPalette(
     carTaillight: new THREE.MeshBasicMaterial({ color: '#ef4444' }),
     amberIndicator: new THREE.MeshBasicMaterial({ color: '#f59e0b' }),
     foliageGreen: new THREE.MeshStandardMaterial({
-      color: '#15803d',
-      roughness: 0.7,
-      metalness: 0.1,
+      color: '#22c55e',
+      roughness: 0.65,
+      metalness: 0.05,
     }),
     foliageDarkGreen: new THREE.MeshStandardMaterial({
-      color: '#166534',
-      roughness: 0.7,
-      metalness: 0.1,
+      color: '#16a34a',
+      roughness: 0.65,
+      metalness: 0.05,
     }),
     grassLawn: new THREE.MeshStandardMaterial({
-      color: '#15803d',
+      color: '#22c55e',
       roughness: 0.85,
       metalness: 0.05,
     }),
