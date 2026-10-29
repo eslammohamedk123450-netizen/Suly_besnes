@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import type { CountryDefinition } from '../domain/countries';
 import type { PlayerProfile } from '../domain/player';
 import { accountCodeFromSeed } from '../domain/accountFeatures';
-import { formatGold, formatMoney, formatNumber } from '../domain/formatters';
+import { formatGold, formatMoney, formatNumber, formatCompactMoney, formatCompactGold, formatCompactNumber } from '../domain/formatters';
 import { getPlayerProgress } from '../game/onboarding';
 import { selectEmpirePulse } from '../game/selectors';
 import { deleteCurrentAccount } from '../storage/authRepository';
@@ -713,8 +713,8 @@ export function ProfilePage({
             <Coins className="w-3.5 h-3.5 text-emerald-400" />
             السيولة النقدية
           </span>
-          <strong className="text-sm sm:text-base font-black text-emerald-400 font-mono">
-            {formatMoney(profile.bankBalance, country)}
+          <strong className="text-sm sm:text-base font-black text-emerald-400 font-mono" title={formatMoney(profile.bankBalance, country)}>
+            {formatCompactMoney(profile.bankBalance, country)}
           </strong>
         </div>
 
@@ -723,8 +723,8 @@ export function ProfilePage({
             <Sparkles className="w-3.5 h-3.5 text-yellow-400" />
             سبائك الذهب
           </span>
-          <strong className="text-sm sm:text-base font-black text-yellow-300 font-mono">
-            {formatGold(profile.goldGrams)}
+          <strong className="text-sm sm:text-base font-black text-yellow-300 font-mono" title={formatGold(profile.goldGrams)}>
+            {formatCompactGold(profile.goldGrams)}
           </strong>
         </div>
 
@@ -733,8 +733,8 @@ export function ProfilePage({
             <Gem className="w-3.5 h-3.5 text-cyan-400" />
             الماس الإمبراطوري
           </span>
-          <strong className="text-sm sm:text-base font-black text-cyan-300 font-mono">
-            {formatNumber(profile.diamonds)} 💎
+          <strong className="text-sm sm:text-base font-black text-cyan-300 font-mono" title={formatNumber(profile.diamonds)}>
+            {formatCompactNumber(profile.diamonds)} 💎
           </strong>
         </div>
 

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import type { CountryDefinition } from '../domain/countries';
 import { type PlayerProfile, calculateTotalAssets } from '../domain/player';
 import type { SectionId } from '../domain/navigation';
-import { formatMoney } from '../domain/formatters';
+import { formatMoney, formatCompactMoney } from '../domain/formatters';
 import { type GameCommand, type GameResult } from '../game/engine';
 import { playSound } from '../game/soundEffects';
 import { LeaderboardModal } from './LeaderboardModal';
@@ -462,8 +462,8 @@ export function Dashboard({
               <Crown className="w-4 h-4 text-amber-400" />
             </div>
           </div>
-          <strong className="text-lg sm:text-xl font-black text-amber-400 block tracking-tight tabular-nums">
-            {formatMoney(totalAssets, country)}
+          <strong className="text-lg sm:text-xl font-black text-amber-400 block tracking-tight tabular-nums" title={formatMoney(totalAssets, country)}>
+            {formatCompactMoney(totalAssets, country)}
           </strong>
           <span className="text-[10px] text-slate-400 mt-1 block">
             تقييم الشركات والأراضي والسيولة
@@ -477,8 +477,8 @@ export function Dashboard({
               <Wallet className="w-4 h-4 text-emerald-400" />
             </div>
           </div>
-          <strong className="text-lg sm:text-xl font-black text-emerald-400 block tracking-tight tabular-nums">
-            {formatMoney(profile.bankBalance, country)}
+          <strong className="text-lg sm:text-xl font-black text-emerald-400 block tracking-tight tabular-nums" title={formatMoney(profile.bankBalance, country)}>
+            {formatCompactMoney(profile.bankBalance, country)}
           </strong>
           <span className="text-[10px] text-slate-400 mt-1 block">
             جاهزة للتشغيل والتوسع الفوري
