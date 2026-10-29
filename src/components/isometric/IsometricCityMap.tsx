@@ -247,41 +247,162 @@ export const IsometricCityMap: React.FC<IsometricCityMapProps> = ({ profile, sel
 
 export default IsometricCityMap;
 
-const SKELETON_BUILDINGS = [
-  { id: 'hq', label: 'المقر الرئيسي', image: '/assets/buildings/hq.png', zone: 'center', x: 50, y: 42, size: 31 },
-  { id: 'shop', label: 'المركز التجاري', image: '/assets/buildings/shop.png', zone: 'center', x: 68, y: 52, size: 22 },
-  { id: 'factory', label: 'المنطقة الصناعية', image: '/assets/buildings/factory.png', zone: 'industrial', x: 27, y: 34, size: 25 },
+const MAP_GRID_SIZE = 40;
+const MAP_WORLD_SIZE = 1400;
+const MIN_MAP_ZOOM = 0.16;
+const MAX_MAP_ZOOM = 2.2;
+
+const MAP_BUILDINGS = [
+  { id: 'hq', label: 'المقر الرئيسي', image: '/assets/buildings/hq.png', col: 18, row: 18, cells: 9 },
+  { id: 'shop', label: 'المركز التجاري', image: '/assets/buildings/shop.png', col: 24, row: 22, cells: 8 },
+  { id: 'factory', label: 'المنطقة الصناعية', image: '/assets/buildings/factory.png', col: 32, row: 8, cells: 8 },
 ] as const;
 
-export const IsometricMapSkeleton: React.FC = () => (
-  <main className="map-skeleton" aria-label="خريطة إمبراطورية الأعمال">
-    <div className="map-skeleton-board">
-      <div className="map-skeleton-grid" aria-hidden="true">
-        {Array.from({ length: 100 }, (_, index) => <span key={index} />)}
-      </div>
-      <div className="map-skeleton-zones" aria-hidden="true">
-        <span className="zone-center" />
-        <span className="zone-industry" />
-      </div>
-      <div className="map-skeleton-assets">
-        {SKELETON_BUILDINGS.map((building) => (
-          <figure key={building.id} className={`map-skeleton-building building-${building.id}`} style={{ left: `${building.x}%`, top: `${building.y}%`, width: `${building.size}%` }}>
-            <img src={building.image} alt="" draggable={false} />
-            <figcaption>{building.label}</figcaption>
-          </figure>
-        ))}
-        <div className="map-skeleton-port" aria-label="منطقة الميناء">
-          <span className="port-water" />
-          <span className="port-pier" />
-          <span className="port-crane" />
-          <span className="map-skeleton-label">الميناء</span>
+const MAP_AIRPORT = { col: 28, row: 3 };
+const MAP_PORT = { col: 7, row: 34 };
+const MAIN_ROAD_INDEX = Math.floor(MAP_GRID_SIZE / 2);
+
+function isFutureBuildingPlot(row: number, col: number): boolean {
+  if (Math.abs(row - MAIN_ROAD_INDEX) <= 1 || Math.abs(col - MAIN_ROAD_INDEX) <= 1) return false;
+  const reserved = [...MAP_BUILDINGS.map(({ row: buildingRow, col: buildingCol }) => ({ row: buildingRow, col: buildingCol })), MAP_AIRPORT, MAP_PORT];
+  if (reserved.some((item) => Math.abs(row - item.row) <= 1 && Math.abs(col - item.col) <= 1)) return false;
+  const nearHub = Math.abs(row - 18) <= 4 && Math.abs(col - 18) <= 4;
+  const nearFactory = Math.abs(row - 8) <= 4 && Math.abs(col - 32) <= 4;
+  return nearHub || nearFactory;
+}
+
+function toMapPercent(cellIndex: number): string {
+  return `${((cellIndex + 0.5) / MAP_GRID_SIZE) * 100}%`;
+}
+
+function getMapFitZoom(): number {
+  const width = window.visualViewport?.width ?? window.innerWidth;
+  const height = window.visualViewport?.height ?? window.innerHeight;
+  const fit = Math.min(width, height) / MAP_WORLD_SIZE;
+  return Math.min(MAX_MAP_ZOOM, Math.max(MIN_MAP_ZOOM, fit * 0.94));
+}
+
+export const IsometricMapSkeleton: React.FC = () => {
+  const viewportRef = React.useRef<HTMLDivElement>(null);
+  const pointersRef = React.useRef(new Map<number, { x: number; y: number }>());
+  const dragRef = React.useRef<{ x: number; y: number } | null>(null);
+  const pinchRef = React.useRef<{ distance: number; zoom: number } | null>(null);
+  const [zoom, setZoom] = React.useState(getMapFitZoom);
+  const [offset, setOffset] = React.useState({ x: 0, y: 0 });
+
+  const fitMap = React.useCallback(() => {
+    const viewport = viewportRef.current;
+    if (!viewport) return;
+    const visualWidth = window.visualViewport?.width ?? viewport.clientWidth;
+    const visualHeight = window.visualViewport?.height ?? viewport.clientHeight;
+    const fit = Math.min(visualWidth, visualHeight) / MAP_WORLD_SIZE;
+    setZoom(Math.min(MAX_MAP_ZOOM, Math.max(MIN_MAP_ZOOM, fit * 0.94)));
+    setOffset({ x: 0, y: 0 });
+  }, []);
+
+  React.useEffect(() => {
+    fitMap();
+    const viewport = viewportRef.current;
+    if (!viewport) return;
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(fitMap);
+    observer?.observe(viewport);
+    window.addEventListener('resize', fitMap);
+    window.visualViewport?.addEventListener('resize', fitMap);
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener('resize', fitMap);
+      window.visualViewport?.removeEventListener('resize', fitMap);
+    };
+  }, [fitMap]);
+
+  const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+    if ((event.target as HTMLElement).closest('.map-expansion-controls')) return;
+    event.currentTarget.setPointerCapture(event.pointerId);
+    pointersRef.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    if (pointersRef.current.size >= 2) {
+      const [first, second] = [...pointersRef.current.values()];
+      pinchRef.current = { distance: Math.hypot(first.x - second.x, first.y - second.y), zoom };
+      dragRef.current = null;
+      return;
+    }
+    dragRef.current = { x: event.clientX, y: event.clientY };
+  };
+
+  const handlePointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (pointersRef.current.has(event.pointerId)) {
+      pointersRef.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    }
+    if (pointersRef.current.size >= 2 && pinchRef.current) {
+      const [first, second] = [...pointersRef.current.values()];
+      const distance = Math.max(1, Math.hypot(first.x - second.x, first.y - second.y));
+      setZoom(Math.min(MAX_MAP_ZOOM, Math.max(MIN_MAP_ZOOM, pinchRef.current.zoom * distance / pinchRef.current.distance)));
+      return;
+    }
+    if (!dragRef.current) return;
+    const dx = event.clientX - dragRef.current.x;
+    const dy = event.clientY - dragRef.current.y;
+    setOffset((current) => ({ x: current.x + dx, y: current.y + dy }));
+    dragRef.current = { x: event.clientX, y: event.clientY };
+  };
+
+  const handlePointerUp = (event: React.PointerEvent<HTMLDivElement>) => {
+    pointersRef.current.delete(event.pointerId);
+    if (pointersRef.current.size < 2) pinchRef.current = null;
+    dragRef.current = null;
+  };
+
+  const handleWheel = (event: React.WheelEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    setZoom((current) => Math.min(MAX_MAP_ZOOM, Math.max(MIN_MAP_ZOOM, current + (event.deltaY < 0 ? 0.08 : -0.08))));
+  };
+
+  return (
+    <main className="map-skeleton" aria-label="خريطة إمبراطورية الأعمال">
+      <div ref={viewportRef} className="map-expansion-viewport" onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} onPointerCancel={handlePointerUp} onWheel={handleWheel}>
+        <div className="map-expansion-world" style={{ transform: `translate(calc(-50% + ${offset.x}px), calc(-50% + ${offset.y}px)) scale(${zoom})` }}>
+          <div className="map-expansion-zones" aria-hidden="true">
+            <span className="zone--commercial" />
+            <span className="zone--industrial" />
+            <span className="zone--logistics" />
+          </div>
+          <div className="map-expansion-grid" aria-label="شبكة 40 في 40، 1600 قطعة أرض">
+            {Array.from({ length: MAP_GRID_SIZE * MAP_GRID_SIZE }, (_, index) => {
+              const row = Math.floor(index / MAP_GRID_SIZE);
+              const col = index % MAP_GRID_SIZE;
+              return <span key={index} className={`map-expansion-cell${isFutureBuildingPlot(row, col) ? ' is-future-plot' : ''}`} />;
+            })}
+          </div>
+          <div className="map-expansion-roads" aria-hidden="true">
+            <span className="map-road map-road--horizontal" />
+            <span className="map-road map-road--vertical" />
+          </div>
+          <div className="map-expansion-assets">
+            {MAP_BUILDINGS.map((building) => (
+              <figure key={building.id} className={`map-expansion-building building--${building.id}`} style={{ left: toMapPercent(building.col), top: toMapPercent(building.row), width: `${(building.cells / MAP_GRID_SIZE) * 100}%` }}>
+                <img src={building.image} alt={building.label} draggable={false} />
+                <figcaption>{building.label}</figcaption>
+              </figure>
+            ))}
+            <div className="map-expansion-airport" style={{ left: toMapPercent(MAP_AIRPORT.col), top: toMapPercent(MAP_AIRPORT.row) }} aria-label="المطار في المنطقة الشمالية">
+              <span className="airport-runway"><i /><i /><i /><i /><i /></span>
+              <span className="airport-terminal">✈</span>
+              <span className="map-expansion-label">المطار</span>
+            </div>
+            <div className="map-expansion-port" style={{ left: toMapPercent(MAP_PORT.col), top: toMapPercent(MAP_PORT.row) }} aria-label="الميناء في المنطقة الجنوبية">
+              <span className="port-water" />
+              <span className="port-pier" />
+              <span className="port-crane" />
+              <span className="map-expansion-label">الميناء</span>
+            </div>
+          </div>
         </div>
-        <div className="map-skeleton-airport" aria-label="منطقة المطار">
-          <span className="airport-runway"><i /><i /><i /><i /><i /></span>
-          <span className="airport-terminal">✈</span>
-          <span className="map-skeleton-label">المطار</span>
-        </div>
       </div>
-    </div>
-  </main>
-);
+      <nav className="map-expansion-controls" aria-label="أدوات عرض الخريطة" onPointerDown={(event) => event.stopPropagation()}>
+        <span className="map-expansion-size">40 × 40 · 1,600 قطعة</span>
+        <button type="button" aria-label="تكبير" onClick={() => setZoom((current) => Math.min(MAX_MAP_ZOOM, current + 0.14))}>+</button>
+        <button type="button" aria-label="تصغير" onClick={() => setZoom((current) => Math.max(MIN_MAP_ZOOM, current - 0.14))}>−</button>
+        <button type="button" aria-label="ملاءمة الخريطة للشاشة" onClick={fitMap}>⌂</button>
+      </nav>
+    </main>
+  );
+};

@@ -2,3 +2,50 @@
 
 /* Temporary full-screen economic city skeleton */
 .map-skeleton{position:fixed;inset:0;z-index:1000;overflow:hidden;background:#bfe35b;isolation:isolate}.map-skeleton-board{position:absolute;inset:0;background-image:url('/assets/buildings/road-network.png');background-position:center;background-repeat:no-repeat;background-size:contain}.map-skeleton-grid{position:absolute;inset:0;display:grid;grid-template-columns:repeat(10,1fr);grid-template-rows:repeat(10,1fr);opacity:.12;pointer-events:none}.map-skeleton-grid span{border:1px solid #51764b}.map-skeleton-zones{position:absolute;inset:0;pointer-events:none}.map-skeleton-zones span{position:absolute;display:block;border-radius:50%;filter:blur(2px);opacity:.18}.zone-center{left:37%;top:34%;width:35%;height:31%;background:#ffd76b}.zone-industry{left:13%;top:18%;width:27%;height:29%;background:#ee8446}.map-skeleton-assets{position:absolute;inset:0}.map-skeleton-building{position:absolute;z-index:2;margin:0;transform:translate(-50%,-50%);transform-origin:bottom center;display:flex;flex-direction:column;align-items:center;filter:drop-shadow(0 12px 8px rgba(27,53,39,.24))}.map-skeleton-building img{display:block;width:100%;height:auto;object-fit:contain}.map-skeleton-building figcaption,.map-skeleton-label{position:relative;z-index:3;margin-top:-5%;padding:5px 10px;border:1px solid rgba(255,255,255,.62);border-radius:999px;background:rgba(23,47,47,.88);color:#fff;font-size:clamp(10px,1.35vw,15px);font-weight:800;white-space:nowrap;box-shadow:0 5px 14px rgba(17,37,28,.2)}.building-hq{z-index:4}.building-shop{z-index:5}.building-factory{z-index:3}.map-skeleton-port{position:absolute;left:18%;top:76%;width:22%;height:18%;z-index:5}.port-water{position:absolute;left:0;bottom:0;width:100%;height:60%;background:linear-gradient(155deg,#68c9d5,#238da9);clip-path:polygon(0 35%,100% 0,100% 100%,0 100%);border:3px solid rgba(255,255,255,.6)}.port-pier{position:absolute;left:48%;bottom:24%;width:38%;height:12%;background:#b77d4e;transform:skewY(-24deg);box-shadow:0 5px 0 #785536}.port-crane{position:absolute;left:64%;top:8%;width:5px;height:56%;background:#8b583b;transform:skewY(-24deg)}.port-crane:before{content:"";position:absolute;left:-2px;top:0;width:48px;height:5px;background:#8b583b}.map-skeleton-port .map-skeleton-label{position:absolute;left:3%;top:2%}.map-skeleton-airport{position:absolute;right:8%;top:8%;width:30%;height:20%;z-index:4}.airport-runway{position:absolute;inset:18% 10%;background:#6a7173;border:5px solid #d2d1bd;transform:rotate(-24deg);box-shadow:0 6px 0 rgba(57,65,61,.2)}.airport-runway i{position:relative;display:inline-block;width:8%;height:4px;margin:17% 4%;background:#f8f3d4}.airport-terminal{position:absolute;right:14%;bottom:0;padding:10px 18px;background:#e5e0d0;border:4px solid #747b78;border-radius:8px;color:#147c95;font-size:clamp(20px,3vw,36px);box-shadow:0 8px 0 rgba(48,58,54,.2)}.map-skeleton-airport .map-skeleton-label{position:absolute;right:0;top:0}@media(max-width:640px){.map-skeleton-board{background-size:auto 100%;}.map-skeleton-building figcaption,.map-skeleton-label{font-size:10px;padding:4px 7px}.building-hq{width:42%!important;left:51%!important;top:43%!important}.building-shop{width:28%!important;left:74%!important;top:55%!important}.building-factory{width:33%!important;left:24%!important;top:35%!important}.map-skeleton-port{left:4%;top:77%;width:31%;height:16%}.map-skeleton-airport{right:1%;top:10%;width:39%;height:18%}}
+
+
+/* 40×40 expandable city map */
+.map-expansion-viewport{position:fixed;inset:0;overflow:hidden;touch-action:none;cursor:grab;background:#bfe35b;user-select:none;-webkit-user-select:none}
+.map-expansion-viewport{background:#bfe35b url('/assets/buildings/road-network.png') center/cover no-repeat}
+.map-expansion-viewport:active{cursor:grabbing}
+.map-expansion-world{position:absolute;left:50%;top:50%;width:1400px;height:1400px;overflow:hidden;transform-origin:center center;will-change:transform;background:#bfe35b url('/assets/buildings/road-network.png') center/100% 100% no-repeat;box-shadow:0 22px 70px rgba(31,55,34,.2)}
+.map-expansion-zones{position:absolute;inset:0;pointer-events:none}
+.map-expansion-zones span{position:absolute;border:2px dashed rgba(49,80,53,.42);border-radius:40px;background:rgba(241,220,123,.11)}
+.map-expansion-zones .zone--commercial{left:31%;top:30%;width:37%;height:38%;border-color:rgba(198,145,48,.48);background:rgba(251,208,99,.15)}
+.map-expansion-zones .zone--industrial{right:2%;top:2%;width:34%;height:33%;border-color:rgba(205,104,57,.55);background:rgba(226,125,75,.12)}
+.map-expansion-zones .zone--logistics{left:0;bottom:0;width:27%;height:25%;border-color:rgba(45,133,163,.6);background:rgba(65,174,203,.13)}
+.map-expansion-grid{position:absolute;inset:0;display:grid;grid-template-columns:repeat(40,minmax(0,1fr));grid-template-rows:repeat(40,minmax(0,1fr));pointer-events:none}
+.map-expansion-cell{position:relative;min-width:0;min-height:0;border:1px solid rgba(53,84,49,.22);background:rgba(241,255,201,.025)}
+.map-expansion-cell.is-future-plot:after{content:"";position:absolute;inset:23%;border:1px dashed rgba(255,247,203,.92);border-radius:50%;background:rgba(248,244,203,.16);box-shadow:0 0 0 1px rgba(39,87,52,.12)}
+.map-expansion-roads{position:absolute;inset:0;pointer-events:none}
+.map-road{position:absolute;display:block;background:#5f6861;border:6px solid rgba(218,220,193,.94);box-sizing:border-box;box-shadow:0 4px 0 rgba(50,68,49,.24)}
+.map-road--horizontal{left:0;top:50%;width:100%;height:96px;transform:translateY(-50%)}
+.map-road--vertical{left:50%;top:0;width:96px;height:100%;transform:translateX(-50%)}
+.map-road--horizontal:after,.map-road--vertical:after{content:"";position:absolute;display:block}
+.map-road--horizontal:after{left:0;top:50%;width:100%;height:4px;transform:translateY(-50%);background:repeating-linear-gradient(90deg,#f3eab2 0 26px,transparent 26px 51px)}
+.map-road--vertical:after{left:50%;top:0;width:4px;height:100%;transform:translateX(-50%);background:repeating-linear-gradient(180deg,#f3eab2 0 26px,transparent 26px 51px)}
+.map-expansion-assets{position:absolute;inset:0}
+.map-expansion-building{position:absolute;z-index:4;display:flex;justify-content:center;align-items:center;margin:0;transform:translate(-50%,-50%);transform-origin:bottom center;filter:drop-shadow(0 12px 8px rgba(27,53,39,.29))}
+.map-expansion-building img{display:block;width:100%;height:auto;object-fit:contain;pointer-events:none}
+.map-expansion-building figcaption,.map-expansion-label{position:absolute;z-index:7;left:50%;bottom:0;transform:translate(-50%,45%);padding:7px 13px;border:1px solid rgba(255,255,255,.7);border-radius:999px;background:rgba(23,47,47,.92);color:#fff;font-size:15px;font-weight:800;line-height:1.2;white-space:nowrap;box-shadow:0 5px 14px rgba(17,37,28,.28)}
+.map-expansion-building.building--shop{z-index:5}
+.map-expansion-building.building--hq{z-index:6}
+.map-expansion-building.building--factory{z-index:4}
+.map-expansion-airport,.map-expansion-port{position:absolute;z-index:5;width:19%;height:15%;transform:translate(-50%,-50%);filter:drop-shadow(0 10px 7px rgba(29,47,42,.26))}
+.airport-runway{position:absolute;inset:28% 4%;transform:rotate(-24deg);border:7px solid #d2d1bd;background:repeating-linear-gradient(90deg,#626b6c 0 11%,#747c7a 11% 12%);box-shadow:0 5px 0 rgba(47,62,56,.28)}
+.airport-runway i{position:relative;display:inline-block;width:7%;height:5px;margin:16% 3%;background:#fff2be}
+.airport-terminal{position:absolute;right:13%;bottom:0;padding:10px 18px;border:4px solid #747b78;border-radius:8px;background:#e5e0d0;color:#147c95;font-size:32px;box-shadow:0 8px 0 rgba(48,58,54,.2)}
+.map-expansion-airport .map-expansion-label{top:0;bottom:auto;left:50%;transform:translateX(-50%)}
+.map-expansion-port{z-index:6;width:20%;height:16%}
+.port-water{position:absolute;left:0;bottom:0;width:100%;height:67%;border:4px solid rgba(224,248,240,.88);background:linear-gradient(155deg,#69cfdb,#218ba8);clip-path:polygon(0 31%,100% 0,100% 100%,0 100%)}
+.port-pier{position:absolute;left:46%;bottom:25%;width:45%;height:12%;transform:skewY(-24deg);background:#b77d4e;box-shadow:0 6px 0 #785536}
+.port-crane{position:absolute;left:67%;top:7%;width:6px;height:58%;transform:skewY(-24deg);background:#8b583b}
+.port-crane:before{content:"";position:absolute;left:-2px;top:0;width:52px;height:6px;background:#8b583b}
+.map-expansion-port .map-expansion-label{top:0;bottom:auto;left:50%;transform:translate(-50%,-105%)}
+.map-expansion-controls{position:fixed;z-index:1001;top:12px;inset-inline-start:12px;display:flex;align-items:center;gap:7px;padding:8px;border:1px solid rgba(255,255,255,.52);border-radius:16px;background:rgba(17,44,45,.9);color:#fff;box-shadow:0 8px 26px rgba(23,44,35,.24);backdrop-filter:blur(10px)}
+.map-expansion-size{padding:0 8px;color:#f4d788;font-size:12px;font-weight:800;white-space:nowrap}
+.map-expansion-controls button{width:36px;height:36px;border:1px solid rgba(255,255,255,.24);border-radius:10px;background:#254d4e;color:#fff;font-size:22px;font-weight:800;line-height:1;cursor:pointer}
+.map-expansion-controls button:active{transform:scale(.94)}
+@media(max-width:640px){.map-expansion-controls{top:8px;inset-inline-start:8px;gap:5px;padding:6px;border-radius:13px}.map-expansion-size{padding:0 4px;font-size:10px}.map-expansion-controls button{width:32px;height:32px}.map-expansion-building figcaption,.map-expansion-label{padding:5px 9px;font-size:12px}.map-road--horizontal{height:72px}.map-road--vertical{width:72px}.airport-runway{border-width:4px}.airport-terminal{padding:6px 10px;border-width:3px;font-size:22px}}
+
+.map-skeleton{background:#bfe35b url('/assets/buildings/road-network.png') center/cover no-repeat}
