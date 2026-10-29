@@ -5,6 +5,10 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { createCityMaterialPalette } from './cityMaterials';
 import { buildCartelBastionMesh, CARTEL_STRONGHOLD_LEVELS } from './cartelStronghold3D';
 import { RotateCcw, Sun, Moon, Sparkles, ZoomIn, ZoomOut, Play, Pause } from 'lucide-react';
@@ -81,6 +85,18 @@ export const CartelStrongholdViewer3D: React.FC<CartelStrongholdViewer3DProps> =
       container.removeChild(container.firstChild);
     }
     container.appendChild(renderer.domElement);
+
+    // Cinematic Post-Processing Pipeline
+    const composer = new EffectComposer(renderer);
+    composer.addPass(new RenderPass(scene, camera));
+    const bloomPass = new UnrealBloomPass(
+      new THREE.Vector2(width, heightPx),
+      0.5, // strength
+      0.4, // radius
+      0.8  // threshold
+    );
+    composer.addPass(bloomPass);
+    composer.addPass(new OutputPass());
 
     // Lights
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.65);
@@ -211,6 +227,8 @@ export const CartelStrongholdViewer3D: React.FC<CartelStrongholdViewer3DProps> =
           camera.aspect = newW / newH;
           camera.updateProjectionMatrix();
           renderer.setSize(newW, newH);
+          composer.setSize(newW, newH);
+          bloomPass.resolution.set(newW, newH);
         }
       }
     });
@@ -236,7 +254,7 @@ export const CartelStrongholdViewer3D: React.FC<CartelStrongholdViewer3DProps> =
         rotorMesh.rotation.y += dt * 22;
       }
 
-      renderer.render(scene, camera);
+      composer.render();
     };
     animId = requestAnimationFrame(animate);
 
@@ -263,6 +281,7 @@ export const CartelStrongholdViewer3D: React.FC<CartelStrongholdViewer3DProps> =
       domEl.removeEventListener('pointerup', onPointerUp);
       domEl.removeEventListener('pointercancel', onPointerUp);
       domEl.removeEventListener('wheel', onWheel);
+      composer.dispose();
       renderer.dispose();
       scene.clear();
       if (container.contains(domEl)) {

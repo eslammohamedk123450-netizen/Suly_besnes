@@ -7,6 +7,11 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { SSAOPass } from 'three/addons/postprocessing/SSAOPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import type { PlayerProfile } from '../../domain/player';
 import {
   resolveCityGrid,
@@ -205,6 +210,49 @@ export const CityCanvas: React.FC<CityCanvasProps> = ({
       container.removeChild(container.firstChild);
     }
     container.appendChild(renderer.domElement);
+
+    // 3b. Cinematic Post-Processing Pipeline (EffectComposer, Bloom, SSAO, ACES Filmic Tone Mapping)
+    let composer: EffectComposer | null = null;
+    let ssaoPass: SSAOPass | null = null;
+    let bloomPass: UnrealBloomPass | null = null;
+    let outputPass: OutputPass | null = null;
+
+    try {
+      composer = new EffectComposer(renderer);
+
+      // Render base scene pass
+      const renderPass = new RenderPass(scene, camera);
+      composer.addPass(renderPass);
+
+      // SSAOPass: creates realistic soft shadows in corners and crevices (e.g., between buildings and ground)
+      try {
+        ssaoPass = new SSAOPass(scene, camera, width, height);
+        ssaoPass.kernelRadius = 16;
+        ssaoPass.minDistance = 0.005;
+        ssaoPass.maxDistance = 0.15;
+        ssaoPass.output = SSAOPass.OUTPUT.Default;
+        composer.addPass(ssaoPass);
+      } catch (err) {
+        console.warn('SSAOPass could not be initialized:', err);
+      }
+
+      // UnrealBloomPass with low threshold (0.8) and medium strength (0.5)
+      // Makes golden dome, lit windows, and glowing elements glow beautifully
+      bloomPass = new UnrealBloomPass(
+        new THREE.Vector2(width, height),
+        0.5, // strength (medium)
+        0.4, // radius
+        0.8  // threshold (low)
+      );
+      composer.addPass(bloomPass);
+
+      // OutputPass ensures ACESFilmic tone mapping and sRGB color grading
+      outputPass = new OutputPass();
+      composer.addPass(outputPass);
+    } catch (e) {
+      console.warn('EffectComposer initialization error:', e);
+      composer = null;
+    }
 
     // 4. Procedural Studio Environment (skipped in performance mode for maximum mobile FPS)
     if (!isPerformance) {
@@ -634,6 +682,15 @@ export const CityCanvas: React.FC<CityCanvasProps> = ({
       camera.aspect = w / h;
       camera.updateProjectionMatrix();
       renderer.setSize(w, h);
+      if (composer) {
+        composer.setSize(w, h);
+      }
+      if (ssaoPass) {
+        ssaoPass.setSize(w, h);
+      }
+      if (bloomPass) {
+        bloomPass.resolution.set(w, h);
+      }
     };
     window.addEventListener('resize', onResize);
     const resizeObserver = typeof ResizeObserver !== 'undefined'
@@ -777,7 +834,11 @@ export const CityCanvas: React.FC<CityCanvasProps> = ({
         selectionHalo.visible = false;
       }
 
-      renderer.render(scene, camera);
+      if (composer) {
+        composer.render();
+      } else {
+        renderer.render(scene, camera);
+      }
       scheduleFrame();
     };
 
@@ -799,6 +860,19 @@ export const CityCanvas: React.FC<CityCanvasProps> = ({
       intersectionObserver?.disconnect();
       touchCtrl.dispose();
       touchControllerRef.current = null;
+
+      if (composer) {
+        composer.dispose();
+      }
+      if (ssaoPass) {
+        ssaoPass.dispose();
+      }
+      if (bloomPass) {
+        bloomPass.dispose();
+      }
+      if (outputPass) {
+        outputPass.dispose();
+      }
 
       renderer.dispose();
       scene.traverse((object) => {

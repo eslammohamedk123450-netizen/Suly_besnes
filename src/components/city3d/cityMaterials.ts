@@ -9,6 +9,10 @@ import * as THREE from 'three';
  * Procedural texture cache to avoid memory leaks and reduce draw calls
  */
 let asphaltTexture: THREE.CanvasTexture | null = null;
+let groundGridTexture: { day: THREE.CanvasTexture | null; night: THREE.CanvasTexture | null } = {
+  day: null,
+  night: null,
+};
 let solarTexture: THREE.CanvasTexture | null = null;
 let cautionTexture: THREE.CanvasTexture | null = null;
 let officeWindowTextures: { day: THREE.CanvasTexture | null; night: THREE.CanvasTexture | null } = {
@@ -203,43 +207,120 @@ export function getOrCreatePaverTexture(): THREE.Texture {
 }
 
 /**
- * Creates procedural asphalt texture with subtle road noise
+ * Creates procedural asphalt texture with subtle road noise, dark aggregate, and paving grid lines
  */
 export function getOrCreateAsphaltTexture(maxAnisotropy = 4): THREE.Texture {
   if (asphaltTexture) return asphaltTexture;
 
   if (typeof document === 'undefined') {
-    const data = new Uint8Array([30, 41, 59, 255]);
+    const data = new Uint8Array([15, 23, 42, 255]);
     const tex = new THREE.DataTexture(data, 1, 1);
     tex.needsUpdate = true;
     return tex;
   }
 
   const canvas = document.createElement('canvas');
-  canvas.width = 128;
-  canvas.height = 128;
+  canvas.width = 256;
+  canvas.height = 256;
   const ctx = canvas.getContext('2d');
   if (ctx) {
-    ctx.fillStyle = '#1e293b';
-    ctx.fillRect(0, 0, 128, 128);
+    // Darker asphalt base
+    ctx.fillStyle = '#0a0f1d';
+    ctx.fillRect(0, 0, 256, 256);
 
-    // Subtle grain
-    for (let i = 0; i < 400; i++) {
-      const x = Math.floor(Math.random() * 128);
-      const y = Math.floor(Math.random() * 128);
-      const shade = Math.random() > 0.5 ? 40 : 20;
-      ctx.fillStyle = `rgba(${shade}, ${shade}, ${shade + 10}, 0.25)`;
-      ctx.fillRect(x, y, 1, 1);
+    // Subtle road grid and expansion joints so roads don't look like a plain flat plane
+    const gridSize = 64;
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.04)';
+    ctx.lineWidth = 1;
+    for (let x = 0; x <= 256; x += gridSize) {
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, 256);
+      ctx.stroke();
+    }
+    for (let y = 0; y <= 256; y += gridSize) {
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(256, y);
+      ctx.stroke();
+    }
+
+    // Dense asphalt grain and aggregate speckles
+    for (let i = 0; i < 900; i++) {
+      const x = Math.floor(Math.random() * 256);
+      const y = Math.floor(Math.random() * 256);
+      const isLighter = Math.random() > 0.6;
+      const gray = isLighter ? 35 + Math.floor(Math.random() * 25) : 10;
+      ctx.fillStyle = `rgba(${gray}, ${gray + 2}, ${gray + 8}, ${0.15 + Math.random() * 0.25})`;
+      const sz = Math.random() > 0.85 ? 2 : 1;
+      ctx.fillRect(x, y, sz, sz);
     }
   }
 
   asphaltTexture = new THREE.CanvasTexture(canvas);
   asphaltTexture.wrapS = THREE.RepeatWrapping;
   asphaltTexture.wrapT = THREE.RepeatWrapping;
-  asphaltTexture.repeat.set(4, 4);
+  asphaltTexture.repeat.set(6, 6);
   asphaltTexture.colorSpace = THREE.SRGBColorSpace;
   asphaltTexture.anisotropy = maxAnisotropy;
   return asphaltTexture;
+}
+
+/**
+ * Creates procedural terrain ground texture with a subtle district coordinate grid
+ */
+export function getOrCreateGroundGridTexture(isNightMode = true, maxAnisotropy = 4): THREE.Texture {
+  const mode = isNightMode ? 'night' : 'day';
+  if (groundGridTexture[mode]) return groundGridTexture[mode]!;
+
+  if (typeof document === 'undefined') {
+    const data = new Uint8Array([11, 18, 32, 255]);
+    const tex = new THREE.DataTexture(data, 1, 1);
+    tex.needsUpdate = true;
+    return tex;
+  }
+
+  const canvas = document.createElement('canvas');
+  canvas.width = 256;
+  canvas.height = 256;
+  const ctx = canvas.getContext('2d');
+  if (ctx) {
+    ctx.fillStyle = isNightMode ? '#070c18' : '#1e2837';
+    ctx.fillRect(0, 0, 256, 256);
+
+    // Subtle coordinate grid so terrain doesn't look like a plain flat plane
+    const step = 32;
+    ctx.strokeStyle = isNightMode ? 'rgba(56, 189, 248, 0.04)' : 'rgba(255, 255, 255, 0.05)';
+    ctx.lineWidth = 1;
+    for (let i = 0; i <= 256; i += step) {
+      ctx.beginPath();
+      ctx.moveTo(i, 0);
+      ctx.lineTo(i, 256);
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.moveTo(0, i);
+      ctx.lineTo(256, i);
+      ctx.stroke();
+    }
+
+    // Surface stone & soil noise
+    for (let i = 0; i < 600; i++) {
+      const rx = Math.floor(Math.random() * 256);
+      const ry = Math.floor(Math.random() * 256);
+      ctx.fillStyle = isNightMode ? 'rgba(255, 255, 255, 0.03)' : 'rgba(0, 0, 0, 0.06)';
+      ctx.fillRect(rx, ry, 1, 1);
+    }
+  }
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(16, 16);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = maxAnisotropy;
+  groundGridTexture[mode] = tex;
+  return tex;
 }
 
 /**
@@ -546,7 +627,7 @@ export interface CityMaterialPalette {
   brushedGold: THREE.MeshStandardMaterial;
   navyStructure: THREE.MeshStandardMaterial;
   slateStructure: THREE.MeshStandardMaterial;
-  curtainGlass: THREE.MeshStandardMaterial;
+  curtainGlass: THREE.MeshPhysicalMaterial | THREE.MeshStandardMaterial;
   litGlassNight: THREE.MeshStandardMaterial;
   officeWindowsLit: THREE.MeshStandardMaterial;
   facadeConcrete: THREE.MeshStandardMaterial;
@@ -609,10 +690,10 @@ export interface CityMaterialPalette {
   lamborghiniGreen: THREE.MeshStandardMaterial;
   lamborghiniOrange: THREE.MeshStandardMaterial;
   carbonFiber: THREE.MeshStandardMaterial;
-  blackObsidianGlass: THREE.MeshStandardMaterial;
+  blackObsidianGlass: THREE.MeshPhysicalMaterial | THREE.MeshStandardMaterial;
   yachtHullWhite: THREE.MeshStandardMaterial;
   teakWood: THREE.MeshStandardMaterial;
-  skyReflectiveCurtainGlass: THREE.MeshStandardMaterial;
+  skyReflectiveCurtainGlass: THREE.MeshPhysicalMaterial | THREE.MeshStandardMaterial;
   fountainWaterDancing: THREE.MeshStandardMaterial;
   bronzeStatue: THREE.MeshStandardMaterial;
   rolexGreenMarble: THREE.MeshStandardMaterial;
@@ -640,15 +721,16 @@ export function createCityMaterialPalette(
 
   return {
     ground: new THREE.MeshStandardMaterial({
+      map: getOrCreateGroundGridTexture(isNightMode, isSoftwareGl ? 1 : 4),
       color: isNightMode ? '#080d1a' : '#273449',
       roughness: 0.88,
       metalness: 0.08,
     }),
     asphalt: new THREE.MeshStandardMaterial({
       map: asphaltTex,
-      color: isNightMode ? '#121a2b' : '#263449',
-      roughness: 0.74,
-      metalness: 0.22,
+      color: isNightMode ? '#0a0f1d' : '#1e293b',
+      roughness: 0.8,
+      metalness: 0.15,
     }),
     sidewalk: new THREE.MeshStandardMaterial({
       color: isNightMode ? '#202b3f' : '#64748b',
@@ -662,9 +744,9 @@ export function createCityMaterialPalette(
       metalness: 0.24,
     }),
     curbGold: new THREE.MeshStandardMaterial({
-      color: '#a8792b',
-      roughness: 0.3,
-      metalness: 0.9,
+      color: 0xffd700,
+      roughness: 0.2,
+      metalness: 1.0,
     }),
     roadLine: new THREE.MeshBasicMaterial({
       color: '#f59e0b',
@@ -673,16 +755,16 @@ export function createCityMaterialPalette(
       color: '#f8fafc',
     }),
 
-    // Luxury Empire theme
+    // Luxury Empire theme & Golden Dome PBR
     imperialGold: new THREE.MeshStandardMaterial({
-      color: '#c89b45',
-      roughness: 0.22,
-      metalness: 0.92,
+      color: 0xffd700,
+      metalness: 1.0,
+      roughness: 0.2,
     }),
     brushedGold: new THREE.MeshStandardMaterial({
-      color: '#9d6f24',
-      roughness: 0.34,
-      metalness: 0.86,
+      color: 0xffd700,
+      roughness: 0.25,
+      metalness: 0.95,
     }),
     navyStructure: new THREE.MeshStandardMaterial({
       color: isNightMode ? '#091225' : '#1e293b',
@@ -694,12 +776,14 @@ export function createCityMaterialPalette(
       roughness: 0.45,
       metalness: 0.5,
     }),
-    curtainGlass: new THREE.MeshStandardMaterial({
-      color: isNightMode ? '#075985' : '#7dd3fc',
-      roughness: 0.12,
-      metalness: 0.86,
+    curtainGlass: new THREE.MeshPhysicalMaterial({
+      color: isNightMode ? 0x0f172a : 0x7dd3fc,
+      transmission: 0.9,
+      roughness: 0.1,
+      metalness: 0.1,
+      ior: 1.5,
       transparent: true,
-      opacity: 0.88,
+      opacity: 1.0,
     }),
     litGlassNight: new THREE.MeshStandardMaterial({
       color: isNightMode ? '#38bdf8' : '#bae6fd',
@@ -969,12 +1053,14 @@ export function createCityMaterialPalette(
       roughness: 0.4,
       metalness: 0.5,
     }),
-    blackObsidianGlass: new THREE.MeshStandardMaterial({
-      color: '#09090b',
+    blackObsidianGlass: new THREE.MeshPhysicalMaterial({
+      color: 0x09090b,
+      transmission: 0.9,
       roughness: 0.1,
-      metalness: 0.9,
+      metalness: 0.1,
+      ior: 1.5,
       transparent: true,
-      opacity: 0.85,
+      opacity: 1.0,
     }),
     yachtHullWhite: new THREE.MeshStandardMaterial({
       color: '#f8fafc',
@@ -986,12 +1072,14 @@ export function createCityMaterialPalette(
       roughness: 0.65,
       metalness: 0.05,
     }),
-    skyReflectiveCurtainGlass: new THREE.MeshStandardMaterial({
-      color: '#38bdf8',
+    skyReflectiveCurtainGlass: new THREE.MeshPhysicalMaterial({
+      color: 0x38bdf8,
+      transmission: 0.9,
       roughness: 0.1,
-      metalness: 0.9,
+      metalness: 0.1,
+      ior: 1.5,
       transparent: true,
-      opacity: 0.7,
+      opacity: 1.0,
     }),
     fountainWaterDancing: new THREE.MeshStandardMaterial({
       color: '#06b6d4',
