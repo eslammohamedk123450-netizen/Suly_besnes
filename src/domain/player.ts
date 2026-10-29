@@ -166,7 +166,7 @@ export function createNewPlayer(
 ): PlayerProfile {
   const createdAt = now.toISOString();
 
-  const initialCash = country.startingBalance || 25_000;
+  const initialCash = 10_000;
   const initialLoanPrincipal = 5_000;
   const initialLoanRepay = 5_250;
   const initialLandValue = 7_000;
@@ -280,7 +280,7 @@ export function createNewPlayer(
     payables: 0,
     goldGrams: 0,
     goldCostBasis: 0,
-    diamonds: 15,
+    diamonds: 0,
     speedCards: [],
     badges: ['طوق النجاة'],
     assets: [],

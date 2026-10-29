@@ -90,13 +90,37 @@ export function formatCompactGold(grams: number, decimals: number = 1): string {
   return formatGold(grams, { compact: true, decimals });
 }
 
+/**
+ * Formats a currency/number amount into a compact readable string:
+ * 1,500,000 -> 1.5M
+ * 1,000,000,000 -> 1B
+ * 10,000 -> 10K
+ * 500 -> 500
+ */
 export function formatCurrency(
-  value: number, 
-  currencySymbol = '$',
+  amount: number, 
+  currencySymbol?: string,
   options?: { compact?: boolean; decimals?: number }
 ): string {
-  if (options?.compact) {
-    return `${currencySymbol} ${formatCompactNumber(value ?? 0, options.decimals ?? 1)}`;
+  if (amount === null || amount === undefined || isNaN(amount)) return '0';
+  const abs = Math.abs(amount);
+  const sign = amount < 0 ? '-' : '';
+  const decimals = options?.decimals ?? 1;
+
+  let formatted: string;
+  if (abs >= 1e12) {
+    formatted = (abs / 1e12).toFixed(decimals).replace(/\.0+$/, '') + 'T';
+  } else if (abs >= 1e9) {
+    formatted = (abs / 1e9).toFixed(decimals).replace(/\.0+$/, '') + 'B';
+  } else if (abs >= 1e6) {
+    formatted = (abs / 1e6).toFixed(decimals).replace(/\.0+$/, '') + 'M';
+  } else if (abs >= 1e3) {
+    formatted = (abs / 1e3).toFixed(decimals).replace(/\.0+$/, '') + 'K';
+  } else {
+    formatted = integerFormat.format(Math.round(abs));
   }
-  return `${currencySymbol} ${formatNumber(value ?? 0)}`;
+
+  const result = `${sign}${formatted}`;
+  return currencySymbol ? `${currencySymbol} ${result}` : result;
 }
+

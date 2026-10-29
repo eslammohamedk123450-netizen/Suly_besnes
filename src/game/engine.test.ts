@@ -273,7 +273,7 @@ describe('Business Empire economy invariants', () => {
     if (result.ok) {
       expect(result.data.level).toBe(2);
       expect(result.profile.lands[0].areaSquareMeters).toBe(1_100);
-      expect(result.profile.bankBalance).toBe(170_000);
+      expect(result.profile.bankBalance).toBe(250_000 - Math.round(1_500 * Math.pow(1.5, 1)));
     }
   });
 

@@ -517,6 +517,45 @@ export default function App() {
     };
   }, [account?.id, account?.isGuest]);
 
+  // نظام مصاريف الصيانة (Maintenance): كل مبنى يخصم 10 ذهب/كاش كل 60 ثانية في الخلفية
+  useEffect(() => {
+    if (!profile) return;
+
+    const maintenanceInterval = window.setInterval(() => {
+      setProfile((current) => {
+        if (!current) return current;
+        const buildingCount = current.companies?.length ?? 0;
+        if (buildingCount <= 0) return current;
+
+        const maintenancePerBuilding = 10;
+        const totalCost = buildingCount * maintenancePerBuilding;
+        const newBalance = Math.max(0, (current.bankBalance ?? 0) - totalCost);
+
+        const entry: FinanceLedgerEntry = {
+          id: `maint-${current.day}-${Date.now()}`,
+          category: 'expense',
+          amount: totalCost,
+          countryId: current.countryId,
+          occurredAt: new Date().toISOString(),
+          note: `مصاريف صيانة دورية للمباني (${buildingCount} مبانٍ · ${maintenancePerBuilding}$ لكل مبنى)`,
+        };
+
+        const updated: PlayerProfile = {
+          ...current,
+          bankBalance: newBalance,
+          ledger: [...(current.ledger ?? []), entry],
+        };
+
+        saveGame(updated, account?.id);
+        return updated;
+      });
+    }, 60_000);
+
+    return () => {
+      window.clearInterval(maintenanceInterval);
+    };
+  }, [profile?.id, account?.id]);
+
   async function handleAuthenticated(nextAccount: LocalAccount) {
     setAccount(nextAccount);
     const local = loadSavedGame(nextAccount.id) ?? loadPendingInitialProfile(nextAccount.id)?.profile ?? null;

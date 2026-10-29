@@ -463,8 +463,9 @@ export function upgradeLand(profile: PlayerProfile, landId: string, paymentMetho
   const land = profile.lands.find((item) => item.id === landId);
   if (!land) return failure(profile, 'not-found', 'الأرض غير موجودة.');
   const level = land.upgradeLevel ?? 1;
-  if (level >= 5) return failure(profile, 'condition-not-met', 'وصلت الأرض إلى أعلى مستوى تطوير.');
-  const cost = Math.round(80_000 * Math.pow(1.55, level - 1));
+  if (level >= 10) return failure(profile, 'condition-not-met', 'وصلت الأرض إلى أعلى مستوى تطوير.');
+  const baseCost = 1_500;
+  const cost = Math.round(baseCost * Math.pow(1.5, level));
   const payment = resolvePurchaseDebit(profile, cost, paymentMethod);
   if ('message' in payment) return failure(profile, 'insufficient-funds', payment.message);
   const upgraded = { ...land, upgradeLevel: level + 1, areaSquareMeters: Math.round(land.areaSquareMeters * 1.1), purchasePrice: land.purchasePrice + cost };
@@ -1105,17 +1106,54 @@ export function foundCompany(profile: PlayerProfile, industryId: IndustryId, lan
   return success(syncTasks(nextProfile), `تم تأسيس ${companyName} وترخيصها ${paymentMethod === 'diamonds' ? `مقابل ${payment.diamondsSpent} ماسة` : 'نقدًا'}.`, { companyId, totalCost, diamondsSpent: payment.diamondsSpent });
 }
 
+/**
+ * Calculates exponential building upgrade cost:
+ * cost = baseCost * Math.pow(1.5, currentLevel)
+ */
+export function calculateBuildingUpgradeCost(baseCost: number, currentLevel: number): number {
+  return Math.round(baseCost * Math.pow(1.5, currentLevel));
+}
+
+/**
+ * Deducts periodic building maintenance expenses:
+ * Deducts 10 gold/cash per building/company every 60 seconds
+ */
+export function deductBuildingMaintenance(profile: PlayerProfile, maintenancePerBuilding: number = 10): { profile: PlayerProfile; deducted: number } {
+  const buildingCount = profile.companies?.length ?? 0;
+  if (buildingCount <= 0) return { profile, deducted: 0 };
+  const cost = buildingCount * maintenancePerBuilding;
+  const newBalance = Math.max(0, profile.bankBalance - cost);
+  const entry: FinanceLedgerEntry = {
+    id: `maint-${profile.day}-${Date.now()}`,
+    category: 'expense',
+    amount: cost,
+    countryId: profile.countryId,
+    occurredAt: new Date().toISOString(),
+    note: `مصاريف صيانة دورية للمباني (${buildingCount} مبانٍ · ${maintenancePerBuilding}$ لكل مبنى)`,
+  };
+  return {
+    profile: {
+      ...profile,
+      bankBalance: newBalance,
+      ledger: [...(profile.ledger ?? []), entry],
+    },
+    deducted: cost,
+  };
+}
+
 export function upgradeCompany(profile: PlayerProfile, companyId: string, paymentMethod: PurchasePaymentMethod = 'cash'): GameResult<{ companyId: string; level: number; cost: number; diamondsSpent: number }> {
   const company = profile.companies.find((item) => item.id === companyId);
   if (!company) return failure(profile, 'not-found', 'الشركة غير موجودة.');
   const level = company.upgradeLevel ?? 1;
-  if (level >= 5) return failure(profile, 'condition-not-met', 'وصلت هذه الشركة إلى أعلى مستوى تطوير.');
+  if (level >= 10) return failure(profile, 'condition-not-met', 'وصلت هذه الشركة إلى أعلى مستوى تطوير.');
   const completedBatches = profile.productionOrders
     .filter((order) => order.companyId === companyId && order.status === 'completed')
     .reduce((sum, order) => sum + order.batches, 0);
   const requiredBatches = level * 2;
   if (completedBatches < requiredBatches) return failure(profile, 'condition-not-met', `تحتاج إلى إكمال ${requiredBatches} دفعات إنتاج قبل الوصول إلى المستوى ${level + 1}. أكملت ${completedBatches}.`);
-  const cost = Math.round(120_000 * Math.pow(1.55, level - 1));
+  const industry = findIndustry(company.industryId);
+  const baseCost = industry?.setupFee ?? 2_000;
+  const cost = Math.round(baseCost * Math.pow(1.5, level));
   const payment = resolvePurchaseDebit(profile, cost, paymentMethod);
   if ('message' in payment) return failure(profile, 'insufficient-funds', `تحتاج إلى ${cost.toLocaleString('ar-EG')} $ أو ما يعادلها بالماس لتطوير الشركة. ${payment.message}`);
   const capacityBonus = 20 * level;
