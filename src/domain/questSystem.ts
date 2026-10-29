@@ -10,22 +10,26 @@ import { loadCityConstructions } from '../game/cityGridSystem';
  * الواجهة الرسمية للمهمة وفق متطلبات التحديث:
  * id, title, description, targetAmount, currentAmount, isCompleted, reward
  */
-export interface QuestTask {
+export interface QuestReward {
+  type: 'gold' | 'diamonds';
+  amount: number;
+  label: string;
+}
+
+export interface Quest {
   id: string;
   title: string;
   description: string;
   targetAmount: number;
   currentAmount: number;
   isCompleted: boolean;
+  reward: QuestReward;
   isClaimed?: boolean;
-  reward: {
-    type: 'gold' | 'diamonds';
-    amount: number;
-    label: string;
-  };
   icon?: string;
   category?: 'construction' | 'wealth' | 'upgrade';
 }
+
+export type QuestTask = Quest;
 
 /**
  * 3 مهام افتراضية أساسية:
@@ -37,7 +41,7 @@ export const DEFAULT_QUEST_TASKS: QuestTask[] = [
   {
     id: 'quest_small_beginning',
     title: 'البداية الصغيرة',
-    description: 'قم ببناء 1 مبنى تجاري أو صناعي في إمبراطوريتك.',
+    description: 'قم ببناء 1 مبنى في إمبراطوريتك (المكافأة: 5000 ذهب).',
     targetAmount: 1,
     currentAmount: 0,
     isCompleted: false,
@@ -53,7 +57,7 @@ export const DEFAULT_QUEST_TASKS: QuestTask[] = [
   {
     id: 'quest_businessman',
     title: 'رجل الأعمال',
-    description: 'اجمع 50,000 ذهب في رصيدك المالي لتعزيز سيولتك.',
+    description: 'اجمع 50,000 ذهب في رصيدك المالي (المكافأة: 10 ألماس).',
     targetAmount: 50000,
     currentAmount: 0,
     isCompleted: false,
@@ -69,7 +73,7 @@ export const DEFAULT_QUEST_TASKS: QuestTask[] = [
   {
     id: 'quest_expansion',
     title: 'التوسع',
-    description: 'قم بترقية أي مبنى أو شركة للمستوى 2 لزيادة الإنتاجية.',
+    description: 'قم بترقية أي مبنى للمستوى 2 (المكافأة: 15000 ذهب).',
     targetAmount: 1,
     currentAmount: 0,
     isCompleted: false,

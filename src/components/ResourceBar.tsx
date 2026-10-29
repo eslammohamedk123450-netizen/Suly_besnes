@@ -203,6 +203,17 @@ export function ResourceBar({
           </div>
 
           {!minimal3D && <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+            {/* Quick Quest Manager Access */}
+            <button
+              type="button"
+              onClick={() => window.dispatchEvent(new CustomEvent('open_quest_manager'))}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-900/90 border border-amber-500/40 hover:border-amber-400 hover:bg-slate-850 text-amber-300 text-xs font-black shadow-sm transition active:scale-95 cursor-pointer"
+              title="نظام المهام وتوجيه اللاعب (Quests)"
+            >
+              <span className="text-sm">🏆</span>
+              <span className="hidden md:inline text-[11px] font-bold">المهام</span>
+            </button>
+
             {onOpenNotifications && (
               <NotificationBell
                 unreadCount={unreadNotificationsCount}

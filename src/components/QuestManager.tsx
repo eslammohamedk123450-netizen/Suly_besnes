@@ -25,6 +25,8 @@ import {
   Award,
 } from 'lucide-react';
 
+import { triggerHaptic } from '../services/nativeMobileService';
+
 export type { QuestTask };
 
 interface QuestManagerProps {
@@ -54,6 +56,16 @@ export const QuestManager: React.FC<QuestManagerProps> = ({
   };
   const handleOpen = () => setInternalIsOpen(true);
 
+  // السماح بفتح شريط المهام من أي مكان في التطبيق عبر Event
+  useEffect(() => {
+    const handleGlobalOpen = () => setInternalIsOpen(true);
+    window.addEventListener('open_quest_manager', handleGlobalOpen);
+    return () => window.removeEventListener('open_quest_manager', handleGlobalOpen);
+  }, []);
+
+  // تصفية المهام: النشطة، المكتملة، أو الكل
+  const [filterTab, setFilterTab] = useState<'active' | 'completed' | 'all'>('active');
+
   // إدارة حالة المهام (Quest State)
   const [tasks, setTasks] = useState<QuestTask[]>(() => {
     const loaded = loadQuestTasks(profile.id);
@@ -75,19 +87,22 @@ export const QuestManager: React.FC<QuestManagerProps> = ({
     profile.warehouseLevel,
     profile.level,
     profile.cartelStrongholdLevel,
+    profile.lands?.length,
   ]);
 
   // عدد المهام الجاهزة للاستلام حالياً
   const claimableCount = tasks.filter((t) => t.isCompleted && !t.isClaimed).length;
   const completedCount = tasks.filter((t) => t.isCompleted).length;
+  const activeCount = tasks.filter((t) => !t.isClaimed).length;
 
   // استلام المكافأة (Claim Reward)
   const handleClaimReward = (task: QuestTask) => {
     if (!task.isCompleted || task.isClaimed) return;
 
-    // تشغيل المؤثرات الصوتية
+    // تشغيل المؤثرات الصوتية والاهتزاز
     playSound('cash');
     playSound('success');
+    triggerHaptic('success');
 
     // تحديث بيانات اللاعب وإضافة المكافأة
     const updatedProfile: PlayerProfile = {
@@ -122,6 +137,12 @@ export const QuestManager: React.FC<QuestManagerProps> = ({
       onUpdateProfile(updatedProfile);
     }
   };
+
+  const filteredTasks = tasks.filter((t) => {
+    if (filterTab === 'active') return !t.isClaimed;
+    if (filterTab === 'completed') return t.isClaimed;
+    return true;
+  });
 
   return (
     <>
@@ -204,6 +225,73 @@ export const QuestManager: React.FC<QuestManagerProps> = ({
               </div>
             </div>
 
+            {/* أشرطة التصفية للمهام (النشطة افتراضياً) */}
+            <div className="px-4 py-2.5 bg-slate-900/60 border-b border-slate-800 flex items-center gap-2">
+              <button
+                onClick={() => setFilterTab('active')}
+                className={`flex-1 py-1.5 px-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                  filterTab === 'active'
+                    ? 'bg-gradient-to-r from-amber-500 to-yellow-400 text-slate-950 font-black shadow-md shadow-amber-500/20'
+                    : 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800'
+                }`}
+              >
+                <span>المهام النشطة</span>
+                {activeCount > 0 && (
+                  <span
+                    className={`px-1.5 py-0.2 rounded-full text-[10px] font-black ${
+                      filterTab === 'active'
+                        ? 'bg-slate-950/25 text-slate-950'
+                        : 'bg-amber-500/20 text-amber-300'
+                    }`}
+                  >
+                    {activeCount}
+                  </span>
+                )}
+              </button>
+
+              <button
+                onClick={() => setFilterTab('completed')}
+                className={`flex-1 py-1.5 px-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                  filterTab === 'completed'
+                    ? 'bg-gradient-to-r from-amber-500 to-yellow-400 text-slate-950 font-black shadow-md shadow-amber-500/20'
+                    : 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800'
+                }`}
+              >
+                <span>المكتملة</span>
+                {tasks.filter((t) => t.isClaimed).length > 0 && (
+                  <span
+                    className={`px-1.5 py-0.2 rounded-full text-[10px] font-black ${
+                      filterTab === 'completed'
+                        ? 'bg-slate-950/25 text-slate-950'
+                        : 'bg-emerald-500/20 text-emerald-300'
+                    }`}
+                  >
+                    {tasks.filter((t) => t.isClaimed).length}
+                  </span>
+                )}
+              </button>
+
+              <button
+                onClick={() => setFilterTab('all')}
+                className={`flex-1 py-1.5 px-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                  filterTab === 'all'
+                    ? 'bg-gradient-to-r from-amber-500 to-yellow-400 text-slate-950 font-black shadow-md shadow-amber-500/20'
+                    : 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800'
+                }`}
+              >
+                <span>الكل</span>
+                <span
+                  className={`px-1.5 py-0.2 rounded-full text-[10px] font-black ${
+                    filterTab === 'all'
+                      ? 'bg-slate-950/25 text-slate-950'
+                      : 'bg-slate-800 text-slate-400'
+                  }`}
+                >
+                  {tasks.length}
+                </span>
+              </button>
+            </div>
+
             {/* رسالة التهنئة المنبثقة عند استلام المكافأة */}
             {claimToast && (
               <div className="mx-4 mt-3 p-3 rounded-xl bg-gradient-to-r from-amber-500/20 via-yellow-500/20 to-emerald-500/20 border border-amber-400/50 flex items-center gap-2.5 animate-bounce">
@@ -217,7 +305,23 @@ export const QuestManager: React.FC<QuestManagerProps> = ({
 
             {/* قائمة المهام (Quest List) */}
             <div className="flex-1 overflow-y-auto p-4 space-y-3.5">
-              {tasks.map((task) => {
+              {filteredTasks.length === 0 ? (
+                <div className="text-center py-12 px-4 rounded-2xl bg-slate-900/50 border border-slate-800">
+                  <Trophy className="w-10 h-10 text-slate-600 mx-auto mb-2" />
+                  <p className="text-sm font-bold text-slate-400">
+                    {filterTab === 'active'
+                      ? 'رائع! لا توجد مهام نشطة حالياً، لقد أنجزت جميع المهام المتاحة.'
+                      : 'لا توجد مهام في هذا التبويب.'}
+                  </p>
+                  <button
+                    onClick={() => setFilterTab('all')}
+                    className="mt-3 px-3 py-1.5 rounded-xl bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-bold hover:bg-amber-500/30 transition-colors"
+                  >
+                    عرض كل المهام
+                  </button>
+                </div>
+              ) : (
+                filteredTasks.map((task) => {
                 const progressPercent = Math.min(
                   100,
                   Math.floor((task.currentAmount / task.targetAmount) * 100)
@@ -316,7 +420,7 @@ export const QuestManager: React.FC<QuestManagerProps> = ({
                     </div>
                   </div>
                 );
-              })}
+              }))}
             </div>
 
             {/* التذييل السفلي */}
