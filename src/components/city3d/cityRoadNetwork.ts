@@ -390,8 +390,11 @@ function buildCyberSUV(palette: CityMaterialPalette, isSoftwareGl: boolean): THR
 export function buildCityRoadNetwork(
   palette: CityMaterialPalette,
   isSoftwareGl: boolean,
-  isNightMode: boolean
+  timeOfDay: 'sunset' | 'night' | 'day' | boolean = 'sunset'
 ): CityRoadNetworkResult {
+  const isNightOrSunset = typeof timeOfDay === 'boolean' 
+    ? timeOfDay 
+    : (timeOfDay === 'night' || timeOfDay === 'sunset');
   const roadGroup = new THREE.Group();
   const vehicles: TrafficVehicle[] = [];
   const coastlineX = CITY_WORLD_CONFIG.coastlineX;
@@ -598,7 +601,7 @@ export function buildCityRoadNetwork(
     // Downward Luminaire Lamp Head with Warm Glow
     const luminaire = new THREE.Mesh(
       new THREE.BoxGeometry(0.42, 0.14, 0.24),
-      isNightMode ? palette.carHeadlight : palette.chromeMetal
+      isNightOrSunset ? palette.carHeadlight : palette.chromeMetal
     );
     luminaire.position.set(armX, 4.08, 0);
     lamp.add(luminaire);
@@ -718,6 +721,16 @@ export function buildCityRoadNetwork(
     }
 
     roadGroup.add(vehicleMesh);
+  });
+
+  // Ensure all roads, curbs, sidewalks, and street props receive and cast shadows
+  roadGroup.traverse((child) => {
+    if (child instanceof THREE.Mesh) {
+      child.receiveShadow = !isSoftwareGl;
+      if (child.name !== 'expanded_harbor_water' && !(child.material as THREE.Material)?.transparent) {
+        child.castShadow = !isSoftwareGl;
+      }
+    }
   });
 
   return { group: roadGroup, vehicles };
