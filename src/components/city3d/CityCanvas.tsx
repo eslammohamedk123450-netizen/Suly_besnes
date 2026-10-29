@@ -68,7 +68,6 @@ import {
   type LandmarkSystemDefinition,
 } from './cityWorldData';
 import { createBuildingLabelSprite } from './cityLabels';
-import { buildEgyptGeography } from './egyptMapGeography';
 
 import './CityCanvas.css';
 
@@ -234,7 +233,6 @@ export const CityCanvas: React.FC<CityCanvasProps> = ({
     ground.rotation.x = -Math.PI / 2;
     ground.receiveShadow = !isLowPowerDevice;
     scene.add(ground);
-    const egyptGeography = buildEgyptGeography(scene, isNightMode);
 
 
     // 8. Modular Road Grid & Traffic
