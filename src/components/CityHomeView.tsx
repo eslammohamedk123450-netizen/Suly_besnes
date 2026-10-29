@@ -8,7 +8,8 @@ import type { CountryDefinition } from '../domain/countries';
 import type { PlayerProfile } from '../domain/player';
 import type { SectionId } from '../domain/navigation';
 import type { GameCommand, GameResult } from '../game/engine';
-import { CityCanvas, type SelectedItem, type CityCameraPreset } from './city3d/CityCanvas';
+import { type SelectedItem, type CityCameraPreset } from './city3d/CityCanvas';
+import { IsometricCityMap } from './isometric/IsometricCityMap';
 import { BuildingDetailSheet } from './city3d/BuildingDetailSheet';
 import { BranchAndShopSheet } from './city3d/BranchAndShopSheet';
 import { CityControlsBar } from './city3d/CityControlsBar';
@@ -163,16 +164,12 @@ export const CityHomeView: React.FC<CityHomeViewProps> = (props) => {
         <div className="relative w-full space-y-3">
           {/* Interactive 3D Canvas */}
           <div className="relative">
-            <CityCanvas
-              key={`city-canvas-${gridRefreshKey}`}
+            <IsometricCityMap
+              key={`isometric-city-map-${gridRefreshKey}`}
               profile={profile}
               selectedItem={selectedItem}
               onSelectItem={handleSelectItem}
-              isNightMode={isNightMode}
-              timeOfDay={timeOfDay}
               cameraPreset={cameraPreset}
-              cameraSpeed={cameraSpeed}
-              graphicsQuality={graphicsQuality}
               onResetPreset={() => setCameraPreset(null)}
             />
 
