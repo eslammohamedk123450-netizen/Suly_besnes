@@ -9,6 +9,12 @@ export default defineConfig(({mode}) => {
   return {
     base,
     plugins: [react(), tailwindcss()],
+    build: {
+      sourcemap: false,
+      minify: 'esbuild',
+      cssMinify: true,
+      reportCompressedSize: false,
+    },
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),

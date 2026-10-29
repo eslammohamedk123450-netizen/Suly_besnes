@@ -285,7 +285,6 @@ export const IsometricCityMap: React.FC<IsometricCityMapProps> = ({ profile, sel
 };
 
 export default IsometricCityMap;
-
 const MAP_GRID_SIZE = 40;
 const MAP_WORLD_WIDTH = 1400;
 const MAP_WORLD_HEIGHT = 875;
@@ -293,9 +292,9 @@ const MIN_MAP_ZOOM = 0.16;
 const MAX_MAP_ZOOM = 2.2;
 
 const MAP_BUILDINGS = [
-  { id: 'hq', label: 'المقر الرئيسي', image: '/assets/buildings/hq.png', col: 18, row: 18, cells: 9 },
-  { id: 'shop', label: 'المركز التجاري', image: '/assets/buildings/shop.png', col: 24, row: 22, cells: 8 },
-  { id: 'factory', label: 'المنطقة الصناعية', image: '/assets/buildings/factory.png', col: 32, row: 8, cells: 8 },
+  { id: 'hq', label: 'المقر الرئيسي', image: '/assets/buildings/hq.webp', col: 18, row: 18, cells: 9 },
+  { id: 'shop', label: 'المركز التجاري', image: '/assets/buildings/shop.webp', col: 24, row: 22, cells: 8 },
+  { id: 'factory', label: 'المنطقة الصناعية', image: '/assets/buildings/factory.webp', col: 32, row: 8, cells: 8 },
 ] as const;
 
 const MAP_AIRPORT = { col: 28, row: 3 };
