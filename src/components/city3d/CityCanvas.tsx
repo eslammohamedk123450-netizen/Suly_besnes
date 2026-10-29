@@ -554,6 +554,12 @@ export const CityCanvas: React.FC<CityCanvasProps> = ({
     const mouse = new THREE.Vector2();
 
     const handleTapRaycast = (normX: number, normY: number) => {
+      // If a building or plot is already selected, ignore all canvas taps!
+      // The building menu must ONLY close when the user explicitly clicks the X button.
+      if (selectedItemRef.current !== null) {
+        return;
+      }
+
       mouse.x = normX;
       mouse.y = normY;
       raycaster.setFromCamera(mouse, camera);
@@ -576,8 +582,6 @@ export const CityCanvas: React.FC<CityCanvasProps> = ({
       if (hitItem) {
         playSound('click');
         onSelectItemRef.current(hitItem);
-      } else {
-        onSelectItemRef.current(null);
       }
     };
 
@@ -832,9 +836,15 @@ export const CityCanvas: React.FC<CityCanvasProps> = ({
     if (onResetPreset) onResetPreset();
   }, [cameraPreset, onResetPreset]);
 
-  // Pan to clicked landmark automatically
+  // Pan to clicked landmark automatically and freeze/lock camera steady
   useEffect(() => {
     touchControllerRef.current?.cancelMotion();
+    if (selectedItem) {
+      touchControllerRef.current?.setLocked(true);
+    } else {
+      touchControllerRef.current?.setLocked(false);
+    }
+
     if (selectedItem?.type === 'landmark') {
       const def = ALL_CITY_LANDMARKS.find((l) => l.id === selectedItem.id);
       if (def) {

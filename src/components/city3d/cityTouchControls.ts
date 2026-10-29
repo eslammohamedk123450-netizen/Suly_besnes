@@ -110,6 +110,7 @@ export class CityTouchController {
   private velocityX = 0;
   private velocityZ = 0;
   private speedMultiplier = 1;
+  private isLocked = false;
 
   constructor(options: CityTouchControllerOptions) {
     this.dom = options.domElement;
@@ -122,7 +123,19 @@ export class CityTouchController {
     this.bindEvents();
   }
 
+  public setLocked(locked: boolean): void {
+    this.isLocked = locked;
+    if (locked) {
+      this.cancelMotion();
+    }
+  }
+
+  public getLocked(): boolean {
+    return this.isLocked;
+  }
+
   private onPointerDown = (e: MouseEvent | TouchEvent) => {
+    if (this.isLocked) return;
     this.isPointerDown = true;
     this.velocityX = 0;
     this.velocityZ = 0;
@@ -153,7 +166,7 @@ export class CityTouchController {
   };
 
   private onPointerMove = (e: MouseEvent | TouchEvent) => {
-    if (!this.isPointerDown) return;
+    if (this.isLocked || !this.isPointerDown) return;
 
     if ('touches' in e && e.touches.length === 0) return;
 
@@ -196,6 +209,12 @@ export class CityTouchController {
   };
 
   private onPointerUp = (e: MouseEvent | TouchEvent) => {
+    if (this.isLocked) {
+      this.isPointerDown = false;
+      this.isPinching = false;
+      return;
+    }
+
     if (this.dragDistance < 6) {
       const rect = this.dom.getBoundingClientRect();
       let clientX = this.startX;
@@ -219,6 +238,7 @@ export class CityTouchController {
   };
 
   private onWheel = (e: WheelEvent) => {
+    if (this.isLocked) return;
     e.preventDefault();
     this.targetFov.current = adjustCityCameraFov(
       this.targetFov.current,
@@ -227,6 +247,7 @@ export class CityTouchController {
   };
 
   public zoomStep(direction: 'in' | 'out') {
+    if (this.isLocked) return;
     const delta = direction === 'in'
       ? -CITY_CAMERA_LIMITS.zoomStep * this.speedMultiplier
       : CITY_CAMERA_LIMITS.zoomStep * this.speedMultiplier;
@@ -252,6 +273,12 @@ export class CityTouchController {
   }
 
   public updateInertia(dt: number) {
+    if (this.isLocked) {
+      this.velocityX = 0;
+      this.velocityZ = 0;
+      return;
+    }
+
     if (!this.isPointerDown && (Math.abs(this.velocityX) > 0.001 || Math.abs(this.velocityZ) > 0.001)) {
       const requestedX = this.velocityX * dt;
       const requestedZ = this.velocityZ * dt;

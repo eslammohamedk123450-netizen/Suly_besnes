@@ -204,8 +204,13 @@ export const BuildingDetailSheet: React.FC<BuildingDetailSheetProps> = ({
               </div>
             </div>
             <button
-              onClick={onClose}
-              className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"
+              onClick={(e) => {
+                e.stopPropagation();
+                onClose();
+              }}
+              className="p-2.5 rounded-xl bg-slate-800/90 hover:bg-rose-500/25 hover:border-rose-500/50 text-slate-300 hover:text-white border border-slate-700 transition-all shadow-md active:scale-95 cursor-pointer"
+              title="إغلاق القائمة (X)"
+              aria-label="إغلاق"
             >
               <X className="w-5 h-5" />
             </button>
@@ -419,8 +424,13 @@ export const BuildingDetailSheet: React.FC<BuildingDetailSheetProps> = ({
               </div>
             </div>
             <button
-              onClick={onClose}
-              className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"
+              onClick={(e) => {
+                e.stopPropagation();
+                onClose();
+              }}
+              className="p-2.5 rounded-xl bg-slate-800/90 hover:bg-rose-500/25 hover:border-rose-500/50 text-slate-300 hover:text-white border border-slate-700 transition-all shadow-md active:scale-95 cursor-pointer"
+              title="إغلاق القائمة (X)"
+              aria-label="إغلاق"
             >
               <X className="w-5 h-5" />
             </button>
@@ -573,8 +583,13 @@ export const BuildingDetailSheet: React.FC<BuildingDetailSheetProps> = ({
               </div>
             </div>
             <button
-              onClick={onClose}
-              className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"
+              onClick={(e) => {
+                e.stopPropagation();
+                onClose();
+              }}
+              className="p-2.5 rounded-xl bg-slate-800/90 hover:bg-rose-500/25 hover:border-rose-500/50 text-slate-300 hover:text-white border border-slate-700 transition-all shadow-md active:scale-95 cursor-pointer"
+              title="إغلاق القائمة (X)"
+              aria-label="إغلاق"
             >
               <X className="w-5 h-5" />
             </button>
@@ -707,8 +722,13 @@ export const BuildingDetailSheet: React.FC<BuildingDetailSheetProps> = ({
               </div>
             </div>
             <button
-              onClick={onClose}
-              className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"
+              onClick={(e) => {
+                e.stopPropagation();
+                onClose();
+              }}
+              className="p-2.5 rounded-xl bg-slate-800/90 hover:bg-rose-500/25 hover:border-rose-500/50 text-slate-300 hover:text-white border border-slate-700 transition-all shadow-md active:scale-95 cursor-pointer"
+              title="إغلاق القائمة (X)"
+              aria-label="إغلاق"
             >
               <X className="w-5 h-5" />
             </button>
@@ -1382,8 +1402,13 @@ export const BuildingDetailSheet: React.FC<BuildingDetailSheetProps> = ({
           </div>
         </div>
         <button
-          onClick={onClose}
-          className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"
+          onClick={(e) => {
+            e.stopPropagation();
+            onClose();
+          }}
+          className="p-2.5 rounded-xl bg-slate-800/90 hover:bg-rose-500/25 hover:border-rose-500/50 text-slate-300 hover:text-white border border-slate-700 transition-all shadow-md active:scale-95 cursor-pointer"
+          title="إغلاق القائمة (X)"
+          aria-label="إغلاق"
         >
           <X className="w-5 h-5" />
         </button>

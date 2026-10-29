@@ -260,6 +260,24 @@ export const CityHomeView: React.FC<CityHomeViewProps> = (props) => {
               </button>
             </div>
 
+            {/* Protective Touch Barrier Overlay: Intercepts all clicks and touches outside the building sheet so the menu NEVER closes accidentally and the camera NEVER moves away. It ONLY closes when the user clicks 'X'! */}
+            {selectedItem !== null && (
+              <div
+                className="absolute inset-0 z-30 pointer-events-auto bg-black/45 backdrop-blur-[2px] transition-opacity"
+                onClick={(e) => {
+                  // Strictly ignore outside clicks to prevent accidental closures
+                  e.stopPropagation();
+                  e.preventDefault();
+                }}
+                onTouchStart={(e) => {
+                  e.stopPropagation();
+                }}
+                onTouchMove={(e) => {
+                  e.stopPropagation();
+                }}
+              />
+            )}
+
             {/* Slide-up Detail Sheet for Selected Building or Plot */}
             {selectedItem?.type === 'plot' &&
             (isBranchShopOpen || selectedItem.plot.branch || selectedItem.plot.shop) ? (
