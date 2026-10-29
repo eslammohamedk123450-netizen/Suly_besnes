@@ -21,7 +21,7 @@ const supportedCommandNames = new Set<GameCommand['name']>([
   'claim_season_challenge', 'claim_login_reward', 'choose_season_event', 'update_notification_state',
   'list_player_asset', 'settle_player_auction', 'cancel_player_auction',
   'claim_starter_mission', 'claim_mission_reward',
-  'accept_bot_offer',
+  'accept_bot_offer', 'upgrade_cartel_stronghold',
 ]);
 
 function storageKey(accountId: string): string {

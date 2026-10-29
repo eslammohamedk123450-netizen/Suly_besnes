@@ -83,6 +83,13 @@ const REGIONAL_CITADEL_LEVEL_IMAGES = Array.from({ length: 5 }, (_, index) => ({
   src: `/images/regional-citadel/level-${String(index + 1).padStart(2, '0')}.jpg`,
 }));
 
+import {
+  CARTEL_STRONGHOLD_LEVELS,
+  getCartelStrongholdLevel,
+  saveCartelStrongholdLevel,
+} from './cartelStronghold3D';
+import { CartelStrongholdViewer3D } from './CartelStrongholdViewer3D';
+
 interface BuildingDetailSheetProps {
   selectedItem: SelectedItem | null;
   profile: PlayerProfile;
@@ -114,6 +121,9 @@ export const BuildingDetailSheet: React.FC<BuildingDetailSheetProps> = ({
   const [customCompanyName, setCustomCompanyName] = useState<string>('');
   const [actionNotice, setActionNotice] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
   const [nowClock, setNowClock] = useState(Date.now());
+  const [cartelPreviewLevel, setCartelPreviewLevel] = useState<number>(() =>
+    getCartelStrongholdLevel(profile)
+  );
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -781,6 +791,163 @@ export const BuildingDetailSheet: React.FC<BuildingDetailSheetProps> = ({
                   );
                 })}
               </div>
+            </div>
+          )}
+
+          {landmarkDef.id === 'cartel' && (
+            <div className="mb-4 rounded-2xl border border-red-500/30 bg-gradient-to-b from-red-950/30 via-slate-950/80 to-slate-950 p-4 space-y-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="p-1.5 rounded-lg bg-red-500/20 text-red-300 font-black text-xs">
+                      ⚔️ معقل الكارتيل والتحالفات
+                    </span>
+                    <span className="text-[11px] font-bold text-amber-300">
+                      8 مستويات معمارية ومجسمات 3D مطابقة
+                    </span>
+                  </div>
+                  <p className="mt-1 text-xs text-slate-300">
+                    مجسمات 3D تفاعلية ومطابقة لصور القصور الصخرية، الشلالات، القباب الذهبية، واليخوت
+                  </p>
+                </div>
+                <div className="text-left">
+                  <span className="rounded-lg border border-amber-400/40 bg-amber-400/10 px-2.5 py-1 text-xs font-black text-amber-200 block">
+                    المستوى الحالي: {getCartelStrongholdLevel(profile)}
+                  </span>
+                </div>
+              </div>
+
+              {/* 3D Real-time Interactive Model Viewer */}
+              <CartelStrongholdViewer3D
+                level={cartelPreviewLevel}
+                onLevelChange={(lvl) => setCartelPreviewLevel(lvl)}
+                height={330}
+              />
+
+              {/* Selected Level Info & Features Card */}
+              {(() => {
+                const currentStrongholdLvl = getCartelStrongholdLevel(profile);
+                const info =
+                  CARTEL_STRONGHOLD_LEVELS.find((l) => l.level === cartelPreviewLevel) ??
+                  CARTEL_STRONGHOLD_LEVELS[0];
+                const isCurrent = info.level === currentStrongholdLvl;
+                const canUpgradeToThis = info.level === currentStrongholdLvl + 1;
+                const canAfford = profile.bankBalance >= info.upgradeCost;
+
+                return (
+                  <div className="rounded-xl border border-amber-500/30 bg-slate-900/90 p-3.5 space-y-3">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-b border-slate-800 pb-2.5">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h4 className="text-sm font-black text-white">
+                            {info.nameAr} - المستوى {info.level}
+                          </h4>
+                          {isCurrent && (
+                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-bold">
+                              المعقل الحالي النشط ✅
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[11px] text-amber-300/90 mt-0.5">{info.subTitleAr}</p>
+                      </div>
+
+                      {canUpgradeToThis && (
+                        <button
+                          disabled={!canAfford || isSubmitting}
+                          onClick={() => {
+                            if (!canAfford) {
+                              showFeedback(
+                                `الرصيد المتاح لا يكفي للترقية! التكلفة المطلوبة: ${formatMoney(info.upgradeCost)}`,
+                                'error'
+                              );
+                              return;
+                            }
+                            setIsSubmitting(true);
+                            try {
+                              onCommand(
+                                {
+                                  name: 'upgrade_cartel_stronghold',
+                                  args: { targetLevel: info.level },
+                                },
+                                (current) => {
+                                  const updated = {
+                                    ...current,
+                                    bankBalance: current.bankBalance - info.upgradeCost,
+                                    cartelStrongholdLevel: info.level,
+                                  };
+                                  saveCartelStrongholdLevel(current.id, info.level);
+                                  return {
+                                    ok: true,
+                                    profile: updated,
+                                    message: `تمت ترقية معقل الكارتيل إلى مستوى ${info.level}`,
+                                    data: undefined,
+                                  };
+                                }
+                              );
+                              showFeedback(
+                                `تهانينا! تمت ترقية معقل الكارتيل بنجاح إلى ${info.nameAr} (المستوى ${info.level})!`,
+                                'success'
+                              );
+                              onRefreshGrid();
+                            } catch (err: any) {
+                              showFeedback(err?.message || 'تعذر ترقية المعقل', 'error');
+                            } finally {
+                              setIsSubmitting(false);
+                            }
+                          }}
+                          className={`px-3 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 shadow-lg transition-all ${
+                            canAfford
+                              ? 'bg-gradient-to-r from-amber-500 to-yellow-500 text-slate-950 hover:brightness-110 active:scale-95'
+                              : 'bg-slate-800 text-slate-500 border border-slate-700 cursor-not-allowed'
+                          }`}
+                        >
+                          <Sparkles className="w-3.5 h-3.5" />
+                          <span>ترقية المعقل الآن ({formatMoney(info.upgradeCost)})</span>
+                        </button>
+                      )}
+                    </div>
+
+                    <p className="text-xs text-slate-300 leading-relaxed">{info.descriptionAr}</p>
+
+                    {/* Architectural Feature Badges */}
+                    <div className="flex flex-wrap gap-1.5">
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-amber-950/60 text-amber-200 border border-amber-500/30">
+                        🕌 {info.totalDomes} قباب ذهبية بهلال إسلامي
+                      </span>
+                      {info.hasWaterfall && (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-cyan-950/60 text-cyan-200 border border-cyan-400/40">
+                          🌊 شلال مائي هائل منساب في البحر
+                        </span>
+                      )}
+                      {info.hasHelipad && (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-950/60 text-emerald-200 border border-emerald-400/40">
+                          🚁 مهبط طائرات هليكوبتر تنفيذي
+                        </span>
+                      )}
+                      {info.hasYachtHarbor && (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-sky-950/60 text-sky-200 border border-sky-400/40">
+                          🛥️ مرسى ويخوت سياحية خاصة
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Perks List */}
+                    <div className="pt-2 border-t border-slate-800">
+                      <span className="text-[11px] font-black text-amber-200 block mb-1">
+                        امتيازات ومكاسب هذا المستوى:
+                      </span>
+                      <ul className="grid grid-cols-1 sm:grid-cols-2 gap-1 text-[11px] text-slate-300">
+                        {info.perksAr.map((perk, pIdx) => (
+                          <li key={pIdx} className="flex items-center gap-1.5">
+                            <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                            <span>{perk}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
           )}
 

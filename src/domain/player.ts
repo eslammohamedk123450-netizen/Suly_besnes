@@ -123,6 +123,7 @@ export interface PlayerProfile {
   bio?: string;
   renameCountThisWeek?: number;
   lastRenameWeekTimestamp?: number;
+  cartelStrongholdLevel?: number;
   lastOfflineClaimAt?: number;
   globalShipments?: GlobalShipmentRecord[];
   forwardContracts?: ForwardSupplyContract[];
