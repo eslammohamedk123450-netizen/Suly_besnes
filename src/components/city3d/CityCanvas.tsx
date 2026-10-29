@@ -55,6 +55,7 @@ import {
   buildPrestigeConsulateMesh,
 } from './cityMeshBuilders';
 import { buildCityRoadNetwork, type TrafficVehicle } from './cityRoadNetwork';
+import { buildCityPowerGrid } from './cityPowerGrid';
 import {
   CityTouchController,
   CITY_CAMERA_LIMITS,
@@ -280,6 +281,10 @@ export const CityCanvas: React.FC<CityCanvasProps> = ({
     const roadNetwork = buildCityRoadNetwork(palette, isSoftwareGl, currentTimeOfDay);
     scene.add(roadNetwork.group);
     const trafficVehicles: TrafficVehicle[] = roadNetwork.vehicles;
+
+    // Subterranean Power Grid & Interactive Fiber Optics
+    const powerGrid = buildCityPowerGrid(palette, isSoftwareGl, currentTimeOfDay === 'night');
+    scene.add(powerGrid.group);
 
     // 9. Clickable Targets Map
     const clickableObjects = new Map<THREE.Object3D, SelectedItem>();
@@ -774,14 +779,24 @@ export const CityCanvas: React.FC<CityCanvasProps> = ({
         diamondCrystalMesh.position.y = 4.2 + Math.sin(elapsedTime * 2) * 0.25;
       }
 
-      // Update Selection Indicator position
+      // Update Water Shaders wave and ripple time
+      if (palette.harborWater && 'uniforms' in palette.harborWater) {
+        (palette.harborWater as THREE.ShaderMaterial).uniforms.uTime.value = elapsedTime;
+      }
+      if (palette.waterSurface && 'uniforms' in palette.waterSurface) {
+        (palette.waterSurface as THREE.ShaderMaterial).uniforms.uTime.value = elapsedTime;
+      }
+
+      // Update Selection Indicator position & Interactive Fiber Optics
       const currentSelected = selectedItemRef.current;
+      let selectedCoords: { x: number; z: number } | null = null;
       if (currentSelected) {
         selectionHalo.visible = true;
         if (currentSelected.type === 'landmark') {
           const foundDef = ALL_CITY_LANDMARKS.find((l) => l.id === currentSelected.id);
           if (foundDef) {
             selectionHalo.position.set(foundDef.coordinates.x, 0.35, foundDef.coordinates.z);
+            selectedCoords = foundDef.coordinates;
           }
         } else if (currentSelected.type === 'plot') {
           selectionHalo.position.set(
@@ -789,11 +804,15 @@ export const CityCanvas: React.FC<CityCanvasProps> = ({
             0.35,
             currentSelected.plot.gridZ
           );
+          selectedCoords = { x: currentSelected.plot.gridX, z: currentSelected.plot.gridZ };
         }
         selectionHalo.rotation.z += dt * 1.5;
       } else {
         selectionHalo.visible = false;
       }
+
+      // Pulse subterranean power grid and illuminate fiber optics to selected node
+      powerGrid.update(elapsedTime, selectedCoords);
 
       renderer.render(scene, camera);
       scheduleFrame();

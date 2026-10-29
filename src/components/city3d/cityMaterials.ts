@@ -4,6 +4,7 @@
  */
 
 import * as THREE from 'three';
+import { createRealisticWaterMaterial, createFountainWaterMaterial } from './cityWaterShader';
 
 /**
  * Procedural texture cache to avoid memory leaks and reduce draw calls
@@ -18,6 +19,8 @@ export function resolveTimeOfDay(time?: TimeOfDay | boolean): TimeOfDay {
 }
 
 let asphaltTexture: THREE.CanvasTexture | null = null;
+let sidewalkTexture: THREE.CanvasTexture | null = null;
+let golfGrassTexture: THREE.CanvasTexture | null = null;
 let solarTexture: THREE.CanvasTexture | null = null;
 let cautionTexture: THREE.CanvasTexture | null = null;
 let officeWindowTextures: { day: THREE.CanvasTexture | null; night: THREE.CanvasTexture | null; sunset: THREE.CanvasTexture | null } = {
@@ -111,22 +114,22 @@ export function getOrCreateGroundTexture(timeOfDay?: TimeOfDay | boolean): THREE
         ctx.stroke();
       }
     } else {
-      // Vibrant, cheerful tycoon lawn parkland with alternating mowed grass bands
-      ctx.fillStyle = '#22c55e'; // Vibrant fresh grass
+      // Luxury golf-course style manicured lawn with rich dark green fairway mowing stripes
+      ctx.fillStyle = '#15803d'; // Deep lush emerald fairway green
       ctx.fillRect(0, 0, 512, 512);
 
-      // Alternating lawn stripes (classic stadium/park manicured look)
-      ctx.fillStyle = '#16a34a';
+      // Alternating dark green mowing bands (classic championship golf course look)
+      ctx.fillStyle = '#14532d';
       for (let y = 0; y < 512; y += 64) {
         ctx.fillRect(0, y, 512, 32);
       }
 
-      // Subtle fine grass stipples for depth
-      for (let i = 0; i < 1500; i++) {
+      // High-density fine grass blade stipples for velvety organic depth
+      for (let i = 0; i < 2200; i++) {
         const x = Math.floor(Math.random() * 512);
         const y = Math.floor(Math.random() * 512);
         const isLight = Math.random() > 0.5;
-        ctx.fillStyle = isLight ? 'rgba(134, 239, 172, 0.45)' : 'rgba(21, 128, 61, 0.35)';
+        ctx.fillStyle = isLight ? 'rgba(74, 222, 128, 0.28)' : 'rgba(5, 46, 22, 0.45)';
         ctx.fillRect(x, y, 2, 2);
       }
 
@@ -466,7 +469,7 @@ export function getOrCreatePaverTexture(): THREE.Texture {
 }
 
 /**
- * Creates procedural asphalt texture with subtle road noise
+ * Creates procedural realistic asphalt texture with dark bitumen, aggregate stones, and tire-track grain
  */
 export function getOrCreateAsphaltTexture(maxAnisotropy = 4): THREE.Texture {
   if (asphaltTexture) return asphaltTexture;
@@ -479,30 +482,172 @@ export function getOrCreateAsphaltTexture(maxAnisotropy = 4): THREE.Texture {
   }
 
   const canvas = document.createElement('canvas');
-  canvas.width = 128;
-  canvas.height = 128;
+  canvas.width = 256;
+  canvas.height = 256;
   const ctx = canvas.getContext('2d');
   if (ctx) {
-    ctx.fillStyle = '#1e293b';
-    ctx.fillRect(0, 0, 128, 128);
+    // 1. Dark bitumen slate base
+    ctx.fillStyle = '#1c2430';
+    ctx.fillRect(0, 0, 256, 256);
 
-    // Subtle grain
-    for (let i = 0; i < 400; i++) {
-      const x = Math.floor(Math.random() * 128);
-      const y = Math.floor(Math.random() * 128);
-      const shade = Math.random() > 0.5 ? 40 : 20;
-      ctx.fillStyle = `rgba(${shade}, ${shade}, ${shade + 10}, 0.25)`;
-      ctx.fillRect(x, y, 1, 1);
+    // 2. Subtle directional rolling wear (tire tracks)
+    const tireGrad = ctx.createLinearGradient(0, 0, 256, 0);
+    tireGrad.addColorStop(0, 'rgba(15, 23, 42, 0.4)');
+    tireGrad.addColorStop(0.25, 'rgba(30, 41, 59, 0.1)');
+    tireGrad.addColorStop(0.5, 'rgba(15, 23, 42, 0.5)');
+    tireGrad.addColorStop(0.75, 'rgba(30, 41, 59, 0.1)');
+    tireGrad.addColorStop(1, 'rgba(15, 23, 42, 0.4)');
+    ctx.fillStyle = tireGrad;
+    ctx.fillRect(0, 0, 256, 256);
+
+    // 3. Realistic aggregate mineral stones (basalt, granite, quartz flecks)
+    for (let i = 0; i < 3500; i++) {
+      const x = Math.floor(Math.random() * 256);
+      const y = Math.floor(Math.random() * 256);
+      const rand = Math.random();
+      if (rand > 0.85) {
+        // Light quartz aggregate fleck
+        ctx.fillStyle = 'rgba(203, 213, 225, 0.35)';
+        ctx.fillRect(x, y, 1, 1);
+      } else if (rand > 0.45) {
+        // Dark basalt aggregate pebble
+        ctx.fillStyle = 'rgba(15, 20, 28, 0.45)';
+        ctx.fillRect(x, y, 2, 2);
+      } else {
+        // Medium mineral stone
+        ctx.fillStyle = 'rgba(71, 85, 105, 0.3)';
+        ctx.fillRect(x, y, 1, 2);
+      }
+    }
+
+    // 4. Micro-surface road pores
+    ctx.fillStyle = 'rgba(2, 6, 23, 0.35)';
+    for (let j = 0; j < 800; j++) {
+      const px = Math.floor(Math.random() * 256);
+      const py = Math.floor(Math.random() * 256);
+      ctx.fillRect(px, py, 1, 1);
     }
   }
 
   asphaltTexture = new THREE.CanvasTexture(canvas);
   asphaltTexture.wrapS = THREE.RepeatWrapping;
   asphaltTexture.wrapT = THREE.RepeatWrapping;
-  asphaltTexture.repeat.set(4, 4);
+  asphaltTexture.repeat.set(6, 6);
   asphaltTexture.colorSpace = THREE.SRGBColorSpace;
   asphaltTexture.anisotropy = maxAnisotropy;
   return asphaltTexture;
+}
+
+/**
+ * Creates procedural realistic sidewalk paver texture with beveled rectangular flagstones
+ */
+export function getOrCreateSidewalkTexture(): THREE.Texture {
+  if (sidewalkTexture) return sidewalkTexture;
+
+  if (typeof document === 'undefined') {
+    const data = new Uint8Array([226, 232, 240, 255]);
+    const tex = new THREE.DataTexture(data, 1, 1);
+    tex.needsUpdate = true;
+    return tex;
+  }
+
+  const canvas = document.createElement('canvas');
+  canvas.width = 256;
+  canvas.height = 256;
+  const ctx = canvas.getContext('2d');
+  if (ctx) {
+    // Architectural concrete paver base
+    ctx.fillStyle = '#e2e8f0';
+    ctx.fillRect(0, 0, 256, 256);
+
+    const blockW = 32;
+    const blockH = 16;
+    ctx.strokeStyle = '#94a3b8';
+    ctx.lineWidth = 1.5;
+
+    // Running bond interlocking pavers
+    for (let y = 0; y < 256; y += blockH) {
+      const rowIdx = Math.floor(y / blockH);
+      const xOffset = (rowIdx % 2) * (blockW / 2);
+      for (let x = -blockW; x < 256 + blockW; x += blockW) {
+        ctx.strokeRect(x + xOffset, y, blockW, blockH);
+        // Bevel shade highlight
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.25)';
+        ctx.fillRect(x + xOffset + 1, y + 1, blockW - 2, 2);
+        // Stone tone variation
+        const toneVar = Math.sin((x + xOffset) * 0.1 + y * 0.2);
+        ctx.fillStyle = toneVar > 0 ? 'rgba(241, 245, 249, 0.4)' : 'rgba(203, 213, 225, 0.35)';
+        ctx.fillRect(x + xOffset + 1, y + 2, blockW - 2, blockH - 3);
+      }
+    }
+
+    // Fine concrete sand texture
+    for (let i = 0; i < 1200; i++) {
+      const sx = Math.floor(Math.random() * 256);
+      const sy = Math.floor(Math.random() * 256);
+      ctx.fillStyle = Math.random() > 0.5 ? 'rgba(255, 255, 255, 0.3)' : 'rgba(100, 116, 139, 0.25)';
+      ctx.fillRect(sx, sy, 1, 1);
+    }
+  }
+
+  sidewalkTexture = new THREE.CanvasTexture(canvas);
+  sidewalkTexture.wrapS = THREE.RepeatWrapping;
+  sidewalkTexture.wrapT = THREE.RepeatWrapping;
+  sidewalkTexture.repeat.set(4, 4);
+  sidewalkTexture.colorSpace = THREE.SRGBColorSpace;
+  return sidewalkTexture;
+}
+
+/**
+ * Creates procedural dark green championship golf course grass texture
+ */
+export function getOrCreateGolfGrassTexture(): THREE.Texture {
+  if (golfGrassTexture) return golfGrassTexture;
+
+  if (typeof document === 'undefined') {
+    const data = new Uint8Array([21, 128, 61, 255]);
+    const tex = new THREE.DataTexture(data, 1, 1);
+    tex.needsUpdate = true;
+    return tex;
+  }
+
+  const canvas = document.createElement('canvas');
+  canvas.width = 256;
+  canvas.height = 256;
+  const ctx = canvas.getContext('2d');
+  if (ctx) {
+    // Deep championship green base
+    ctx.fillStyle = '#14532d';
+    ctx.fillRect(0, 0, 256, 256);
+
+    // Fairway mowing stripes
+    ctx.fillStyle = '#15803d';
+    for (let y = 0; y < 256; y += 32) {
+      ctx.fillRect(0, y, 256, 16);
+    }
+
+    // Dense organic grass blade flecks
+    for (let i = 0; i < 2400; i++) {
+      const gx = Math.floor(Math.random() * 256);
+      const gy = Math.floor(Math.random() * 256);
+      const r = Math.random();
+      if (r > 0.6) {
+        ctx.fillStyle = 'rgba(74, 222, 128, 0.35)'; // Fresh blade highlight
+      } else if (r > 0.25) {
+        ctx.fillStyle = 'rgba(5, 46, 22, 0.45)'; // Deep shadow
+      } else {
+        ctx.fillStyle = 'rgba(34, 197, 94, 0.3)';
+      }
+      ctx.fillRect(gx, gy, 1, 2);
+    }
+  }
+
+  golfGrassTexture = new THREE.CanvasTexture(canvas);
+  golfGrassTexture.wrapS = THREE.RepeatWrapping;
+  golfGrassTexture.wrapT = THREE.RepeatWrapping;
+  golfGrassTexture.repeat.set(8, 8);
+  golfGrassTexture.colorSpace = THREE.SRGBColorSpace;
+  return golfGrassTexture;
 }
 
 /**
@@ -668,7 +813,7 @@ export interface CityMaterialPalette {
   officeWindowsLit: THREE.MeshStandardMaterial;
   facadeConcrete: THREE.MeshStandardMaterial;
   chromeMetal: THREE.MeshStandardMaterial;
-  waterSurface: THREE.MeshStandardMaterial;
+  waterSurface: THREE.Material;
   sulyBrandMat: THREE.MeshStandardMaterial;
   ankhReliefMat: THREE.MeshStandardMaterial;
   royalNavyMat: THREE.MeshStandardMaterial;
@@ -686,7 +831,7 @@ export interface CityMaterialPalette {
   neonGold: THREE.MeshBasicMaterial;
   neonRed: THREE.MeshBasicMaterial;
   obsidianFortress: THREE.MeshStandardMaterial;
-  harborWater: THREE.MeshStandardMaterial;
+  harborWater: THREE.Material;
   poolTurquoise: THREE.MeshStandardMaterial;
   containerRed: THREE.MeshStandardMaterial;
   containerBlue: THREE.MeshStandardMaterial;
@@ -728,42 +873,46 @@ export function createCityMaterialPalette(
   isSoftwareGl = false
 ): CityMaterialPalette {
   const mode = resolveTimeOfDay(timeOfDay);
+  const isNightMode = mode === 'night';
   const cautionTex = getOrCreateCautionTexture();
   const asphaltTex = getOrCreateAsphaltTexture(isSoftwareGl ? 1 : 4);
   const officeWindowTex = getOrCreateOfficeWindowTexture(mode);
+  const sidewalkTex = getOrCreateSidewalkTexture();
+  const golfGrassTex = getOrCreateGolfGrassTexture();
   const paverTex = getOrCreatePaverTexture();
 
   return {
     ground: new THREE.MeshStandardMaterial({
       map: getOrCreateGroundTexture(mode),
-      color: mode === 'night' ? '#071521' : mode === 'sunset' ? '#142d1f' : '#ffffff',
+      color: mode === 'night' ? '#0a2316' : mode === 'sunset' ? '#142d1f' : '#ffffff',
       roughness: 0.85,
       metalness: 0.04,
     }),
     asphalt: new THREE.MeshStandardMaterial({
       map: asphaltTex,
-      color: mode === 'night' ? '#0b1120' : mode === 'sunset' ? '#182030' : '#1e293b',
-      roughness: 0.72,
-      metalness: 0.16,
+      color: mode === 'night' ? '#111827' : mode === 'sunset' ? '#1e2430' : '#2b3544',
+      roughness: 0.84,
+      metalness: 0.12,
     }),
     sidewalk: new THREE.MeshStandardMaterial({
-      color: mode === 'night' ? '#172033' : mode === 'sunset' ? '#292524' : '#f1f5f9',
-      roughness: 0.58,
-      metalness: 0.1,
+      map: sidewalkTex,
+      color: mode === 'night' ? '#1e293b' : mode === 'sunset' ? '#292524' : '#f8fafc',
+      roughness: 0.65,
+      metalness: 0.08,
     }),
     plazaPaver: new THREE.MeshStandardMaterial({
       map: paverTex,
       color: mode === 'night' ? '#1e293b' : mode === 'sunset' ? '#fed7aa' : '#ffffff',
-      roughness: 0.55,
-      metalness: 0.12,
+      roughness: 0.58,
+      metalness: 0.1,
     }),
     curbGold: new THREE.MeshStandardMaterial({
       color: '#f59e0b',
-      roughness: 0.25,
-      metalness: 0.88,
+      roughness: 0.28,
+      metalness: 0.85,
     }),
     roadLine: new THREE.MeshBasicMaterial({
-      color: '#f59e0b',
+      color: '#facc15', // Vivid Highway Yellow with painted bead sheen
     }),
     roadZebra: new THREE.MeshBasicMaterial({
       color: '#f8fafc',
@@ -858,15 +1007,7 @@ export function createCityMaterialPalette(
       emissive: new THREE.Color('#f59e0b'),
       emissiveIntensity: mode === 'night' ? 1.6 : mode === 'sunset' ? 1.2 : 0.45,
     }),
-    waterSurface: new THREE.MeshStandardMaterial({
-      color: '#06b6d4',
-      emissive: mode === 'night' ? new THREE.Color('#0369a1') : mode === 'sunset' ? new THREE.Color('#7c2d12') : new THREE.Color('#0284c7'),
-      emissiveIntensity: mode === 'night' ? 0.35 : mode === 'sunset' ? 0.25 : 0.08,
-      roughness: 0.08,
-      metalness: 0.6,
-      transparent: true,
-      opacity: 0.88,
-    }),
+    waterSurface: createFountainWaterMaterial(isNightMode),
 
     // Materials for industries
     industrialSteel: new THREE.MeshStandardMaterial({
@@ -914,13 +1055,7 @@ export function createCityMaterialPalette(
       roughness: 0.25,
       metalness: 0.85,
     }),
-    harborWater: new THREE.MeshStandardMaterial({
-      color: '#0369a1',
-      roughness: 0.1,
-      metalness: 0.6,
-      transparent: true,
-      opacity: 0.88,
-    }),
+    harborWater: createRealisticWaterMaterial(isNightMode),
     poolTurquoise: new THREE.MeshStandardMaterial({
       color: '#06b6d4',
       roughness: 0.05,
@@ -1040,24 +1175,25 @@ export function createCityMaterialPalette(
     carTaillight: new THREE.MeshBasicMaterial({ color: '#ef4444' }),
     amberIndicator: new THREE.MeshBasicMaterial({ color: '#f59e0b' }),
     foliageGreen: new THREE.MeshStandardMaterial({
-      color: '#22c55e',
-      roughness: 0.65,
-      metalness: 0.05,
+      color: '#15803d',
+      roughness: 0.6,
+      metalness: 0.04,
     }),
     foliageDarkGreen: new THREE.MeshStandardMaterial({
-      color: '#16a34a',
-      roughness: 0.65,
-      metalness: 0.05,
+      color: '#14532d',
+      roughness: 0.6,
+      metalness: 0.04,
     }),
     grassLawn: new THREE.MeshStandardMaterial({
-      color: '#22c55e',
-      roughness: 0.85,
-      metalness: 0.05,
+      map: golfGrassTex,
+      color: isNightMode ? '#0f3d23' : '#15803d',
+      roughness: 0.88,
+      metalness: 0.02,
     }),
     treeTrunk: new THREE.MeshStandardMaterial({
-      color: '#78350f',
-      roughness: 0.9,
-      metalness: 0.1,
+      color: '#451a03',
+      roughness: 0.92,
+      metalness: 0.08,
     }),
   };
 }

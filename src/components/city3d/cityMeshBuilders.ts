@@ -5,6 +5,7 @@
 
 import * as THREE from 'three';
 import type { CityMaterialPalette } from './cityMaterials';
+import { buildLuxuryPalmTree, buildFlowerBed } from './cityFoliageBuilders';
 
 /**
  * Shared reusable geometries to minimize GC and memory footprint on mobile devices
@@ -625,16 +626,11 @@ export function buildHQMesh(
   jetSpire.position.set(0, 1.2, 5.8);
   hq.add(jetSpire);
 
-  // Symmetrical Topiary Planters on Plaza
+  // Symmetrical Luxury Blooming Flower Beds on Plaza
   [-5.8, 5.8].forEach((px) => {
-    const planter = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.6, 1.4), palette.whiteMarble);
-    planter.position.set(px, 0.6, 5.8);
-    hq.add(planter);
-
-    const bush = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.2, 1.2), palette.foliageGreen);
-    bush.position.set(px, 1.4, 5.8);
-    bush.castShadow = !isSoftwareGl;
-    hq.add(bush);
+    const flowerBed = buildFlowerBed(palette, isSoftwareGl, 1.8, 1.8, 'round');
+    flowerBed.position.set(px, 0.4, 5.8);
+    hq.add(flowerBed);
   });
 
   // =========================================================================
@@ -2711,15 +2707,12 @@ export function buildLuxuryClubMesh(palette: CityMaterialPalette, isSoftwareGl: 
 
   group.add(yachtGroup);
 
-  // Palm Trees on lawn
-  [[-5.2, 2.8], [-5.2, -3.2]].forEach(([px, pz]) => {
-    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.18, 3.4, 7), palette.treeTrunk);
-    trunk.position.set(px, 1.7, pz);
-    group.add(trunk);
-
-    const fronds = new THREE.Mesh(new THREE.ConeGeometry(1.6, 1.1, 7), palette.foliageGreen);
-    fronds.position.set(px, 3.6, pz);
-    group.add(fronds);
+  // Luxury Date Palm Trees on lawn
+  [[-5.2, 2.8], [-5.2, -3.2]].forEach(([px, pz], idx) => {
+    const palm = buildLuxuryPalmTree(palette, isSoftwareGl, 0.85, 0.08);
+    palm.position.set(px, 0.4, pz);
+    palm.rotation.y = idx * 1.5;
+    group.add(palm);
   });
 
   return group;

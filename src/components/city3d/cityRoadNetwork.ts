@@ -6,6 +6,11 @@
 import * as THREE from 'three';
 import type { CityMaterialPalette } from './cityMaterials';
 import { CITY_WORLD_CONFIG } from './cityWorldData';
+import {
+  buildLuxuryPalmTree,
+  buildFlowerBed,
+  buildGolfGreenTurfIsland,
+} from './cityFoliageBuilders';
 
 export interface TrafficVehicle {
   mesh: THREE.Group;
@@ -423,6 +428,19 @@ export function buildCityRoadNetwork(
     roadGroup.add(curb);
   });
 
+  // Double solid yellow highway lines along Central Grand Avenue
+  [-0.14, 0.14].forEach((lx) => {
+    const yellowLine = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.14, 260), palette.roadLine);
+    yellowLine.position.set(lx, 0.08, 0);
+    roadGroup.add(yellowLine);
+  });
+  // Outer road shoulder demarcation lines
+  [-4.4, 4.4].forEach((ex) => {
+    const shoulderLine = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.14, 260), palette.roadLine);
+    shoulderLine.position.set(ex, 0.08, 0);
+    roadGroup.add(shoulderLine);
+  });
+
   // 2. Cross Boulevard (X axis: East-West) ends at the waterfront.
   const crossBoulevardGeo = new THREE.BoxGeometry(eastWestRoadLength, 0.12, 9.6);
   const crossBoulevard = new THREE.Mesh(crossBoulevardGeo, palette.asphalt);
@@ -443,6 +461,18 @@ export function buildCityRoadNetwork(
     roadGroup.add(curb);
   });
 
+  // Double solid yellow highway lines along Cross Boulevard
+  [-0.14, 0.14].forEach((lz) => {
+    const yellowLine = new THREE.Mesh(new THREE.BoxGeometry(eastWestRoadLength, 0.14, 0.12), palette.roadLine);
+    yellowLine.position.set(0, 0.08, lz);
+    roadGroup.add(yellowLine);
+  });
+  [-4.4, 4.4].forEach((ez) => {
+    const shoulderLine = new THREE.Mesh(new THREE.BoxGeometry(eastWestRoadLength, 0.14, 0.12), palette.roadLine);
+    shoulderLine.position.set(0, 0.08, ez);
+    roadGroup.add(shoulderLine);
+  });
+
   // 3. Secondary Ring Roads (North & South avenues connecting all districts)
   [-65, -35, 35, 65].forEach((rz) => {
     const ringRoad = new THREE.Mesh(new THREE.BoxGeometry(eastWestRoadLength, 0.12, 7.2), palette.asphalt);
@@ -461,6 +491,8 @@ export function buildCityRoadNetwork(
   const harborWaterGeo = new THREE.PlaneGeometry(
     CITY_WORLD_CONFIG.harborWaterSize.width,
     CITY_WORLD_CONFIG.harborWaterSize.depth,
+    48,
+    48
   );
   const harborWater = new THREE.Mesh(harborWaterGeo, palette.harborWater);
   harborWater.name = 'expanded_harbor_water';
@@ -609,7 +641,7 @@ export function buildCityRoadNetwork(
     roadGroup.add(lamp);
   });
 
-  // 7. Landscaped Palm Trees & Flower Planters
+  // 7. Landscaped Luxury Palm Trees, Blooming Flower Beds & Golf Green Islands
   const treeCoordinates = [
     [-7.2, -7.2],
     [7.2, -7.2],
@@ -623,50 +655,68 @@ export function buildCityRoadNetwork(
     [34, -7.2],
     [-7.2, -48],
     [7.2, -48],
+    [-7.2, 48],
+    [7.2, 48],
+    [52, -18],
+    [52, 18],
   ];
 
-  treeCoordinates.forEach(([tx, tz]) => {
-    const tree = new THREE.Group();
-    tree.position.set(tx, 0, tz);
+  treeCoordinates.forEach(([tx, tz], idx) => {
+    // Marble planter base
+    const planter = new THREE.Mesh(new THREE.CylinderGeometry(1.4, 1.6, 0.45, 14), palette.whiteMarble);
+    planter.position.set(tx, 0.225, tz);
+    planter.castShadow = !isSoftwareGl;
+    roadGroup.add(planter);
 
-    // Marble Planter with gold trim
-    const planter = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.2, 0.45, 12), palette.whiteMarble);
-    planter.position.y = 0.225;
-    tree.add(planter);
+    const planterLawn = new THREE.Mesh(new THREE.CylinderGeometry(1.25, 1.25, 0.08, 14), palette.grassLawn);
+    planterLawn.position.set(tx, 0.45, tz);
+    roadGroup.add(planterLawn);
 
-    const planterLawn = new THREE.Mesh(new THREE.CylinderGeometry(0.95, 0.95, 0.08, 12), palette.grassLawn);
-    planterLawn.position.y = 0.45;
-    tree.add(planterLawn);
+    // Realistic luxury royal palm with curved fronds & amber date bunches
+    const palm = buildLuxuryPalmTree(
+      palette,
+      isSoftwareGl,
+      0.95 + (idx % 3) * 0.1,
+      0.06 + (idx % 4) * 0.02
+    );
+    palm.position.set(tx, 0.45, tz);
+    palm.rotation.y = (idx * 1.3) % (Math.PI * 2);
+    roadGroup.add(palm);
+  });
 
-    // Segmented Realistic Palm Trunk
-    for (let seg = 0; seg < 6; seg++) {
-      const radius = 0.24 - seg * 0.015;
-      const segment = new THREE.Mesh(
-        new THREE.CylinderGeometry(radius * 0.9, radius, 0.5, 7),
-        palette.treeTrunk
-      );
-      segment.position.y = 0.65 + seg * 0.45;
-      segment.rotation.z = Math.sin(seg * 0.8) * 0.03;
-      tree.add(segment);
-    }
+  // Blooming floral beds (roses, marigolds, petunias) in sculpted stone planters
+  const flowerBedCoordinates = [
+    { x: -7.2, z: -20, shape: 'round' as const },
+    { x: 7.2, z: -20, shape: 'round' as const },
+    { x: -7.2, z: 20, shape: 'round' as const },
+    { x: 7.2, z: 20, shape: 'round' as const },
+    { x: -20, z: -7.2, shape: 'rect' as const },
+    { x: 20, z: -7.2, shape: 'rect' as const },
+    { x: -20, z: 7.2, shape: 'rect' as const },
+    { x: 20, z: 7.2, shape: 'rect' as const },
+    { x: 50, z: 0, shape: 'round' as const },
+    { x: 50, z: -10, shape: 'round' as const },
+    { x: 50, z: 10, shape: 'round' as const },
+  ];
 
-    // Tiered Lush Palm Fronds
-    const frondAngles = [0, 0.8, 1.6, 2.4, 3.2, 4.0, 4.8, 5.6];
-    frondAngles.forEach((angle) => {
-      const frond = new THREE.Mesh(new THREE.ConeGeometry(0.85, 2.8, 5), palette.foliageGreen);
-      frond.position.set(Math.cos(angle) * 0.6, 3.4, Math.sin(angle) * 0.6);
-      frond.rotation.z = Math.cos(angle) * 0.6;
-      frond.rotation.x = -Math.sin(angle) * 0.6;
-      frond.castShadow = !isSoftwareGl;
-      tree.add(frond);
-    });
+  flowerBedCoordinates.forEach(({ x, z, shape }) => {
+    const flowerBed = buildFlowerBed(palette, isSoftwareGl, 3.2, 3.2, shape);
+    flowerBed.position.set(x, 0, z);
+    roadGroup.add(flowerBed);
+  });
 
-    // Darker inner crown
-    const innerCrown = new THREE.Mesh(new THREE.SphereGeometry(0.65, 8, 8), palette.foliageDarkGreen);
-    innerCrown.position.y = 3.6;
-    tree.add(innerCrown);
+  // Lush golf turf islands with fairway mowing bands
+  const turfIslandCoordinates = [
+    { x: 0, z: -32, w: 9, d: 5 },
+    { x: 0, z: 32, w: 9, d: 5 },
+    { x: -32, z: 0, w: 5, d: 9 },
+    { x: 32, z: 0, w: 5, d: 9 },
+  ];
 
-    roadGroup.add(tree);
+  turfIslandCoordinates.forEach(({ x, z, w, d }) => {
+    const turfIsland = buildGolfGreenTurfIsland(palette, isSoftwareGl, w, d);
+    turfIsland.position.set(x, 0, z);
+    roadGroup.add(turfIsland);
   });
 
   // 8. Animated High-Fidelity Traffic Fleet
