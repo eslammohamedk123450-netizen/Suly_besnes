@@ -11,6 +11,7 @@ import {
   loadQuestTasks,
   saveQuestTasks,
   syncQuestTasksWithGame,
+  recordIncomeForDailyQuests,
 } from '../domain/questSystem';
 import { playSound } from '../game/soundEffects';
 import { formatMoney } from '../domain/formatters';
@@ -62,6 +63,19 @@ export const QuestManager: React.FC<QuestManagerProps> = ({
     window.addEventListener('open_quest_manager', handleGlobalOpen);
     return () => window.removeEventListener('open_quest_manager', handleGlobalOpen);
   }, []);
+
+  // الاستماع لأحداث توليد الدخل وزيادة أموال اللاعب وتحديث تقدم المهمة فورياً
+  useEffect(() => {
+    const handleIncomeEvent = (e: Event) => {
+      const customEvent = e as CustomEvent<{ amount: number }>;
+      const amount = customEvent.detail?.amount;
+      if (typeof amount === 'number' && amount > 0) {
+        setTasks((prevTasks) => recordIncomeForDailyQuests(profile.id, amount, prevTasks));
+      }
+    };
+    window.addEventListener('record_income_event', handleIncomeEvent);
+    return () => window.removeEventListener('record_income_event', handleIncomeEvent);
+  }, [profile.id]);
 
   // تصفية المهام: النشطة، المكتملة، أو الكل
   const [filterTab, setFilterTab] = useState<'active' | 'completed' | 'all'>('active');
@@ -414,7 +428,7 @@ export const QuestManager: React.FC<QuestManagerProps> = ({
                           }`}
                         >
                           <Award className="w-3.5 h-3.5" />
-                          <span>استلام المكافأة (Claim)</span>
+                          <span>{canClaim ? `استلام ${task.reward.label} (Claim)` : 'استلام المكافأة (Claim)'}</span>
                         </button>
                       )}
                     </div>

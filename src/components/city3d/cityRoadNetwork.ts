@@ -465,17 +465,103 @@ export function buildCityRoadNetwork(
   harborWater.position.set(coastlineX + CITY_WORLD_CONFIG.harborWaterSize.width / 2, 0.04, 0);
   roadGroup.add(harborWater);
 
+  // 4a. Coastline Beveled Edge: Smooth transitional beveled slope connecting mainland to water
+  // Eliminates the sharp razor-thin cutoff and provides a natural angled descent into the sea.
+  const coastTotalDepth = CITY_WORLD_CONFIG.groundSize;
+  const beveledEdgeWidth = 3.2;
+  const beveledEdgeSlopeGeo = new THREE.BoxGeometry(beveledEdgeWidth, 0.45, coastTotalDepth);
+  const beveledEdgeSlope = new THREE.Mesh(beveledEdgeSlopeGeo, palette.dockConcrete);
+  beveledEdgeSlope.name = 'coastline_beveled_edge_slope';
+  beveledEdgeSlope.position.set(coastlineX + beveledEdgeWidth / 2 - 0.2, -0.05, 0);
+  beveledEdgeSlope.rotation.z = -0.16; // beveled angle tilting down toward the water
+  beveledEdgeSlope.receiveShadow = !isSoftwareGl;
+  roadGroup.add(beveledEdgeSlope);
+
+  // 4b. Sandy Beach Geometry: Soft golden beach strip along the northern and southern coastlines
+  const beachWidth = 14;
+  const northBeachDepth = 110;
+  const southBeachDepth = 90;
+
+  // Northern Sandy Beach
+  const northBeachGeo = new THREE.PlaneGeometry(beachWidth, northBeachDepth, 8, 16);
+  // Add gentle slope and soft undulating bevel into the water
+  const northBeachPos = northBeachGeo.attributes.position;
+  for (let i = 0; i < northBeachPos.count; i++) {
+    const vx = northBeachPos.getX(i);
+    const vz = northBeachPos.getY(i);
+    // Slope gently down as x approaches the water (eastward)
+    const factor = (vx + beachWidth / 2) / beachWidth;
+    const wave = Math.sin(vz * 0.12) * 0.12;
+    northBeachPos.setZ(i, (1 - factor) * 0.22 - factor * 0.28 + wave);
+  }
+  northBeachGeo.computeVertexNormals();
+  const northBeach = new THREE.Mesh(northBeachGeo, palette.sandyBeach);
+  northBeach.name = 'coastline_sandy_beach_north';
+  northBeach.rotation.x = -Math.PI / 2;
+  northBeach.position.set(coastlineX + beachWidth / 2, 0.06, -75);
+  northBeach.receiveShadow = !isSoftwareGl;
+  roadGroup.add(northBeach);
+
+  // Southern Sandy Beach
+  const southBeachGeo = new THREE.PlaneGeometry(beachWidth, southBeachDepth, 8, 14);
+  const southBeachPos = southBeachGeo.attributes.position;
+  for (let i = 0; i < southBeachPos.count; i++) {
+    const vx = southBeachPos.getX(i);
+    const vz = southBeachPos.getY(i);
+    const factor = (vx + beachWidth / 2) / beachWidth;
+    const wave = Math.cos(vz * 0.15) * 0.1;
+    southBeachPos.setZ(i, (1 - factor) * 0.2 - factor * 0.26 + wave);
+  }
+  southBeachGeo.computeVertexNormals();
+  const southBeach = new THREE.Mesh(southBeachGeo, palette.sandyBeach);
+  southBeach.name = 'coastline_sandy_beach_south';
+  southBeach.rotation.x = -Math.PI / 2;
+  southBeach.position.set(coastlineX + beachWidth / 2, 0.06, 85);
+  southBeach.receiveShadow = !isSoftwareGl;
+  roadGroup.add(southBeach);
+
+  // 4c. Rocky Coastline Geometry: Natural granite rock formations and craggy coastline boulders
+  const coastRockGroup = new THREE.Group();
+  coastRockGroup.name = 'coastline_rocky_shoreline';
+  const rockGeoCluster = [
+    new THREE.DodecahedronGeometry(1.4, 0),
+    new THREE.IcosahedronGeometry(1.0, 0),
+    new THREE.DodecahedronGeometry(0.85, 0),
+  ];
+  const coastHalfDepth = CITY_WORLD_CONFIG.groundSize / 2;
+
+  // Clustered natural coastal rocks along the shoreline
+  for (let z = -coastHalfDepth + 8; z < coastHalfDepth - 8; z += 7.5) {
+    // Leave the port terminal berth open around z = 20 to 45
+    if (z >= 12 && z <= 48) continue;
+    const isMajorRock = (Math.abs(z) % 15) < 7;
+    const rock = new THREE.Mesh(
+      rockGeoCluster[Math.abs(Math.floor(z)) % rockGeoCluster.length],
+      palette.rockyCoastline,
+    );
+    const offsetX = coastlineX + (isMajorRock ? 3.5 : 1.8) + Math.sin(z * 0.3) * 1.5;
+    rock.position.set(offsetX, 0.2 + (isMajorRock ? 0.3 : 0), z);
+    rock.rotation.set(z * 0.1, (z * 0.25) % Math.PI, z * 0.15);
+    const sx = isMajorRock ? 2.2 : 1.4;
+    const sy = isMajorRock ? 1.2 : 0.7;
+    const sz = isMajorRock ? 2.8 : 1.6;
+    rock.scale.set(sx, sy, sz);
+    rock.castShadow = !isSoftwareGl;
+    rock.receiveShadow = !isSoftwareGl;
+    coastRockGroup.add(rock);
+  }
+  roadGroup.add(coastRockGroup);
+
   // Instanced concrete wall sections leave a clear opening at the z=35 truck gate.
   const seawallSectionDepth = 10;
   const seawallSections = new THREE.InstancedMesh(
     new THREE.BoxGeometry(2.4, 0.6, seawallSectionDepth),
-    palette.slateStructure,
+    palette.dockConcrete,
     Math.ceil(CITY_WORLD_CONFIG.groundSize / seawallSectionDepth),
   );
   seawallSections.name = 'harbor_seawall_sections';
   const seawallTransform = new THREE.Object3D();
   let seawallCount = 0;
-  const coastHalfDepth = CITY_WORLD_CONFIG.groundSize / 2;
   for (let z = -coastHalfDepth; z < coastHalfDepth; z += seawallSectionDepth) {
     const centerZ = z + seawallSectionDepth / 2;
     if (Math.abs(centerZ - CITY_WORLD_CONFIG.harborAccessZ) <= seawallSectionDepth / 2) continue;
@@ -490,7 +576,7 @@ export function buildCityRoadNetwork(
   // Low-profile breakwater boulders soften the hard coastline without adding draw calls.
   const breakwater = new THREE.InstancedMesh(
     new THREE.IcosahedronGeometry(0.8, 0),
-    palette.slateStructure,
+    palette.rockyCoastline,
     Math.ceil(CITY_WORLD_CONFIG.groundSize / 10),
   );
   breakwater.name = 'harbor_breakwater_rocks';

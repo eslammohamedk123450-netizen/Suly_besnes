@@ -161,6 +161,29 @@ export default function App() {
     return () => window.clearInterval(maintenanceInterval);
   }, [hasActiveProfile]);
 
+  // Hook into income generation logic: when the player's money increases by X amount,
+  // update quest progress live
+  const prevMoneyRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (!profile) return;
+    const currentMoney = profile.bankBalance ?? 0;
+    if (prevMoneyRef.current !== null && currentMoney > prevMoneyRef.current) {
+      const earnedDelta = currentMoney - prevMoneyRef.current;
+      window.dispatchEvent(
+        new CustomEvent('record_income_event', { detail: { amount: earnedDelta } })
+      );
+    }
+    prevMoneyRef.current = currentMoney;
+  }, [profile?.bankBalance]);
+
+  // Direct trigger to open daily quests modal when tasks section is requested
+  useEffect(() => {
+    if (activeSection === 'tasks') {
+      window.dispatchEvent(new CustomEvent('open_quest_manager'));
+      setActiveSection('home');
+    }
+  }, [activeSection]);
+
   const applyLoadedProfileState = (loadedProfile: PlayerProfile | null) => {
     setProfile(loadedProfile);
     if (!loadedProfile) {

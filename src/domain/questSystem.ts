@@ -41,47 +41,47 @@ export const DEFAULT_QUEST_TASKS: QuestTask[] = [
   {
     id: 'quest_small_beginning',
     title: 'البداية الصغيرة',
-    description: 'قم ببناء 1 مبنى في إمبراطوريتك (المكافأة: 5000 ذهب).',
+    description: 'قم ببناء أو تملك مبنى أو شركة في إمبراطوريتك.',
     targetAmount: 1,
     currentAmount: 0,
     isCompleted: false,
     isClaimed: false,
     reward: {
-      type: 'gold',
-      amount: 5000,
-      label: '5000 ذهب',
+      type: 'diamonds',
+      amount: 20,
+      label: '20 ماسة 💎',
     },
     icon: '🏗️',
     category: 'construction',
   },
   {
     id: 'quest_businessman',
-    title: 'رجل الأعمال',
-    description: 'اجمع 50,000 ذهب في رصيدك المالي (المكافأة: 10 ألماس).',
+    title: 'توليد الدخل المالي',
+    description: 'قم بتوليد دخل مالي وتحقيق أرباح بقيمة 50,000 $ من استثماراتك ومبيعاتك.',
     targetAmount: 50000,
     currentAmount: 0,
     isCompleted: false,
     isClaimed: false,
     reward: {
       type: 'diamonds',
-      amount: 10,
-      label: '10 ألماس',
+      amount: 50,
+      label: '50 ماسة 💎',
     },
-    icon: '💰',
+    icon: '💎',
     category: 'wealth',
   },
   {
     id: 'quest_expansion',
-    title: 'التوسع',
-    description: 'قم بترقية أي مبنى للمستوى 2 (المكافأة: 15000 ذهب).',
+    title: 'التوسع الإمبراطوري',
+    description: 'قم بترقية أي مبنى أو منشأة إلى المستوى 2 أو أعلى.',
     targetAmount: 1,
     currentAmount: 0,
     isCompleted: false,
     isClaimed: false,
     reward: {
-      type: 'gold',
-      amount: 15000,
-      label: '15000 ذهب',
+      type: 'diamonds',
+      amount: 30,
+      label: '30 ماسة 💎',
     },
     icon: '⚡',
     category: 'upgrade',
@@ -151,8 +151,9 @@ export function syncQuestTasksWithGame(profile: PlayerProfile, currentTasks: Que
 
     if (task.id === 'quest_small_beginning') {
       currentAmount = Math.max(task.currentAmount, buildingsCount);
-    } else if (task.id === 'quest_businessman') {
-      currentAmount = Math.max(task.currentAmount, totalGoldOrMoney);
+    } else if (task.id === 'quest_businessman' || task.id === 'quest_generate_income') {
+      const accumulatedRevenue = profile.finances?.totalRevenue ?? 0;
+      currentAmount = Math.max(task.currentAmount, accumulatedRevenue, totalGoldOrMoney);
     } else if (task.id === 'quest_expansion') {
       currentAmount = hasUpgradedBuilding ? 1 : Math.max(task.currentAmount, 0);
     }
@@ -165,4 +166,29 @@ export function syncQuestTasksWithGame(profile: PlayerProfile, currentTasks: Que
       isCompleted,
     };
   });
+}
+
+/**
+ * تسجيل الدخل المالي وتحديث تقدم مهمة توليد الدخل فورياً عند زيادة أموال اللاعب
+ */
+export function recordIncomeForDailyQuests(
+  profileId: string,
+  amountEarned: number,
+  currentTasks: QuestTask[]
+): QuestTask[] {
+  if (amountEarned <= 0) return currentTasks;
+  const next = currentTasks.map((task) => {
+    if (task.id === 'quest_businessman' || task.id === 'quest_generate_income') {
+      const nextAmount = (task.currentAmount ?? 0) + amountEarned;
+      const isCompleted = nextAmount >= task.targetAmount;
+      return {
+        ...task,
+        currentAmount: nextAmount,
+        isCompleted,
+      };
+    }
+    return task;
+  });
+  saveQuestTasks(profileId, next);
+  return next;
 }

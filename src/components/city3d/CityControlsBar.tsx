@@ -16,6 +16,7 @@ import {
   ChevronUp,
   MapPin,
   Sparkles,
+  Trophy,
 } from 'lucide-react';
 
 interface CityControlsBarProps {
@@ -72,7 +73,7 @@ export const CityControlsBar: React.FC<CityControlsBarProps> = ({
       {!isCollapsed && (
         <div className="w-full bg-slate-900/95 border border-amber-500/30 rounded-2xl p-2.5 shadow-2xl backdrop-blur-md flex flex-wrap items-center justify-between gap-2 text-xs">
           {/* The city is the only gameplay view; legacy dashboard navigation is retired. */}
-          <div className="flex items-center bg-slate-950 p-1 rounded-xl border border-slate-800">
+          <div className="flex items-center gap-1.5 bg-slate-950 p-1 rounded-xl border border-slate-800">
             <button
               onClick={() => onToggleView('3d_city')}
               className={`px-3 py-1.5 rounded-lg font-bold transition-all flex items-center gap-1.5 ${
@@ -83,6 +84,16 @@ export const CityControlsBar: React.FC<CityControlsBarProps> = ({
             >
               <Building2 className="w-3.5 h-3.5" />
               <span>المدينة 3D</span>
+            </button>
+
+            {/* Daily Quests button in the dock */}
+            <button
+              onClick={() => window.dispatchEvent(new CustomEvent('open_quest_manager'))}
+              className="px-3 py-1.5 rounded-lg bg-gradient-to-r from-amber-500 via-amber-400 to-yellow-400 text-slate-950 font-black text-xs flex items-center gap-1.5 shadow-md shadow-amber-500/20 hover:brightness-110 active:scale-95 transition-all cursor-pointer"
+              title="المهام اليومية ومكافآت الألماس (Daily Quests)"
+            >
+              <Trophy className="w-3.5 h-3.5 text-slate-950" />
+              <span>المهام اليومية</span>
             </button>
           </div>
 

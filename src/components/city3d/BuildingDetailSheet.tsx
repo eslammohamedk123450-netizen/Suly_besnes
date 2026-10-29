@@ -338,7 +338,7 @@ export const BuildingDetailSheet: React.FC<BuildingDetailSheetProps> = ({
             <button
               onClick={() => {
                 onClose();
-                onNavigate('tasks');
+                window.dispatchEvent(new CustomEvent('open_quest_manager'));
               }}
               className="flex-1 min-w-[130px] py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-colors border border-slate-700"
             >

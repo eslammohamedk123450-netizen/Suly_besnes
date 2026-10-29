@@ -17,6 +17,9 @@ let officeWindowTextures: { day: THREE.CanvasTexture | null; night: THREE.Canvas
 };
 let paverTexture: THREE.CanvasTexture | null = null;
 let containerTexture: THREE.CanvasTexture | null = null;
+let dockConcreteTexture: THREE.CanvasTexture | null = null;
+let sandTexture: THREE.CanvasTexture | null = null;
+let coastRockTexture: THREE.CanvasTexture | null = null;
 let skyTextures: { day: THREE.CanvasTexture | null; night: THREE.CanvasTexture | null } = {
   day: null,
   night: null,
@@ -237,6 +240,152 @@ export function getOrCreateAsphaltTexture(maxAnisotropy = 4): THREE.Texture {
   asphaltTexture.colorSpace = THREE.SRGBColorSpace;
   asphaltTexture.anisotropy = maxAnisotropy;
   return asphaltTexture;
+}
+
+/**
+ * Creates dark grey textured concrete/asphalt for port docks and maritime piers
+ */
+export function getOrCreateDockConcreteTexture(maxAnisotropy = 4): THREE.Texture {
+  if (dockConcreteTexture) return dockConcreteTexture;
+
+  if (typeof document === 'undefined') {
+    const data = new Uint8Array([35, 43, 54, 255]);
+    const tex = new THREE.DataTexture(data, 1, 1);
+    tex.needsUpdate = true;
+    return tex;
+  }
+
+  const canvas = document.createElement('canvas');
+  canvas.width = 256;
+  canvas.height = 256;
+  const ctx = canvas.getContext('2d');
+  if (ctx) {
+    // Dark grey concrete/asphalt base
+    ctx.fillStyle = '#232b36';
+    ctx.fillRect(0, 0, 256, 256);
+
+    // Subtle concrete panel grid / expansion joints
+    ctx.strokeStyle = '#181f28';
+    ctx.lineWidth = 1.5;
+    const slabSize = 64;
+    for (let x = 0; x <= 256; x += slabSize) {
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, 256);
+      ctx.stroke();
+    }
+    for (let y = 0; y <= 256; y += slabSize) {
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(256, y);
+      ctx.stroke();
+    }
+
+    // Heavy concrete/asphalt aggregate noise and speckles
+    for (let i = 0; i < 900; i++) {
+      const rx = Math.floor(Math.random() * 256);
+      const ry = Math.floor(Math.random() * 256);
+      const isLight = Math.random() > 0.6;
+      ctx.fillStyle = isLight ? 'rgba(80, 95, 115, 0.35)' : 'rgba(15, 20, 28, 0.45)';
+      const size = Math.random() > 0.8 ? 2 : 1;
+      ctx.fillRect(rx, ry, size, size);
+    }
+
+    // Slight oil/water tire wear marking
+    ctx.fillStyle = 'rgba(18, 24, 32, 0.18)';
+    ctx.fillRect(40, 0, 30, 256);
+    ctx.fillRect(170, 0, 30, 256);
+  }
+
+  dockConcreteTexture = new THREE.CanvasTexture(canvas);
+  dockConcreteTexture.wrapS = THREE.RepeatWrapping;
+  dockConcreteTexture.wrapT = THREE.RepeatWrapping;
+  dockConcreteTexture.repeat.set(4, 4);
+  dockConcreteTexture.colorSpace = THREE.SRGBColorSpace;
+  dockConcreteTexture.anisotropy = maxAnisotropy;
+  return dockConcreteTexture;
+}
+
+/**
+ * Creates warm procedural sandy beach texture with micro grain
+ */
+export function getOrCreateSandTexture(): THREE.Texture {
+  if (sandTexture) return sandTexture;
+
+  if (typeof document === 'undefined') {
+    const data = new Uint8Array([218, 184, 136, 255]);
+    const tex = new THREE.DataTexture(data, 1, 1);
+    tex.needsUpdate = true;
+    return tex;
+  }
+
+  const canvas = document.createElement('canvas');
+  canvas.width = 128;
+  canvas.height = 128;
+  const ctx = canvas.getContext('2d');
+  if (ctx) {
+    ctx.fillStyle = '#dfbd8c';
+    ctx.fillRect(0, 0, 128, 128);
+
+    // Warm sand grain variation
+    for (let i = 0; i < 600; i++) {
+      const x = Math.floor(Math.random() * 128);
+      const y = Math.floor(Math.random() * 128);
+      const isLight = Math.random() > 0.5;
+      ctx.fillStyle = isLight ? 'rgba(255, 243, 205, 0.35)' : 'rgba(180, 140, 90, 0.3)';
+      ctx.fillRect(x, y, 1, 1);
+    }
+  }
+
+  sandTexture = new THREE.CanvasTexture(canvas);
+  sandTexture.wrapS = THREE.RepeatWrapping;
+  sandTexture.wrapT = THREE.RepeatWrapping;
+  sandTexture.repeat.set(6, 6);
+  sandTexture.colorSpace = THREE.SRGBColorSpace;
+  return sandTexture;
+}
+
+/**
+ * Creates coastal rock and granite striation texture
+ */
+export function getOrCreateCoastRockTexture(): THREE.Texture {
+  if (coastRockTexture) return coastRockTexture;
+
+  if (typeof document === 'undefined') {
+    const data = new Uint8Array([71, 85, 105, 255]);
+    const tex = new THREE.DataTexture(data, 1, 1);
+    tex.needsUpdate = true;
+    return tex;
+  }
+
+  const canvas = document.createElement('canvas');
+  canvas.width = 128;
+  canvas.height = 128;
+  const ctx = canvas.getContext('2d');
+  if (ctx) {
+    ctx.fillStyle = '#475569';
+    ctx.fillRect(0, 0, 128, 128);
+
+    // Layered granite striations
+    for (let y = 0; y < 128; y += 4) {
+      ctx.fillStyle = (y % 8 === 0) ? 'rgba(30, 41, 59, 0.4)' : 'rgba(100, 116, 139, 0.25)';
+      ctx.fillRect(0, y, 128, 2);
+    }
+
+    for (let i = 0; i < 400; i++) {
+      const x = Math.floor(Math.random() * 128);
+      const y = Math.floor(Math.random() * 128);
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.35)';
+      ctx.fillRect(x, y, 1, 1);
+    }
+  }
+
+  coastRockTexture = new THREE.CanvasTexture(canvas);
+  coastRockTexture.wrapS = THREE.RepeatWrapping;
+  coastRockTexture.wrapT = THREE.RepeatWrapping;
+  coastRockTexture.repeat.set(4, 4);
+  coastRockTexture.colorSpace = THREE.SRGBColorSpace;
+  return coastRockTexture;
 }
 
 /**
@@ -468,6 +617,13 @@ export interface CityMaterialPalette {
   bronzeStatue: THREE.MeshStandardMaterial;
   rolexGreenMarble: THREE.MeshStandardMaterial;
   emeraldGlow: THREE.MeshBasicMaterial;
+
+  // Coastline & Port Materials (الساحل والميناء)
+  dockConcrete: THREE.MeshStandardMaterial;
+  craneYellowMetallic: THREE.MeshStandardMaterial;
+  craneSteelMetallic: THREE.MeshStandardMaterial;
+  sandyBeach: THREE.MeshStandardMaterial;
+  rockyCoastline: THREE.MeshStandardMaterial;
 }
 
 export function createCityMaterialPalette(
@@ -476,6 +632,9 @@ export function createCityMaterialPalette(
 ): CityMaterialPalette {
   const cautionTex = getOrCreateCautionTexture();
   const asphaltTex = getOrCreateAsphaltTexture(isSoftwareGl ? 1 : 4);
+  const dockConcreteTex = getOrCreateDockConcreteTexture(isSoftwareGl ? 1 : 4);
+  const sandTex = getOrCreateSandTexture();
+  const coastRockTex = getOrCreateCoastRockTexture();
   const officeWindowTex = getOrCreateOfficeWindowTexture(isNightMode);
   const paverTex = getOrCreatePaverTexture();
 
@@ -686,8 +845,8 @@ export function createCityMaterialPalette(
     // Construction stages
     constructionYellow: new THREE.MeshStandardMaterial({
       color: '#eab308',
-      roughness: 0.35,
-      metalness: 0.7,
+      roughness: 0.18,
+      metalness: 0.88,
     }),
     craneSteel: new THREE.MeshStandardMaterial({
       color: '#ca8a04',
@@ -852,6 +1011,36 @@ export function createCityMaterialPalette(
       metalness: 0.3,
     }),
     emeraldGlow: new THREE.MeshBasicMaterial({ color: '#10b981' }),
+
+    // Coastline & Port Materials (الساحل والميناء)
+    dockConcrete: new THREE.MeshStandardMaterial({
+      map: dockConcreteTex,
+      color: isNightMode ? '#1e2530' : '#333b47',
+      roughness: 0.68,
+      metalness: 0.28,
+    }),
+    craneYellowMetallic: new THREE.MeshStandardMaterial({
+      color: '#facc15',
+      roughness: 0.16,
+      metalness: 0.88,
+    }),
+    craneSteelMetallic: new THREE.MeshStandardMaterial({
+      color: '#94a3b8',
+      roughness: 0.2,
+      metalness: 0.92,
+    }),
+    sandyBeach: new THREE.MeshStandardMaterial({
+      map: sandTex,
+      color: isNightMode ? '#5e4e37' : '#dfbd8c',
+      roughness: 0.94,
+      metalness: 0.02,
+    }),
+    rockyCoastline: new THREE.MeshStandardMaterial({
+      map: coastRockTex,
+      color: isNightMode ? '#1e293b' : '#475569',
+      roughness: 0.82,
+      metalness: 0.22,
+    }),
   };
 }
 

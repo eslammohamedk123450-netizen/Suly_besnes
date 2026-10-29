@@ -1946,23 +1946,30 @@ export function buildMaritimePortMesh(palette: CityMaterialPalette, isSoftwareGl
 
   // The land yard is deliberately kept west of the x=65 service road so it
   // does not overlap the existing factory or logistics warehouse.
-  const yardSlab = new THREE.Mesh(new THREE.BoxGeometry(8.1, 0.42, 54), palette.slateStructure);
+  // Port docks textured in dark grey concrete/asphalt as specified in prompt.
+  const yardSlab = new THREE.Mesh(new THREE.BoxGeometry(8.1, 0.42, 54), palette.dockConcrete);
   yardSlab.position.set(-17.05, 0.21, 3);
   yardSlab.receiveShadow = !isSoftwareGl;
   group.add(yardSlab);
-  const yardApron = new THREE.Mesh(new THREE.BoxGeometry(7.85, 0.04, 53.7), palette.plazaPaver);
+  const yardApron = new THREE.Mesh(new THREE.BoxGeometry(7.85, 0.04, 53.7), palette.dockConcrete);
   yardApron.position.set(-17.05, 0.44, 3);
   yardApron.receiveShadow = !isSoftwareGl;
   group.add(yardApron);
 
-  // Quay sits east of the seawall; its deck forms a continuous berth for ships.
-  const quay = new THREE.Mesh(new THREE.BoxGeometry(14, 0.4, 56), palette.slateStructure);
+  // Quay sits east of the seawall; its deck forms a continuous dark grey textured berth for ships.
+  const quay = new THREE.Mesh(new THREE.BoxGeometry(14, 0.4, 56), palette.dockConcrete);
   quay.position.set(3.5, 0.2, 3);
   quay.receiveShadow = !isSoftwareGl;
   group.add(quay);
-  const quayTop = new THREE.Mesh(new THREE.BoxGeometry(13.7, 0.05, 55.7), palette.plazaPaver);
+  const quayTop = new THREE.Mesh(new THREE.BoxGeometry(13.7, 0.05, 55.7), palette.dockConcrete);
   quayTop.position.set(3.5, 0.425, 3);
   group.add(quayTop);
+
+  // Beveled edge curb along dock edge transitioning to water
+  const quayEdgeBevel = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.35, 56), palette.dockConcrete);
+  quayEdgeBevel.position.set(10.35, 0.36, 3);
+  quayEdgeBevel.rotation.z = -0.35; // beveled chamfer toward the sea
+  group.add(quayEdgeBevel);
 
   // Port access apron continues the existing east-west road through the seawall opening.
   const accessRamp = new THREE.Mesh(new THREE.BoxGeometry(10, 0.16, 7.6), palette.asphalt);
@@ -1970,7 +1977,7 @@ export function buildMaritimePortMesh(palette: CityMaterialPalette, isSoftwareGl
   accessRamp.rotation.z = Math.atan2(0.28, 10);
   accessRamp.name = 'port_access_ramp';
   group.add(accessRamp);
-  const accessRoad = new THREE.Mesh(new THREE.BoxGeometry(13, 0.12, 7.6), palette.asphalt);
+  const accessRoad = new THREE.Mesh(new THREE.BoxGeometry(13, 0.12, 7.6), palette.dockConcrete);
   accessRoad.position.set(3.5, 0.51, 3);
   accessRoad.name = 'port_access_road';
   accessRoad.receiveShadow = !isSoftwareGl;
@@ -2016,19 +2023,19 @@ export function buildMaritimePortMesh(palette: CityMaterialPalette, isSoftwareGl
   const bollardGeometry = new THREE.CylinderGeometry(0.18, 0.24, 0.75, 8);
   for (let z = -22; z <= 28; z += 6) {
     if (Math.abs(z - 3) < 6) continue;
-    const bollard = new THREE.Mesh(bollardGeometry, palette.craneSteel);
+    const bollard = new THREE.Mesh(bollardGeometry, palette.craneSteelMetallic);
     bollard.position.set(10, 0.76, z);
     bollard.castShadow = !isSoftwareGl;
     group.add(bollard);
   }
 
-  // Four ship-to-shore gantry cranes with A-frame legs, long booms, cabins and hooks.
+  // Four ship-to-shore gantry cranes with high metalness, low roughness metallic yellow material
   const addBrace = (parent: THREE.Group, x1: number, y1: number, x2: number, y2: number, z: number) => {
     const dx = x2 - x1;
     const dy = y2 - y1;
     const brace = new THREE.Mesh(
       new THREE.BoxGeometry(Math.hypot(dx, dy), 0.28, 0.28),
-      palette.craneSteel,
+      palette.craneSteelMetallic,
     );
     brace.position.set((x1 + x2) / 2, (y1 + y2) / 2, z);
     brace.rotation.z = Math.atan2(dy, dx);
@@ -2043,27 +2050,27 @@ export function buildMaritimePortMesh(palette: CityMaterialPalette, isSoftwareGl
 
     const legGeometry = new THREE.BoxGeometry(0.72, 10.4, 0.78);
     [[-4, -1.8], [-4, 1.8], [4, -1.8], [4, 1.8]].forEach(([x, legZ]) => {
-      const leg = new THREE.Mesh(legGeometry, palette.constructionYellow);
+      const leg = new THREE.Mesh(legGeometry, palette.craneYellowMetallic);
       leg.position.set(x, 5.35, legZ);
       leg.castShadow = !isSoftwareGl;
       crane.add(leg);
     });
 
-    const portalBeam = new THREE.Mesh(new THREE.BoxGeometry(9, 0.85, 0.95), palette.constructionYellow);
+    const portalBeam = new THREE.Mesh(new THREE.BoxGeometry(9, 0.85, 0.95), palette.craneYellowMetallic);
     portalBeam.position.set(0, 10.5, 0);
     crane.add(portalBeam);
     [-4, 4].forEach((x) => {
-      const crossTie = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.58, 4.4), palette.craneSteel);
+      const crossTie = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.58, 4.4), palette.craneSteelMetallic);
       crossTie.position.set(x, 9.7, 0);
       crane.add(crossTie);
     });
 
     // Main boom reaches from the berth out above the ship lane.
-    const boom = new THREE.Mesh(new THREE.BoxGeometry(28, 0.58, 0.88), palette.constructionYellow);
+    const boom = new THREE.Mesh(new THREE.BoxGeometry(28, 0.58, 0.88), palette.craneYellowMetallic);
     boom.position.set(9, 11.25, 0);
     boom.castShadow = !isSoftwareGl;
     crane.add(boom);
-    const counterJib = new THREE.Mesh(new THREE.BoxGeometry(7, 0.65, 0.9), palette.constructionYellow);
+    const counterJib = new THREE.Mesh(new THREE.BoxGeometry(7, 0.65, 0.9), palette.craneYellowMetallic);
     counterJib.position.set(-4.8, 11.2, 0);
     crane.add(counterJib);
     [-1.8, 1.8].forEach((braceZ) => {
@@ -2078,7 +2085,7 @@ export function buildMaritimePortMesh(palette: CityMaterialPalette, isSoftwareGl
     cabinGlass.position.set(2, 9.05, 1.14);
     crane.add(cabinGlass);
 
-    const trolley = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.6, 1.35), palette.craneSteel);
+    const trolley = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.6, 1.35), palette.craneSteelMetallic);
     trolley.position.set(16, 10.85, 0);
     crane.add(trolley);
     const hoistCable = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.055, 4.8, 6), palette.navyStructure);
