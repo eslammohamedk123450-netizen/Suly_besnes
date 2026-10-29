@@ -10,6 +10,7 @@ import {
 } from '../game/onboarding';
 import { Icon } from './Icon';
 import { playSound } from '../game/soundEffects';
+import { playCash, playClick } from '../utils/soundManager';
 
 interface StarterMissionDockProps {
   profile: PlayerProfile;
@@ -32,6 +33,7 @@ export function StarterMissionDock({ profile, onNavigate, onProfileUpdate }: Sta
     event.stopPropagation();
     const result = claimStarterMission(profile, missionId);
     if (result.ok) {
+      playCash();
       playSound('cash');
       playSound('levelUp');
       if (onProfileUpdate) {

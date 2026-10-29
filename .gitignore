@@ -11,3 +11,4 @@ node-compile-cache/
 .aistudio/
 public/assets/aistudio/
 *.hm
+node_modules

@@ -42,6 +42,7 @@ import {
   createDeposit,
 } from '../../game/engine';
 import { playSound } from '../../game/soundEffects';
+import { playUpgrade, playClick, playCash } from '../../utils/soundManager';
 import {
   X,
   Building2,
@@ -1279,6 +1280,7 @@ export const BuildingDetailSheet: React.FC<BuildingDetailSheetProps> = ({
         },
         (current) => upgradeLand(current, landId, 'cash')
       );
+      playUpgrade();
       showFeedback('تمت ترقية الأرض وزيادة مساحتها بنسبة 10% بنجاح!', 'success');
       setTimeout(() => {
         setIsSubmitting(false);
@@ -1308,6 +1310,7 @@ export const BuildingDetailSheet: React.FC<BuildingDetailSheetProps> = ({
         },
         (current) => upgradeCompany(current, companyId, 'cash')
       );
+      playUpgrade();
       showFeedback('تمت ترقية المنشأة وزيادة طاقتها التشغيلية بنجاح!', 'success');
       setTimeout(() => {
         setIsSubmitting(false);

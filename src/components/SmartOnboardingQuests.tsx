@@ -5,6 +5,7 @@ import type { PlayerProfile } from '../domain/player';
 import { getCountryScenario, type CountryStoryQuest } from '../game/countryScenarios';
 import { isSectionUnlocked } from '../game/onboarding';
 import { playSound } from '../game/soundEffects';
+import { playCash, playClick } from '../utils/soundManager';
 import { QuestBriefingModal } from './QuestBriefingModal';
 
 interface SmartOnboardingQuestsProps {
@@ -54,6 +55,7 @@ export const SmartOnboardingQuests: React.FC<SmartOnboardingQuestsProps> = ({
 
   const handleClaim = (quest: CountryStoryQuest) => {
     if (!quest.isCompleted(profile) || claimedSet.has(quest.id)) return;
+    playCash();
     playSound('cash');
     playSound('levelUp');
     onClaimReward(quest.cashReward, quest.diamondReward, quest.id);
@@ -61,6 +63,7 @@ export const SmartOnboardingQuests: React.FC<SmartOnboardingQuestsProps> = ({
 
   const handleClaimAll = () => {
     if (claimableQuests.length === 0) return;
+    playCash();
     playSound('cash');
     claimableQuests.forEach((quest) => onClaimReward(quest.cashReward, quest.diamondReward, quest.id));
   };

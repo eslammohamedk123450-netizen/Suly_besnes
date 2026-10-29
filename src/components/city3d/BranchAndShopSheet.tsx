@@ -10,6 +10,7 @@ import { RETAIL_SHOP_SPECS, findShopSpec, getBranchSpecs } from '../../domain/br
 import { formatCurrency, formatMoney } from '../../domain/formatters';
 import { BUILDING_UPGRADE_BASE_COSTS, calculateBuildingUpgradeCost } from '../../game/economyBalance';
 import { playSound } from '../../game/soundEffects';
+import { playUpgrade, playClick, playCash } from '../../utils/soundManager';
 import {
   establishBranch,
   upgradeBranch,
@@ -97,6 +98,7 @@ export const BranchAndShopSheet: React.FC<BranchAndShopSheetProps> = ({
       try {
         const res = upgradeBranch(profile, branch.id, 'cash');
         if (res.ok) {
+          playUpgrade();
           showFeedback(res.message, 'success');
           onProfileUpdate(res.profile);
           onRefreshGrid();
@@ -222,6 +224,7 @@ export const BranchAndShopSheet: React.FC<BranchAndShopSheetProps> = ({
       try {
         const res = upgradeRetailShop(profile, shop.id, 'cash');
         if (res.ok) {
+          playUpgrade();
           showFeedback(res.message, 'success');
           onProfileUpdate(res.profile);
           onRefreshGrid();

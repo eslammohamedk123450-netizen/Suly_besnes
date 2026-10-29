@@ -58,6 +58,7 @@ import { ResourceBar, type ResourceSyncState } from './components/ResourceBar';
 import { acknowledgeGameCommand, blockGameCommand, createGameCommandKey, enqueueGameCommand, loadQueuedGameCommands } from './storage/commandOutbox';
 import { clearPendingInitialProfile, loadPendingInitialProfile, queueInitialProfile } from './storage/pendingInitialProfile';
 import { playSound } from './game/soundEffects';
+import { initGlobalButtonSounds, playUpgrade, playCash, playClick } from './utils/soundManager';
 import { RightActionHub } from './components/RightActionHub';
 import { StoryEventPopup, getLocalizedStoryEventAlerts, type StoryEventAlert } from './components/StoryEventPopup';
 import { DynamicEconomyEvents } from './components/DynamicEconomyEvents';
@@ -132,6 +133,11 @@ export default function App() {
   const syncLock = useRef(false);
   const remoteCommandAttempts = useRef(new Map<string, Promise<RemoteGameCommandAttempt>>());
   const lastLocalSaveSignature = useRef('');
+
+  useEffect(() => {
+    const cleanupSounds = initGlobalButtonSounds();
+    return cleanupSounds;
+  }, []);
 
   useEffect(() => {
     if (!profile) return;
@@ -954,6 +960,11 @@ export default function App() {
 
   async function handleGameCommand(command: GameCommand, fallback: (current: PlayerProfile) => GameResult<unknown>) {
     if (!profile) return;
+    if (command.name.startsWith('upgrade_') || command.name.includes('upgrade')) {
+      playUpgrade();
+    } else if (command.name.includes('collect') || command.name.includes('claim')) {
+      playCash();
+    }
     const previousProfile = profile;
     const execution = await executeCommandForProfile(profile, command, fallback);
     if (execution.source === 'remote' && execution.result.ok) void recordVerifiedTransactions(previousProfile, execution.result.profile);

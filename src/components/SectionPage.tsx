@@ -17,6 +17,7 @@ import { Icon, type IconName } from './Icon';
 import { Warehouse, Boxes, ShoppingBag, Store } from 'lucide-react';
 import { triggerHaptic } from '../services/nativeMobileService';
 import { isSoundEnabled, setSoundEnabled, playSound } from '../game/soundEffects';
+import { playUpgrade, playCash, playClick } from '../utils/soundManager';
 import { EconomyEmpty, EconomyPageShell, EconomyPanel as BaseEconomyPanel, EconomyStat, type EconomyPanelProps } from './EconomyUI';
 import { DiamondStore } from './DiamondStore';
 import { PurchaseOptions } from './PurchaseOptions';
@@ -205,7 +206,14 @@ export function SectionPage({ section, profile, country, focus, notificationThem
   const dayDurationMinutes = getGameDayDurationMinutes(daySpeedMultiplier);
   const compactPage = compactSectionIds.has(section.id);
   const run = (action: (current: PlayerProfile) => GameResult<unknown>) => onAction(action(profile));
-  const runCommand = (command: GameCommand, fallback: (current: PlayerProfile) => GameResult<unknown>) => onCommand(command, fallback);
+  const runCommand = (command: GameCommand, fallback: (current: PlayerProfile) => GameResult<unknown>) => {
+    if (command.name.startsWith('upgrade_') || command.name.includes('upgrade')) {
+      playUpgrade();
+    } else if (command.name.includes('collect') || command.name.includes('claim') || command.name.includes('sell')) {
+      playCash();
+    }
+    return onCommand(command, fallback);
+  };
 
   const contextValue = useMemo<SectionPageContextValue>(() => ({
     compactPage,

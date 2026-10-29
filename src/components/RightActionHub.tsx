@@ -9,6 +9,7 @@ import { getStarterMissions, claimStarterMission, isSectionUnlocked } from '../g
 import { generateBotMarketOffers, acceptBotMarketOffer, type BotMarketOffer } from '../game/economyBots';
 import { Icon } from './Icon';
 import { playSound } from '../game/soundEffects';
+import { playCash, playClick, playUpgrade } from '../utils/soundManager';
 import { getLuckySpinState } from '../game/luckyWheelService';
 import './RightActionHub.css';
 
@@ -106,6 +107,7 @@ export function RightActionHub({
   const handleAcceptBotDeal = (offerId: string) => {
     const result = acceptBotMarketOffer(profile, offerId);
     if (result.ok) {
+      playCash();
       playSound('cash');
       setTradeMessage(result.message);
       if (onProfileUpdate) onProfileUpdate(result.profile);
@@ -119,6 +121,7 @@ export function RightActionHub({
 
   const handleCollectActual = () => {
     if (alreadyCollectedToday) return;
+    playCash();
     playSound('cash');
     if (typeof window !== 'undefined') {
       window.localStorage.setItem(storageKey, String(profile.day));
@@ -128,12 +131,14 @@ export function RightActionHub({
   };
 
   const handleLaunchProduct = (productId: string, quantity: number) => {
+    playCash();
     playSound('cash');
     onSellProduct(productId, quantity);
   };
 
   const handleLaunchAllProducts = () => {
     if (finishedProductsInStock.length === 0) return;
+    playCash();
     playSound('cash');
     for (const item of finishedProductsInStock) {
       if (item.maxCanSell > 0) {

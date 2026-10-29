@@ -5,6 +5,7 @@ import type { SectionId } from '../domain/navigation';
 import { formatMoney } from '../domain/formatters';
 import { Icon } from './Icon';
 import { playSound } from '../game/soundEffects';
+import { playCash, playClick } from '../utils/soundManager';
 
 interface QuickActionFABProps {
   profile: PlayerProfile;
@@ -20,6 +21,7 @@ export function QuickActionFAB({ profile, country, onNavigate, onCollectProfit }
   const dailyIncome = profile.companies.reduce((sum, c) => sum + ((c.upgradeLevel ?? 1) * 15000), 12500);
 
   const handleCollect = () => {
+    playCash();
     playSound('success');
     onCollectProfit();
     setExpanded(false);
