@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
@@ -89,6 +89,10 @@ export type CityCameraPreset =
   | 'plots'
   | null;
 
+const LANDMARK_MAP = new Map(ALL_CITY_LANDMARKS.map((l) => [l.id, l]));
+
+export type GraphicsQualityMode = 'performance' | 'balanced' | 'high';
+
 interface CityCanvasProps {
   profile: PlayerProfile;
   selectedItem: SelectedItem | null;
@@ -97,6 +101,7 @@ interface CityCanvasProps {
   cameraPreset?: CityCameraPreset;
   onResetPreset?: () => void;
   cameraSpeed?: number;
+  graphicsQuality?: GraphicsQualityMode;
 }
 
 export const CityCanvas: React.FC<CityCanvasProps> = ({
@@ -107,12 +112,25 @@ export const CityCanvas: React.FC<CityCanvasProps> = ({
   cameraPreset,
   onResetPreset,
   cameraSpeed = 1,
+  graphicsQuality,
 }) => {
   const mountRef = useRef<HTMLDivElement>(null);
+  const profileRef = useRef(profile);
+  profileRef.current = profile;
   const selectedItemRef = useRef(selectedItem);
   selectedItemRef.current = selectedItem;
   const onSelectItemRef = useRef(onSelectItem);
   onSelectItemRef.current = onSelectItem;
+
+  // Memoize stable city layout key so balance/income ticks NEVER destroy and recreate the 3D scene
+  const cityLayoutKey = useMemo(() => {
+    const companies = (profile.companies ?? []).map((c) => `${c.id}:${c.upgradeLevel}`).join(',');
+    const lands = (profile.lands ?? []).length;
+    const constructions = Object.keys(loadCityConstructions(profile) ?? {}).length;
+    const level = profile.level ?? 1;
+    const cartelLevel = getCartelStrongholdLevel(profile);
+    return `${level}-${cartelLevel}-${lands}-${companies}-${constructions}`;
+  }, [profile.companies, profile.lands, profile.level, profile.cartelStrongholdLevel]);
 
   // Fixed-height camera rail: only the city focus and zoom level can change.
   const cameraTargetPos = useRef(new THREE.Vector3(
@@ -149,8 +167,13 @@ export const CityCanvas: React.FC<CityCanvasProps> = ({
       }
     })();
     const isMobileDevice = window.matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0;
-    const isLowPowerDevice = isSoftwareGl || isMobileDevice;
-    const devicePixelRatio = Math.min(window.devicePixelRatio || 1, isLowPowerDevice ? 1.25 : 1.75);
+    const isPerformance = graphicsQuality === 'performance' || (graphicsQuality === undefined && isMobileDevice);
+    const isBalanced = graphicsQuality === 'balanced';
+    const isLowPowerDevice = isSoftwareGl || isPerformance;
+    const devicePixelRatio = Math.min(
+      window.devicePixelRatio || 1,
+      isPerformance ? 1.0 : isBalanced ? 1.2 : 1.5
+    );
 
     // 1. Scene setup with expanded atmospheric horizon fog
     const scene = new THREE.Scene();
@@ -164,9 +187,10 @@ export const CityCanvas: React.FC<CityCanvasProps> = ({
     camera.position.copy(cameraTargetPos.current);
     camera.lookAt(cameraCurrentLookAtPos.current);
 
-    // 3. WebGL Renderer
+    // 3. WebGL Renderer with performance optimizations
+    const enableShadows = !isPerformance && !isSoftwareGl;
     const renderer = new THREE.WebGLRenderer({
-      antialias: !isLowPowerDevice,
+      antialias: !isPerformance && !isLowPowerDevice,
       powerPreference: 'high-performance',
       alpha: false,
     });
@@ -175,57 +199,63 @@ export const CityCanvas: React.FC<CityCanvasProps> = ({
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.15;
-    renderer.shadowMap.enabled = !isLowPowerDevice;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.shadowMap.enabled = enableShadows;
+    renderer.shadowMap.type = isBalanced ? THREE.BasicShadowMap : THREE.PCFSoftShadowMap;
     while (container.firstChild) {
       container.removeChild(container.firstChild);
     }
     container.appendChild(renderer.domElement);
 
-    // 4. Procedural Studio Environment
-    const pmremGenerator = new THREE.PMREMGenerator(renderer);
-    scene.environment = pmremGenerator.fromScene(new RoomEnvironment(), 0.04).texture;
-    pmremGenerator.dispose();
+    // 4. Procedural Studio Environment (skipped in performance mode for maximum mobile FPS)
+    if (!isPerformance) {
+      const pmremGenerator = new THREE.PMREMGenerator(renderer);
+      scene.environment = pmremGenerator.fromScene(new RoomEnvironment(), 0.04).texture;
+      pmremGenerator.dispose();
+    }
 
     // 5. Lighting Rig (Warm Key, Cool Sky Fill, Rim Lighting)
     const hemiLight = new THREE.HemisphereLight(
       isNightMode ? '#38bdf8' : '#e0f2fe',
       isNightMode ? '#090d18' : '#1e293b',
-      isNightMode ? 0.8 : 1.2
+      isNightMode ? (isPerformance ? 1.0 : 0.8) : (isPerformance ? 1.4 : 1.2)
     );
     scene.add(hemiLight);
 
     const dirLight = new THREE.DirectionalLight('#fef08a', isNightMode ? 1.6 : 2.4);
     dirLight.position.set(50, 80, 50);
-    dirLight.castShadow = !isLowPowerDevice;
-    dirLight.shadow.mapSize.width = isLowPowerDevice ? 512 : 1024;
-    dirLight.shadow.mapSize.height = isLowPowerDevice ? 512 : 1024;
-    dirLight.shadow.camera.near = 10;
-    dirLight.shadow.camera.far = 250;
-    const shadowD = 90;
-    dirLight.shadow.camera.left = -shadowD;
-    dirLight.shadow.camera.right = shadowD;
-    dirLight.shadow.camera.top = shadowD;
-    dirLight.shadow.camera.bottom = -shadowD;
-    dirLight.shadow.bias = -0.0005;
+    dirLight.castShadow = enableShadows;
+    if (enableShadows) {
+      dirLight.shadow.mapSize.width = isBalanced ? 512 : 1024;
+      dirLight.shadow.mapSize.height = isBalanced ? 512 : 1024;
+      dirLight.shadow.camera.near = 10;
+      dirLight.shadow.camera.far = 250;
+      const shadowD = 90;
+      dirLight.shadow.camera.left = -shadowD;
+      dirLight.shadow.camera.right = shadowD;
+      dirLight.shadow.camera.top = shadowD;
+      dirLight.shadow.camera.bottom = -shadowD;
+      dirLight.shadow.bias = -0.0005;
+    }
     scene.add(dirLight);
 
-    // District accent point lights
-    const hqPointLight = new THREE.PointLight('#f59e0b', 2.8, 60);
-    hqPointLight.position.set(0, 20, 0);
-    scene.add(hqPointLight);
+    // District accent point lights (only active in balanced/high modes to eliminate fragment shader bottleneck)
+    if (!isPerformance) {
+      const hqPointLight = new THREE.PointLight('#f59e0b', 2.8, 60);
+      hqPointLight.position.set(0, 20, 0);
+      scene.add(hqPointLight);
 
-    const techPointLight = new THREE.PointLight('#c084fc', 2.4, 50);
-    techPointLight.position.set(-45, 16, -45);
-    scene.add(techPointLight);
+      const techPointLight = new THREE.PointLight('#c084fc', 2.4, 50);
+      techPointLight.position.set(-45, 16, -45);
+      scene.add(techPointLight);
 
-    const maritimePointLight = new THREE.PointLight('#0284c7', 2.4, 55);
-    maritimePointLight.position.set(70, 16, 32);
-    scene.add(maritimePointLight);
+      const maritimePointLight = new THREE.PointLight('#0284c7', 2.4, 55);
+      maritimePointLight.position.set(70, 16, 32);
+      scene.add(maritimePointLight);
 
-    const tradePointLight = new THREE.PointLight('#10b981', 2.2, 50);
-    tradePointLight.position.set(-45, 16, 35);
-    scene.add(tradePointLight);
+      const tradePointLight = new THREE.PointLight('#10b981', 2.2, 50);
+      tradePointLight.position.set(-45, 16, 35);
+      scene.add(tradePointLight);
+    }
 
     // 6. Materials Palette
     const palette: CityMaterialPalette = createCityMaterialPalette(isNightMode, isLowPowerDevice);
@@ -731,7 +761,7 @@ export const CityCanvas: React.FC<CityCanvasProps> = ({
       if (currentSelected) {
         selectionHalo.visible = true;
         if (currentSelected.type === 'landmark') {
-          const foundDef = ALL_CITY_LANDMARKS.find((l) => l.id === currentSelected.id);
+          const foundDef = LANDMARK_MAP.get(currentSelected.id);
           if (foundDef) {
             selectionHalo.position.set(foundDef.coordinates.x, 0.35, foundDef.coordinates.z);
           }
@@ -786,7 +816,7 @@ export const CityCanvas: React.FC<CityCanvasProps> = ({
         renderer.domElement.parentNode.removeChild(renderer.domElement);
       }
     };
-  }, [profile, isNightMode]);
+  }, [cityLayoutKey, isNightMode, graphicsQuality]);
 
   useEffect(() => {
     touchControllerRef.current?.setSpeed(cameraSpeed);

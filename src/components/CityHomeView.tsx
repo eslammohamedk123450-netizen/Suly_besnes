@@ -61,6 +61,25 @@ export const CityHomeView: React.FC<CityHomeViewProps> = (props) => {
   const [gridRefreshKey, setGridRefreshKey] = useState(0);
   const [cameraSpeed, setCameraSpeed] = useState(1);
   const [showCameraSettings, setShowCameraSettings] = useState(false);
+  const [graphicsQuality, setGraphicsQuality] = useState<'performance' | 'balanced' | 'high'>(() => {
+    try {
+      const saved = localStorage.getItem('suly_graphics_quality');
+      if (saved === 'performance' || saved === 'balanced' || saved === 'high') return saved;
+      const isMobile = typeof window !== 'undefined' && (window.matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0);
+      return isMobile ? 'performance' : 'balanced';
+    } catch {
+      return 'balanced';
+    }
+  });
+
+  const handleSetGraphicsQuality = (quality: 'performance' | 'balanced' | 'high') => {
+    setGraphicsQuality(quality);
+    try {
+      localStorage.setItem('suly_graphics_quality', quality);
+    } catch {
+      // ignore
+    }
+  };
 
   useEffect(() => {
     if (!props.focusSection) return;
@@ -147,6 +166,7 @@ export const CityHomeView: React.FC<CityHomeViewProps> = (props) => {
               isNightMode={isNightMode}
               cameraPreset={cameraPreset}
               cameraSpeed={cameraSpeed}
+              graphicsQuality={graphicsQuality}
               onResetPreset={() => setCameraPreset(null)}
             />
 
@@ -161,26 +181,65 @@ export const CityHomeView: React.FC<CityHomeViewProps> = (props) => {
               <button
                 type="button"
                 onClick={() => setShowCameraSettings((open) => !open)}
-                className="w-9 h-9 rounded-xl bg-slate-950/85 border border-amber-500/40 text-amber-300 flex items-center justify-center shadow-lg backdrop-blur-md"
-                aria-label="إعدادات حركة الكاميرا"
-                title="إعدادات حركة الكاميرا"
+                className="w-9 h-9 rounded-xl bg-slate-950/85 border border-amber-500/40 text-amber-300 flex items-center justify-center shadow-lg backdrop-blur-md hover:border-amber-400 transition"
+                aria-label="إعدادات الأداء وحركة الكاميرا"
+                title="إعدادات الأداء وحركة الكاميرا"
               >
                 <Settings className="w-4 h-4" />
               </button>
               {showCameraSettings && (
-                <div className="mt-2 w-40 rounded-2xl bg-slate-950/95 border border-amber-500/35 p-2 shadow-2xl backdrop-blur-md">
-                  <div className="text-[10px] text-slate-400 font-bold mb-1.5">سرعة حركة الكاميرا</div>
-                  <div className="grid grid-cols-3 gap-1">
-                    {[0.5, 1, 2].map((speed) => (
+                <div className="mt-2 w-52 rounded-2xl bg-slate-950/95 border border-amber-500/35 p-2.5 shadow-2xl backdrop-blur-md space-y-2.5" dir="rtl">
+                  {/* Performance Mode & Graphics Quality */}
+                  <div>
+                    <div className="flex items-center justify-between text-[10px] text-amber-300 font-bold mb-1.5">
+                      <span>أداء وسلاسة الجرافيك</span>
+                      <span className="text-slate-400 text-[9px]">
+                        {graphicsQuality === 'performance' ? '⚡ 60 FPS' : graphicsQuality === 'balanced' ? '⚖️ متوازن' : '✨ عالي'}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-3 gap-1">
                       <button
-                        key={speed}
                         type="button"
-                        onClick={() => setCameraSpeed(speed)}
-                        className={`px-1 py-1.5 rounded-lg text-[10px] font-black ${cameraSpeed === speed ? 'bg-amber-500 text-slate-950' : 'bg-slate-800 text-slate-300'}`}
+                        onClick={() => handleSetGraphicsQuality('performance')}
+                        className={`px-1 py-1.5 rounded-lg text-[9px] font-black transition ${graphicsQuality === 'performance' ? 'bg-gradient-to-r from-amber-500 to-yellow-400 text-slate-950 shadow' : 'bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800'}`}
+                        title="وضع الأداء الفائق: بدون تقطيع (موصى به للهواتف)"
                       >
-                        {speed === 0.5 ? 'بطيء' : speed === 1 ? 'طبيعي' : 'سريع'}
+                        ⚡ سريع
                       </button>
-                    ))}
+                      <button
+                        type="button"
+                        onClick={() => handleSetGraphicsQuality('balanced')}
+                        className={`px-1 py-1.5 rounded-lg text-[9px] font-black transition ${graphicsQuality === 'balanced' ? 'bg-gradient-to-r from-amber-500 to-yellow-400 text-slate-950 shadow' : 'bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800'}`}
+                        title="وضع متوازن"
+                      >
+                        ⚖️ متوازن
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleSetGraphicsQuality('high')}
+                        className={`px-1 py-1.5 rounded-lg text-[9px] font-black transition ${graphicsQuality === 'high' ? 'bg-gradient-to-r from-amber-500 to-yellow-400 text-slate-950 shadow' : 'bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800'}`}
+                        title="جودة سينمائية كاملة"
+                      >
+                        ✨ عالي
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Camera Movement Speed */}
+                  <div className="pt-2 border-t border-slate-800/80">
+                    <div className="text-[10px] text-slate-400 font-bold mb-1.5">سرعة حركة الكاميرا</div>
+                    <div className="grid grid-cols-3 gap-1">
+                      {[0.5, 1, 2].map((speed) => (
+                        <button
+                          key={speed}
+                          type="button"
+                          onClick={() => setCameraSpeed(speed)}
+                          className={`px-1 py-1.5 rounded-lg text-[9px] font-black transition ${cameraSpeed === speed ? 'bg-amber-500 text-slate-950 shadow' : 'bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800'}`}
+                        >
+                          {speed === 0.5 ? 'بطيء' : speed === 1 ? 'طبيعي' : 'سريع'}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 </div>
               )}
