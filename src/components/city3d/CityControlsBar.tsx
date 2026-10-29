@@ -52,6 +52,7 @@ export const CityControlsBar: React.FC<CityControlsBarProps> = ({
   onToggleView,
 }) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState<'buildings' | 'roads' | 'nature' | 'services'>('buildings');
 
   return (
     <div className="w-full flex flex-col items-center select-none pt-2">
@@ -76,6 +77,33 @@ export const CityControlsBar: React.FC<CityControlsBarProps> = ({
       {/* Main Bottom Control Dock */}
       {!isCollapsed && (
         <div className="w-full bg-slate-900/95 border border-amber-500/30 rounded-2xl p-2.5 shadow-2xl backdrop-blur-md flex flex-wrap items-center justify-between gap-2 text-xs">
+          {/* Mobile build palette: selecting a category focuses the placement plots. */}
+          <div className="w-full flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1 border-b border-slate-800">
+            {([
+              ['buildings', 'المباني 🏢'],
+              ['roads', 'الطرق 🛣️'],
+              ['nature', 'الطبيعة 🌳'],
+              ['services', 'الخدمات ⚙️'],
+            ] as const).map(([category, label]) => (
+              <button
+                key={category}
+                type="button"
+                onClick={() => {
+                  setSelectedCategory(category);
+                  onSelectPreset('plots');
+                }}
+                className={`shrink-0 rounded-xl border px-3 py-2 font-bold transition-all ${
+                  selectedCategory === category
+                    ? 'border-amber-400/70 bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
+                    : 'border-slate-700 bg-slate-950 text-slate-300 hover:border-amber-500/40 hover:text-white'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+            <span className="mr-auto shrink-0 text-[10px] text-slate-500">اضغط على قطعة أرض لوضع العنصر</span>
+          </div>
+
           {/* The city is the only gameplay view; legacy dashboard navigation is retired. */}
           <div className="flex items-center gap-1.5 bg-slate-950 p-1 rounded-xl border border-slate-800">
             <button
