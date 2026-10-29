@@ -2742,7 +2742,8 @@ export type GameCommand =
   | { name: 'instant_sell_player_asset'; args: { assetType: 'land' | 'company' | 'asset'; assetId: string } }
   | { name: 'claim_starter_mission'; args: { missionId: string } }
   | { name: 'claim_mission_reward'; args: { missionId: string } }
-  | { name: 'accept_bot_offer'; args: { offerId: string } };
+  | { name: 'accept_bot_offer'; args: { offerId: string } }
+  | { name: 'upgrade_cartel_stronghold'; args: { targetLevel: number } };
 
 export type GameCommandHandler = (command: GameCommand, fallback: (profile: PlayerProfile) => GameResult<unknown>) => void | Promise<void>;
 
@@ -2804,6 +2805,17 @@ export function executeGameCommand(profile: PlayerProfile, command: GameCommand)
     case 'claim_starter_mission': return claimStarterMission(profile, command.args.missionId);
     case 'claim_mission_reward': return claimMissionReward(profile, command.args.missionId);
     case 'accept_bot_offer': return acceptBotMarketOffer(profile, command.args.offerId);
+    case 'upgrade_cartel_stronghold': {
+      return {
+        ok: true,
+        profile: {
+          ...profile,
+          cartelStrongholdLevel: command.args.targetLevel,
+        },
+        message: 'تمت ترقية معقل الكارتيل والتحالف بنجاح',
+        data: undefined,
+      };
+    }
   }
 }
 

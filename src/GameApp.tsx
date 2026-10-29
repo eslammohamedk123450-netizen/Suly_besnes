@@ -20,6 +20,7 @@ import { ProfilePage } from './components/ProfilePage';
 import { Icon } from './components/Icon';
 import { FlyingToast, type ToastAlert } from './components/FlyingToast';
 import { NotificationModal } from './components/NotificationModal';
+import { QuestManager } from './components/QuestManager';
 import { selectNotifications, type GameNotification } from './game/notifications';
 import { SectionPage } from './components/SectionPage';
 import { COUNTRIES, findCountry } from './domain/countries';
@@ -1458,6 +1459,15 @@ export default function App() {
       <CelebrationModal
         data={celebrationData}
         onClose={() => setCelebrationData(null)}
+      />
+
+      {/* Quest System & Player Guidance (نظام المهام وتوجيه اللاعب) */}
+      <QuestManager
+        profile={profile}
+        onUpdateProfile={(updated) => {
+          setProfile(updated);
+          saveGame(updated, account?.id);
+        }}
       />
 
       {/* The 3D city and its building sheets replace the legacy mobile section nav. */}

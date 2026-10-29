@@ -263,40 +263,12 @@
 .app-frame .notification-count { color: #8fe9cf; background: rgba(22,199,154,.12); }
 .app-frame .asset-map-node { color: #e0ebf4; background: rgba(255,255,255,.04); border-color: var(--ui-line); }
 
-.app-frame .button-primary {
-  color: #fce79a;
-  background: linear-gradient(180deg, #131c2d 0%, #0a111c 100%);
-  border: 1px solid rgba(245, 158, 11, 0.45);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12), 0 4px 14px rgba(0,0,0,0.5);
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.85);
-}
-.app-frame .button-primary:hover {
-  color: #ffffff;
-  background: linear-gradient(180deg, #182337 0%, #0d1624 100%);
-  border-color: rgba(251, 191, 36, 0.85);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 0 16px rgba(245, 158, 11, 0.35), 0 6px 18px rgba(0,0,0,0.6);
-}
-.app-frame .button-secondary {
-  color: #f8fafc;
-  background: linear-gradient(180deg, #161b24 0%, #0d1017 100%);
-  border: 1px solid rgba(148, 163, 184, 0.28);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 3px 10px rgba(0,0,0,0.35);
-}
-.app-frame .button-secondary:hover {
-  color: #fffbeb;
-  background: linear-gradient(180deg, #1c222e 0%, #10141d 100%);
-  border-color: rgba(245, 158, 11, 0.45);
-}
-.app-frame .button-danger {
-  color: #fee2e2;
-  background: linear-gradient(180deg, #241113 0%, #13080a 100%);
-  border: 1px solid rgba(239, 68, 68, 0.35);
-}
-.app-frame .button-danger:hover {
-  background: linear-gradient(180deg, #2d1417 0%, #1a0b0d 100%);
-  border-color: rgba(239, 68, 68, 0.6);
-  color: #ffffff;
-}
+.app-frame .button-primary { color: #18243a; background: linear-gradient(135deg, #ffd871, #f2b83f); border-color: rgba(255,225,146,.62); box-shadow: 0 7px 18px rgba(246,196,83,.16); }
+.app-frame .button-primary:hover { color: #111c30; background: linear-gradient(135deg, #ffe28f, #f7c74c); box-shadow: 0 9px 22px rgba(246,196,83,.24); }
+.app-frame .button-secondary { color: #d8e5ef; background: rgba(255,255,255,.055); border-color: var(--ui-line); }
+.app-frame .button-secondary:hover { color: #fff; background: rgba(255,255,255,.1); border-color: rgba(151,185,211,.32); }
+.app-frame .button-danger { color: #fff; background: #bd4f50; border-color: rgba(255,120,106,.4); }
+.app-frame .button-danger:hover { background: #a53f44; }
 .app-frame .button:disabled { opacity: .48; }
 .app-frame .settings-row--highlight .saved-status { color: #8fe9cf !important; }
 .app-frame .code-redemption { color: var(--ui-text); background: linear-gradient(135deg, rgba(62,48,23,.45), rgba(18,42,67,.9)); border-color: rgba(246,196,83,.2); }
@@ -305,26 +277,12 @@
 .app-frame .code-redemption-notice { color: #ffb4ac; background: rgba(255,120,106,.1); }
 .app-frame .code-redemption-notice.is-success { color: #90ead0; background: rgba(22,199,154,.11); }
 
-.app-frame .mobile-bottom-nav {
-  color: var(--ui-text);
-  background: rgba(8, 14, 26, 0.92);
-  backdrop-filter: blur(16px);
-  border-color: rgba(245, 158, 11, 0.25);
-  box-shadow: 0 -8px 30px rgba(0,0,0,.5);
-}
-.app-frame .mobile-nav-item { color: #94a3b8; }
-.app-frame .mobile-nav-item.is-active {
-  color: #fde047;
-  background: rgba(245, 158, 11, 0.12);
-  border: 1px solid rgba(245, 158, 11, 0.25);
-}
+.app-frame .mobile-bottom-nav { color: var(--ui-text); background: rgba(7,19,38,.96); border-color: rgba(151,185,211,.16); box-shadow: 0 -8px 28px rgba(0,0,0,.24); }
+.app-frame .mobile-nav-item { color: #829ab0; }
+.app-frame .mobile-nav-item.is-active { color: #78e1c2; background: rgba(22,199,154,.11); }
 .app-frame .mobile-nav-item.is-locked { opacity: .55; }
-.app-frame .mobile-more-menu {
-  color: var(--ui-text);
-  background: #0b1322;
-  border-color: rgba(245, 158, 11, 0.25);
-}
-.app-frame .mobile-more-heading { color: #fef08a; }
+.app-frame .mobile-more-menu { color: var(--ui-text); background: #10243d; border-color: var(--ui-line); }
+.app-frame .mobile-more-heading { color: #f0f6fb; }
 .app-frame .mobile-more-item { color: #d7e4ee; border-color: var(--ui-line); }
 .app-frame .mobile-more-item > svg:first-child { color: var(--ui-green); }
 .app-frame .mobile-more-item > span small { color: #9db2c5; }

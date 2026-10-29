@@ -120,6 +120,7 @@ export interface PlayerCartelState {
   contributedFunds: number;
   activeAgreement: string | null;
   warVictoryCount: number;
+  strongholdLevel?: number;
 }
 
 // -------------------------------------------------------------

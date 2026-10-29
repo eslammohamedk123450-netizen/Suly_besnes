@@ -7,7 +7,6 @@ import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { buildExecutiveHelicopter } from './cityLifeAssets';
 import type { PlayerProfile } from '../../domain/player';
 import {
   resolveCityGrid,
@@ -21,7 +20,6 @@ import {
   disposeCityMaterialPalette,
   getOrCreateSkyTexture,
   type CityMaterialPalette,
-  type TimeOfDay,
 } from './cityMaterials';
 import {
   buildEmptyPlotMesh,
@@ -55,8 +53,8 @@ import {
   buildLuckyWheelRotundaMesh,
   buildPrestigeConsulateMesh,
 } from './cityMeshBuilders';
+import { getCartelStrongholdLevel } from './cartelStronghold3D';
 import { buildCityRoadNetwork, type TrafficVehicle } from './cityRoadNetwork';
-import { buildCityPowerGrid } from './cityPowerGrid';
 import {
   CityTouchController,
   CITY_CAMERA_LIMITS,
@@ -71,7 +69,6 @@ import {
   type LandmarkSystemDefinition,
 } from './cityWorldData';
 import { createBuildingLabelSprite } from './cityLabels';
-
 import './CityCanvas.css';
 
 export type SelectedItem =
@@ -96,7 +93,6 @@ interface CityCanvasProps {
   profile: PlayerProfile;
   selectedItem: SelectedItem | null;
   onSelectItem: (item: SelectedItem | null) => void;
-  timeOfDay?: TimeOfDay;
   isNightMode?: boolean;
   cameraPreset?: CityCameraPreset;
   onResetPreset?: () => void;
@@ -107,8 +103,7 @@ export const CityCanvas: React.FC<CityCanvasProps> = ({
   profile,
   selectedItem,
   onSelectItem,
-  timeOfDay,
-  isNightMode,
+  isNightMode = true,
   cameraPreset,
   onResetPreset,
   cameraSpeed = 1,
@@ -157,32 +152,21 @@ export const CityCanvas: React.FC<CityCanvasProps> = ({
     const isLowPowerDevice = isSoftwareGl || isMobileDevice;
     const devicePixelRatio = Math.min(window.devicePixelRatio || 1, isLowPowerDevice ? 1.25 : 1.75);
 
-    // Resolve active lighting & atmosphere mode: defaults to sunset (الغروب) as requested
-    const currentTimeOfDay: TimeOfDay = timeOfDay ?? (isNightMode !== undefined ? (isNightMode ? 'night' : 'day') : 'sunset');
-
-    // 1. Scene setup with rich atmospheric dark blue horizon fog
-    // (يخفي حواف الخريطة ويضيف عمقاً وجواً من الغموض والفخامة باللون الأزرق الداكن)
+    // 1. Scene setup with expanded atmospheric horizon fog
     const scene = new THREE.Scene();
-    const fogColor = currentTimeOfDay === 'night' 
-      ? '#060d1d' 
-      : currentTimeOfDay === 'sunset' 
-        ? '#0b1329' 
-        : '#0f1d38';
-    scene.background = getOrCreateSkyTexture(currentTimeOfDay);
-    scene.fog = new THREE.FogExp2(
-      fogColor, 
-      currentTimeOfDay === 'night' ? 0.0026 : currentTimeOfDay === 'sunset' ? 0.0022 : 0.0016
-    );
+    const fogColor = isNightMode ? '#0b1630' : '#64748b';
+    scene.background = getOrCreateSkyTexture(isNightMode);
+    scene.fog = new THREE.FogExp2(fogColor, isNightMode ? 0.003 : 0.0026);
 
     // 2. Camera with expanded view frustum for enlarged city
-    const camera = new THREE.PerspectiveCamera(cameraTargetFov.current, width / height, 0.5, 650);
+    const camera = new THREE.PerspectiveCamera(cameraTargetFov.current, width / height, 0.5, 600);
     cameraCurrentLookAtPos.current.copy(cameraLookAtPos.current);
     camera.position.copy(cameraTargetPos.current);
     camera.lookAt(cameraCurrentLookAtPos.current);
 
-    // 3. WebGL Renderer with real PCF Soft Shadows enabled
+    // 3. WebGL Renderer
     const renderer = new THREE.WebGLRenderer({
-      antialias: !isSoftwareGl,
+      antialias: !isLowPowerDevice,
       powerPreference: 'high-performance',
       alpha: false,
     });
@@ -190,111 +174,70 @@ export const CityCanvas: React.FC<CityCanvasProps> = ({
     renderer.setPixelRatio(devicePixelRatio);
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = currentTimeOfDay === 'night' ? 1.35 : currentTimeOfDay === 'sunset' ? 1.25 : 1.15;
-    renderer.shadowMap.enabled = !isSoftwareGl;
+    renderer.toneMappingExposure = 1.15;
+    renderer.shadowMap.enabled = !isLowPowerDevice;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     container.appendChild(renderer.domElement);
 
-    // 4. Procedural Outdoor Sky Environment Map (Enables real sky, horizon, and city reflections on obsidian towers)
+    // 4. Procedural Studio Environment
     const pmremGenerator = new THREE.PMREMGenerator(renderer);
-    const skyTexture = getOrCreateSkyTexture(currentTimeOfDay);
-    scene.environment = pmremGenerator.fromEquirectangular(skyTexture).texture;
+    scene.environment = pmremGenerator.fromScene(new RoomEnvironment(), 0.04).texture;
     pmremGenerator.dispose();
 
-    // 5. Lighting Rig (Sunset: Warm orange key + purple fill / Night: Cool moonlit blue / Day: Crisp sun)
-    let hemiSky = '#d946ef';
-    let hemiGround = '#451a03';
-    let hemiInt = 1.35;
-    let dirColor = '#ff8f3d';
-    let dirInt = 2.85;
-    const dirPos = new THREE.Vector3(85, 45, 65); // Lower, dramatic sunset angle casting elongated golden shadows
-
-    if (currentTimeOfDay === 'night') {
-      hemiSky = '#38bdf8';
-      hemiGround = '#060b18';
-      hemiInt = 0.95;
-      dirColor = '#93c5fd';
-      dirInt = 1.6;
-      dirPos.set(50, 85, 50);
-    } else if (currentTimeOfDay === 'day') {
-      hemiSky = '#ffffff';
-      hemiGround = '#86efac';
-      hemiInt = 1.35;
-      dirColor = '#fffbeb';
-      dirInt = 2.6;
-      dirPos.set(55, 90, 50);
-    }
-
-    const hemiLight = new THREE.HemisphereLight(hemiSky, hemiGround, hemiInt);
+    // 5. Lighting Rig (Warm Key, Cool Sky Fill, Rim Lighting)
+    const hemiLight = new THREE.HemisphereLight(
+      isNightMode ? '#38bdf8' : '#e0f2fe',
+      isNightMode ? '#090d18' : '#1e293b',
+      isNightMode ? 0.8 : 1.2
+    );
     scene.add(hemiLight);
 
-    const dirLight = new THREE.DirectionalLight(dirColor, dirInt);
-    dirLight.position.copy(dirPos);
-    dirLight.castShadow = !isSoftwareGl;
-    dirLight.shadow.mapSize.width = isSoftwareGl ? 512 : 2048;
-    dirLight.shadow.mapSize.height = isSoftwareGl ? 512 : 2048;
+    const dirLight = new THREE.DirectionalLight('#fef08a', isNightMode ? 1.6 : 2.4);
+    dirLight.position.set(50, 80, 50);
+    dirLight.castShadow = !isLowPowerDevice;
+    dirLight.shadow.mapSize.width = isLowPowerDevice ? 512 : 1024;
+    dirLight.shadow.mapSize.height = isLowPowerDevice ? 512 : 1024;
     dirLight.shadow.camera.near = 10;
-    dirLight.shadow.camera.far = 350;
-    const shadowD = 135;
+    dirLight.shadow.camera.far = 250;
+    const shadowD = 90;
     dirLight.shadow.camera.left = -shadowD;
     dirLight.shadow.camera.right = shadowD;
     dirLight.shadow.camera.top = shadowD;
     dirLight.shadow.camera.bottom = -shadowD;
-    dirLight.shadow.bias = -0.0006;
-    dirLight.shadow.normalBias = 0.02;
+    dirLight.shadow.bias = -0.0005;
     scene.add(dirLight);
 
     // District accent point lights
-    const hqPointLight = new THREE.PointLight(
-      currentTimeOfDay === 'night' ? '#f59e0b' : currentTimeOfDay === 'sunset' ? '#ea580c' : '#f59e0b',
-      currentTimeOfDay === 'night' ? 3.4 : currentTimeOfDay === 'sunset' ? 3.0 : 2.5,
-      65
-    );
+    const hqPointLight = new THREE.PointLight('#f59e0b', 2.8, 60);
     hqPointLight.position.set(0, 20, 0);
     scene.add(hqPointLight);
 
-    const techPointLight = new THREE.PointLight(
-      currentTimeOfDay === 'sunset' ? '#e879f9' : '#c084fc',
-      2.6,
-      55
-    );
+    const techPointLight = new THREE.PointLight('#c084fc', 2.4, 50);
     techPointLight.position.set(-45, 16, -45);
     scene.add(techPointLight);
 
-    const maritimePointLight = new THREE.PointLight('#0284c7', 2.5, 60);
+    const maritimePointLight = new THREE.PointLight('#0284c7', 2.4, 55);
     maritimePointLight.position.set(70, 16, 32);
     scene.add(maritimePointLight);
 
-    const tradePointLight = new THREE.PointLight('#10b981', 2.3, 50);
+    const tradePointLight = new THREE.PointLight('#10b981', 2.2, 50);
     tradePointLight.position.set(-45, 16, 35);
     scene.add(tradePointLight);
 
-    // 6. Materials Palette (With warm illuminated windows at night/sunset)
-    const palette: CityMaterialPalette = createCityMaterialPalette(currentTimeOfDay, isSoftwareGl);
+    // 6. Materials Palette
+    const palette: CityMaterialPalette = createCityMaterialPalette(isNightMode, isLowPowerDevice);
 
-    // 7. Mainland footprint with extended coverage fading into dark blue horizon fog
-    const groundGeo = new THREE.PlaneGeometry(CITY_WORLD_CONFIG.groundSize * 1.5, CITY_WORLD_CONFIG.groundSize * 1.5);
+    // 7. Mainland footprint; the eastern harbor water extends beyond this plane.
+    const groundGeo = new THREE.PlaneGeometry(CITY_WORLD_CONFIG.groundSize, CITY_WORLD_CONFIG.groundSize);
     const ground = new THREE.Mesh(groundGeo, palette.ground);
     ground.rotation.x = -Math.PI / 2;
-    ground.receiveShadow = !isSoftwareGl;
+    ground.receiveShadow = !isLowPowerDevice;
     scene.add(ground);
 
-    // 8. Modular Road Grid & Traffic (with Supercars, Coastal Yachts, and Dancing Fountains)
-    const roadNetwork = buildCityRoadNetwork(palette, isSoftwareGl, currentTimeOfDay);
+    // 8. Modular Road Grid & Traffic
+    const roadNetwork = buildCityRoadNetwork(palette, isLowPowerDevice, isNightMode);
     scene.add(roadNetwork.group);
     const trafficVehicles: TrafficVehicle[] = roadNetwork.vehicles;
-    const animatedYachts = roadNetwork.yachts;
-    const dancingFountains = roadNetwork.fountains;
-
-    // Executive VIP Helicopter flying and patrolling above the towers
-    const heliAssets = buildExecutiveHelicopter(palette, isSoftwareGl);
-    heliAssets.group.position.set(0, 46, 0);
-    scene.add(heliAssets.group);
-    let heliAngle = 0;
-
-    // Subterranean Power Grid & Interactive Fiber Optics
-    const powerGrid = buildCityPowerGrid(palette, isSoftwareGl, currentTimeOfDay === 'night');
-    scene.add(powerGrid.group);
 
     // 9. Clickable Targets Map
     const clickableObjects = new Map<THREE.Object3D, SelectedItem>();
@@ -326,6 +269,7 @@ export const CityCanvas: React.FC<CityCanvasProps> = ({
     let crownRingMesh: THREE.Mesh | null = null;
     let luckyWheelDiscMesh: THREE.Object3D | null = null;
     let diamondCrystalMesh: THREE.Object3D | null = null;
+    let cartelRotorMesh: THREE.Object3D | null = null;
 
     ALL_CITY_LANDMARKS.forEach((def) => {
       let landmarkMesh: THREE.Group | null = null;
@@ -413,9 +357,16 @@ export const CityCanvas: React.FC<CityCanvasProps> = ({
         case 'territory':
           landmarkMesh = buildTerritoryCitadelMesh(palette, isLowPowerDevice, profile.level ?? 1);
           break;
-        case 'cartel':
-          landmarkMesh = buildCartelBastionMesh(palette, isLowPowerDevice);
+        case 'cartel': {
+          const cartelLevel = getCartelStrongholdLevel(profile);
+          landmarkMesh = buildCartelBastionMesh(palette, isLowPowerDevice, cartelLevel);
+          landmarkMesh.traverse((c) => {
+            if (c.name === 'cartelHelicopterRotor') {
+              cartelRotorMesh = c;
+            }
+          });
           break;
+        }
         case 'maritime':
           landmarkMesh = buildMaritimePortMesh(palette, isLowPowerDevice);
           break;
@@ -463,19 +414,6 @@ export const CityCanvas: React.FC<CityCanvasProps> = ({
       }
 
       if (landmarkMesh) {
-        // Guarantee every building mesh casts real shadows and receives floor shadows
-        landmarkMesh.traverse((child) => {
-          if (child instanceof THREE.Mesh) {
-            const mat = child.material as THREE.Material;
-            const isHelperOrRing = child.geometry instanceof THREE.RingGeometry || 
-                                   (mat && mat.transparent && (mat.opacity ?? 1) < 0.6);
-            if (!isHelperOrRing) {
-              child.castShadow = !isSoftwareGl;
-            }
-            child.receiveShadow = !isSoftwareGl;
-          }
-        });
-
         landmarkMesh.position.set(def.coordinates.x, 0, def.coordinates.z);
         scene.add(landmarkMesh);
         registerClickable(landmarkMesh, { type: 'landmark', id: def.id });
@@ -595,19 +533,6 @@ export const CityCanvas: React.FC<CityCanvasProps> = ({
 
         plotGroup.add(completedFacilityMesh);
       }
-
-      // Guarantee every plot facility and structure casts and receives real shadows
-      plotGroup.traverse((child) => {
-        if (child instanceof THREE.Mesh) {
-          const mat = child.material as THREE.Material;
-          const isHelperOrRing = child.geometry instanceof THREE.RingGeometry || 
-                                 (mat && mat.transparent && (mat.opacity ?? 1) < 0.6);
-          if (!isHelperOrRing) {
-            child.castShadow = !isSoftwareGl;
-          }
-          child.receiveShadow = !isSoftwareGl;
-        }
-      });
 
       scene.add(plotGroup);
       registerClickable(plotGroup, { type: 'plot', plot });
@@ -773,54 +698,6 @@ export const CityCanvas: React.FC<CityCanvasProps> = ({
         }
       });
 
-      // Animate coastal luxury superyachts (cruising + oceanic wave bobbing)
-      animatedYachts.forEach((yacht) => {
-        yacht.mesh.position.z += yacht.dir * yacht.speed * dt * 60;
-        if (yacht.mesh.position.z > yacht.max || yacht.mesh.position.z < yacht.min) {
-          yacht.dir = (yacht.dir * -1) as 1 | -1;
-          yacht.mesh.rotation.y += Math.PI;
-        }
-        yacht.mesh.position.y = 0.08 + Math.sin(elapsedTime * 2.2 + yacht.phase) * 0.12;
-        yacht.mesh.rotation.x = Math.sin(elapsedTime * 1.6 + yacht.phase) * 0.025;
-        yacht.mesh.rotation.z = Math.cos(elapsedTime * 1.9 + yacht.phase) * 0.035;
-      });
-
-      // Animate dancing fountains (pulsing water jets and color-cycling underwater LEDs)
-      dancingFountains.forEach((fountain) => {
-        const pulse = (Math.sin(elapsedTime * 3.6 + fountain.phase) + 1) * 0.5;
-        fountain.centerJet.scale.y = 0.55 + pulse * 1.7;
-        fountain.jets.forEach((jet, jIdx) => {
-          const wave = (Math.sin(elapsedTime * 4.2 + jIdx * 0.78 + fountain.phase) + 1) * 0.5;
-          jet.scale.y = 0.45 + wave * 1.35;
-        });
-        const hue = (elapsedTime * 0.08 + fountain.phase * 0.15) % 1;
-        fountain.lightMaterial.color.setHSL(hue, 0.95, 0.55);
-      });
-
-      // Animate executive helicopter patrol circling above the skyscrapers
-      if (heliAssets) {
-        heliAssets.mainRotor.rotation.y += dt * 32;
-        heliAssets.tailRotor.rotation.x += dt * 38;
-        heliAssets.strobeLight.visible = Math.floor(elapsedTime * 4) % 2 === 0;
-
-        heliAngle += dt * 0.35;
-        const heliRadiusX = 42;
-        const heliRadiusZ = 36;
-        const prevX = heliAssets.group.position.x;
-        const prevZ = heliAssets.group.position.z;
-        const nextX = Math.cos(heliAngle) * heliRadiusX;
-        const nextZ = Math.sin(heliAngle) * heliRadiusZ;
-
-        heliAssets.group.position.x = nextX;
-        heliAssets.group.position.z = nextZ;
-        heliAssets.group.position.y = 44 + Math.sin(heliAngle * 2) * 3.0;
-
-        const heading = Math.atan2(-(nextX - prevX), -(nextZ - prevZ));
-        heliAssets.group.rotation.y = heading;
-        heliAssets.group.rotation.z = -0.16; // banking into turn
-        heliAssets.group.rotation.x = 0.08;  // forward pitch
-      }
-
       // Subtle rotation on HQ beacon ring
       if (crownRingMesh) {
         crownRingMesh.rotation.z += dt * 0.45;
@@ -837,24 +714,19 @@ export const CityCanvas: React.FC<CityCanvasProps> = ({
         diamondCrystalMesh.position.y = 4.2 + Math.sin(elapsedTime * 2) * 0.25;
       }
 
-      // Update Water Shaders wave and ripple time
-      if (palette.harborWater && 'uniforms' in palette.harborWater) {
-        (palette.harborWater as THREE.ShaderMaterial).uniforms.uTime.value = elapsedTime;
-      }
-      if (palette.waterSurface && 'uniforms' in palette.waterSurface) {
-        (palette.waterSurface as THREE.ShaderMaterial).uniforms.uTime.value = elapsedTime;
+      // Animate cartel helicopter rotor
+      if (cartelRotorMesh) {
+        cartelRotorMesh.rotation.y += dt * 20.0;
       }
 
-      // Update Selection Indicator position & Interactive Fiber Optics
+      // Update Selection Indicator position
       const currentSelected = selectedItemRef.current;
-      let selectedCoords: { x: number; z: number } | null = null;
       if (currentSelected) {
         selectionHalo.visible = true;
         if (currentSelected.type === 'landmark') {
           const foundDef = ALL_CITY_LANDMARKS.find((l) => l.id === currentSelected.id);
           if (foundDef) {
             selectionHalo.position.set(foundDef.coordinates.x, 0.35, foundDef.coordinates.z);
-            selectedCoords = foundDef.coordinates;
           }
         } else if (currentSelected.type === 'plot') {
           selectionHalo.position.set(
@@ -862,15 +734,11 @@ export const CityCanvas: React.FC<CityCanvasProps> = ({
             0.35,
             currentSelected.plot.gridZ
           );
-          selectedCoords = { x: currentSelected.plot.gridX, z: currentSelected.plot.gridZ };
         }
         selectionHalo.rotation.z += dt * 1.5;
       } else {
         selectionHalo.visible = false;
       }
-
-      // Pulse subterranean power grid and illuminate fiber optics to selected node
-      powerGrid.update(elapsedTime, selectedCoords);
 
       renderer.render(scene, camera);
       scheduleFrame();
@@ -911,7 +779,7 @@ export const CityCanvas: React.FC<CityCanvasProps> = ({
         renderer.domElement.parentNode.removeChild(renderer.domElement);
       }
     };
-  }, [profile, isNightMode, timeOfDay]);
+  }, [profile, isNightMode]);
 
   useEffect(() => {
     touchControllerRef.current?.setSpeed(cameraSpeed);

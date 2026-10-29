@@ -9,7 +9,6 @@ import type { PlayerProfile } from '../domain/player';
 import type { SectionId } from '../domain/navigation';
 import type { GameCommand, GameResult } from '../game/engine';
 import { CityCanvas, type SelectedItem, type CityCameraPreset } from './city3d/CityCanvas';
-import { type TimeOfDay } from './city3d/cityMaterials';
 import { BuildingDetailSheet } from './city3d/BuildingDetailSheet';
 import { BranchAndShopSheet } from './city3d/BranchAndShopSheet';
 import { CityControlsBar } from './city3d/CityControlsBar';
@@ -56,27 +55,12 @@ export const CityHomeView: React.FC<CityHomeViewProps> = (props) => {
   const { profile, country, onNavigate, onCommand } = props;
   const [activeView, setActiveView] = useState<'3d_city' | 'dashboard'>('3d_city');
   const [selectedItem, setSelectedItem] = useState<SelectedItem | null>(null);
-  // Default to Sunset (الغروب) as specifically requested
-  const [timeOfDay, setTimeOfDay] = useState<TimeOfDay>('sunset');
-  const [autoCycle, setAutoCycle] = useState<boolean>(false);
+  const [isNightMode, setIsNightMode] = useState(false);
   const [cameraPreset, setCameraPreset] = useState<CityCameraPreset>(null);
   const [isBranchShopOpen, setIsBranchShopOpen] = useState(false);
   const [gridRefreshKey, setGridRefreshKey] = useState(0);
   const [cameraSpeed, setCameraSpeed] = useState(1);
   const [showCameraSettings, setShowCameraSettings] = useState(false);
-
-  // Optional Day/Night smooth auto-cycling
-  useEffect(() => {
-    if (!autoCycle) return;
-    const cycleOrder: TimeOfDay[] = ['sunset', 'night', 'day'];
-    const timer = setInterval(() => {
-      setTimeOfDay((curr) => {
-        const nextIdx = (cycleOrder.indexOf(curr) + 1) % cycleOrder.length;
-        return cycleOrder[nextIdx];
-      });
-    }, 45000);
-    return () => clearInterval(timer);
-  }, [autoCycle]);
 
   useEffect(() => {
     if (!props.focusSection) return;
@@ -160,8 +144,7 @@ export const CityHomeView: React.FC<CityHomeViewProps> = (props) => {
               profile={profile}
               selectedItem={selectedItem}
               onSelectItem={handleSelectItem}
-              timeOfDay={timeOfDay}
-              isNightMode={timeOfDay === 'night'}
+              isNightMode={isNightMode}
               cameraPreset={cameraPreset}
               cameraSpeed={cameraSpeed}
               onResetPreset={() => setCameraPreset(null)}
@@ -302,18 +285,16 @@ export const CityHomeView: React.FC<CityHomeViewProps> = (props) => {
             )}
           </div>
 
-          {/* Unified Bottom Controls Bar with Day/Night cycle & District presets */}
+          {/* Unified Bottom Controls Bar */}
+          <div className="hidden">
           <CityControlsBar
             onSelectPreset={setCameraPreset}
-            timeOfDay={timeOfDay}
-            onChangeTimeOfDay={setTimeOfDay}
-            autoCycle={autoCycle}
-            onToggleAutoCycle={() => setAutoCycle((v) => !v)}
-            isNightMode={timeOfDay === 'night'}
-            onToggleNightMode={() => setTimeOfDay((curr) => curr === 'sunset' ? 'night' : curr === 'night' ? 'day' : 'sunset')}
+            isNightMode={isNightMode}
+            onToggleNightMode={() => setIsNightMode(!isNightMode)}
             activeView={activeView}
             onToggleView={setActiveView}
           />
+          </div>
 
           {/* Quick-Action Tiles connecting to other parts of the empire */}
           <div className="hidden grid grid-cols-2 md:grid-cols-4 gap-3 pt-2">

@@ -18,8 +18,6 @@ import {
   Sparkles,
 } from 'lucide-react';
 
-import type { TimeOfDay } from './cityMaterials';
-
 interface CityControlsBarProps {
   onSelectPreset: (
     preset:
@@ -35,23 +33,15 @@ interface CityControlsBarProps {
       | 'luxury'
       | 'plots'
   ) => void;
-  timeOfDay?: TimeOfDay;
-  onChangeTimeOfDay?: (mode: TimeOfDay) => void;
-  autoCycle?: boolean;
-  onToggleAutoCycle?: () => void;
-  isNightMode?: boolean;
-  onToggleNightMode?: () => void;
+  isNightMode: boolean;
+  onToggleNightMode: () => void;
   activeView: '3d_city' | 'dashboard';
   onToggleView: (view: '3d_city' | 'dashboard') => void;
 }
 
 export const CityControlsBar: React.FC<CityControlsBarProps> = ({
   onSelectPreset,
-  timeOfDay = 'sunset',
-  onChangeTimeOfDay,
-  autoCycle = false,
-  onToggleAutoCycle,
-  isNightMode = false,
+  isNightMode,
   onToggleNightMode,
   activeView,
   onToggleView,
@@ -172,58 +162,24 @@ export const CityControlsBar: React.FC<CityControlsBarProps> = ({
             </button>
           </div>
 
-          {/* Day / Night / Sunset Lighting Rig Selector */}
-          <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800">
-            <button
-              onClick={() => onChangeTimeOfDay ? onChangeTimeOfDay('sunset') : onToggleNightMode?.()}
-              className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 ${
-                timeOfDay === 'sunset'
-                  ? 'bg-gradient-to-r from-orange-600 to-amber-500 text-slate-950 shadow-md shadow-orange-500/20'
-                  : 'text-orange-300 hover:text-white hover:bg-slate-900'
-              }`}
-              title="غروب ساحر بألوان برتقالية بنفسجية وظلال ذهبية ممتدة"
-            >
-              <span>🌅 الغروب</span>
-            </button>
-            <button
-              onClick={() => onChangeTimeOfDay ? onChangeTimeOfDay('night') : onToggleNightMode?.()}
-              className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 ${
-                timeOfDay === 'night'
-                  ? 'bg-indigo-600 text-amber-200 shadow-md shadow-indigo-500/20'
-                  : 'text-indigo-300 hover:text-white hover:bg-slate-900'
-              }`}
-              title="ليل هادئ مع نوافذ صفراء متوهجة وضوء قمر واقعي"
-            >
-              <Moon className="w-3.5 h-3.5 text-amber-300" />
-              <span>الليل</span>
-            </button>
-            <button
-              onClick={() => onChangeTimeOfDay ? onChangeTimeOfDay('day') : onToggleNightMode?.()}
-              className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 ${
-                timeOfDay === 'day'
-                  ? 'bg-sky-500 text-slate-950 shadow-md shadow-sky-500/20'
-                  : 'text-sky-300 hover:text-white hover:bg-slate-900'
-              }`}
-              title="نهار مشرق مشمس مع ظلال واضحة"
-            >
-              <Sun className="w-3.5 h-3.5 text-amber-400" />
-              <span>النهار</span>
-            </button>
-            {onToggleAutoCycle && (
-              <button
-                onClick={onToggleAutoCycle}
-                className={`px-2 py-1.5 rounded-lg text-[10px] font-bold transition-all flex items-center gap-1 ${
-                  autoCycle
-                    ? 'bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/20'
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
-                }`}
-                title="تدوير زمني تلقائي للمدينة"
-              >
-                <Sparkles className="w-3 h-3" />
-                <span>دوران زمني</span>
-              </button>
+          {/* Day / Night lighting toggle */}
+          <button
+            onClick={onToggleNightMode}
+            className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-400 transition-colors border border-slate-700 flex items-center gap-1.5"
+            title="تبديل وضع الإضاءة (ليلي / نهاري)"
+          >
+            {isNightMode ? (
+              <>
+                <Moon className="w-3.5 h-3.5" />
+                <span className="text-[11px] text-slate-300 font-medium">ليلي فاخر</span>
+              </>
+            ) : (
+              <>
+                <Sun className="w-3.5 h-3.5" />
+                <span className="text-[11px] text-slate-300 font-medium">نهاري مشرق</span>
+              </>
             )}
-          </div>
+          </button>
         </div>
       )}
     </div>
