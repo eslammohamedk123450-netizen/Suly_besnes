@@ -755,12 +755,19 @@ export function buildCityRoadNetwork(
 
   // 8. Animated High-Fidelity Traffic Fleet
   const trafficFleet = [
-    { type: 'sedan', colorIdx: 0, axis: 'z' as const, dir: 1 as const, lane: 2.2, zStart: -45, speed: 0.16 },
-    { type: 'truck', colorIdx: 1, axis: 'z' as const, dir: -1 as const, lane: -2.2, zStart: 35, speed: 0.12 },
-    { type: 'bus', colorIdx: 2, axis: 'x' as const, dir: 1 as const, lane: 2.2, zStart: -50, speed: 0.13 },
+    // Z-axis Grand Avenue (North-South) - lane +2.2 and lane -2.2
+    { type: 'sedan', colorIdx: 0, axis: 'z' as const, dir: 1 as const, lane: 2.2, zStart: -85, speed: 0.18 },
+    { type: 'truck', colorIdx: 1, axis: 'z' as const, dir: -1 as const, lane: -2.2, zStart: 80, speed: 0.13 },
+    { type: 'suv', colorIdx: 4, axis: 'z' as const, dir: 1 as const, lane: 2.2, zStart: -15, speed: 0.20 },
+    { type: 'taxi', colorIdx: 6, axis: 'z' as const, dir: -1 as const, lane: -2.2, zStart: 15, speed: 0.17 },
+    { type: 'sedan', colorIdx: 2, axis: 'z' as const, dir: 1 as const, lane: 2.2, zStart: 45, speed: 0.19 },
+
+    // X-axis Cross Boulevard (East-West) - lane +2.2 and lane -2.2
+    { type: 'bus', colorIdx: 2, axis: 'x' as const, dir: 1 as const, lane: 2.2, zStart: -50, speed: 0.14 },
     { type: 'taxi', colorIdx: 6, axis: 'x' as const, dir: -1 as const, lane: -2.2, zStart: 40, speed: 0.17 },
-    { type: 'suv', colorIdx: 4, axis: 'z' as const, dir: 1 as const, lane: 2.2, zStart: 15, speed: 0.18 },
+    { type: 'truck', colorIdx: 3, axis: 'x' as const, dir: 1 as const, lane: 2.2, zStart: 10, speed: 0.12 },
     { type: 'sedan', colorIdx: 3, axis: 'x' as const, dir: -1 as const, lane: -2.2, zStart: -15, speed: 0.16 },
+    { type: 'suv', colorIdx: 5, axis: 'x' as const, dir: -1 as const, lane: -2.2, zStart: -55, speed: 0.18 },
   ];
 
   trafficFleet.forEach((v) => {

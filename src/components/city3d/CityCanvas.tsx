@@ -21,6 +21,8 @@ import {
   type CityConstructionState,
 } from '../../game/cityGridSystem';
 import { playSound } from '../../game/soundEffects';
+import { playCash } from '../../soundManager';
+import { buildDancingFountain } from './cityLifeAssets';
 import {
   createCityMaterialPalette,
   disposeCityMaterialPalette,
@@ -125,6 +127,7 @@ export const CityCanvas: React.FC<CityCanvasProps> = ({
   const mountRef = useRef<HTMLDivElement>(null);
   const profileRef = useRef(profile);
   profileRef.current = profile;
+  const floatingOverlayRef = useRef<HTMLDivElement>(null);
   const selectedItemRef = useRef(selectedItem);
   selectedItemRef.current = selectedItem;
   const onSelectItemRef = useRef(onSelectItem);
@@ -418,14 +421,116 @@ export const CityCanvas: React.FC<CityCanvasProps> = ({
       });
     };
 
-    // 10. Smoke Particles for Industrial Stacks
-    const smokeParticles: THREE.Mesh[] = [];
-    const smokeGeo = new THREE.SphereGeometry(0.35, 6, 6);
-    const smokeMat = new THREE.MeshBasicMaterial({
-      color: '#94a3b8',
+    // Track building root groups for bounce animations and floating UI
+    const landmarkMeshMap = new Map<LandmarkId, THREE.Group>();
+    const plotMeshMap = new Map<string, THREE.Group>();
+
+    // 10. Smoke Particle System above Factory/Industrial Area (using THREE.Points)
+    const SMOKE_COUNT = isLowPowerDevice ? 100 : 180;
+    const smokeGeo = new THREE.BufferGeometry();
+    const smokePositions = new Float32Array(SMOKE_COUNT * 3);
+    const smokeData: {
+      baseX: number;
+      baseY: number;
+      baseZ: number;
+      vx: number;
+      vy: number;
+      vz: number;
+      life: number;
+      maxLife: number;
+    }[] = [];
+
+    // Factory smokestacks coordinates (landmark factory at x: 45, z: 52)
+    const factoryChimneys = [
+      { x: 45 + 3.8, y: 9.4, z: 52 - 2.6 },
+      { x: 45 + 5.2, y: 9.4, z: 52 - 2.6 },
+    ];
+
+    for (let i = 0; i < SMOKE_COUNT; i++) {
+      const ch = factoryChimneys[i % factoryChimneys.length];
+      const maxLife = 2.4 + Math.random() * 2.0;
+      const life = Math.random() * maxLife;
+      const vx = 0.18 + (Math.random() - 0.5) * 0.2;
+      const vy = 1.6 + Math.random() * 0.8;
+      const vz = 0.12 + (Math.random() - 0.5) * 0.2;
+      smokeData.push({
+        baseX: ch.x,
+        baseY: ch.y,
+        baseZ: ch.z,
+        vx,
+        vy,
+        vz,
+        life,
+        maxLife,
+      });
+      smokePositions[i * 3] = ch.x + vx * life;
+      smokePositions[i * 3 + 1] = ch.y + vy * life;
+      smokePositions[i * 3 + 2] = ch.z + vz * life;
+    }
+    smokeGeo.setAttribute('position', new THREE.BufferAttribute(smokePositions, 3));
+    const smokePointsMat = new THREE.PointsMaterial({
+      color: '#cbd5e1',
+      size: isLowPowerDevice ? 1.6 : 2.4,
       transparent: true,
-      opacity: 0.35,
+      opacity: 0.55,
+      depthWrite: false,
     });
+    const smokePoints = new THREE.Points(smokeGeo, smokePointsMat);
+    scene.add(smokePoints);
+
+    // 11. Grand Musical Dancing Fountain in Central Civic Plaza
+    const fountainAsset = buildDancingFountain(palette, isLowPowerDevice, 4.6);
+    const fountainPos = new THREE.Vector3(-16, 0, 22);
+    fountainAsset.group.position.copy(fountainPos);
+    scene.add(fountainAsset.group);
+    registerClickable(fountainAsset.group, { type: 'landmark', id: 'hq' });
+
+    // Water Splash Particle System above Fountain (using THREE.Points)
+    const FOUNTAIN_SPLASH_COUNT = isLowPowerDevice ? 120 : 200;
+    const splashGeo = new THREE.BufferGeometry();
+    const splashPositions = new Float32Array(FOUNTAIN_SPLASH_COUNT * 3);
+    const splashData: {
+      originX: number;
+      originY: number;
+      originZ: number;
+      vx: number;
+      vy: number;
+      vz: number;
+    }[] = [];
+
+    const fountainCenter = { x: fountainPos.x, y: 1.35, z: fountainPos.z };
+    for (let i = 0; i < FOUNTAIN_SPLASH_COUNT; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const spread = 0.3 + Math.random() * 1.5;
+      const vy = 5.2 + Math.random() * 3.8;
+      const vx = Math.cos(angle) * spread;
+      const vz = Math.sin(angle) * spread;
+
+      splashData.push({
+        originX: fountainCenter.x,
+        originY: fountainCenter.y,
+        originZ: fountainCenter.z,
+        vx,
+        vy,
+        vz,
+      });
+
+      const t = Math.random() * 0.7;
+      splashPositions[i * 3] = fountainCenter.x + vx * t;
+      splashPositions[i * 3 + 1] = Math.max(0.45, fountainCenter.y + vy * t - 0.5 * 14 * t * t);
+      splashPositions[i * 3 + 2] = fountainCenter.z + vz * t;
+    }
+    splashGeo.setAttribute('position', new THREE.BufferAttribute(splashPositions, 3));
+    const splashPointsMat = new THREE.PointsMaterial({
+      color: '#38bdf8',
+      size: isLowPowerDevice ? 1.1 : 1.6,
+      transparent: true,
+      opacity: 0.8,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+    });
+    const splashPoints = new THREE.Points(splashGeo, splashPointsMat);
+    scene.add(splashPoints);
 
     // -------------------------------------------------------------
     // BUILD ALL 20 SYSTEM LANDMARKS & 3D LABELS
@@ -541,14 +646,6 @@ export const CityCanvas: React.FC<CityCanvasProps> = ({
         case 'factory': {
           const factoryResult = buildFactoryMesh(palette, isLowPowerDevice);
           landmarkMesh = factoryResult.group;
-          factoryResult.smokePositions.forEach((pos) => {
-            for (let s = 0; s < 4; s++) {
-              const sm = new THREE.Mesh(smokeGeo, smokeMat);
-              sm.position.set(def.coordinates.x + pos.x, pos.y + s * 0.8, def.coordinates.z + pos.z);
-              scene.add(sm);
-              smokeParticles.push(sm);
-            }
-          });
           break;
         }
         case 'warehouse_hub':
@@ -585,6 +682,7 @@ export const CityCanvas: React.FC<CityCanvasProps> = ({
         applyShadowProperties(landmarkMesh);
         landmarkMesh.position.set(def.coordinates.x, 0, def.coordinates.z);
         scene.add(landmarkMesh);
+        landmarkMeshMap.set(def.id, landmarkMesh);
         registerClickable(landmarkMesh, { type: 'landmark', id: def.id });
 
         // Build & attach 3D camera-facing Arabic Nameplate Sprite above building
@@ -705,6 +803,7 @@ export const CityCanvas: React.FC<CityCanvasProps> = ({
 
       applyShadowProperties(plotGroup);
       scene.add(plotGroup);
+      plotMeshMap.set(plot.id, plotGroup);
       registerClickable(plotGroup, { type: 'plot', plot });
     });
 
@@ -716,29 +815,91 @@ export const CityCanvas: React.FC<CityCanvasProps> = ({
     selectionHalo.visible = false;
     scene.add(selectionHalo);
 
+    // -------------------------------------------------------------
+    // INTERACTIVE BUILDING BOUNCE & FLOATING UI SYSTEMS
+    // -------------------------------------------------------------
+    interface ActiveBounce {
+      target: THREE.Object3D;
+      baseScale: THREE.Vector3;
+      startTime: number;
+      duration: number;
+    }
+    const activeBounces: ActiveBounce[] = [];
+
+    const triggerBuildingBounce = (target: THREE.Object3D) => {
+      const existing = activeBounces.find((b) => b.target === target);
+      if (existing) {
+        target.scale.copy(existing.baseScale);
+        existing.startTime = performance.now();
+        return;
+      }
+      activeBounces.push({
+        target,
+        baseScale: target.scale.clone(),
+        startTime: performance.now(),
+        duration: 260,
+      });
+    };
+
+    interface ActiveFloatingText {
+      dom: HTMLDivElement;
+      worldPos: THREE.Vector3;
+      startTime: number;
+      duration: number;
+    }
+    const activeFloatingTexts: ActiveFloatingText[] = [];
+
+    const spawnFloatingMoneyText = (worldPos: THREE.Vector3, text: string = '+$100') => {
+      if (!floatingOverlayRef.current) return;
+      const el = document.createElement('div');
+      el.className = 'floating-money-node';
+      el.style.position = 'absolute';
+      el.style.left = '0px';
+      el.style.top = '0px';
+      el.style.pointerEvents = 'none';
+      el.style.willChange = 'transform, opacity';
+      el.style.zIndex = '50';
+      el.innerHTML = `
+        <div style="display: flex; align-items: center; gap: 5px; font-weight: 900; font-size: 1.35rem; color: #fbbf24; text-shadow: 0 0 14px rgba(245,158,11,0.95), 0 2px 6px rgba(0,0,0,0.9); user-select: none; letter-spacing: 0.05em; font-family: ui-sans-serif, system-ui, sans-serif;">
+          <span>💰</span><span>${text}</span>
+        </div>
+      `;
+      floatingOverlayRef.current.appendChild(el);
+      activeFloatingTexts.push({
+        dom: el,
+        worldPos: worldPos.clone(),
+        startTime: performance.now(),
+        duration: 1000,
+      });
+    };
+
+    const onMoneyCollected = (e: Event) => {
+      const ce = e as CustomEvent<{ pos?: THREE.Vector3; text?: string }>;
+      const pos = ce.detail?.pos || cameraLookAtPos.current;
+      const text = ce.detail?.text || '+$100';
+      spawnFloatingMoneyText(pos, text);
+    };
+    window.addEventListener('suly:money-collected', onMoneyCollected);
+
     // 12. Touch & Mouse Interaction Controller
     const raycaster = new THREE.Raycaster();
     const mouse = new THREE.Vector2();
 
     const handleTapRaycast = (normX: number, normY: number) => {
-      // If a building or plot is already selected, ignore all canvas taps!
-      // The building menu must ONLY close when the user explicitly clicks the X button.
-      if (selectedItemRef.current !== null) {
-        return;
-      }
-
       mouse.x = normX;
       mouse.y = normY;
       raycaster.setFromCamera(mouse, camera);
 
       const intersects = raycaster.intersectObjects(scene.children, true);
       let hitItem: SelectedItem | null = null;
+      let hitMesh: THREE.Object3D | null = null;
 
       for (const hit of intersects) {
         let curr: THREE.Object3D | null = hit.object;
         while (curr && curr !== scene) {
           if (clickableObjects.has(curr)) {
             hitItem = clickableObjects.get(curr)!;
+            hitMesh = curr;
             break;
           }
           curr = curr.parent;
@@ -746,9 +907,32 @@ export const CityCanvas: React.FC<CityCanvasProps> = ({
         if (hitItem) break;
       }
 
-      if (hitItem) {
-        playSound('click');
-        onSelectItemRef.current(hitItem);
+      if (hitItem && hitMesh) {
+        // Resolve root building mesh/group for bounce animation
+        let buildingRoot: THREE.Object3D = hitMesh;
+        if (hitItem.type === 'landmark') {
+          buildingRoot = landmarkMeshMap.get(hitItem.id) || hitMesh;
+        } else if (hitItem.type === 'plot') {
+          buildingRoot = plotMeshMap.get(hitItem.plot.id) || hitMesh;
+        }
+
+        // 1. Quick bounce animation (scale up to 1.05 then back to 1.0)
+        triggerBuildingBounce(buildingRoot);
+
+        // 2. Trigger playCash() sound effect
+        playCash();
+        playSound('cash');
+
+        // 3. Spawn Floating Text system (+ $100 in gold at building 3D coordinates, animates up and fades out over 1s)
+        const worldPos = new THREE.Vector3();
+        buildingRoot.getWorldPosition(worldPos);
+        worldPos.y += hitItem.type === 'landmark' ? 12.0 : 6.0;
+        spawnFloatingMoneyText(worldPos, '+$100');
+
+        // Open building details if not already selected
+        if (selectedItemRef.current === null) {
+          onSelectItemRef.current(hitItem);
+        }
       }
     };
 
@@ -854,32 +1038,124 @@ export const CityCanvas: React.FC<CityCanvasProps> = ({
       // Update mobile touch inertia
       touchCtrl.updateInertia(dt);
 
-      // Animate smoke particles rising from stacks
-      smokeParticles.forEach((smoke, idx) => {
-        smoke.position.y += dt * 0.65;
-        smoke.scale.multiplyScalar(1 + dt * 0.12);
-        if (smoke.position.y > 15.2) {
-          smoke.position.y = 9.8 + (idx % 4) * 0.6;
-          smoke.scale.set(1, 1, 1);
+      // 1. Update Road Traffic (Cars/Trucks move along road grid and reset when reaching the end of the road)
+      const dtStep = Math.min(dt, 0.1) * 60;
+      trafficVehicles.forEach((v) => {
+        if (v.axis === 'z') {
+          if (v.dir === 1) {
+            v.mesh.position.z += v.speed * dtStep;
+            if (v.mesh.position.z > v.max) {
+              v.mesh.position.z = v.min;
+            }
+          } else {
+            v.mesh.position.z -= v.speed * dtStep;
+            if (v.mesh.position.z < v.min) {
+              v.mesh.position.z = v.max;
+            }
+          }
+        } else {
+          if (v.dir === 1) {
+            v.mesh.position.x += v.speed * dtStep;
+            if (v.mesh.position.x > v.max) {
+              v.mesh.position.x = v.min;
+            }
+          } else {
+            v.mesh.position.x -= v.speed * dtStep;
+            if (v.mesh.position.x < v.min) {
+              v.mesh.position.x = v.max;
+            }
+          }
         }
       });
 
-      // Animate road traffic
-      trafficVehicles.forEach((v) => {
-        if (v.axis === 'z') {
-          v.mesh.position.z += v.dir * v.speed;
-          if (v.mesh.position.z > v.max || v.mesh.position.z < v.min) {
-            v.dir = (v.dir * -1) as 1 | -1;
-            v.mesh.rotation.y += Math.PI;
-          }
+      // 2. Animate Factory Smoke Particles (using THREE.Points)
+      for (let i = 0; i < SMOKE_COUNT; i++) {
+        const p = smokeData[i];
+        p.life += dt;
+        if (p.life >= p.maxLife || smokePositions[i * 3 + 1] > 22) {
+          p.life = 0;
+          smokePositions[i * 3] = p.baseX + (Math.random() - 0.5) * 0.4;
+          smokePositions[i * 3 + 1] = p.baseY;
+          smokePositions[i * 3 + 2] = p.baseZ + (Math.random() - 0.5) * 0.4;
         } else {
-          v.mesh.position.x += v.dir * v.speed;
-          if (v.mesh.position.x > v.max || v.mesh.position.x < v.min) {
-            v.dir = (v.dir * -1) as 1 | -1;
-            v.mesh.rotation.y += Math.PI;
+          smokePositions[i * 3] += p.vx * dt;
+          smokePositions[i * 3 + 1] += p.vy * dt;
+          smokePositions[i * 3 + 2] += p.vz * dt;
+        }
+      }
+      smokeGeo.attributes.position.needsUpdate = true;
+
+      // 3. Animate Fountain Water Splash Particles (using THREE.Points)
+      const splashGravity = 14.0;
+      for (let i = 0; i < FOUNTAIN_SPLASH_COUNT; i++) {
+        const p = splashData[i];
+        p.vy -= splashGravity * dt;
+        splashPositions[i * 3] += p.vx * dt;
+        splashPositions[i * 3 + 1] += p.vy * dt;
+        splashPositions[i * 3 + 2] += p.vz * dt;
+
+        if (splashPositions[i * 3 + 1] <= 0.45) {
+          splashPositions[i * 3] = p.originX + (Math.random() - 0.5) * 0.3;
+          splashPositions[i * 3 + 1] = p.originY;
+          splashPositions[i * 3 + 2] = p.originZ + (Math.random() - 0.5) * 0.3;
+          const angle = Math.random() * Math.PI * 2;
+          const spread = 0.4 + Math.random() * 1.5;
+          p.vx = Math.cos(angle) * spread;
+          p.vy = 5.2 + Math.random() * 4.0;
+          p.vz = Math.sin(angle) * spread;
+        }
+      }
+      splashGeo.attributes.position.needsUpdate = true;
+
+      // 4. Animate Building Bounces (quick scale up to 1.05 and back to 1.0)
+      const nowMs = performance.now();
+      for (let i = activeBounces.length - 1; i >= 0; i--) {
+        const b = activeBounces[i];
+        const elapsed = nowMs - b.startTime;
+        const progress = elapsed / b.duration;
+        if (progress >= 1) {
+          b.target.scale.copy(b.baseScale);
+          activeBounces.splice(i, 1);
+        } else {
+          const bounceFactor = 1.0 + Math.sin(progress * Math.PI) * 0.05;
+          b.target.scale.set(
+            b.baseScale.x * bounceFactor,
+            b.baseScale.y * bounceFactor,
+            b.baseScale.z * bounceFactor
+          );
+        }
+      }
+
+      // 5. Project & Animate Floating Text UI (Moves up and fades out over 1s)
+      if (container && floatingOverlayRef.current && activeFloatingTexts.length > 0) {
+        const cWidth = container.clientWidth;
+        const cHeight = container.clientHeight;
+        const projVec = new THREE.Vector3();
+        for (let i = activeFloatingTexts.length - 1; i >= 0; i--) {
+          const item = activeFloatingTexts[i];
+          const elapsed = nowMs - item.startTime;
+          const progress = elapsed / item.duration;
+          if (progress >= 1) {
+            item.dom.remove();
+            activeFloatingTexts.splice(i, 1);
+          } else {
+            projVec.copy(item.worldPos);
+            projVec.project(camera);
+            if (projVec.z > -1 && projVec.z < 1) {
+              const screenX = (projVec.x * 0.5 + 0.5) * cWidth;
+              const screenY = (-projVec.y * 0.5 + 0.5) * cHeight;
+              const offsetY = progress * 65;
+              const opacity = Math.max(0, 1 - progress);
+              const scale = 1.0 + Math.sin(progress * Math.PI * 0.5) * 0.2;
+              item.dom.style.transform = `translate3d(${screenX}px, ${screenY - offsetY}px, 0) translate(-50%, -50%) scale(${scale})`;
+              item.dom.style.opacity = `${opacity}`;
+              item.dom.style.display = 'block';
+            } else {
+              item.dom.style.display = 'none';
+            }
           }
         }
-      });
+      }
 
       // Subtle rotation on HQ beacon ring
       if (crownRingMesh) {
@@ -980,9 +1256,13 @@ export const CityCanvas: React.FC<CityCanvasProps> = ({
       });
       if (scene.environment) scene.environment.dispose();
       disposeCityMaterialPalette(palette);
+      window.removeEventListener('suly:money-collected', onMoneyCollected);
+      activeFloatingTexts.forEach((t) => t.dom.remove());
       groundGeo.dispose();
       smokeGeo.dispose();
-      smokeMat.dispose();
+      smokePointsMat.dispose();
+      splashGeo.dispose();
+      splashPointsMat.dispose();
       selectionHaloGeo.dispose();
 
       if (renderer.domElement && renderer.domElement.parentNode && renderer.domElement.parentNode.contains(renderer.domElement)) {
@@ -1076,6 +1356,8 @@ export const CityCanvas: React.FC<CityCanvasProps> = ({
   return (
     <div className="city-canvas-shell relative w-full h-[calc(100dvh-4.5rem)] min-h-[520px] md:h-[calc(100dvh-5.5rem)] md:min-h-[620px] rounded-2xl md:rounded-3xl overflow-hidden shadow-2xl border border-amber-500/30 bg-slate-950 select-none">
       <div ref={mountRef} className="w-full h-full cursor-grab active:cursor-grabbing touch-none" />
+      {/* Floating Gold UI Feedback Overlay */}
+      <div ref={floatingOverlayRef} className="absolute inset-0 pointer-events-none overflow-hidden z-20" />
 
       {/* Minimal Touch Navigation Helpers (Bottom-Right, non-intrusive) */}
       <div className="absolute bottom-3 right-3 flex items-center gap-1.5 z-10">
