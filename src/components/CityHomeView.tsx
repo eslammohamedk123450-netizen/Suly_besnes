@@ -55,7 +55,8 @@ export const CityHomeView: React.FC<CityHomeViewProps> = (props) => {
   const { profile, country, onNavigate, onCommand } = props;
   const [activeView, setActiveView] = useState<'3d_city' | 'dashboard'>('3d_city');
   const [selectedItem, setSelectedItem] = useState<SelectedItem | null>(null);
-  const [isNightMode, setIsNightMode] = useState(false);
+  const [timeOfDay, setTimeOfDay] = useState<'day' | 'sunset' | 'night'>('sunset');
+  const isNightMode = timeOfDay === 'night';
   const [cameraPreset, setCameraPreset] = useState<CityCameraPreset>(null);
   const [isBranchShopOpen, setIsBranchShopOpen] = useState(false);
   const [gridRefreshKey, setGridRefreshKey] = useState(0);
@@ -79,6 +80,10 @@ export const CityHomeView: React.FC<CityHomeViewProps> = (props) => {
     } catch {
       // ignore
     }
+  };
+
+  const handleCycleTimeOfDay = () => {
+    setTimeOfDay((curr) => (curr === 'sunset' ? 'night' : curr === 'night' ? 'day' : 'sunset'));
   };
 
   useEffect(() => {
@@ -164,6 +169,7 @@ export const CityHomeView: React.FC<CityHomeViewProps> = (props) => {
               selectedItem={selectedItem}
               onSelectItem={handleSelectItem}
               isNightMode={isNightMode}
+              timeOfDay={timeOfDay}
               cameraPreset={cameraPreset}
               cameraSpeed={cameraSpeed}
               graphicsQuality={graphicsQuality}
@@ -363,14 +369,39 @@ export const CityHomeView: React.FC<CityHomeViewProps> = (props) => {
           </div>
 
           {/* Unified Bottom Controls Bar */}
-          <div className="hidden">
-          <CityControlsBar
-            onSelectPreset={setCameraPreset}
-            isNightMode={isNightMode}
-            onToggleNightMode={() => setIsNightMode(!isNightMode)}
-            activeView={activeView}
-            onToggleView={setActiveView}
-          />
+          <div className="w-full">
+            <CityControlsBar
+              onSelectPreset={(preset) => {
+                setCameraPreset(preset);
+                const landmarkId =
+                  preset === 'hq'
+                    ? 'hq'
+                    : preset === 'bank'
+                    ? 'bank'
+                    : preset === 'stock_exchange'
+                    ? 'stock_exchange'
+                    : preset === 'tech'
+                    ? 'tech_tree'
+                    : preset === 'maritime'
+                    ? 'maritime'
+                    : preset === 'gov'
+                    ? 'megaprojects'
+                    : preset === 'trade'
+                    ? 'auctions'
+                    : preset === 'luxury'
+                    ? 'luxury_club'
+                    : null;
+                if (landmarkId) {
+                  handleSelectItem({ type: 'landmark', id: landmarkId });
+                }
+              }}
+              isNightMode={isNightMode}
+              onToggleNightMode={() => setTimeOfDay((t) => (t === 'night' ? 'sunset' : 'night'))}
+              timeOfDay={timeOfDay}
+              onCycleTimeOfDay={handleCycleTimeOfDay}
+              activeView={activeView}
+              onToggleView={setActiveView}
+            />
           </div>
 
           {/* Quick-Action Tiles connecting to other parts of the empire */}

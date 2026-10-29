@@ -6,6 +6,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { Sky } from 'three/addons/objects/Sky.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
@@ -103,6 +104,7 @@ interface CityCanvasProps {
   selectedItem: SelectedItem | null;
   onSelectItem: (item: SelectedItem | null) => void;
   isNightMode?: boolean;
+  timeOfDay?: 'day' | 'sunset' | 'night';
   cameraPreset?: CityCameraPreset;
   onResetPreset?: () => void;
   cameraSpeed?: number;
@@ -113,7 +115,8 @@ export const CityCanvas: React.FC<CityCanvasProps> = ({
   profile,
   selectedItem,
   onSelectItem,
-  isNightMode = true,
+  isNightMode = false,
+  timeOfDay: timeOfDayProp,
   cameraPreset,
   onResetPreset,
   cameraSpeed = 1,
@@ -180,11 +183,62 @@ export const CityCanvas: React.FC<CityCanvasProps> = ({
       isPerformance ? 1.0 : isBalanced ? 1.2 : 1.5
     );
 
+    const timeOfDay = timeOfDayProp || (isNightMode ? 'night' : 'sunset');
+
+    // Helper to enforce shadows across all meshes as requested in prompt:
+    // "Iterate through all building meshes, tree meshes, and vehicle meshes and set mesh.castShadow = true."
+    const applyShadowProperties = (object: THREE.Object3D) => {
+      if (!enableShadows) return;
+      object.traverse((child) => {
+        if (child instanceof THREE.Mesh) {
+          // If it's a wireframe or hologram ring or sky, don't cast shadow
+          if (
+            child.name?.includes('atmospheric_sky') ||
+            child.name?.includes('plotHoloRing') ||
+            child.name?.includes('selectionHalo')
+          ) {
+            return;
+          }
+          if (child.name?.includes('expanded_harbor_water') || child.name?.includes('water')) {
+            child.receiveShadow = true;
+            return;
+          }
+          child.castShadow = true;
+          child.receiveShadow = true;
+        }
+      });
+    };
+
     // 1. Scene setup with expanded atmospheric horizon fog
     const scene = new THREE.Scene();
-    const fogColor = isNightMode ? '#0b1630' : '#64748b';
-    scene.background = getOrCreateSkyTexture(isNightMode);
-    scene.fog = new THREE.FogExp2(fogColor, isNightMode ? 0.003 : 0.0026);
+    const fogColor =
+      timeOfDay === 'sunset' ? '#4a1525' : (timeOfDay === 'night' ? '#0b1630' : '#bae6fd');
+    scene.background = getOrCreateSkyTexture(timeOfDay);
+    scene.fog = new THREE.FogExp2(
+      fogColor,
+      timeOfDay === 'sunset' ? 0.0028 : (timeOfDay === 'night' ? 0.003 : 0.0024)
+    );
+
+    // 1b. Atmospheric scattering Sky object (Three.js Sky example object)
+    const sky = new Sky();
+    sky.name = 'atmospheric_sky';
+    sky.scale.setScalar(450000);
+    scene.add(sky);
+
+    const skyUniforms = sky.material.uniforms;
+    skyUniforms['turbidity'].value = timeOfDay === 'sunset' ? 10 : 8;
+    skyUniforms['rayleigh'].value =
+      timeOfDay === 'sunset' ? 4.2 : (timeOfDay === 'night' ? 0.4 : 1.8);
+    skyUniforms['mieCoefficient'].value = 0.005;
+    skyUniforms['mieDirectionalG'].value = timeOfDay === 'sunset' ? 0.82 : 0.7;
+
+    const sunElevation =
+      timeOfDay === 'sunset' ? 2.8 : (timeOfDay === 'night' ? -10 : 48);
+    const sunAzimuth = 180;
+    const sunPhi = THREE.MathUtils.degToRad(90 - sunElevation);
+    const sunTheta = THREE.MathUtils.degToRad(sunAzimuth);
+    const sunDirection = new THREE.Vector3().setFromSphericalCoords(1, sunPhi, sunTheta);
+    skyUniforms['sunPosition'].value.copy(sunDirection);
 
     // 2. Camera with expanded view frustum for enlarged city
     const camera = new THREE.PerspectiveCamera(cameraTargetFov.current, width / height, 0.5, 600);
@@ -203,7 +257,7 @@ export const CityCanvas: React.FC<CityCanvasProps> = ({
     renderer.setPixelRatio(devicePixelRatio);
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.15;
+    renderer.toneMappingExposure = timeOfDay === 'sunset' ? 1.25 : 1.15;
     renderer.shadowMap.enabled = enableShadows;
     renderer.shadowMap.type = isBalanced ? THREE.BasicShadowMap : THREE.PCFSoftShadowMap;
     while (container.firstChild) {
@@ -217,72 +271,100 @@ export const CityCanvas: React.FC<CityCanvasProps> = ({
     let bloomPass: UnrealBloomPass | null = null;
     let outputPass: OutputPass | null = null;
 
-    try {
-      composer = new EffectComposer(renderer);
-
-      // Render base scene pass
-      const renderPass = new RenderPass(scene, camera);
-      composer.addPass(renderPass);
-
-      // SSAOPass: creates realistic soft shadows in corners and crevices (e.g., between buildings and ground)
+    if (!isPerformance) {
       try {
-        ssaoPass = new SSAOPass(scene, camera, width, height);
-        ssaoPass.kernelRadius = 16;
-        ssaoPass.minDistance = 0.005;
-        ssaoPass.maxDistance = 0.15;
-        ssaoPass.output = SSAOPass.OUTPUT.Default;
-        composer.addPass(ssaoPass);
-      } catch (err) {
-        console.warn('SSAOPass could not be initialized:', err);
+        composer = new EffectComposer(renderer);
+
+        // Render base scene pass
+        const renderPass = new RenderPass(scene, camera);
+        composer.addPass(renderPass);
+
+        // SSAOPass: creates realistic soft shadows in corners and crevices (e.g., between buildings and ground)
+        try {
+          ssaoPass = new SSAOPass(scene, camera, width, height);
+          ssaoPass.kernelRadius = 16;
+          ssaoPass.minDistance = 0.005;
+          ssaoPass.maxDistance = 0.15;
+          ssaoPass.output = SSAOPass.OUTPUT.Default;
+          composer.addPass(ssaoPass);
+        } catch (err) {
+          console.warn('SSAOPass could not be initialized:', err);
+        }
+
+        // UnrealBloomPass with low threshold (0.8) and medium strength (0.5)
+        // Makes golden dome, lit windows, and glowing elements glow beautifully
+        bloomPass = new UnrealBloomPass(
+          new THREE.Vector2(width, height),
+          0.5, // strength (medium)
+          0.4, // radius
+          0.8  // threshold (low)
+        );
+        composer.addPass(bloomPass);
+
+        // OutputPass ensures ACESFilmic tone mapping and sRGB color grading
+        outputPass = new OutputPass();
+        composer.addPass(outputPass);
+      } catch (e) {
+        console.warn('EffectComposer initialization error:', e);
+        composer = null;
       }
-
-      // UnrealBloomPass with low threshold (0.8) and medium strength (0.5)
-      // Makes golden dome, lit windows, and glowing elements glow beautifully
-      bloomPass = new UnrealBloomPass(
-        new THREE.Vector2(width, height),
-        0.5, // strength (medium)
-        0.4, // radius
-        0.8  // threshold (low)
-      );
-      composer.addPass(bloomPass);
-
-      // OutputPass ensures ACESFilmic tone mapping and sRGB color grading
-      outputPass = new OutputPass();
-      composer.addPass(outputPass);
-    } catch (e) {
-      console.warn('EffectComposer initialization error:', e);
-      composer = null;
     }
 
-    // 4. Procedural Studio Environment (skipped in performance mode for maximum mobile FPS)
+    // 4. Procedural Studio Environment & Sky Reflection
+    let skyEnvMap: THREE.Texture | null = null;
     if (!isPerformance) {
       const pmremGenerator = new THREE.PMREMGenerator(renderer);
-      scene.environment = pmremGenerator.fromScene(new RoomEnvironment(), 0.04).texture;
+      const skyTexture = getOrCreateSkyTexture(timeOfDay);
+      skyEnvMap = pmremGenerator.fromEquirectangular(skyTexture).texture;
+      scene.environment = skyEnvMap;
       pmremGenerator.dispose();
     }
 
     // 5. Lighting Rig (Warm Key, Cool Sky Fill, Rim Lighting)
+    const hemiSky =
+      timeOfDay === 'sunset' ? '#fed7aa' : (timeOfDay === 'night' ? '#38bdf8' : '#e0f2fe');
+    const hemiGround =
+      timeOfDay === 'sunset' ? '#431407' : (timeOfDay === 'night' ? '#090d18' : '#1e293b');
     const hemiLight = new THREE.HemisphereLight(
-      isNightMode ? '#38bdf8' : '#e0f2fe',
-      isNightMode ? '#090d18' : '#1e293b',
-      isNightMode ? (isPerformance ? 1.0 : 0.8) : (isPerformance ? 1.4 : 1.2)
+      hemiSky,
+      hemiGround,
+      timeOfDay === 'sunset' ? 0.95 : (timeOfDay === 'night' ? 0.7 : 1.1)
     );
     scene.add(hemiLight);
 
-    const dirLight = new THREE.DirectionalLight('#fef08a', isNightMode ? 1.6 : 2.4);
-    dirLight.position.set(50, 80, 50);
+    // Prompt requirement 4: "Add a HemisphereLight or AmbientLight with a low intensity so the shadowed areas are not completely pitch black."
+    const ambientLight = new THREE.AmbientLight(
+      timeOfDay === 'sunset' ? '#7c2d12' : (timeOfDay === 'night' ? '#1e293b' : '#64748b'),
+      timeOfDay === 'sunset' ? 0.38 : (timeOfDay === 'night' ? 0.3 : 0.35)
+    );
+    scene.add(ambientLight);
+
+    // Prompt requirement 1: "Change the DirectionalLight (Sun) to cast shadows. Enable castShadow on the light, and configure the shadow map size (e.g., 2048) for better resolution."
+    const sunColor =
+      timeOfDay === 'sunset' ? '#ffedd5' : (timeOfDay === 'night' ? '#93c5fd' : '#fffbeb');
+    const dirLight = new THREE.DirectionalLight(
+      sunColor,
+      timeOfDay === 'sunset' ? 2.8 : (timeOfDay === 'night' ? 1.4 : 2.5)
+    );
+    dirLight.position.set(
+      timeOfDay === 'sunset' ? 65 : 55,
+      timeOfDay === 'sunset' ? 45 : 95,
+      timeOfDay === 'sunset' ? 70 : 55
+    );
     dirLight.castShadow = enableShadows;
     if (enableShadows) {
-      dirLight.shadow.mapSize.width = isBalanced ? 512 : 1024;
-      dirLight.shadow.mapSize.height = isBalanced ? 512 : 1024;
+      const shadowRes = isBalanced ? 1024 : 2048; // Requirement: 2048 shadow map size
+      dirLight.shadow.mapSize.width = shadowRes;
+      dirLight.shadow.mapSize.height = shadowRes;
       dirLight.shadow.camera.near = 10;
-      dirLight.shadow.camera.far = 250;
-      const shadowD = 90;
+      dirLight.shadow.camera.far = 320;
+      const shadowD = 115;
       dirLight.shadow.camera.left = -shadowD;
       dirLight.shadow.camera.right = shadowD;
       dirLight.shadow.camera.top = shadowD;
       dirLight.shadow.camera.bottom = -shadowD;
-      dirLight.shadow.bias = -0.0005;
+      dirLight.shadow.bias = -0.0004;
+      dirLight.shadow.normalBias = 0.02;
     }
     scene.add(dirLight);
 
@@ -306,17 +388,22 @@ export const CityCanvas: React.FC<CityCanvasProps> = ({
     }
 
     // 6. Materials Palette
-    const palette: CityMaterialPalette = createCityMaterialPalette(isNightMode, isLowPowerDevice);
+    const palette: CityMaterialPalette = createCityMaterialPalette(isNightMode, isLowPowerDevice, timeOfDay);
+    if (skyEnvMap) {
+      palette.harborWater.envMap = skyEnvMap;
+      palette.waterSurface.envMap = skyEnvMap;
+    }
 
     // 7. Mainland footprint; the eastern harbor water extends beyond this plane.
     const groundGeo = new THREE.PlaneGeometry(CITY_WORLD_CONFIG.groundSize, CITY_WORLD_CONFIG.groundSize);
     const ground = new THREE.Mesh(groundGeo, palette.ground);
     ground.rotation.x = -Math.PI / 2;
-    ground.receiveShadow = !isLowPowerDevice;
+    ground.receiveShadow = enableShadows;
     scene.add(ground);
 
     // 8. Modular Road Grid & Traffic
     const roadNetwork = buildCityRoadNetwork(palette, isLowPowerDevice, isNightMode);
+    applyShadowProperties(roadNetwork.group);
     scene.add(roadNetwork.group);
     const trafficVehicles: TrafficVehicle[] = roadNetwork.vehicles;
 
@@ -495,6 +582,7 @@ export const CityCanvas: React.FC<CityCanvasProps> = ({
       }
 
       if (landmarkMesh) {
+        applyShadowProperties(landmarkMesh);
         landmarkMesh.position.set(def.coordinates.x, 0, def.coordinates.z);
         scene.add(landmarkMesh);
         registerClickable(landmarkMesh, { type: 'landmark', id: def.id });
@@ -615,6 +703,7 @@ export const CityCanvas: React.FC<CityCanvasProps> = ({
         plotGroup.add(completedFacilityMesh);
       }
 
+      applyShadowProperties(plotGroup);
       scene.add(plotGroup);
       registerClickable(plotGroup, { type: 'plot', plot });
     });
@@ -813,6 +902,16 @@ export const CityCanvas: React.FC<CityCanvasProps> = ({
         cartelRotorMesh.rotation.y += dt * 20.0;
       }
 
+      // Animate water waves via normal map offset
+      if (palette.harborWater.normalMap) {
+        palette.harborWater.normalMap.offset.x = (elapsedTime * 0.016) % 1;
+        palette.harborWater.normalMap.offset.y = (elapsedTime * 0.011) % 1;
+      }
+      if (palette.waterSurface.normalMap) {
+        palette.waterSurface.normalMap.offset.x = (elapsedTime * 0.02) % 1;
+        palette.waterSurface.normalMap.offset.y = (elapsedTime * 0.014) % 1;
+      }
+
       // Update Selection Indicator position
       const currentSelected = selectedItemRef.current;
       if (currentSelected) {
@@ -890,7 +989,7 @@ export const CityCanvas: React.FC<CityCanvasProps> = ({
         renderer.domElement.parentNode.removeChild(renderer.domElement);
       }
     };
-  }, [cityLayoutKey, isNightMode, graphicsQuality]);
+  }, [cityLayoutKey, isNightMode, graphicsQuality, timeOfDayProp]);
 
   useEffect(() => {
     touchControllerRef.current?.setSpeed(cameraSpeed);

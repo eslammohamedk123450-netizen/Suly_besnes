@@ -463,6 +463,7 @@ export function buildCityRoadNetwork(
   harborWater.name = 'expanded_harbor_water';
   harborWater.rotation.x = -Math.PI / 2;
   harborWater.position.set(coastlineX + CITY_WORLD_CONFIG.harborWaterSize.width / 2, 0.04, 0);
+  harborWater.receiveShadow = true;
   roadGroup.add(harborWater);
 
   // 4a. Coastline Beveled Edge: Smooth transitional beveled slope connecting mainland to water

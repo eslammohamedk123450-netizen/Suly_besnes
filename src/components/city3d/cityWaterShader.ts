@@ -16,10 +16,10 @@ export function createRealisticWaterMaterial(isNightMode: boolean): THREE.Shader
       value: new THREE.Vector3(0.5, 0.8, 0.3).normalize(),
     },
     uDeepColor: {
-      value: new THREE.Color(isNightMode ? '#031726' : '#033a5b'),
+      value: new THREE.Color(isNightMode ? '#020f1c' : '#06203d'),
     },
     uShallowColor: {
-      value: new THREE.Color(isNightMode ? '#082f49' : '#0284c7'),
+      value: new THREE.Color(isNightMode ? '#051e36' : '#0d3b66'),
     },
     uSkyColor: {
       value: new THREE.Color(isNightMode ? '#0f172a' : '#38bdf8'),

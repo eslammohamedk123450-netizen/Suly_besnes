@@ -36,6 +36,8 @@ interface CityControlsBarProps {
   ) => void;
   isNightMode: boolean;
   onToggleNightMode: () => void;
+  timeOfDay?: 'day' | 'sunset' | 'night';
+  onCycleTimeOfDay?: () => void;
   activeView: '3d_city' | 'dashboard';
   onToggleView: (view: '3d_city' | 'dashboard') => void;
 }
@@ -44,6 +46,8 @@ export const CityControlsBar: React.FC<CityControlsBarProps> = ({
   onSelectPreset,
   isNightMode,
   onToggleNightMode,
+  timeOfDay = isNightMode ? 'night' : 'sunset',
+  onCycleTimeOfDay,
   activeView,
   onToggleView,
 }) => {
@@ -173,21 +177,26 @@ export const CityControlsBar: React.FC<CityControlsBarProps> = ({
             </button>
           </div>
 
-          {/* Day / Night lighting toggle */}
+          {/* Sky & Atmosphere lighting toggle (Sunset / Night / Day) */}
           <button
-            onClick={onToggleNightMode}
-            className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-400 transition-colors border border-slate-700 flex items-center gap-1.5"
-            title="تبديل وضع الإضاءة (ليلي / نهاري)"
+            onClick={onCycleTimeOfDay || onToggleNightMode}
+            className="p-2 px-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-400 transition-colors border border-amber-500/30 flex items-center gap-1.5 shadow-md active:scale-95"
+            title="تبديل الإضاءة الجوية (غروب سينمائي / ليلي فاخر / نهاري مشرق)"
           >
-            {isNightMode ? (
+            {timeOfDay === 'sunset' ? (
               <>
-                <Moon className="w-3.5 h-3.5" />
-                <span className="text-[11px] text-slate-300 font-medium">ليلي فاخر</span>
+                <span className="text-sm">🌅</span>
+                <span className="text-[11px] text-orange-300 font-bold">غروب سينمائي</span>
+              </>
+            ) : timeOfDay === 'night' ? (
+              <>
+                <Moon className="w-3.5 h-3.5 text-sky-400" />
+                <span className="text-[11px] text-sky-200 font-medium">ليلي فاخر</span>
               </>
             ) : (
               <>
-                <Sun className="w-3.5 h-3.5" />
-                <span className="text-[11px] text-slate-300 font-medium">نهاري مشرق</span>
+                <Sun className="w-3.5 h-3.5 text-amber-400" />
+                <span className="text-[11px] text-amber-200 font-medium">نهاري مشرق</span>
               </>
             )}
           </button>

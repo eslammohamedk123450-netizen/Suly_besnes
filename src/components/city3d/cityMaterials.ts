@@ -24,8 +24,14 @@ let containerTexture: THREE.CanvasTexture | null = null;
 let dockConcreteTexture: THREE.CanvasTexture | null = null;
 let sandTexture: THREE.CanvasTexture | null = null;
 let coastRockTexture: THREE.CanvasTexture | null = null;
-let skyTextures: { day: THREE.CanvasTexture | null; night: THREE.CanvasTexture | null } = {
+let waterNormalTexture: THREE.CanvasTexture | null = null;
+let skyTextures: {
+  day: THREE.CanvasTexture | null;
+  sunset: THREE.CanvasTexture | null;
+  night: THREE.CanvasTexture | null;
+} = {
   day: null,
+  sunset: null,
   night: null,
 };
 
@@ -107,8 +113,18 @@ export function getOrCreateOfficeWindowTexture(isNightMode = true): THREE.Textur
  * Lightweight equirectangular sky backdrop. It gives the procedural city a
  * cinematic horizon without adding an HDR download or another runtime asset.
  */
-export function getOrCreateSkyTexture(isNightMode = true): THREE.Texture {
-  const mode = isNightMode ? 'night' : 'day';
+/**
+ * Lightweight equirectangular sky backdrop with atmospheric scattering gradients.
+ * Simulates Sunset, Clear Day, and Night horizons with realistic atmospheric tones.
+ */
+export function getOrCreateSkyTexture(
+  modeInput: 'day' | 'sunset' | 'night' | boolean = 'night'
+): THREE.Texture {
+  const mode: 'day' | 'sunset' | 'night' =
+    typeof modeInput === 'boolean'
+      ? (modeInput ? 'night' : 'day')
+      : modeInput;
+
   if (skyTextures[mode]) return skyTextures[mode]!;
 
   if (typeof document === 'undefined') {
@@ -124,33 +140,73 @@ export function getOrCreateSkyTexture(isNightMode = true): THREE.Texture {
   const ctx = canvas.getContext('2d');
   if (ctx) {
     const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
-    if (isNightMode) {
+    if (mode === 'sunset') {
+      // Atmospheric scattering sunset: deep violet zenith -> rich terracotta -> warm golden horizon
+      gradient.addColorStop(0, '#1e1b4b');    // Deep twilight violet-indigo at zenith
+      gradient.addColorStop(0.38, '#4a1525'); // Dusky burgundy mid-sky
+      gradient.addColorStop(0.58, '#9a3412'); // Rich terracotta orange
+      gradient.addColorStop(0.74, '#ea580c'); // Vivid sunset amber
+      gradient.addColorStop(0.86, '#f59e0b'); // Golden horizon scatter
+      gradient.addColorStop(0.95, '#fef08a'); // Brilliant sun glow at coastline
+      gradient.addColorStop(1.0, '#78350f');  // Ground horizon haze
+    } else if (mode === 'day') {
+      // Atmospheric clear day with Rayleigh scattering
+      gradient.addColorStop(0, '#0284c7');    // Deep atmospheric sky blue at zenith
+      gradient.addColorStop(0.42, '#38bdf8'); // Bright clear cerulean mid-sky
+      gradient.addColorStop(0.72, '#7dd3fc'); // Soft sky blue
+      gradient.addColorStop(0.88, '#bae6fd'); // Rayleigh scattering haze near horizon
+      gradient.addColorStop(1.0, '#e0f2fe');  // Sunlit horizon blend
+    } else {
+      // Midnight luxury night
       gradient.addColorStop(0, '#020617');
       gradient.addColorStop(0.48, '#0b1630');
       gradient.addColorStop(0.76, '#172554');
       gradient.addColorStop(1, '#0f172a');
-    } else {
-      gradient.addColorStop(0, '#7dd3fc');
-      gradient.addColorStop(0.52, '#bae6fd');
-      gradient.addColorStop(0.78, '#dbeafe');
-      gradient.addColorStop(1, '#64748b');
     }
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    if (isNightMode) {
+    if (mode === 'night') {
       const stars = [
         [0.12, 0.18], [0.24, 0.31], [0.38, 0.14], [0.51, 0.25],
         [0.67, 0.12], [0.78, 0.29], [0.9, 0.17], [0.58, 0.38],
+        [0.15, 0.42], [0.33, 0.22], [0.82, 0.38], [0.44, 0.09],
       ];
-      ctx.fillStyle = 'rgba(255, 248, 210, 0.75)';
+      ctx.fillStyle = 'rgba(255, 248, 210, 0.85)';
       stars.forEach(([x, y], index) => {
         ctx.beginPath();
-        ctx.arc(x * canvas.width, y * canvas.height, index % 3 === 0 ? 2 : 1, 0, Math.PI * 2);
+        ctx.arc(x * canvas.width, y * canvas.height, index % 3 === 0 ? 2 : 1.2, 0, Math.PI * 2);
         ctx.fill();
       });
+    } else if (mode === 'sunset') {
+      // Glowing setting sun disc at the eastern sea horizon
+      const sunX = canvas.width * 0.72;
+      const sunY = canvas.height * 0.86;
+      const sunGlow = ctx.createRadialGradient(sunX, sunY, 6, sunX, sunY, 140);
+      sunGlow.addColorStop(0, 'rgba(255, 255, 240, 0.95)');
+      sunGlow.addColorStop(0.18, 'rgba(254, 215, 170, 0.85)');
+      sunGlow.addColorStop(0.45, 'rgba(249, 115, 22, 0.45)');
+      sunGlow.addColorStop(1, 'rgba(234, 88, 12, 0)');
+      ctx.fillStyle = sunGlow;
+      ctx.fillRect(sunX - 150, sunY - 150, 300, 300);
+
+      // Distant atmospheric cirrus bands
+      ctx.fillStyle = 'rgba(254, 202, 202, 0.18)';
+      ctx.fillRect(0, canvas.height * 0.52, canvas.width, canvas.height * 0.08);
+      ctx.fillStyle = 'rgba(253, 186, 116, 0.15)';
+      ctx.fillRect(0, canvas.height * 0.65, canvas.width, canvas.height * 0.06);
     } else {
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.28)';
+      // Clear day sun halo & light cumulus haze
+      const sunX = canvas.width * 0.68;
+      const sunY = canvas.height * 0.32;
+      const sunGlow = ctx.createRadialGradient(sunX, sunY, 8, sunX, sunY, 180);
+      sunGlow.addColorStop(0, 'rgba(255, 255, 255, 0.95)');
+      sunGlow.addColorStop(0.25, 'rgba(254, 240, 138, 0.55)');
+      sunGlow.addColorStop(1, 'rgba(255, 255, 255, 0)');
+      ctx.fillStyle = sunGlow;
+      ctx.fillRect(sunX - 200, sunY - 200, 400, 400);
+
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.22)';
       ctx.fillRect(0, canvas.height * 0.62, canvas.width, canvas.height * 0.12);
     }
   }
@@ -159,6 +215,95 @@ export function getOrCreateSkyTexture(isNightMode = true): THREE.Texture {
   texture.colorSpace = THREE.SRGBColorSpace;
   texture.mapping = THREE.EquirectangularReflectionMapping;
   skyTextures[mode] = texture;
+  return texture;
+}
+
+/**
+ * Procedural water normal map generator.
+ * Creates multi-octave harmonic wave normals to simulate realistic ripples and swell,
+ * allowing specular reflections and envMap highlights to shimmer dynamically across the water.
+ */
+export function getOrCreateWaterNormalTexture(): THREE.CanvasTexture {
+  if (waterNormalTexture) return waterNormalTexture;
+
+  if (typeof document === 'undefined') {
+    const data = new Uint8Array([128, 128, 255, 255]);
+    const tex = new THREE.DataTexture(data, 1, 1);
+    tex.needsUpdate = true;
+    return tex as unknown as THREE.CanvasTexture;
+  }
+
+  const size = 512;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) {
+    const data = new Uint8Array([128, 128, 255, 255]);
+    const tex = new THREE.DataTexture(data, 1, 1);
+    tex.needsUpdate = true;
+    return tex as unknown as THREE.CanvasTexture;
+  }
+
+  const imgData = ctx.createImageData(size, size);
+  const data = imgData.data;
+
+  // Synthesize wave height field from multiple harmonic directions
+  const heights = new Float32Array(size * size);
+  for (let y = 0; y < size; y++) {
+    const v = (y / size) * Math.PI * 8;
+    for (let x = 0; x < size; x++) {
+      const u = (x / size) * Math.PI * 8;
+
+      // Octave 1: Primary deep water swell
+      let h = Math.sin(u * 1.2 + v * 0.8) * 0.45;
+      h += Math.cos(u * 0.9 - v * 1.4) * 0.38;
+
+      // Octave 2: Cross sea waves
+      h += Math.sin((u + v) * 2.4) * 0.22;
+      h += Math.cos((u * 1.8 - v * 2.1)) * 0.18;
+
+      // Octave 3: High-frequency capillary ripples
+      h += Math.sin(u * 4.6 + v * 3.2) * 0.12;
+      h += Math.cos(u * 3.8 - v * 5.4) * 0.08;
+
+      heights[y * size + x] = h;
+    }
+  }
+
+  // Derive normal map vectors via central differences
+  const bumpStrength = 4.2;
+  for (let y = 0; y < size; y++) {
+    const yU = (y - 1 + size) % size;
+    const yD = (y + 1) % size;
+    for (let x = 0; x < size; x++) {
+      const xL = (x - 1 + size) % size;
+      const xR = (x + 1) % size;
+
+      const dX = (heights[y * size + xR] - heights[y * size + xL]) * bumpStrength;
+      const dY = (heights[yD * size + x] - heights[yU * size + x]) * bumpStrength;
+
+      // Normal (-dX, -dY, 1.0) normalized to tangent space
+      const len = Math.sqrt(dX * dX + dY * dY + 1.0);
+      const nx = -dX / len;
+      const ny = -dY / len;
+      const nz = 1.0 / len;
+
+      const idx = (y * size + x) * 4;
+      data[idx] = Math.floor((nx * 0.5 + 0.5) * 255);
+      data[idx + 1] = Math.floor((ny * 0.5 + 0.5) * 255);
+      data[idx + 2] = Math.floor((nz * 0.5 + 0.5) * 255);
+      data[idx + 3] = 255;
+    }
+  }
+
+  ctx.putImageData(imgData, 0, 0);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.RepeatWrapping;
+  texture.repeat.set(16, 16);
+  waterNormalTexture = texture;
   return texture;
 }
 
@@ -709,8 +854,10 @@ export interface CityMaterialPalette {
 
 export function createCityMaterialPalette(
   isNightMode: boolean,
-  isSoftwareGl: boolean
+  isSoftwareGl: boolean,
+  timeOfDayInput: 'day' | 'sunset' | 'night' = isNightMode ? 'night' : 'day'
 ): CityMaterialPalette {
+  const timeOfDay = timeOfDayInput;
   const cautionTex = getOrCreateCautionTexture();
   const asphaltTex = getOrCreateAsphaltTexture(isSoftwareGl ? 1 : 4);
   const dockConcreteTex = getOrCreateDockConcreteTexture(isSoftwareGl ? 1 : 4);
@@ -718,6 +865,7 @@ export function createCityMaterialPalette(
   const coastRockTex = getOrCreateCoastRockTexture();
   const officeWindowTex = getOrCreateOfficeWindowTexture(isNightMode);
   const paverTex = getOrCreatePaverTexture();
+  const waterNormalTex = getOrCreateWaterNormalTexture();
 
   return {
     ground: new THREE.MeshStandardMaterial({
@@ -833,13 +981,14 @@ export function createCityMaterialPalette(
       emissiveIntensity: isNightMode ? 0.9 : 0.45,
     }),
     waterSurface: new THREE.MeshStandardMaterial({
-      color: '#0284c7',
-      emissive: new THREE.Color('#0369a1'),
-      emissiveIntensity: isNightMode ? 0.4 : 0.1,
-      roughness: 0.1,
-      metalness: 0.8,
+      color: timeOfDay === 'night' ? '#061a30' : timeOfDay === 'sunset' ? '#0b2445' : '#0a345e',
+      roughness: 0.08,
+      metalness: 0.2,
+      normalMap: waterNormalTex,
+      normalScale: new THREE.Vector2(0.35, 0.35),
       transparent: true,
-      opacity: 0.85,
+      opacity: 0.9,
+      envMapIntensity: 1.25,
     }),
 
     // Materials for industries
@@ -889,11 +1038,14 @@ export function createCityMaterialPalette(
       metalness: 0.85,
     }),
     harborWater: new THREE.MeshStandardMaterial({
-      color: '#0369a1',
+      color: timeOfDay === 'night' ? '#041528' : timeOfDay === 'sunset' ? '#091e38' : '#072a4d',
       roughness: 0.1,
-      metalness: 0.6,
+      metalness: 0.22,
+      normalMap: waterNormalTex,
+      normalScale: new THREE.Vector2(0.45, 0.45),
       transparent: true,
-      opacity: 0.88,
+      opacity: 0.92,
+      envMapIntensity: 1.35,
     }),
     poolTurquoise: new THREE.MeshStandardMaterial({
       color: '#06b6d4',
