@@ -36,9 +36,6 @@ import {
   type GameCommandHandler,
 } from '../game/engine';
 import { formatMoney, formatNumber } from '../domain/formatters';
-const StaffAcademyBuilding = React.lazy(() =>
-  import('./StaffAcademyBuilding').then((module) => ({ default: module.StaffAcademyBuilding })),
-);
 
 interface StaffManagementViewProps {
   profile: PlayerProfile;
@@ -229,10 +226,6 @@ export const StaffManagementView: React.FC<StaffManagementViewProps> = ({
           </div>
         </div>
       </div>
-
-      <React.Suspense fallback={<div className="rounded-3xl border border-slate-800 bg-slate-900 p-5 text-sm text-slate-400">جاري تحميل مبنى الأكاديمية...</div>}>
-        <StaffAcademyBuilding level={staffBuildingLevel} activeStaffCount={activeStaff.length} />
-      </React.Suspense>
 
       {/* 2. Automation Directives Panel (Executive Suite Control) */}
       <div className="rounded-3xl bg-slate-900 border border-slate-800 p-5 sm:p-6 shadow-xl relative overflow-hidden">

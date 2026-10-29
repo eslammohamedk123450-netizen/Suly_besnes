@@ -3,7 +3,7 @@ import type { PlayerProfile } from '../../domain/player';
 import { formatMoney } from '../../domain/formatters';
 import { resolveCityGrid, type CityPlotDefinition } from '../../game/cityGridSystem';
 import { ALL_CITY_LANDMARKS, type LandmarkId } from '../city3d/cityWorldData';
-import type { SelectedItem, CityCameraPreset } from '../city3d/CityCanvas';
+import type { SelectedItem, CityCameraPreset } from './cityMapTypes';
 import './isometricCityMap.css';
 
 interface IsometricCityMapProps {

@@ -8,7 +8,7 @@ import type { CountryDefinition } from '../domain/countries';
 import type { PlayerProfile } from '../domain/player';
 import type { SectionId } from '../domain/navigation';
 import type { GameCommand, GameResult } from '../game/engine';
-import { type SelectedItem, type CityCameraPreset } from './city3d/CityCanvas';
+import { type SelectedItem, type CityCameraPreset } from './isometric/cityMapTypes';
 import { IsometricCityMap } from './isometric/IsometricCityMap';
 import { BuildingDetailSheet } from './city3d/BuildingDetailSheet';
 import { BranchAndShopSheet } from './city3d/BranchAndShopSheet';
@@ -54,7 +54,7 @@ interface CityHomeViewProps {
 
 export const CityHomeView: React.FC<CityHomeViewProps> = (props) => {
   const { profile, country, onNavigate, onCommand } = props;
-  const [activeView, setActiveView] = useState<'3d_city' | 'dashboard'>('3d_city');
+  const [activeView, setActiveView] = useState<'isometric_city' | 'dashboard'>('isometric_city');
   const [selectedItem, setSelectedItem] = useState<SelectedItem | null>(null);
   const [timeOfDay, setTimeOfDay] = useState<'day' | 'sunset' | 'night'>('sunset');
   const isNightMode = timeOfDay === 'night';
@@ -97,7 +97,7 @@ export const CityHomeView: React.FC<CityHomeViewProps> = (props) => {
     const landmarkId = landmarkForSection(props.focusSection);
     const landmark = ALL_CITY_LANDMARKS.find((item) => item.id === landmarkId);
     if (!landmark) return;
-    setActiveView('3d_city');
+    setActiveView('isometric_city');
     setCameraPreset(landmarkId === 'hq' ? 'hq' : null);
     setSelectedItem({ type: 'landmark', id: landmark.id });
   }, [props.focusSection]);
@@ -159,10 +159,10 @@ export const CityHomeView: React.FC<CityHomeViewProps> = (props) => {
         </div>
       </div>
 
-      {/* Main View Area: Either 3D City or Classic Dashboard */}
-      {activeView === '3d_city' ? (
+      {/* Main View Area: Either Isometric City or Classic Dashboard */}
+      {activeView === 'isometric_city' ? (
         <div className="relative w-full space-y-3">
-          {/* Interactive 3D Canvas */}
+          {/* Interactive Isometric Map */}
           <div className="relative">
             <IsometricCityMap
               key={`isometric-city-map-${gridRefreshKey}`}
@@ -176,7 +176,7 @@ export const CityHomeView: React.FC<CityHomeViewProps> = (props) => {
             {/* Instruction badge over canvas for first-time / touch feedback */}
             <div className="hidden absolute top-3 right-3 pointer-events-none bg-slate-950/80 border border-slate-800/80 backdrop-blur-md px-3 py-1.5 rounded-xl text-[11px] text-slate-300 flex items-center gap-2 shadow-lg">
               <span className="w-2 h-2 rounded-full bg-emerald-400" />
-              <span>خريطة 3D حية: اضغط على أي مبنى للتفاعل مع نظامه</span>
+              <span>خريطة إيزومترية تفاعلية: اضغط على أي مبنى للتفاعل مع نظامه</span>
             </div>
 
             {/* Active Landmark Quick Floating Bar */}
@@ -469,7 +469,7 @@ export const CityHomeView: React.FC<CityHomeViewProps> = (props) => {
               <span>الوضع التنفيذي الكلاسيكي مفعل</span>
             </span>
             <button
-              onClick={() => setActiveView('3d_city')}
+              onClick={() => setActiveView('isometric_city')}
               className="px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold flex items-center gap-1.5 transition-all shadow-md shadow-amber-500/20"
             >
               <Building2 className="w-4 h-4" />

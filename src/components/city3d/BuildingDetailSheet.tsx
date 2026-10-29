@@ -74,7 +74,7 @@ import {
   BarChart3,
   Gavel,
 } from 'lucide-react';
-import type { SelectedItem } from './CityCanvas';
+import type { SelectedItem } from '../isometric/cityMapTypes';
 
 const RESEARCH_CENTER_LEVEL_IMAGES = Array.from({ length: 8 }, (_, index) => ({
   level: index + 1,
@@ -90,9 +90,6 @@ import {
   getCartelStrongholdLevel,
   saveCartelStrongholdLevel,
 } from '../cartelStrongholdData';
-const CartelStrongholdViewer3D = React.lazy(() =>
-  import('./CartelStrongholdViewer3D').then((module) => ({ default: module.CartelStrongholdViewer3D })),
-);
 
 interface BuildingDetailSheetProps {
   selectedItem: SelectedItem | null;
@@ -827,11 +824,11 @@ export const BuildingDetailSheet: React.FC<BuildingDetailSheetProps> = ({
                       ⚔️ معقل الكارتيل والتحالفات
                     </span>
                     <span className="text-[11px] font-bold text-amber-300">
-                      8 مستويات معمارية ومجسمات 3D مطابقة
+                      8 مستويات معمارية متدرجة
                     </span>
                   </div>
                   <p className="mt-1 text-xs text-slate-300">
-                    مجسمات 3D تفاعلية ومطابقة لصور القصور الصخرية، الشلالات، القباب الذهبية، واليخوت
+                    مستويات متدرجة للقصور الصخرية والشلالات والقباب الذهبية والمرافئ
                   </p>
                 </div>
                 <div className="text-left">
@@ -840,15 +837,6 @@ export const BuildingDetailSheet: React.FC<BuildingDetailSheetProps> = ({
                   </span>
                 </div>
               </div>
-
-              {/* 3D Real-time Interactive Model Viewer */}
-              <React.Suspense fallback={<div className="rounded-xl border border-slate-800 bg-slate-950/70 p-4 text-xs text-slate-400">جاري تحميل المعرض...</div>}>
-                <CartelStrongholdViewer3D
-                  level={cartelPreviewLevel}
-                  onLevelChange={(lvl) => setCartelPreviewLevel(lvl)}
-                  height={330}
-                />
-              </React.Suspense>
 
               {/* Selected Level Info & Features Card */}
               {(() => {

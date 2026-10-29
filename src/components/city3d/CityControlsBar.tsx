@@ -38,8 +38,8 @@ interface CityControlsBarProps {
   onToggleNightMode: () => void;
   timeOfDay?: 'day' | 'sunset' | 'night';
   onCycleTimeOfDay?: () => void;
-  activeView: '3d_city' | 'dashboard';
-  onToggleView: (view: '3d_city' | 'dashboard') => void;
+  activeView: 'isometric_city' | 'dashboard';
+  onToggleView: (view: 'isometric_city' | 'dashboard') => void;
 }
 
 export const CityControlsBar: React.FC<CityControlsBarProps> = ({
@@ -79,9 +79,9 @@ export const CityControlsBar: React.FC<CityControlsBarProps> = ({
           {/* The city is the only gameplay view; legacy dashboard navigation is retired. */}
           <div className="flex items-center gap-1.5 bg-slate-950 p-1 rounded-xl border border-slate-800">
             <button
-              onClick={() => onToggleView('3d_city')}
+              onClick={() => onToggleView('isometric_city')}
               className={`px-3 py-1.5 rounded-lg font-bold transition-all flex items-center gap-1.5 ${
-                activeView === '3d_city'
+                activeView === 'isometric_city'
                   ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
                   : 'text-slate-400 hover:text-white'
               }`}
