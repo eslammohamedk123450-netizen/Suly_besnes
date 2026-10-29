@@ -1,4 +1,4 @@
-const CACHE_NAME = 'business-empire-shell-v4';
+const CACHE_NAME = 'business-empire-shell-v5';
 const BASE_URL = new URL('./', self.registration.scope).pathname;
 const APP_SHELL = [BASE_URL, `${BASE_URL}manifest.webmanifest`, `${BASE_URL}icons/app-icon.svg`, `${BASE_URL}images/cairo-skyline-lite.webp`];
 

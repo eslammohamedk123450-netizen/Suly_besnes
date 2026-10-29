@@ -7,11 +7,14 @@ import {
   CARTEL_STRONGHOLD_LEVELS,
   getCartelStrongholdLevel,
   saveCartelStrongholdLevel,
-} from './city3d/cartelStronghold3D';
-import { CartelStrongholdViewer3D } from './city3d/CartelStrongholdViewer3D';
+} from './cartelStrongholdData';
 import { formatMoney } from '../domain/formatters';
 import { Sparkles, Shield, Trophy } from 'lucide-react';
 import './CartelSyndicate.css';
+
+const CartelStrongholdViewer3D = React.lazy(() =>
+  import('./city3d/CartelStrongholdViewer3D').then((module) => ({ default: module.CartelStrongholdViewer3D })),
+);
 
 interface Props {
   profile: PlayerProfile;
@@ -239,11 +242,9 @@ export const CartelSyndicate: React.FC<Props> = ({ profile, expansion, onUpdate 
       {activeTab === 'stronghold_3d' && (
         <div className="space-y-4 my-2">
           {/* 3D Interactive Viewer */}
-          <CartelStrongholdViewer3D
-            level={previewLevel}
-            onLevelChange={setPreviewLevel}
-            height={360}
-          />
+          <React.Suspense fallback={<div className="cartel-3d-fallback">جاري تحميل المعرض...</div>}>
+            <CartelStrongholdViewer3D level={previewLevel} onLevelChange={setPreviewLevel} height={360} />
+          </React.Suspense>
 
           {/* Stronghold Status & Controls Card */}
           {(() => {

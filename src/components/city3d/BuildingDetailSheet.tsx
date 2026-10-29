@@ -89,8 +89,10 @@ import {
   CARTEL_STRONGHOLD_LEVELS,
   getCartelStrongholdLevel,
   saveCartelStrongholdLevel,
-} from './cartelStronghold3D';
-import { CartelStrongholdViewer3D } from './CartelStrongholdViewer3D';
+} from '../cartelStrongholdData';
+const CartelStrongholdViewer3D = React.lazy(() =>
+  import('./CartelStrongholdViewer3D').then((module) => ({ default: module.CartelStrongholdViewer3D })),
+);
 
 interface BuildingDetailSheetProps {
   selectedItem: SelectedItem | null;
@@ -840,11 +842,13 @@ export const BuildingDetailSheet: React.FC<BuildingDetailSheetProps> = ({
               </div>
 
               {/* 3D Real-time Interactive Model Viewer */}
-              <CartelStrongholdViewer3D
-                level={cartelPreviewLevel}
-                onLevelChange={(lvl) => setCartelPreviewLevel(lvl)}
-                height={330}
-              />
+              <React.Suspense fallback={<div className="rounded-xl border border-slate-800 bg-slate-950/70 p-4 text-xs text-slate-400">جاري تحميل المعرض...</div>}>
+                <CartelStrongholdViewer3D
+                  level={cartelPreviewLevel}
+                  onLevelChange={(lvl) => setCartelPreviewLevel(lvl)}
+                  height={330}
+                />
+              </React.Suspense>
 
               {/* Selected Level Info & Features Card */}
               {(() => {
