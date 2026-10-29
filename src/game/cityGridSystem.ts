@@ -9,6 +9,7 @@ import type { CountryId, IndustryId } from '../domain/countries';
 import type { CompanyBranch, RetailShop } from '../domain/branchAndShop';
 import { getDirectLandsForCountry, findIndustry, INDUSTRY_CATALOG, type DirectLandListing } from './catalog';
 import type { PurchasePaymentMethod } from './purchasePricing';
+import { BUILDING_UPGRADE_BASE_COSTS, calculateBuildingUpgradeCost } from './economyBalance';
 import {
   type GameResult,
   resolvePurchaseDebit,
@@ -93,7 +94,7 @@ export const HQ_TIERS: readonly HQTierSpec[] = [
   {
     level: 2,
     title: 'برج الإدارة التنفيذية والعمليات',
-    costCash: 25_000,
+    costCash: calculateBuildingUpgradeCost(BUILDING_UPGRADE_BASE_COSTS.hq, 1),
     costDiamonds: 15,
     requiredNetWorth: 35_000,
     reputationBonus: 50,
@@ -104,7 +105,7 @@ export const HQ_TIERS: readonly HQTierSpec[] = [
   {
     level: 3,
     title: 'مجمع المقر الإمبراطوري المتكامل',
-    costCash: 75_000,
+    costCash: calculateBuildingUpgradeCost(BUILDING_UPGRADE_BASE_COSTS.hq, 2),
     costDiamonds: 35,
     requiredNetWorth: 100_000,
     reputationBonus: 120,
@@ -115,7 +116,7 @@ export const HQ_TIERS: readonly HQTierSpec[] = [
   {
     level: 4,
     title: 'ناطحة السحاب المالية العالمية',
-    costCash: 200_000,
+    costCash: calculateBuildingUpgradeCost(BUILDING_UPGRADE_BASE_COSTS.hq, 3),
     costDiamonds: 70,
     requiredNetWorth: 300_000,
     reputationBonus: 300,
@@ -126,7 +127,7 @@ export const HQ_TIERS: readonly HQTierSpec[] = [
   {
     level: 5,
     title: 'الصرح السيادي لإمبراطورية الأعمال',
-    costCash: 500_000,
+    costCash: calculateBuildingUpgradeCost(BUILDING_UPGRADE_BASE_COSTS.hq, 4),
     costDiamonds: 150,
     requiredNetWorth: 800_000,
     reputationBonus: 700,
@@ -451,8 +452,8 @@ export function upgradeEmpireHQ(
     );
   }
 
-  // Resolve debit
-  const cost = targetSpec.costCash;
+  // Resolve debit using exponential building upgrade cost formula
+  const cost = calculateBuildingUpgradeCost(BUILDING_UPGRADE_BASE_COSTS.hq, currentHQLevel);
   const payment = resolvePurchaseDebit(profile, cost, paymentMethod);
   if ('message' in payment) {
     return failure(profile, 'insufficient-funds', `لا تكفي الأموال لتطوير المقر. ${payment.message}`);

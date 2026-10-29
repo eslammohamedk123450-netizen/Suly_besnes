@@ -3,6 +3,7 @@ import type { CountryDefinition } from '../domain/countries';
 import type { PlayerProfile } from '../domain/player';
 import type { SectionId } from '../domain/navigation';
 import {
+  formatCurrency,
   formatGold,
   formatMoney,
   formatNumber,
@@ -10,6 +11,7 @@ import {
   formatCompactNumber,
   formatCompactGold,
 } from '../domain/formatters';
+import { BUILDING_MAINTENANCE_COST, getOwnedBuildingsCount } from '../game/economyBalance';
 import { getPlayerProgress, isSectionUnlocked } from '../game/onboarding';
 import { AvatarPortrait } from './AvatarPortrait';
 import { GameDayTimer } from './GameDayTimer';
@@ -55,6 +57,8 @@ export function ResourceBar({
 }: ResourceBarProps) {
   const progress = getPlayerProgress(profile);
   const cashTargetSection: SectionId = isSectionUnlocked(profile, 'bank') ? 'bank' : 'obligations';
+  const ownedBuildings = getOwnedBuildingsCount(profile);
+  const maintenancePerMinute = ownedBuildings * BUILDING_MAINTENANCE_COST;
 
   return (
     <header
@@ -116,7 +120,7 @@ export function ResourceBar({
                 role="button"
                 tabIndex={0}
                 className="flex items-center gap-1.5 sm:gap-2 px-2.5 py-1.5 rounded-xl bg-gradient-to-b from-[#0f192b]/75 to-[#090f1c]/85 backdrop-blur-md border border-amber-400/25 hover:border-amber-400/60 hover:shadow-[0_0_12px_rgba(245,158,11,0.25)] transition shadow-sm cursor-pointer group shrink-0"
-                title={`السيولة البنكية المتاحة: ${formatMoney(profile.bankBalance, country)} - انقر لإدارة السيولة`}
+                title={`السيولة البنكية المتاحة: ${formatMoney(profile.bankBalance, country)} · صيانة المباني: ${formatCurrency(maintenancePerMinute)} $/دقيقة (${ownedBuildings} مبنى)`}
               >
                 <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg bg-[#061e16]/80 border border-emerald-500/30 flex items-center justify-center text-xs sm:text-sm group-hover:scale-110 transition-transform">
                   <Shiny3DCashIcon size={24} />

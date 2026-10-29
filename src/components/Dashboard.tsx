@@ -120,7 +120,7 @@ export function Dashboard({
         {
           id: 'initial-setup',
           category: 'revenue',
-          amount: profile.bankBalance || 25_000,
+          amount: profile.bankBalance || 10_000,
           occurredAt: new Date().toISOString(),
           note: 'رأس مال التأسيس والتشغيل الأولي',
         },

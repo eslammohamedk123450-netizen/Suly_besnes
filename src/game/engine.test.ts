@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { COUNTRIES } from '../domain/countries';
 import { createNewPlayer, type PlayerProfile } from '../domain/player';
 import { getContractOffers } from './contracts';
-import { advanceDay, acceptContract, buyDirectLand, buyGoldWithDiamonds, buyMaterial, buySpeedCard, createDeposit, deliverContract, executeGameCommand, foundCompany, getDayBriefing, getStaffUpgradeCost, mergeDeposits, payStaffSalary, placeBid, repayLoan, runProduction, sellGold, takeLoan, updateNotificationState, upgradeLand, upgradeStaff, upgradeWarehouse, useDaySpeedCard, withdrawDeposit } from './engine';
+import { formatCurrency } from '../domain/formatters';
+import { advanceDay, acceptContract, applyBuildingMaintenance, BUILDING_UPGRADE_BASE_COSTS, buyDirectLand, buyGoldWithDiamonds, buyMaterial, buySpeedCard, calculateBuildingUpgradeCost, createDeposit, deliverContract, executeGameCommand, foundCompany, getDayBriefing, getStaffUpgradeCost, mergeDeposits, payStaffSalary, placeBid, repayLoan, runProduction, sellGold, takeLoan, updateNotificationState, upgradeCompany, upgradeLand, upgradeStaff, upgradeWarehouse, useDaySpeedCard, withdrawDeposit } from './engine';
 import { negotiateContract } from './engine';
 import { getSynergyBonuses } from './synergy';
 import { normalizeSavedProfile } from '../storage/saveRepository';
@@ -273,7 +274,7 @@ describe('Business Empire economy invariants', () => {
     if (result.ok) {
       expect(result.data.level).toBe(2);
       expect(result.profile.lands[0].areaSquareMeters).toBe(1_100);
-      expect(result.profile.bankBalance).toBe(170_000);
+      expect(result.profile.bankBalance).toBe(250_000 - calculateBuildingUpgradeCost(BUILDING_UPGRADE_BASE_COSTS.land, 1));
     }
   });
 
@@ -410,5 +411,55 @@ describe('Business Empire economy invariants', () => {
       expect(orderWith.qualityScore).toBeGreaterThan(orderWithout.qualityScore);
       expect(orderWith.materialCost).toBeLessThan(orderWithout.materialCost);
     }
+  });
+
+  it('starts new players with 10,000 balance and 0 diamonds', () => {
+    const starter = createNewPlayer(COUNTRIES[0], 'مؤسس جديد', new Date('2026-01-01T00:00:00.000Z'));
+    expect(starter.bankBalance).toBe(10_000);
+    expect(starter.diamonds).toBe(0);
+  });
+
+  it('calculates exponential building upgrade costs as baseCost * Math.pow(1.5, currentLevel)', () => {
+    expect(calculateBuildingUpgradeCost(1_000, 1)).toBe(1_500);
+    expect(calculateBuildingUpgradeCost(1_000, 2)).toBe(2_250);
+    expect(calculateBuildingUpgradeCost(2_000, 4)).toBe(Math.round(2_000 * Math.pow(1.5, 4)));
+
+    const completedOrder = {
+      id: 'prod-done-1',
+      companyId: 'inherited-food-company',
+      productId: 'food-pack',
+      productName: 'عبوات غذائية',
+      batches: 2,
+      outputQuantity: 24,
+      outputUnit: 'صندوق',
+      materialCost: 100,
+      energyCost: 20,
+      expectedUnitCost: 5,
+      demandForecast: 50,
+      qualityScore: 90,
+      maintenanceCost: 10,
+      startedOnDay: 1,
+      completesOnDay: 1,
+      status: 'completed' as const,
+    };
+    const upgraded = upgradeCompany(profile({ productionOrders: [completedOrder] }), 'inherited-food-company');
+    expect(upgraded.ok).toBe(true);
+    if (upgraded.ok) {
+      expect(upgraded.data.cost).toBe(calculateBuildingUpgradeCost(BUILDING_UPGRADE_BASE_COSTS.company, 1));
+    }
+  });
+
+  it('deducts periodic maintenance per owned building without going negative', () => {
+    const base = profile({ bankBalance: 10_000 });
+    const tick = applyBuildingMaintenance(base, 10, new Date('2026-01-01T00:01:00.000Z'));
+    expect(tick.buildingCount).toBe(1);
+    expect(tick.deducted).toBe(10);
+    expect(tick.profile.bankBalance).toBe(9_990);
+  });
+
+  it('formats compact currency values with K, M, and B suffixes', () => {
+    expect(formatCurrency(10_000)).toBe('10K');
+    expect(formatCurrency(1_500_000)).toBe('1.5M');
+    expect(formatCurrency(1_000_000_000)).toBe('1B');
   });
 });

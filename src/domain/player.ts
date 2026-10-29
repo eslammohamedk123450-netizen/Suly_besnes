@@ -24,6 +24,7 @@ import type {
 } from './futureSystems';
 import type { SpeedCardStack } from './accountFeatures';
 import { FREE_AVATAR_IDS, DEFAULT_AVATAR_ID } from './avatars';
+import { STARTING_DIAMONDS_BALANCE, STARTING_GOLD_BALANCE } from '../game/economyBalance';
 
 export interface PlayerAsset {
   id: string;
@@ -166,9 +167,9 @@ export function createNewPlayer(
 ): PlayerProfile {
   const createdAt = now.toISOString();
 
-  const initialCash = country.startingBalance || 25_000;
-  const initialLoanPrincipal = 5_000;
-  const initialLoanRepay = 5_250;
+  const initialCash = country.startingBalance ?? STARTING_GOLD_BALANCE;
+  const initialLoanPrincipal = 2_000;
+  const initialLoanRepay = 2_100;
   const initialLandValue = 7_000;
   const initialOperatingCost = 80;
 
@@ -280,7 +281,7 @@ export function createNewPlayer(
     payables: 0,
     goldGrams: 0,
     goldCostBasis: 0,
-    diamonds: 15,
+    diamonds: STARTING_DIAMONDS_BALANCE,
     speedCards: [],
     badges: ['طوق النجاة'],
     assets: [],

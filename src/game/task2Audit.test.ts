@@ -56,7 +56,7 @@ describe('Task 2 — Comprehensive Internal Systems, Economy, and Persistence Au
       const country = findCountry('egypt')!;
       let profile = createNewPlayer(country, 'المستثمر المصري');
       const startBalance = profile.bankBalance;
-      expect(startBalance).toBe(25_000);
+      expect(startBalance).toBe(10_000);
 
       // Buy gold (10 grams @ $110/g)
       const buyRes = buyGold(profile, 10);

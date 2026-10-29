@@ -29,7 +29,7 @@ export function formatCompactNumber(value: number, decimals: number = 1): string
     const v = (abs / 1e6).toFixed(decimals).replace(/\.0+$/, '');
     return `${sign}${v}M`;
   }
-  if (abs >= 1e5) {
+  if (abs >= 1e3) {
     const v = (abs / 1e3).toFixed(decimals).replace(/\.0+$/, '');
     return `${sign}${v}K`;
   }
@@ -90,13 +90,18 @@ export function formatCompactGold(grams: number, decimals: number = 1): string {
   return formatGold(grams, { compact: true, decimals });
 }
 
+/**
+ * Formats currency/resource amounts compactly for UI display:
+ * 1,500,000 -> "1.5M", 1,000,000,000 -> "1B", 10,000 -> "10K".
+ */
 export function formatCurrency(
-  value: number, 
-  currencySymbol = '$',
+  amount: number,
+  currencySymbol?: string,
   options?: { compact?: boolean; decimals?: number }
 ): string {
-  if (options?.compact) {
-    return `${currencySymbol} ${formatCompactNumber(value ?? 0, options.decimals ?? 1)}`;
-  }
-  return `${currencySymbol} ${formatNumber(value ?? 0)}`;
+  const useCompact = options?.compact ?? true;
+  const formatted = useCompact
+    ? formatCompactNumber(amount ?? 0, options?.decimals ?? 1)
+    : formatNumber(amount ?? 0);
+  return currencySymbol ? `${currencySymbol} ${formatted}` : formatted;
 }

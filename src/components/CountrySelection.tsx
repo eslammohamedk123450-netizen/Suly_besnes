@@ -6,6 +6,7 @@ import { getCountryScenario } from '../game/countryScenarios';
 import { AvatarPortrait } from './AvatarPortrait';
 import { Icon } from './Icon';
 import { Brand } from './Brand';
+import { formatCurrency } from '../domain/formatters';
 import './CountrySelection.css';
 
 interface CountrySelectionProps {
@@ -81,7 +82,7 @@ export function CountrySelection({
             <span className="eyebrow">{selectedCountry.flag} {scenario.scenarioTitle}</span>
             <h1>من مصنعٍ متعثر…<br />إلى إمبراطورية اقتصادية.</h1>
             <p>
-              ابدأ برأس مال تأسيسي قدره <strong>25,000 $</strong>، مصنع موروث بكفاءة 25%، وأرض صناعية حقيقية في{' '}
+              ابدأ برأس مال تأسيسي قدره <strong>{formatCurrency(selectedCountry.startingBalance)} $</strong>، مصنع موروث بكفاءة 25%، وأرض صناعية حقيقية في{' '}
               <strong>{selectedCountry.name}</strong>، وأعد بناء مجدك خطوة بخطوة.
             </p>
           </div>
@@ -260,7 +261,7 @@ export function CountrySelection({
                         </small>
                       </span>
                       <span className="country-currency-badge">
-                        25,000 $
+                        {formatCurrency(country.startingBalance)} $
                       </span>
                       <span className="country-radio" aria-hidden="true">
                         {active ? <span /> : null}
@@ -321,7 +322,7 @@ export function CountrySelection({
                 <div className="grid grid-cols-2 gap-2 text-xs mt-1">
                   <div className="p-2 rounded-lg bg-slate-950/50 border border-slate-800">
                     <span className="text-slate-400 block text-[11px]">السيولة النقدية والماس</span>
-                    <strong className="text-emerald-400 font-bold">25,000 $ + 15 ماسة</strong>
+                    <strong className="text-emerald-400 font-bold">10,000 $ + 0 ماسة</strong>
                   </div>
                   <div className="p-2 rounded-lg bg-slate-950/50 border border-slate-800">
                     <span className="text-slate-400 block text-[11px]">المنشأة والأرض الموروثة</span>
@@ -329,7 +330,7 @@ export function CountrySelection({
                   </div>
                   <div className="p-2 rounded-lg bg-slate-950/50 border border-slate-800">
                     <span className="text-slate-400 block text-[11px]">الالتزام الموروث</span>
-                    <strong className="text-rose-300 font-bold">قرض 5,250 $ (سماح 7 أيام)</strong>
+                    <strong className="text-rose-300 font-bold">قرض 2,100 $ (سماح 7 أيام)</strong>
                   </div>
                   <div className="p-2 rounded-lg bg-slate-950/50 border border-slate-800">
                     <span className="text-slate-400 block text-[11px]">المؤسسات الوطنية</span>

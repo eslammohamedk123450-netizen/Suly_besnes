@@ -161,7 +161,7 @@ describe('Update B Systems Verification', () => {
       expect(jordan).toBeDefined();
       expect(jordan?.flag).toBe('🇯🇴');
       expect(jordan?.currency.symbol).toBe('د.أ');
-      expect(jordan?.startingBalance).toBe(25_000);
+      expect(jordan?.startingBalance).toBe(10_000);
       expect(COUNTRIES.length).toBe(14);
     });
 

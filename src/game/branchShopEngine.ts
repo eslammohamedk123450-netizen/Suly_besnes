@@ -33,6 +33,7 @@ import {
   releaseTransactionLock,
 } from './cityGridSystem';
 import type { PurchasePaymentMethod } from './purchasePricing';
+import { BUILDING_UPGRADE_BASE_COSTS, calculateBuildingUpgradeCost } from './economyBalance';
 
 function generateUniqueId(prefix: string): string {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
@@ -186,7 +187,7 @@ export function upgradeBranch(
   }
 
   const nextLevel = branch.level + 1;
-  const upgradeCost = 8000 * branch.level;
+  const upgradeCost = calculateBuildingUpgradeCost(BUILDING_UPGRADE_BASE_COSTS.branch, branch.level);
   const payment = resolvePurchaseDebit(profile, upgradeCost, paymentMethod);
   if ('message' in payment) {
     return failure(profile, 'insufficient-funds', `لا تكفي الأموال لترقية الفرع. ${payment.message}`);
@@ -387,7 +388,7 @@ export function upgradeRetailShop(
   const spec = findShopSpec(shop.shopType);
   const baseCap = spec?.shelfBaseCapacity ?? 150;
   const nextLevel = shop.level + 1;
-  const upgradeCost = 6500 * shop.level;
+  const upgradeCost = calculateBuildingUpgradeCost(BUILDING_UPGRADE_BASE_COSTS.shop, shop.level);
 
   const payment = resolvePurchaseDebit(profile, upgradeCost, paymentMethod);
   if ('message' in payment) {

@@ -17,7 +17,25 @@ import {
 } from './catalog';
 import { getMarketQuote } from './market';
 import { isAuctionOpen, resolveAuctionListing } from './auctions';
-import { getInvestmentPayoutRate, getOperatingCostProgression } from './economyBalance';
+import {
+  BUILDING_MAINTENANCE_COST,
+  BUILDING_MAINTENANCE_INTERVAL_MS,
+  BUILDING_UPGRADE_BASE_COSTS,
+  applyBuildingMaintenance,
+  calculateBuildingUpgradeCost,
+  getInvestmentPayoutRate,
+  getOperatingCostProgression,
+  getOwnedBuildingsCount,
+} from './economyBalance';
+
+export {
+  BUILDING_MAINTENANCE_COST,
+  BUILDING_MAINTENANCE_INTERVAL_MS,
+  BUILDING_UPGRADE_BASE_COSTS,
+  applyBuildingMaintenance,
+  calculateBuildingUpgradeCost,
+  getOwnedBuildingsCount,
+};
 import { GAME_DAY_MS } from './time';
 import { getContractOffers } from './contracts';
 import { getSynergyOperatingMultiplier, getSynergyProductionMultiplier } from './synergy';
@@ -464,7 +482,7 @@ export function upgradeLand(profile: PlayerProfile, landId: string, paymentMetho
   if (!land) return failure(profile, 'not-found', 'الأرض غير موجودة.');
   const level = land.upgradeLevel ?? 1;
   if (level >= 5) return failure(profile, 'condition-not-met', 'وصلت الأرض إلى أعلى مستوى تطوير.');
-  const cost = Math.round(80_000 * Math.pow(1.55, level - 1));
+  const cost = calculateBuildingUpgradeCost(BUILDING_UPGRADE_BASE_COSTS.land, level);
   const payment = resolvePurchaseDebit(profile, cost, paymentMethod);
   if ('message' in payment) return failure(profile, 'insufficient-funds', payment.message);
   const upgraded = { ...land, upgradeLevel: level + 1, areaSquareMeters: Math.round(land.areaSquareMeters * 1.1), purchasePrice: land.purchasePrice + cost };
@@ -1115,7 +1133,7 @@ export function upgradeCompany(profile: PlayerProfile, companyId: string, paymen
     .reduce((sum, order) => sum + order.batches, 0);
   const requiredBatches = level * 2;
   if (completedBatches < requiredBatches) return failure(profile, 'condition-not-met', `تحتاج إلى إكمال ${requiredBatches} دفعات إنتاج قبل الوصول إلى المستوى ${level + 1}. أكملت ${completedBatches}.`);
-  const cost = Math.round(120_000 * Math.pow(1.55, level - 1));
+  const cost = calculateBuildingUpgradeCost(BUILDING_UPGRADE_BASE_COSTS.company, level);
   const payment = resolvePurchaseDebit(profile, cost, paymentMethod);
   if ('message' in payment) return failure(profile, 'insufficient-funds', `تحتاج إلى ${cost.toLocaleString('ar-EG')} $ أو ما يعادلها بالماس لتطوير الشركة. ${payment.message}`);
   const capacityBonus = 20 * level;
@@ -1320,7 +1338,7 @@ export function autoSupplyAndProduce(profile: PlayerProfile, companyId: string, 
 export function serviceCompany(profile: PlayerProfile, companyId: string): GameResult<{ companyId: string; cost: number }> {
   const company = profile.companies.find((item) => item.id === companyId);
   if (!company) return failure(profile, 'not-found', 'الشركة غير موجودة.');
-  const cost = Math.max(5_000, Math.round((company.operatingCostPerDay ?? 0) * 0.4 * getOperatingCostProgression(profile.day)));
+  const cost = Math.max(1_500, Math.round((company.operatingCostPerDay ?? 0) * 0.4 * getOperatingCostProgression(profile.day)));
   if (profile.bankBalance < cost) return failure(profile, 'insufficient-funds', 'لا يكفي الرصيد لإجراء صيانة المصنع.');
   const nextProfile = addLedger(
     { ...profile, companies: profile.companies.map((item) => item.id === companyId ? { ...item, maintenanceCondition: 100 } : item) },

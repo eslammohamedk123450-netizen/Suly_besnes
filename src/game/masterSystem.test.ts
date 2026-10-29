@@ -125,8 +125,8 @@ describe('Suly Business Empire — Master System Verification (17 Suites)', () =
       const profile = createNewPlayer(country, `مؤسس ${country.name}`, new Date('2026-03-01T00:00:00.000Z'));
 
       expect(profile.countryId).toBe(countryId);
-      expect(profile.bankBalance).toBe(25_000);
-      expect(profile.diamonds).toBe(15);
+      expect(profile.bankBalance).toBe(10_000);
+      expect(profile.diamonds).toBe(0);
       expect(profile.lands).toHaveLength(1);
       expect(profile.lands[0].purchasePrice).toBe(7_000);
       expect(profile.companies).toHaveLength(1);
@@ -134,7 +134,7 @@ describe('Suly Business Empire — Master System Verification (17 Suites)', () =
       expect(profile.companies[0].industryId).toBe('food');
       expect(profile.companies[0].maintenanceCondition).toBe(25);
       expect(profile.banking.loans).toHaveLength(1);
-      expect(profile.banking.loans[0].remainingBalance).toBe(5_250);
+      expect(profile.banking.loans[0].remainingBalance).toBe(2_100);
       expect(profile.banking.loans[0].nextPaymentDay).toBe(7);
       expect(profile.ledger.every((entry) => entry.amount > 0)).toBe(true);
 

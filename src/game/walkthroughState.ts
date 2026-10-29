@@ -88,7 +88,7 @@ export const WALKTHROUGH_STEPS: WalkthroughStep[] = [
         return 'لا توجد شركة مسجلة حالياً؛ انتقل لتأسيس شركتك الأولى من لوحة تأسيس شركة.';
       }
       const company = profile.companies[0];
-      const cost = Math.max(5_000, Math.round((company.operatingCostPerDay ?? 0) * 0.4));
+      const cost = Math.max(1_500, Math.round((company.operatingCostPerDay ?? 0) * 0.4));
       if ((company.maintenanceCondition ?? 100) < 90 && profile.bankBalance < cost) {
         return `السيولة النقدية الحالية أقل من تكلفة الصيانة (${cost.toLocaleString('ar-EG')} $). بِع فائض المخزون أو استلم مكافآت المهام المتاحة لتوفير السيولة.`;
       }
@@ -113,7 +113,7 @@ export const WALKTHROUGH_STEPS: WalkthroughStep[] = [
     targetSelector: '[data-guide-target="pay-obligation-btn"]',
     phaseBadge: 'المرحلة 2 من 6 · تسوية الالتزامات',
     title: 'سداد القرض الموروث وحماية الطاقة',
-    actionGoal: 'تسوية القرض الطارئ الموروث (5,250 $) لإبراء ذمتك المالية',
+    actionGoal: 'تسوية القرض الطارئ الموروث (2,100 $) لإبراء ذمتك المالية',
     targetButtonLabel: 'سداد قسط طوعي',
     clickInstruction: 'افتح لوحة خريطة الالتزامات ثم اضغط بنفسك على «سداد قسط طوعي» لإغلاق المديونية.',
     whyInstruction: 'تأخر سداد الالتزامات يوقف إمداد الطاقة للمصانع؛ السداد المبكر ينظف سجلك الائتماني فوراً.',
@@ -121,7 +121,7 @@ export const WALKTHROUGH_STEPS: WalkthroughStep[] = [
     checklist: [
       'الدخول إلى قسم «الالتزامات» من شريط التنقل',
       'فتح لوحة «خريطة الالتزامات والديون» ومراجعة القرض الموروث',
-      'الضغط بنفسك على زر «سداد قسط طوعي» لتسوية الـ 5,250 $',
+      'الضغط بنفسك على زر «سداد قسط طوعي» لتسوية الـ 2,100 $',
     ],
     message: 'سدّد القرض الموروث لحماية طاقة المصنع وتنظيف سجلك المالي.',
     subMessage: 'افتح خريطة الالتزامات واضغط بنفسك على زر السداد.',

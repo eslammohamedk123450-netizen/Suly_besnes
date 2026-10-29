@@ -6,7 +6,8 @@
 import React, { useState, useEffect } from 'react';
 import type { PlayerProfile } from '../../domain/player';
 import type { SectionId } from '../../domain/navigation';
-import { formatMoney } from '../../domain/formatters';
+import { formatCurrency, formatMoney } from '../../domain/formatters';
+import { BUILDING_UPGRADE_BASE_COSTS, calculateBuildingUpgradeCost } from '../../game/economyBalance';
 import {
   INDUSTRY_CATALOG,
   findIndustry,
@@ -218,7 +219,7 @@ export const BuildingDetailSheet: React.FC<BuildingDetailSheetProps> = ({
             </div>
             <div className="p-3 bg-slate-950/70 border border-slate-800 rounded-xl">
               <span className="text-slate-400 block mb-1">الرصيد النقدي:</span>
-              <span className="font-bold text-emerald-400 text-sm">{formatMoney(profile.bankBalance)}</span>
+              <span className="font-bold text-emerald-400 text-sm">$ {formatCurrency(profile.bankBalance)}</span>
             </div>
             <div className="p-3 bg-slate-950/70 border border-slate-800 rounded-xl">
               <span className="text-slate-400 block mb-1">السمعة التجارية:</span>
@@ -272,7 +273,7 @@ export const BuildingDetailSheet: React.FC<BuildingDetailSheetProps> = ({
                     className="flex-1 py-3 px-4 rounded-xl bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-slate-950 font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-lg shadow-amber-500/20"
                   >
                     <Coins className="w-4 h-4" />
-                    <span>تطوير نقدًا ({formatMoney(nextSpec.costCash)})</span>
+                    <span>تطوير نقدًا ($ {formatCurrency(nextSpec.costCash)})</span>
                   </button>
                   <button
                     onClick={() => handleUpgradeHQ('diamonds')}
@@ -788,7 +789,7 @@ export const BuildingDetailSheet: React.FC<BuildingDetailSheetProps> = ({
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 mb-4 text-xs">
             <div className="p-3 bg-slate-950/70 border border-slate-800 rounded-xl">
               <span className="text-slate-400 block mb-1">الرصيد المتاح:</span>
-              <span className="font-bold text-emerald-400 text-sm">{formatMoney(profile.bankBalance)}</span>
+              <span className="font-bold text-emerald-400 text-sm">$ {formatCurrency(profile.bankBalance)}</span>
             </div>
             <div className="p-3 bg-slate-950/70 border border-slate-800 rounded-xl">
               <span className="text-slate-400 block mb-1">رصيد الماس:</span>
@@ -1312,13 +1313,13 @@ export const BuildingDetailSheet: React.FC<BuildingDetailSheetProps> = ({
         <div className="space-y-4">
           <div className="p-3.5 rounded-xl bg-sky-950/40 border border-sky-500/30 text-xs text-sky-200 flex items-center justify-between">
             <span>أنت تمتلك هذه الأرض! اختر نوع المنشأة لتأسيسها وبدء تشييدها:</span>
-            {plot.land && (
+            {plot.land && (plot.land.upgradeLevel ?? 1) < 5 && (
               <button
                 onClick={() => handleUpgradeLand(plot.land!.id)}
-                disabled={isSubmitting}
-                className="px-2.5 py-1 rounded-lg bg-slate-900 border border-sky-400/40 text-[10px] text-sky-300 font-bold hover:bg-slate-800 transition-colors"
+                disabled={isSubmitting || profile.bankBalance < calculateBuildingUpgradeCost(BUILDING_UPGRADE_BASE_COSTS.land, plot.land.upgradeLevel ?? 1)}
+                className="px-2.5 py-1 rounded-lg bg-slate-900 border border-sky-400/40 text-[10px] text-sky-300 font-bold hover:bg-slate-800 disabled:opacity-50 transition-colors"
               >
-                تطوير مساحة الأرض +10%
+                تطوير الأرض +10% ($ {formatCurrency(calculateBuildingUpgradeCost(BUILDING_UPGRADE_BASE_COSTS.land, plot.land.upgradeLevel ?? 1))})
               </button>
             )}
           </div>
@@ -1522,10 +1523,15 @@ export const BuildingDetailSheet: React.FC<BuildingDetailSheetProps> = ({
 
             <button
               onClick={() => handleUpgradeCompany(plot.company!.id)}
-              className="flex-1 min-w-[130px] py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-colors border border-slate-700"
+              disabled={(plot.company.upgradeLevel ?? 1) >= 5 || profile.bankBalance < calculateBuildingUpgradeCost(BUILDING_UPGRADE_BASE_COSTS.company, plot.company.upgradeLevel ?? 1)}
+              className="flex-1 min-w-[130px] py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-colors border border-slate-700"
             >
               <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-              <span>ترقية المنشأة</span>
+              <span>
+                {(plot.company.upgradeLevel ?? 1) >= 5
+                  ? 'أعلى مستوى'
+                  : `ترقية المنشأة ($ ${formatCurrency(calculateBuildingUpgradeCost(BUILDING_UPGRADE_BASE_COSTS.company, plot.company.upgradeLevel ?? 1))})`}
+              </span>
             </button>
 
             <button

@@ -7,7 +7,8 @@ import React, { useState } from 'react';
 import type { PlayerProfile } from '../../domain/player';
 import type { CompanyBranch, RetailShop, RetailShopType } from '../../domain/branchAndShop';
 import { RETAIL_SHOP_SPECS, findShopSpec, getBranchSpecs } from '../../domain/branchAndShop';
-import { formatMoney } from '../../domain/formatters';
+import { formatCurrency, formatMoney } from '../../domain/formatters';
+import { BUILDING_UPGRADE_BASE_COSTS, calculateBuildingUpgradeCost } from '../../game/economyBalance';
 import { playSound } from '../../game/soundEffects';
 import {
   establishBranch,
@@ -189,14 +190,14 @@ export const BranchAndShopSheet: React.FC<BranchAndShopSheetProps> = ({
 
           <button
             onClick={handleUpgradeBranch}
-            disabled={isSubmitting || branch.level >= 5 || profile.bankBalance < 8000 * branch.level}
+            disabled={isSubmitting || branch.level >= 5 || profile.bankBalance < calculateBuildingUpgradeCost(BUILDING_UPGRADE_BASE_COSTS.branch, branch.level)}
             className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 disabled:opacity-50 text-slate-950 font-bold text-xs flex items-center justify-center gap-2 shadow-lg transition-all"
           >
             <Coins className="w-4 h-4" />
             <span>
               {branch.level >= 5
                 ? 'الفرع في أعلى مستوى تطوير'
-                : `ترقية إلى المستوى ${branch.level + 1} (${formatMoney(8000 * branch.level)})`}
+                : `ترقية إلى المستوى ${branch.level + 1} ($ ${formatCurrency(calculateBuildingUpgradeCost(BUILDING_UPGRADE_BASE_COSTS.branch, branch.level))})`}
             </span>
           </button>
         </div>
@@ -435,14 +436,14 @@ export const BranchAndShopSheet: React.FC<BranchAndShopSheetProps> = ({
             <div className="pt-2">
               <button
                 onClick={handleUpgradeShop}
-                disabled={isSubmitting || shop.level >= 5 || profile.bankBalance < 6500 * shop.level}
+                disabled={isSubmitting || shop.level >= 5 || profile.bankBalance < calculateBuildingUpgradeCost(BUILDING_UPGRADE_BASE_COSTS.shop, shop.level)}
                 className="w-full py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-white font-bold text-xs flex items-center justify-center gap-2 border border-slate-700 transition-all"
               >
                 <Layers className="w-4 h-4 text-emerald-400" />
                 <span>
                   {shop.level >= 5
                     ? 'المتجر في أقصى سعة وتطوير'
-                    : `توسعة المتجر وترقيته للمستوى ${shop.level + 1} (${formatMoney(6500 * shop.level)})`}
+                    : `توسعة المتجر وترقيته للمستوى ${shop.level + 1} ($ ${formatCurrency(calculateBuildingUpgradeCost(BUILDING_UPGRADE_BASE_COSTS.shop, shop.level))})`}
                 </span>
               </button>
             </div>

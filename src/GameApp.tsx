@@ -30,7 +30,14 @@ import { createNewPlayer } from './domain/player';
 import type { PlayerProfile } from './domain/player';
 import { formatMoney } from './domain/formatters';
 import type { FinanceLedgerEntry } from './domain/futureSystems';
-import { advanceDay, sellProduct, type GameCommand, type GameResult } from './game/engine';
+import {
+  BUILDING_MAINTENANCE_INTERVAL_MS,
+  advanceDay,
+  applyBuildingMaintenance,
+  sellProduct,
+  type GameCommand,
+  type GameResult,
+} from './game/engine';
 import { loadStockMarketState, disburseHybridDividends } from './game/stockMarket';
 import { loadSavedGame, saveGame } from './storage/saveRepository';
 import { loadNotificationTheme, saveNotificationTheme } from './storage/userPreferences';
@@ -133,6 +140,19 @@ export default function App() {
     const saved = saveGame(profile, accountId);
     if (saved.ok) lastLocalSaveSignature.current = signature;
   }, [profile, account?.id]);
+
+  // Background building maintenance loop: deducts 10 gold per owned building every 60 seconds
+  const hasActiveProfile = Boolean(profile);
+  useEffect(() => {
+    if (!hasActiveProfile) return;
+    const maintenanceInterval = window.setInterval(() => {
+      setProfile((current) => {
+        if (!current) return current;
+        return applyBuildingMaintenance(current).profile;
+      });
+    }, BUILDING_MAINTENANCE_INTERVAL_MS);
+    return () => window.clearInterval(maintenanceInterval);
+  }, [hasActiveProfile]);
 
   const applyLoadedProfileState = (loadedProfile: PlayerProfile | null) => {
     setProfile(loadedProfile);

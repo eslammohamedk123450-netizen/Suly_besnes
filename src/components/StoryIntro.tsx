@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { PlayerProfile } from '../domain/player';
 import { findCountry } from '../domain/countries';
-import { formatMoney } from '../domain/formatters';
+import { formatCompactMoney } from '../domain/formatters';
 import { getCountryScenario } from '../game/countryScenarios';
 import { AvatarPortrait } from './AvatarPortrait';
 import { Building2, MapPin, Wallet, Sparkles, ArrowRight, ShieldCheck, Target, ChevronLeft } from 'lucide-react';
@@ -69,10 +69,10 @@ export function StoryIntro({ profile, onComplete }: StoryIntroProps) {
                     السيولة النقدية
                   </span>
                   <strong className="text-base font-black text-emerald-300 block">
-                    {formatMoney(profile.bankBalance, country)}
+                    {formatCompactMoney(profile.bankBalance, country)}
                   </strong>
                   <span className="text-[10px] text-cyan-300 font-bold mt-1 block">
-                    +{profile.diamonds} ألماسة احتياطية
+                    {profile.diamonds} ألماس
                   </span>
                 </div>
 
@@ -114,7 +114,7 @@ export function StoryIntro({ profile, onComplete }: StoryIntroProps) {
                       مهمتك الأولى: {firstQuest.title}
                     </span>
                     <span className="text-emerald-400 font-mono">
-                      +{formatMoney(firstQuest.cashReward, country)}
+                      +{formatCompactMoney(firstQuest.cashReward, country)}
                     </span>
                   </div>
                   <p className="text-slate-300 text-xs">
