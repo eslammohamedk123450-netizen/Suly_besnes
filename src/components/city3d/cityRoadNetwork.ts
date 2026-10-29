@@ -11,6 +11,17 @@ import {
   buildFlowerBed,
   buildGolfGreenTurfIsland,
 } from './cityFoliageBuilders';
+import {
+  buildLamborghiniSupercar,
+  buildFerrariSupercar,
+  buildLuxurySuperyacht,
+  buildSpeedboatYacht,
+  buildDancingFountain,
+  buildImperialGoldenEagleStatue,
+  buildClassicalTitanStatue,
+  type AnimatedYacht,
+  type DancingFountainAssets,
+} from './cityLifeAssets';
 
 export interface TrafficVehicle {
   mesh: THREE.Group;
@@ -25,6 +36,8 @@ export interface TrafficVehicle {
 export interface CityRoadNetworkResult {
   group: THREE.Group;
   vehicles: TrafficVehicle[];
+  yachts: AnimatedYacht[];
+  fountains: DancingFountainAssets[];
 }
 
 /**
@@ -719,20 +732,35 @@ export function buildCityRoadNetwork(
     roadGroup.add(turfIsland);
   });
 
-  // 8. Animated High-Fidelity Traffic Fleet
+  const yachts: AnimatedYacht[] = [];
+  const fountains: DancingFountainAssets[] = [];
+
+  // 8. Animated High-Fidelity Traffic Fleet (Including Luxury Supercars: Ferrari & Lamborghini)
   const trafficFleet = [
-    { type: 'sedan', colorIdx: 0, axis: 'z' as const, dir: 1 as const, lane: 2.2, zStart: -45, speed: 0.16 },
-    { type: 'truck', colorIdx: 1, axis: 'z' as const, dir: -1 as const, lane: -2.2, zStart: 35, speed: 0.12 },
-    { type: 'bus', colorIdx: 2, axis: 'x' as const, dir: 1 as const, lane: 2.2, zStart: -50, speed: 0.13 },
-    { type: 'taxi', colorIdx: 6, axis: 'x' as const, dir: -1 as const, lane: -2.2, zStart: 40, speed: 0.17 },
-    { type: 'suv', colorIdx: 4, axis: 'z' as const, dir: 1 as const, lane: 2.2, zStart: 15, speed: 0.18 },
+    { type: 'ferrari', colorIdx: 0, axis: 'z' as const, dir: 1 as const, lane: 2.2, zStart: -25, speed: 0.24 },
+    { type: 'lamborghini', colorIdx: 1, axis: 'x' as const, dir: 1 as const, lane: 2.2, zStart: -35, speed: 0.25 },
+    { type: 'ferrari_yellow', colorIdx: 2, axis: 'x' as const, dir: -1 as const, lane: -2.2, zStart: 30, speed: 0.24 },
+    { type: 'lamborghini_orange', colorIdx: 3, axis: 'z' as const, dir: -1 as const, lane: -2.2, zStart: 12, speed: 0.25 },
+    { type: 'sedan', colorIdx: 0, axis: 'z' as const, dir: 1 as const, lane: 2.2, zStart: -65, speed: 0.16 },
+    { type: 'truck', colorIdx: 1, axis: 'z' as const, dir: -1 as const, lane: -2.2, zStart: 55, speed: 0.12 },
+    { type: 'bus', colorIdx: 2, axis: 'x' as const, dir: 1 as const, lane: 2.2, zStart: -60, speed: 0.13 },
+    { type: 'taxi', colorIdx: 6, axis: 'x' as const, dir: -1 as const, lane: -2.2, zStart: 50, speed: 0.17 },
+    { type: 'suv', colorIdx: 4, axis: 'z' as const, dir: 1 as const, lane: 2.2, zStart: 35, speed: 0.18 },
     { type: 'sedan', colorIdx: 3, axis: 'x' as const, dir: -1 as const, lane: -2.2, zStart: -15, speed: 0.16 },
   ];
 
   trafficFleet.forEach((v) => {
     let vehicleMesh: THREE.Group;
 
-    if (v.type === 'truck') {
+    if (v.type === 'lamborghini') {
+      vehicleMesh = buildLamborghiniSupercar(palette, isSoftwareGl, 'green');
+    } else if (v.type === 'lamborghini_orange') {
+      vehicleMesh = buildLamborghiniSupercar(palette, isSoftwareGl, 'orange');
+    } else if (v.type === 'ferrari') {
+      vehicleMesh = buildFerrariSupercar(palette, isSoftwareGl, 'red');
+    } else if (v.type === 'ferrari_yellow') {
+      vehicleMesh = buildFerrariSupercar(palette, isSoftwareGl, 'yellow');
+    } else if (v.type === 'truck') {
       vehicleMesh = buildHeavyLogisticsTruck(palette, isSoftwareGl);
     } else if (v.type === 'bus') {
       vehicleMesh = buildCityTransitBus(palette, isSoftwareGl);
@@ -773,6 +801,67 @@ export function buildCityRoadNetwork(
     roadGroup.add(vehicleMesh);
   });
 
+  // 9. Coastal Luxury Yacht Fleet cruising in the harbor waters
+  const superyacht1 = buildLuxurySuperyacht(palette, isSoftwareGl);
+  superyacht1.position.set(coastlineX + 32, 0.08, -35);
+  superyacht1.rotation.y = 0;
+  roadGroup.add(superyacht1);
+  yachts.push({
+    mesh: superyacht1,
+    speed: 0.09,
+    dir: 1,
+    min: -95,
+    max: 95,
+    phase: 0,
+  });
+
+  const superyacht2 = buildLuxurySuperyacht(palette, isSoftwareGl);
+  superyacht2.scale.set(0.85, 0.85, 0.85);
+  superyacht2.position.set(coastlineX + 55, 0.08, 45);
+  superyacht2.rotation.y = Math.PI;
+  roadGroup.add(superyacht2);
+  yachts.push({
+    mesh: superyacht2,
+    speed: 0.08,
+    dir: -1,
+    min: -90,
+    max: 90,
+    phase: Math.PI / 2,
+  });
+
+  const speedboat = buildSpeedboatYacht(palette, isSoftwareGl);
+  speedboat.position.set(coastlineX + 18, 0.08, 10);
+  speedboat.rotation.y = 0;
+  roadGroup.add(speedboat);
+  yachts.push({
+    mesh: speedboat,
+    speed: 0.16,
+    dir: 1,
+    min: -85,
+    max: 85,
+    phase: Math.PI,
+  });
+
+  // 10. Grand City Center Dancing Fountains
+  const northFountain = buildDancingFountain(palette, isSoftwareGl, 3.6);
+  northFountain.group.position.set(0, 0.08, -24);
+  roadGroup.add(northFountain.group);
+  fountains.push(northFountain);
+
+  const southFountain = buildDancingFountain(palette, isSoftwareGl, 3.6);
+  southFountain.group.position.set(0, 0.08, 24);
+  roadGroup.add(southFountain.group);
+  fountains.push(southFountain);
+
+  // 11. Imperial Classical Statues in Boulevard Medians
+  const eagleMonument = buildImperialGoldenEagleStatue(palette, isSoftwareGl);
+  eagleMonument.position.set(-24, 0.08, 0);
+  roadGroup.add(eagleMonument);
+
+  const titanMonument = buildClassicalTitanStatue(palette, isSoftwareGl);
+  titanMonument.position.set(24, 0.08, 0);
+  roadGroup.add(titanMonument);
+
   // Ensure all roads, curbs, sidewalks, and street props receive and cast shadows
   roadGroup.traverse((child) => {
     if (child instanceof THREE.Mesh) {
@@ -783,5 +872,5 @@ export function buildCityRoadNetwork(
     }
   });
 
-  return { group: roadGroup, vehicles };
+  return { group: roadGroup, vehicles, yachts, fountains };
 }

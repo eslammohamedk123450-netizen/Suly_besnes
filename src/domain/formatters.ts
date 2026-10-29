@@ -105,3 +105,4 @@ export function formatCurrency(
     : formatNumber(amount ?? 0);
   return currencySymbol ? `${currencySymbol} ${formatted}` : formatted;
 }
+

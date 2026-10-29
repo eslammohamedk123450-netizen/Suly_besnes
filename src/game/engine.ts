@@ -1123,11 +1123,23 @@ export function foundCompany(profile: PlayerProfile, industryId: IndustryId, lan
   return success(syncTasks(nextProfile), `تم تأسيس ${companyName} وترخيصها ${paymentMethod === 'diamonds' ? `مقابل ${payment.diamondsSpent} ماسة` : 'نقدًا'}.`, { companyId, totalCost, diamondsSpent: payment.diamondsSpent });
 }
 
+/**
+ * Deducts periodic building maintenance expenses:
+ * Deducts 10 gold/cash per owned building every 60 seconds
+ */
+export function deductBuildingMaintenance(
+  profile: PlayerProfile,
+  maintenancePerBuilding: number = BUILDING_MAINTENANCE_COST,
+): { profile: PlayerProfile; deducted: number } {
+  const { profile: nextProfile, deducted } = applyBuildingMaintenance(profile, maintenancePerBuilding);
+  return { profile: nextProfile, deducted };
+}
+
 export function upgradeCompany(profile: PlayerProfile, companyId: string, paymentMethod: PurchasePaymentMethod = 'cash'): GameResult<{ companyId: string; level: number; cost: number; diamondsSpent: number }> {
   const company = profile.companies.find((item) => item.id === companyId);
   if (!company) return failure(profile, 'not-found', 'الشركة غير موجودة.');
   const level = company.upgradeLevel ?? 1;
-  if (level >= 5) return failure(profile, 'condition-not-met', 'وصلت هذه الشركة إلى أعلى مستوى تطوير.');
+  if (level >= 10) return failure(profile, 'condition-not-met', 'وصلت هذه الشركة إلى أعلى مستوى تطوير.');
   const completedBatches = profile.productionOrders
     .filter((order) => order.companyId === companyId && order.status === 'completed')
     .reduce((sum, order) => sum + order.batches, 0);

@@ -819,6 +819,22 @@ export interface CityMaterialPalette {
   royalNavyMat: THREE.MeshStandardMaterial;
   warmAmberLitGlass: THREE.MeshStandardMaterial;
 
+  // High-Reflection Skyscraper Obsidian Glass & Mirror Glass (Environment Map Reflection)
+  blackObsidianGlass: THREE.MeshStandardMaterial;
+  skyReflectiveCurtainGlass: THREE.MeshStandardMaterial;
+
+  // Supercars (Ferrari, Lamborghini), Yachts & Luxury Props
+  ferrariRed: THREE.MeshStandardMaterial;
+  lamborghiniGreen: THREE.MeshStandardMaterial;
+  lamborghiniOrange: THREE.MeshStandardMaterial;
+  carbonFiber: THREE.MeshStandardMaterial;
+  yachtHullWhite: THREE.MeshStandardMaterial;
+  teakWood: THREE.MeshStandardMaterial;
+  rolexGreenMarble: THREE.MeshStandardMaterial;
+  emeraldGlow: THREE.MeshBasicMaterial;
+  bronzeStatue: THREE.MeshStandardMaterial;
+  fountainWaterDancing: THREE.MeshStandardMaterial;
+
   // Commercial & Industrial Materials
   industrialSteel: THREE.MeshStandardMaterial;
   corrugatedMetal: THREE.MeshStandardMaterial;
@@ -941,8 +957,9 @@ export function createCityMaterialPalette(
     }),
     curtainGlass: new THREE.MeshStandardMaterial({
       color: mode === 'night' ? '#081628' : mode === 'sunset' ? '#172554' : '#7dd3fc',
-      roughness: 0.12,
-      metalness: 0.86,
+      roughness: 0.05,
+      metalness: 0.92,
+      envMapIntensity: 2.2,
       transparent: true,
       opacity: 0.88,
       emissive: mode === 'night'
@@ -951,6 +968,76 @@ export function createCityMaterialPalette(
           ? new THREE.Color('#ea580c')
           : new THREE.Color('#000000'),
       emissiveIntensity: mode === 'night' ? 0.45 : mode === 'sunset' ? 0.35 : 0,
+    }),
+    blackObsidianGlass: new THREE.MeshStandardMaterial({
+      color: mode === 'night' ? '#040711' : mode === 'sunset' ? '#080d1a' : '#0a1020',
+      roughness: 0.04,
+      metalness: 0.96,
+      envMapIntensity: 2.5,
+    }),
+    skyReflectiveCurtainGlass: new THREE.MeshStandardMaterial({
+      color: mode === 'night' ? '#081426' : mode === 'sunset' ? '#132144' : '#60a5fa',
+      roughness: 0.05,
+      metalness: 0.92,
+      envMapIntensity: 2.2,
+      transparent: true,
+      opacity: 0.92,
+    }),
+    ferrariRed: new THREE.MeshStandardMaterial({
+      color: '#dc2626',
+      roughness: 0.1,
+      metalness: 0.88,
+      envMapIntensity: 1.8,
+    }),
+    lamborghiniGreen: new THREE.MeshStandardMaterial({
+      color: '#84cc16',
+      roughness: 0.08,
+      metalness: 0.9,
+      envMapIntensity: 1.8,
+    }),
+    lamborghiniOrange: new THREE.MeshStandardMaterial({
+      color: '#ea580c',
+      roughness: 0.08,
+      metalness: 0.9,
+      envMapIntensity: 1.8,
+    }),
+    carbonFiber: new THREE.MeshStandardMaterial({
+      color: '#18181b',
+      roughness: 0.35,
+      metalness: 0.85,
+    }),
+    yachtHullWhite: new THREE.MeshStandardMaterial({
+      color: '#f8fafc',
+      roughness: 0.08,
+      metalness: 0.75,
+      envMapIntensity: 1.6,
+    }),
+    teakWood: new THREE.MeshStandardMaterial({
+      color: '#a16207',
+      roughness: 0.65,
+      metalness: 0.05,
+    }),
+    rolexGreenMarble: new THREE.MeshStandardMaterial({
+      color: '#064e3b',
+      roughness: 0.15,
+      metalness: 0.6,
+      envMapIntensity: 1.5,
+    }),
+    emeraldGlow: new THREE.MeshBasicMaterial({
+      color: '#10b981',
+    }),
+    bronzeStatue: new THREE.MeshStandardMaterial({
+      color: '#b45309',
+      roughness: 0.28,
+      metalness: 0.92,
+      envMapIntensity: 1.9,
+    }),
+    fountainWaterDancing: new THREE.MeshStandardMaterial({
+      color: '#38bdf8',
+      roughness: 0.05,
+      metalness: 0.8,
+      transparent: true,
+      opacity: 0.82,
     }),
     litGlassNight: new THREE.MeshStandardMaterial({
       color: mode === 'night' ? '#fef08a' : mode === 'sunset' ? '#fed7aa' : '#bae6fd',
