@@ -120,12 +120,49 @@ export const IsometricCityMap: React.FC<IsometricCityMapProps> = ({ profile, sel
   const plots = grid.plots;
   const [zoom, setZoom] = useState(1);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
+  const viewportRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<{ x: number; y: number; moved: boolean } | null>(null);
   const pointersRef = useRef(new Map<number, { x: number; y: number }>());
   const pinchRef = useRef<{ distance: number; zoom: number } | null>(null);
   const suppressClickRef = useRef(false);
+  const velocityRef = useRef({ x: 0, y: 0 });
   const activePlotId = selectedItem?.type === 'plot' ? selectedItem.plot.id : null;
   const activeLandmarkId = selectedItem?.type === 'landmark' ? selectedItem.id : null;
+  const clampOffset = (next: { x: number; y: number }, zoomValue = zoom) => {
+    const viewport = viewportRef.current;
+    const viewportWidth = viewport?.clientWidth ?? MAP_WIDTH;
+    const viewportHeight = viewport?.clientHeight ?? MAP_HEIGHT;
+    const maxX = Math.max(0, (MAP_WIDTH * zoomValue - viewportWidth) / 2 + 120);
+    const maxY = Math.max(0, (MAP_HEIGHT * zoomValue - viewportHeight) / 2 + 120);
+    return {
+      x: Math.min(maxX, Math.max(-maxX, next.x)),
+      y: Math.min(maxY, Math.max(-maxY, next.y)),
+    };
+  };
+  React.useEffect(() => {
+    let frame = 0;
+    let previous = performance.now();
+    const tick = (now: number) => {
+      const dt = Math.min(0.04, (now - previous) / 1000);
+      previous = now;
+      const velocity = velocityRef.current;
+      if (Math.abs(velocity.x) > 0.05 || Math.abs(velocity.y) > 0.05) {
+        setOffset((current) => clampOffset({
+          x: current.x + velocity.x * dt,
+          y: current.y + velocity.y * dt,
+        }));
+        const damping = Math.exp(-7.5 * dt);
+        velocity.x *= damping;
+        velocity.y *= damping;
+        frame = requestAnimationFrame(tick);
+      } else {
+        velocity.x = 0;
+        velocity.y = 0;
+      }
+    };
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  }, [zoom]);
 
   const applyPreset = (preset?: CityCameraPreset) => {
     if (!preset || preset === 'center') {
@@ -143,6 +180,7 @@ export const IsometricCityMap: React.FC<IsometricCityMapProps> = ({ profile, sel
 
   const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
     event.currentTarget.setPointerCapture(event.pointerId);
+    velocityRef.current = { x: 0, y: 0 };
     pointersRef.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
     if (pointersRef.current.size === 2) {
       const [first, second] = [...pointersRef.current.values()];
@@ -168,7 +206,8 @@ export const IsometricCityMap: React.FC<IsometricCityMapProps> = ({ profile, sel
     const dx = event.clientX - drag.x;
     const dy = event.clientY - drag.y;
     if (Math.abs(dx) + Math.abs(dy) > 4) drag.moved = true;
-    setOffset((current) => ({ x: current.x + dx, y: current.y + dy }));
+    velocityRef.current = { x: dx * 18, y: dy * 18 };
+    setOffset((current) => clampOffset({ x: current.x + dx, y: current.y + dy }));
     drag.x = event.clientX;
     drag.y = event.clientY;
   };
@@ -207,7 +246,7 @@ export const IsometricCityMap: React.FC<IsometricCityMapProps> = ({ profile, sel
           <button type="button" onClick={() => applyPreset('center')} aria-label="إعادة تمركز الخريطة">⌾</button>
         </div>
       </div>
-      <div className="isometric-map-viewport" onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} onPointerCancel={handlePointerUp} onWheel={handleWheel}>
+      <div ref={viewportRef} className="isometric-map-viewport" onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} onPointerCancel={handlePointerUp} onWheel={handleWheel}>
         <svg className="isometric-map-canvas" viewBox={`0 0 ${MAP_WIDTH} ${MAP_HEIGHT}`} style={{ transform: `translate(${offset.x}px, ${offset.y}px) scale(${zoom})` }} aria-label="خريطة مدينة الأعمال">
           <defs>
             <linearGradient id="isoGround" x1="0" x2="1" y1="0" y2="1"><stop offset="0" stopColor="#d9edb2" /><stop offset="1" stopColor="#9dcf86" /></linearGradient>

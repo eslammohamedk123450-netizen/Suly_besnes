@@ -1,77 +1,75 @@
 # نظام المدينة 2.5D Isometric
 
-المشروع الحالي يستخدم **React + Three.js + Vite**، لذلك تم تنفيذ النظام داخل المشهد الحالي بدل إضافة مشروع Godot منفصل.
+المشروع الحالي يعمل بـ **React + TypeScript + SVG/CSS** داخل `IsometricCityMap`، وليس Godot أو Unity. هذا الاختيار مناسب للعبة الهاتف الحالية لأنه يعطي خريطة خفيفة وسريعة مع مبانٍ لها عمق بصري وظلال، دون تحميل مشهد WebGL كامل.
 
-## شجرة المشهد الحالية
+## هرمية المكونات
 
 ```text
 CityHomeView
-└── CityCanvas
-    ├── Scene
-    │   ├── Ground Plane
-    │   ├── CityRoadNetwork
-    │   │   ├── Main Avenue + Cross Boulevard
-    │   │   ├── Ring Roads / T-junctions
-    │   │   ├── Green zones, planters and trees
-    │   │   └── Animated Traffic Vehicles
-    │   ├── Landmark Groups
-    │   │   ├── HQ / Bank / Tech Tree / Territory Citadel ...
-    │   │   └── soft_drop_shadow per landmark
-    │   ├── Plot Groups
-    │   │   ├── construction stage or completed facility
-    │   │   └── soft_drop_shadow per plot
-    │   └── Camera-facing Arabic labels
-    └── CityTouchController
+└── IsometricCityMap
+    ├── isometric-map-toolbar
+    ├── isometric-map-viewport
+    │   └── SVG isometric-map-canvas
+    │       ├── ground diamond
+    │       ├── iso-road-layer
+    │       ├── iso-lot-layer
+    │       ├── BuildingGlyph
+    │       └── LandmarkGlyph
+    └── isometric-map-footer
+
+CityControlsBar
+└── bottom mobile palette
+    ├── Buildings
+    ├── Roads
+    ├── Nature
+    └── Services
 ```
 
 ## الكاميرا اللمسية
 
-`src/components/city3d/cityTouchControls.ts` يحتوي على:
+داخل `src/components/isometric/IsometricCityMap.tsx`:
 
-- سحب بإصبع واحد مع inertia وdecay مستقل عن معدل الإطارات.
-- Clamp لمحورَي X/Z عبر `CITY_CAMERA_LIMITS`.
-- Pinch-to-zoom عبر تغيير FOV مع حدود آمنة.
-- Tap منفصل عن drag لإجراء raycast على المباني والأراضي.
+- `Pointer Events` تعمل بالماوس واللمس.
+- سحب بإصبع واحد مع قصور حراري `velocityRef` وdamping مستقل عن FPS.
+- `clampOffset()` يمنع الخريطة من الخروج عن حدود الـ viewport.
+- Pinch-to-zoom محصور بين `0.72` و`1.65`.
+- Tap منفصل عن drag حتى لا يفتح مبنى عند نهاية السحب.
 
-## شبكة Isometric وPlacement
+## شبكة الطرق والمناطق
 
-التحويلات موجودة في `src/components/city3d/isometricGrid.ts`:
+الخريطة تستخدم طرقًا قطرية قليلة وعريضة بدل شبكة مربعة مكتظة. يوجد محور رئيسي، طرق متقاطعة، مناطق خضراء، قطع أرض، ميناء ومطار. المسارات الأساسية مرسومة في `iso-road-layer`.
 
-- `worldToIsoCell(x, z)` يحول نقطة العالم إلى خلية diamond.
-- `isoCellToWorld(cell)` يعيد مرساة الخلية للعالم.
-- `snapWorldToIsoGrid()` يطبق Grid Snapping.
-- `createSoftDropShadow()` ينشئ ظلًا بيضاويًا شفافًا أسفل أي مبنى.
-- `updateIsometricDepthSorting()` يحدث ترتيب اللافتات الشفافة حسب العمق.
+## المباني والعمق والظل
 
-منطق التحقق من الوضع موجود في `src/game/isometricPlacement.ts`:
+`BuildingGlyph` و`LandmarkGlyph` يستخدمان:
 
-- `previewPlacement()` يعرض الخلية بعد snap.
-- `canPlaceItem()` يمنع الخروج من حدود الخريطة والتداخل مع خلايا مشغولة.
-- `commitPlacement()` يحجز خلايا العنصر بعد تأكيد الوضع.
+- إسقاطًا ثنائيًا: `project(x, z)` يحول إحداثيات العالم إلى diamond coordinates.
+- pivot بصري عند أسفل المبنى عبر `point.y`.
+- ظلًا بيضاويًا و`drop-shadow` أسفل كل مبنى.
+- ترتيبًا بصريًا بواسطة ترتيب عناصر SVG وطبقة المباني بعد طبقة الأرض والطرق.
 
-## التدرج البصري للمباني
+## Grid Snapping وPlacement
 
-`src/components/city3d/cityMeshBuilders.ts`:
+يوجد منطق قابل لإعادة الاستخدام في:
 
-- `buildTechTreeMesh(..., level)` يضيف حلقات مدارية، ribs زجاجية، نواة أكبر وعددًا متزايدًا من وحدات البحث.
-- `buildTerritoryCitadelMesh(..., level)` يضيف خندقًا، سورًا داخليًا، أبراجًا إضافية، قمة قيادة ومنارة.
-- `CityCanvas` يمرر `profile.level` إلى كلا المجسمين.
+- `src/game/isometricPlacement.ts`
+- `src/components/city3d/isometricGrid.ts`
 
-## إضافة مبنى جديد
+الدوال المهمة:
 
-1. أضف دالة `build<Name>Mesh` في `cityMeshBuilders.ts`.
-2. اجعل pivot المجسم عند `(0, 0, 0)` أسفل المبنى.
-3. أضف `createSoftDropShadow(width, depth)` إلى المجموعة.
-4. سجّل المبنى في `ALL_CITY_LANDMARKS`.
-5. أضف حالة له في switch داخل `CityCanvas`.
-6. سجّل العناصر القابلة للنقر عبر `registerClickable`.
-7. إذا كان المبنى قابلًا للترقية، مرر المستوى إلى دالة البناء بدل إنشاء mesh ثابت.
+- `worldToIsoCell()` و`isoCellToWorld()` للتحويل بين العالم وخلايا الـ diamond.
+- `previewPlacement()` لتثبيت العنصر على أقرب خلية وفحص الخروج من الخريطة والتداخل.
+- `commitPlacement()` لحجز الخلايا بعد تأكيد اللاعب.
 
-## الاختبارات والتحقق
+تدفق اللعبة الحالي يفتح قطع الأراضي من خلال `CityControlsBar` ثم يكمل الشراء/البناء عبر `BuildingDetailSheet`، بدل السماح بوضع مبنى على طريق أو فوق مبنى قائم.
+
+## لوحة الهاتف
+
+`CityControlsBar` أصبحت ظاهرة أسفل شاشة المدينة وتحتوي على فئات المباني والطرق والطبيعة والخدمات. اختيار الفئة يركّز على منطقة الأراضي، ثم يختار اللاعب قطعة الأرض لفتح تدفق البناء الحالي.
+
+## التحقق
 
 ```bash
 npm run lint
 npm run build
 ```
-
-يجب أن يظل تصميم الطرق هرميًا: محور رئيسي، بوليفارد متقاطع، طرق حلقية، مناطق خضراء وتقاطعات واضحة، وليس شبكة مربعة مكتظة.
