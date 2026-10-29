@@ -6,6 +6,23 @@
 import * as THREE from 'three';
 import type { CityMaterialPalette } from './cityMaterials';
 import { buildLuxuryPalmTree, buildFlowerBed } from './cityFoliageBuilders';
+import {
+  buildDancingFountain,
+  buildImperialGoldenEagleStatue,
+  buildClassicalTitanStatue,
+  buildRolexFlagshipStore,
+  buildLouisVuittonFlagshipStore,
+  buildAppleFlagshipStore,
+} from './cityLifeAssets';
+
+export {
+  buildDancingFountain,
+  buildImperialGoldenEagleStatue,
+  buildClassicalTitanStatue,
+  buildRolexFlagshipStore,
+  buildLouisVuittonFlagshipStore,
+  buildAppleFlagshipStore,
+};
 
 /**
  * Shared reusable geometries to minimize GC and memory footprint on mobile devices
@@ -813,13 +830,21 @@ export function buildHQMesh(
   baseCornice.position.y = 0.45 + baseH + 0.2;
   hq.add(baseCornice);
 
-  // 2. Tower Shaft (Glass curtain walls with warm interior lighting)
+  // 2. Tower Shaft (High-reflection Black Obsidian Glass & Sky-reflective Curtain Wall)
   const shaftY = 0.45 + baseH + 0.4;
-  const shaftMat = level === 4 ? palette.warmAmberLitGlass : palette.officeWindowsLit;
+  const shaftMat = level === 4 ? palette.warmAmberLitGlass : palette.blackObsidianGlass;
   const shaft = new THREE.Mesh(new THREE.BoxGeometry(tW - 0.2, shaftHeight, tD - 0.2), shaftMat);
   shaft.position.y = shaftY + shaftHeight / 2;
   shaft.castShadow = !isSoftwareGl;
   hq.add(shaft);
+
+  // Exterior sky-reflective window curtain reflecting sky and environment
+  const skyReflectiveCurtain = new THREE.Mesh(
+    new THREE.BoxGeometry(tW - 0.1, shaftHeight * 0.95, tD - 0.1),
+    palette.skyReflectiveCurtainGlass
+  );
+  skyReflectiveCurtain.position.y = shaftY + shaftHeight / 2;
+  hq.add(skyReflectiveCurtain);
 
   // Vertical Pier Columns (Royal Navy blue for 2, 3, 5; Brilliant Gold for Level 4)
   const pierMat = level === 4 ? palette.imperialGold : palette.royalNavyMat;
@@ -1423,65 +1448,41 @@ export function buildFactoryMesh(
  */
 export function buildStoreMesh(palette: CityMaterialPalette, isSoftwareGl: boolean): THREE.Group {
   const store = new THREE.Group();
+  store.name = 'luxury_retail_boulevard';
 
-  // 1. Paved Plaza Base
-  const base = new THREE.Mesh(new THREE.BoxGeometry(10.5, 0.4, 9.5), palette.plazaPaver);
+  // 1. Paved Plaza Base with Travertine & Gold Trims
+  const base = new THREE.Mesh(new THREE.BoxGeometry(12.2, 0.4, 11.2), palette.plazaPaver);
   base.position.y = 0.2;
   base.receiveShadow = !isSoftwareGl;
   store.add(base);
 
-  // 2. Multistory Curved Glass Atrium Mall Structure
-  const body = new THREE.Mesh(new THREE.BoxGeometry(8.5, 4.6, 7.2), palette.navyStructure);
-  body.position.y = 2.5;
-  body.castShadow = !isSoftwareGl;
-  store.add(body);
+  const curb = new THREE.Mesh(new THREE.BoxGeometry(12.6, 0.1, 11.6), palette.curbGold);
+  curb.position.y = 0.05;
+  store.add(curb);
 
-  // Front Double-Height Glass Curtain Wall
-  const glassFacade = new THREE.Mesh(new THREE.BoxGeometry(8.6, 3.6, 0.2), palette.curtainGlass);
-  glassFacade.position.set(0, 2.2, 3.62);
-  store.add(glassFacade);
+  // 2. Global Luxury Brand Flagship Store (Rolex Haute Horlogerie Boutique)
+  const rolexStore = buildRolexFlagshipStore(palette, isSoftwareGl);
+  rolexStore.scale.set(0.52, 0.52, 0.52);
+  rolexStore.position.set(-3.0, 0.2, -1.2);
+  store.add(rolexStore);
 
-  // 3. Cantilevered Gold Entrance Canopy & Revolving Doors
-  const canopy = new THREE.Mesh(new THREE.BoxGeometry(4.4, 0.22, 1.8), palette.imperialGold);
-  canopy.position.set(0, 2.4, 4.5);
-  store.add(canopy);
+  // 3. Global Luxury Brand Flagship Store (Louis Vuitton / Gucci Fashion Maison)
+  const lvStore = buildLouisVuittonFlagshipStore(palette, isSoftwareGl);
+  lvStore.scale.set(0.5, 0.5, 0.5);
+  lvStore.position.set(3.0, 0.2, -1.2);
+  store.add(lvStore);
 
-  // 4. Massive Illuminated Digital Billboard Display Screen
-  const billboard = new THREE.Mesh(new THREE.BoxGeometry(5.8, 1.4, 0.18), palette.neonCyan);
-  billboard.position.set(0, 4.1, 3.65);
-  store.add(billboard);
+  // 4. Central Promenade Dancing Fountain with Pulsing Jets
+  const fountain = buildDancingFountain(palette, isSoftwareGl, 1.9);
+  fountain.group.position.set(0, 0.2, 3.2);
+  store.add(fountain.group);
 
-  // Billboard Gold Frame
-  const bFrame = new THREE.Mesh(new THREE.BoxGeometry(6.0, 1.55, 0.12), palette.imperialGold);
-  bFrame.position.set(0, 4.1, 3.64);
-  store.add(bFrame);
-
-  // 5. Rooftop HVAC Chiller Units and Ductwork
-  [-1.8, 1.8].forEach((hx) => {
-    const hvac = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.9, 1.4), palette.industrialSteel);
-    hvac.position.set(hx, 5.2, -1.0);
-    store.add(hvac);
-
-    const fan = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 0.15, 8), palette.slateStructure);
-    fan.position.set(hx, 5.72, -1.0);
-    store.add(fan);
-  });
-
-  // 6. Sidewalk Promenade with Outdoor Café Parasols
-  [-3.2, 3.2].forEach((cx) => {
-    // Parasol Umbrella
-    const umbrella = new THREE.Mesh(new THREE.ConeGeometry(0.9, 0.45, 8), palette.imperialGold);
-    umbrella.position.set(cx, 1.8, 3.8);
-    store.add(umbrella);
-
-    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 1.4, 6), palette.industrialSteel);
-    pole.position.set(cx, 1.1, 3.8);
-    store.add(pole);
-
-    // Café Table
-    const table = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, 0.05, 8), palette.whiteMarble);
-    table.position.set(cx, 0.75, 3.8);
-    store.add(table);
+  // 5. Imperial Classical Statues on Boulevard Entrance Plinths
+  [-5.1, 5.1].forEach((sx) => {
+    const statue = buildImperialGoldenEagleStatue(palette, isSoftwareGl);
+    statue.scale.set(0.42, 0.42, 0.42);
+    statue.position.set(sx, 0.2, 3.4);
+    store.add(statue);
   });
 
   return store;
@@ -1557,19 +1558,25 @@ export function buildWarehouseMesh(palette: CityMaterialPalette, isSoftwareGl: b
  */
 export function buildBranchMesh(palette: CityMaterialPalette, isSoftwareGl: boolean): THREE.Group {
   const branch = new THREE.Group();
+  branch.name = 'corporate_regional_branch';
 
   // 1. Paved Plaza Base with Gold Trim
-  const base = new THREE.Mesh(new THREE.BoxGeometry(8.5, 0.35, 8.5), palette.plazaPaver);
+  const base = new THREE.Mesh(new THREE.BoxGeometry(8.8, 0.35, 8.8), palette.plazaPaver);
   base.position.y = 0.175;
   base.receiveShadow = !isSoftwareGl;
   branch.add(base);
 
-  // 2. 5-Story Corporate Glass Cube with Vertical Bronze Sun Louvers
+  // 2. High-Reflection Corporate Obsidian Glass Pavilion
   const towerH = 5.8;
-  const tower = new THREE.Mesh(new THREE.BoxGeometry(6.4, towerH, 6.4), palette.curtainGlass);
+  const tower = new THREE.Mesh(new THREE.BoxGeometry(6.4, towerH, 6.4), palette.blackObsidianGlass);
   tower.position.y = 0.35 + towerH / 2;
   tower.castShadow = !isSoftwareGl;
   branch.add(tower);
+
+  // Sky-reflective crystal curtain glass wrap
+  const glassWrap = new THREE.Mesh(new THREE.BoxGeometry(6.5, towerH * 0.85, 6.5), palette.skyReflectiveCurtainGlass);
+  glassWrap.position.y = 0.35 + towerH / 2;
+  branch.add(glassWrap);
 
   // Vertical Architectural Louvers on Facade
   for (let l = -2.6; l <= 2.6; l += 0.85) {
@@ -1578,12 +1585,17 @@ export function buildBranchMesh(palette: CityMaterialPalette, isSoftwareGl: bool
     branch.add(louver);
   }
 
-  // 3. Executive Rooftop Terrace Garden with Timber Pergola
+  // 3. Mini Dancing Fountain in front of the branch
+  const fountain = buildDancingFountain(palette, isSoftwareGl, 1.4);
+  fountain.group.position.set(0, 0.2, 3.2);
+  branch.add(fountain.group);
+
+  // 4. Executive Rooftop Terrace Garden with Gilded Pergola
   const roofTerrace = new THREE.Mesh(new THREE.BoxGeometry(6.6, 0.35, 6.6), palette.navyStructure);
   roofTerrace.position.y = 6.25;
   branch.add(roofTerrace);
 
-  const pergola = new THREE.Mesh(new THREE.BoxGeometry(3.6, 1.4, 2.6), palette.copperAccent);
+  const pergola = new THREE.Mesh(new THREE.BoxGeometry(3.6, 1.4, 2.6), palette.imperialGold);
   pergola.position.set(0, 7.1, 0);
   branch.add(pergola);
 
@@ -1594,12 +1606,12 @@ export function buildBranchMesh(palette: CityMaterialPalette, isSoftwareGl: bool
     branch.add(shrub);
   });
 
-  // 4. Illuminated Corporate Brand Totem Pylon
+  // 5. Illuminated Corporate Brand Totem Pylon
   const pylon = new THREE.Mesh(new THREE.BoxGeometry(0.7, 2.8, 0.25), palette.imperialGold);
   pylon.position.set(-3.2, 1.4, 3.4);
   branch.add(pylon);
 
-  const pylonLogo = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.24, 0.08, 12), palette.neonCyan);
+  const pylonLogo = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.24, 0.08, 12), palette.emeraldGlow);
   pylonLogo.rotation.x = Math.PI / 2;
   pylonLogo.position.set(-3.2, 2.3, 3.54);
   branch.add(pylonLogo);
@@ -2527,38 +2539,73 @@ export function buildHRAcademyMesh(palette: CityMaterialPalette, isSoftwareGl: b
  */
 export function buildAuditTowerMesh(palette: CityMaterialPalette, isSoftwareGl: boolean): THREE.Group {
   const group = new THREE.Group();
+  group.name = 'audit_analytics_skyscraper';
 
-  // Base
-  const base = new THREE.Mesh(new THREE.BoxGeometry(8, 0.4, 8), palette.slateStructure);
-  base.position.y = 0.2;
+  // 1. Grand Polished Granite & Gold Base
+  const base = new THREE.Mesh(new THREE.BoxGeometry(8.6, 0.5, 8.6), palette.slateStructure);
+  base.position.y = 0.25;
   group.add(base);
 
-  // Stepped Modern Tower
+  const baseTrim = new THREE.Mesh(new THREE.BoxGeometry(9.0, 0.12, 9.0), palette.imperialGold);
+  baseTrim.position.y = 0.06;
+  group.add(baseTrim);
+
+  // 2. Stepped Modern Obsidian Skyscraper (High Sky & City Reflection)
   const tiers = [
-    { w: 5.8, d: 5.8, h: 4.5, y: 2.65 },
-    { w: 4.6, d: 4.6, h: 3.8, y: 6.8 },
-    { w: 3.4, d: 3.4, h: 3.2, y: 10.3 },
+    { w: 6.2, d: 6.2, h: 5.5, y: 3.25 },
+    { w: 4.8, d: 4.8, h: 4.8, y: 8.4 },
+    { w: 3.6, d: 3.6, h: 4.2, y: 12.9 },
   ];
 
   tiers.forEach((t) => {
-    const block = new THREE.Mesh(new THREE.BoxGeometry(t.w, t.h, t.d), palette.curtainGlass);
+    // High-reflection obsidian glass block reflecting the sky and city
+    const block = new THREE.Mesh(new THREE.BoxGeometry(t.w, t.h, t.d), palette.blackObsidianGlass);
     block.position.y = t.y;
     block.castShadow = !isSoftwareGl;
     group.add(block);
+
+    // Reflective curtain glass accent band
+    const glassBand = new THREE.Mesh(
+      new THREE.BoxGeometry(t.w + 0.06, t.h * 0.72, t.d + 0.06),
+      palette.skyReflectiveCurtainGlass
+    );
+    glassBand.position.y = t.y;
+    group.add(glassBand);
+
+    // Horizontal Gilded Spandrel Cornice
+    const cornice = new THREE.Mesh(new THREE.BoxGeometry(t.w + 0.35, 0.22, t.d + 0.35), palette.imperialGold);
+    cornice.position.y = t.y + t.h / 2 + 0.11;
+    group.add(cornice);
+
+    // Vertical gold mullion corner ribs
+    [
+      [-t.w / 2, -t.d / 2],
+      [t.w / 2, -t.d / 2],
+      [-t.w / 2, t.d / 2],
+      [t.w / 2, t.d / 2],
+    ].forEach(([cx, cz]) => {
+      const rib = new THREE.Mesh(new THREE.BoxGeometry(0.18, t.h, 0.18), palette.imperialGold);
+      rib.position.set(cx, t.y, cz);
+      group.add(rib);
+    });
   });
 
-  // Glowing 3D Bar Chart Sculpture rising on front terrace
-  const chartHeights = [1.2, 2.2, 3.4, 4.6];
+  // 3. Glowing 3D Bar Chart Sculpture rising on front terrace
+  const chartHeights = [1.4, 2.4, 3.6, 4.8];
   chartHeights.forEach((ch, idx) => {
-    const bar = new THREE.Mesh(new THREE.BoxGeometry(0.4, ch, 0.4), palette.neonGold);
-    bar.position.set(-1.2 + idx * 0.8, 4.9 + ch / 2, 2.2);
+    const bar = new THREE.Mesh(new THREE.BoxGeometry(0.42, ch, 0.42), palette.neonGold);
+    bar.position.set(-1.2 + idx * 0.8, 6.0 + ch / 2, 2.4);
     group.add(bar);
   });
 
-  // High Frequency Spire
-  const spire = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.15, 3.6, 8), palette.imperialGold);
-  spire.position.y = 13.7;
+  // 4. High Frequency Spire & Aircraft Warning Light
+  const spire = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.2, 4.8, 8), palette.imperialGold);
+  spire.position.y = 17.4;
   group.add(spire);
+
+  const beacon = new THREE.Mesh(new THREE.SphereGeometry(0.16, 8, 8), palette.carTaillight);
+  beacon.position.y = 19.8;
+  group.add(beacon);
 
   return group;
 }

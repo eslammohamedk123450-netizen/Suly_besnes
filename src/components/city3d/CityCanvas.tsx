@@ -7,6 +7,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { buildExecutiveHelicopter } from './cityLifeAssets';
 import type { PlayerProfile } from '../../domain/player';
 import {
   resolveCityGrid,
@@ -194,9 +195,10 @@ export const CityCanvas: React.FC<CityCanvasProps> = ({
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     container.appendChild(renderer.domElement);
 
-    // 4. Procedural Studio Environment
+    // 4. Procedural Outdoor Sky Environment Map (Enables real sky, horizon, and city reflections on obsidian towers)
     const pmremGenerator = new THREE.PMREMGenerator(renderer);
-    scene.environment = pmremGenerator.fromScene(new RoomEnvironment(), 0.04).texture;
+    const skyTexture = getOrCreateSkyTexture(currentTimeOfDay);
+    scene.environment = pmremGenerator.fromEquirectangular(skyTexture).texture;
     pmremGenerator.dispose();
 
     // 5. Lighting Rig (Sunset: Warm orange key + purple fill / Night: Cool moonlit blue / Day: Crisp sun)
@@ -277,10 +279,18 @@ export const CityCanvas: React.FC<CityCanvasProps> = ({
     ground.receiveShadow = !isSoftwareGl;
     scene.add(ground);
 
-    // 8. Modular Road Grid & Traffic
+    // 8. Modular Road Grid & Traffic (with Supercars, Coastal Yachts, and Dancing Fountains)
     const roadNetwork = buildCityRoadNetwork(palette, isSoftwareGl, currentTimeOfDay);
     scene.add(roadNetwork.group);
     const trafficVehicles: TrafficVehicle[] = roadNetwork.vehicles;
+    const animatedYachts = roadNetwork.yachts;
+    const dancingFountains = roadNetwork.fountains;
+
+    // Executive VIP Helicopter flying and patrolling above the towers
+    const heliAssets = buildExecutiveHelicopter(palette, isSoftwareGl);
+    heliAssets.group.position.set(0, 46, 0);
+    scene.add(heliAssets.group);
+    let heliAngle = 0;
 
     // Subterranean Power Grid & Interactive Fiber Optics
     const powerGrid = buildCityPowerGrid(palette, isSoftwareGl, currentTimeOfDay === 'night');
@@ -762,6 +772,54 @@ export const CityCanvas: React.FC<CityCanvasProps> = ({
           }
         }
       });
+
+      // Animate coastal luxury superyachts (cruising + oceanic wave bobbing)
+      animatedYachts.forEach((yacht) => {
+        yacht.mesh.position.z += yacht.dir * yacht.speed * dt * 60;
+        if (yacht.mesh.position.z > yacht.max || yacht.mesh.position.z < yacht.min) {
+          yacht.dir = (yacht.dir * -1) as 1 | -1;
+          yacht.mesh.rotation.y += Math.PI;
+        }
+        yacht.mesh.position.y = 0.08 + Math.sin(elapsedTime * 2.2 + yacht.phase) * 0.12;
+        yacht.mesh.rotation.x = Math.sin(elapsedTime * 1.6 + yacht.phase) * 0.025;
+        yacht.mesh.rotation.z = Math.cos(elapsedTime * 1.9 + yacht.phase) * 0.035;
+      });
+
+      // Animate dancing fountains (pulsing water jets and color-cycling underwater LEDs)
+      dancingFountains.forEach((fountain) => {
+        const pulse = (Math.sin(elapsedTime * 3.6 + fountain.phase) + 1) * 0.5;
+        fountain.centerJet.scale.y = 0.55 + pulse * 1.7;
+        fountain.jets.forEach((jet, jIdx) => {
+          const wave = (Math.sin(elapsedTime * 4.2 + jIdx * 0.78 + fountain.phase) + 1) * 0.5;
+          jet.scale.y = 0.45 + wave * 1.35;
+        });
+        const hue = (elapsedTime * 0.08 + fountain.phase * 0.15) % 1;
+        fountain.lightMaterial.color.setHSL(hue, 0.95, 0.55);
+      });
+
+      // Animate executive helicopter patrol circling above the skyscrapers
+      if (heliAssets) {
+        heliAssets.mainRotor.rotation.y += dt * 32;
+        heliAssets.tailRotor.rotation.x += dt * 38;
+        heliAssets.strobeLight.visible = Math.floor(elapsedTime * 4) % 2 === 0;
+
+        heliAngle += dt * 0.35;
+        const heliRadiusX = 42;
+        const heliRadiusZ = 36;
+        const prevX = heliAssets.group.position.x;
+        const prevZ = heliAssets.group.position.z;
+        const nextX = Math.cos(heliAngle) * heliRadiusX;
+        const nextZ = Math.sin(heliAngle) * heliRadiusZ;
+
+        heliAssets.group.position.x = nextX;
+        heliAssets.group.position.z = nextZ;
+        heliAssets.group.position.y = 44 + Math.sin(heliAngle * 2) * 3.0;
+
+        const heading = Math.atan2(-(nextX - prevX), -(nextZ - prevZ));
+        heliAssets.group.rotation.y = heading;
+        heliAssets.group.rotation.z = -0.16; // banking into turn
+        heliAssets.group.rotation.x = 0.08;  // forward pitch
+      }
 
       // Subtle rotation on HQ beacon ring
       if (crownRingMesh) {
