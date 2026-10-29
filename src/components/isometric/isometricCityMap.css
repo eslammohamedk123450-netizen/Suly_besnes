@@ -49,3 +49,8 @@
 @media(max-width:640px){.map-expansion-controls{top:8px;inset-inline-start:8px;gap:5px;padding:6px;border-radius:13px}.map-expansion-size{padding:0 4px;font-size:10px}.map-expansion-controls button{width:32px;height:32px}.map-expansion-building figcaption,.map-expansion-label{padding:5px 9px;font-size:12px}.map-road--horizontal{height:72px}.map-road--vertical{width:72px}.airport-runway{border-width:4px}.airport-terminal{padding:6px 10px;border-width:3px;font-size:22px}}
 
 .map-skeleton{background:#bfe35b url('/assets/buildings/road-network.png') center/cover no-repeat}
+.map-expansion-viewport{background:#050607}
+.map-expansion-world{width:1400px;height:875px;background:#83c900 url('/assets/ground/city-ground.svg') center/100% 100% no-repeat;box-shadow:none}
+.map-expansion-zones{display:none}
+.map-expansion-cell{border-color:transparent;background:transparent}
+.map-expansion-cell.is-future-plot:after{opacity:.16}

@@ -248,7 +248,8 @@ export const IsometricCityMap: React.FC<IsometricCityMapProps> = ({ profile, sel
 export default IsometricCityMap;
 
 const MAP_GRID_SIZE = 40;
-const MAP_WORLD_SIZE = 1400;
+const MAP_WORLD_WIDTH = 1400;
+const MAP_WORLD_HEIGHT = 875;
 const MIN_MAP_ZOOM = 0.16;
 const MAX_MAP_ZOOM = 2.2;
 
@@ -278,7 +279,7 @@ function toMapPercent(cellIndex: number): string {
 function getMapFitZoom(): number {
   const width = window.visualViewport?.width ?? window.innerWidth;
   const height = window.visualViewport?.height ?? window.innerHeight;
-  const fit = Math.min(width, height) / MAP_WORLD_SIZE;
+  const fit = Math.min(width / MAP_WORLD_WIDTH, height / MAP_WORLD_HEIGHT);
   return Math.min(MAX_MAP_ZOOM, Math.max(MIN_MAP_ZOOM, fit * 0.94));
 }
 
@@ -295,7 +296,7 @@ export const IsometricMapSkeleton: React.FC = () => {
     if (!viewport) return;
     const visualWidth = window.visualViewport?.width ?? viewport.clientWidth;
     const visualHeight = window.visualViewport?.height ?? viewport.clientHeight;
-    const fit = Math.min(visualWidth, visualHeight) / MAP_WORLD_SIZE;
+    const fit = Math.min(visualWidth / MAP_WORLD_WIDTH, visualHeight / MAP_WORLD_HEIGHT);
     setZoom(Math.min(MAX_MAP_ZOOM, Math.max(MIN_MAP_ZOOM, fit * 0.94)));
     setOffset({ x: 0, y: 0 });
   }, []);
@@ -360,21 +361,12 @@ export const IsometricMapSkeleton: React.FC = () => {
     <main className="map-skeleton" aria-label="خريطة إمبراطورية الأعمال">
       <div ref={viewportRef} className="map-expansion-viewport" onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} onPointerCancel={handlePointerUp} onWheel={handleWheel}>
         <div className="map-expansion-world" style={{ transform: `translate(calc(-50% + ${offset.x}px), calc(-50% + ${offset.y}px)) scale(${zoom})` }}>
-          <div className="map-expansion-zones" aria-hidden="true">
-            <span className="zone--commercial" />
-            <span className="zone--industrial" />
-            <span className="zone--logistics" />
-          </div>
           <div className="map-expansion-grid" aria-label="شبكة 40 في 40، 1600 قطعة أرض">
             {Array.from({ length: MAP_GRID_SIZE * MAP_GRID_SIZE }, (_, index) => {
               const row = Math.floor(index / MAP_GRID_SIZE);
               const col = index % MAP_GRID_SIZE;
               return <span key={index} className={`map-expansion-cell${isFutureBuildingPlot(row, col) ? ' is-future-plot' : ''}`} />;
             })}
-          </div>
-          <div className="map-expansion-roads" aria-hidden="true">
-            <span className="map-road map-road--horizontal" />
-            <span className="map-road map-road--vertical" />
           </div>
           <div className="map-expansion-assets">
             {MAP_BUILDINGS.map((building) => (
