@@ -246,3 +246,42 @@ export const IsometricCityMap: React.FC<IsometricCityMapProps> = ({ profile, sel
 };
 
 export default IsometricCityMap;
+
+const SKELETON_BUILDINGS = [
+  { id: 'hq', label: 'المقر الرئيسي', image: '/assets/buildings/hq.png', zone: 'center', x: 50, y: 42, size: 31 },
+  { id: 'shop', label: 'المركز التجاري', image: '/assets/buildings/shop.png', zone: 'center', x: 68, y: 52, size: 22 },
+  { id: 'factory', label: 'المنطقة الصناعية', image: '/assets/buildings/factory.png', zone: 'industrial', x: 27, y: 34, size: 25 },
+] as const;
+
+export const IsometricMapSkeleton: React.FC = () => (
+  <main className="map-skeleton" aria-label="خريطة إمبراطورية الأعمال">
+    <div className="map-skeleton-board">
+      <div className="map-skeleton-grid" aria-hidden="true">
+        {Array.from({ length: 100 }, (_, index) => <span key={index} />)}
+      </div>
+      <div className="map-skeleton-zones" aria-hidden="true">
+        <span className="zone-center" />
+        <span className="zone-industry" />
+      </div>
+      <div className="map-skeleton-assets">
+        {SKELETON_BUILDINGS.map((building) => (
+          <figure key={building.id} className={`map-skeleton-building building-${building.id}`} style={{ left: `${building.x}%`, top: `${building.y}%`, width: `${building.size}%` }}>
+            <img src={building.image} alt="" draggable={false} />
+            <figcaption>{building.label}</figcaption>
+          </figure>
+        ))}
+        <div className="map-skeleton-port" aria-label="منطقة الميناء">
+          <span className="port-water" />
+          <span className="port-pier" />
+          <span className="port-crane" />
+          <span className="map-skeleton-label">الميناء</span>
+        </div>
+        <div className="map-skeleton-airport" aria-label="منطقة المطار">
+          <span className="airport-runway"><i /><i /><i /><i /><i /></span>
+          <span className="airport-terminal">✈</span>
+          <span className="map-skeleton-label">المطار</span>
+        </div>
+      </div>
+    </div>
+  </main>
+);
